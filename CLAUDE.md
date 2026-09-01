@@ -126,7 +126,7 @@ Before a branch is reported ready, verify — out loud, in the final message:
 | feature | state | notes |
 | --- | --- | --- |
 | Repo scaffold (D01) | in review | PR #1, branch `scaffold` — stack, styling system, server wiring, docs ledger |
-| Logging foundation (D02) | in review | branch `logging` — three JSONL streams, size+day rotation, gzip/retention sweep, correlation IDs, `/api` request log |
+| Logging foundation (D02) | in review | PR #2, branch `logging` — three JSONL streams, size+day rotation, gzip/retention sweep, correlation IDs, `/api` request log |
 
 ---
 

@@ -7,7 +7,7 @@ tracked externally — it must always reflect actual state.
 | ID | Deliverable | Phase | PR # / branch | Status | Notes |
 | --- | --- | --- | --- | --- | --- |
 | D01 | Repo scaffold: structure from life-swipe, CLAUDE.md, README, REQUIREMENTS.md, DELIVERABLES.md seeded with full PR list | 1 | [#1](https://github.com/KevinRaffay/betsheet/pull/1) / `scaffold` | in review | stack, styling tokens, loopback server, theme toggle |
-| D02 | Logging foundation: structured JSON streams, rolling files w/ compression + retention, correlation IDs, config | 1 | `logging` | in review | app / fetch-audit / decision-trace streams; size+day rotation, gzip past hot days, prune past retention; `npm run check-logging` |
+| D02 | Logging foundation: structured JSON streams, rolling files w/ compression + retention, correlation IDs, config | 1 | [#2](https://github.com/KevinRaffay/betsheet/pull/2) / `logging` | in review | app / fetch-audit / decision-trace streams; size+day rotation, gzip past hot days, prune past retention; `npm run check-logging` |
 | D03 | SQLite schema + migrations (full schema incl. Phase 2–4 tables) | 1 | — | planned | better-sqlite3; numbered SQL migrations |
 | D04 | Entries parser — pasted text, with fixtures from real entries | 1 | — | planned | validated against a real entries block before any UI |
 | D05 | Entries parser — program PDF (jumbled columns, index validation, handicapper-analysis extraction) | 1 | — | planned | pdfjs-dist; post-position sequence mapping |
