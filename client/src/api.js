@@ -66,6 +66,16 @@ export const manualPicksPreview = (id, sourceName, text) =>
     body: JSON.stringify({ sourceName, text }),
   }).then(asJson);
 
+export const generateCardApi = (dayId, body = {}) =>
+  fetch(`/api/race-days/${dayId}/cards`, {
+    method: 'POST',
+    headers: { 'content-type': 'application/json' },
+    body: JSON.stringify(body),
+  }).then(asJson);
+
+export const listCards = (dayId) => fetch(`/api/race-days/${dayId}/cards`).then(asJson);
+export const getCard = (id) => fetch(`/api/cards/${id}`).then(asJson);
+
 export const manualPicksSave = (id, sourceName, races) =>
   fetch(`/api/race-days/${id}/consensus/manual`, {
     method: 'POST',

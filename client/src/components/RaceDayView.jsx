@@ -1,10 +1,11 @@
 import React, { useEffect, useState } from 'react';
 import { getRaceDay } from '../api.js';
 import ConsensusPanel from './ConsensusPanel.jsx';
+import CardsPanel from './CardsPanel.jsx';
 
 // Read-only view of a stored race day - what actually landed in the
 // database, not what the parser proposed.
-export default function RaceDayView({ id, onBack }) {
+export default function RaceDayView({ id, onBack, onOpenCard }) {
   const [day, setDay] = useState(null);
   const [error, setError] = useState(null);
 
@@ -26,6 +27,7 @@ export default function RaceDayView({ id, onBack }) {
         {' '}· per-race min {day.per_race_min_cents != null ? `$${(day.per_race_min_cents / 100).toFixed(0)}` : '—'}
         {' '}· {day.races.length} races
       </p>
+      <CardsPanel dayId={day.id} onOpenCard={onOpenCard} />
       <ConsensusPanel dayId={day.id} />
       {day.races.map((race) => (
         <details className="race" key={race.id} open>
