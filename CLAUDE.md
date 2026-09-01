@@ -88,6 +88,8 @@ Breaking any of these is a bug regardless of what the tests say.
 | `server/fetchers/sftb.js` | Sports from the Basement fetcher: sitemap URL discovery (post URLs carry the publish date, not the race date), expected-order tables → top/second/third picks, full order in the top pick's note (D09 contrarian detection), SCRATCH rows excluded. |
 | `tests/fixtures/sources/` | real captured source pages with audited goldens; `sftb-delmar-2026-08-30.html` is their post for the SAME day as the program-PDF fixture. |
 | `scripts/check-sources.js` | per-source verification, one section per fetcher: golden + hand-checked assertions + URL-discovery units, no network. |
+| `shared/classification.js` | the consensus table + UNANIMOUS/SPLIT/CHAOS call (invariant 4's 2-external-source floor, program-only defaults) and contrarian flags (`algo_fades_favorite` via the algo's full expected order, `corroborated_longshot` at 10-1+ from 2+ sources), plus per-horse source counts for the lean-mode coverage rule. Pure functions — the simulator replays them. |
+| `scripts/check-classification.js` | unit verification for classification: every rule with a case that catches its inversion. |
 | `client/src/api.js` | client half of the ingest API; carries the session's correlation id on every call. |
 | `client/src/App.jsx` | root component, theme application, view routing (list / new / day). |
 | `client/src/components/NewRaceDay.jsx` | the ingest screen: track/date/bankroll form, paste box + PDF upload, warnings-first READ-ONLY preview (corrections = fix the source, re-parse), save with replace-on-conflict. |
@@ -116,6 +118,7 @@ npm run check-program  # program-PDF parser vs. the real Del Mar program (~30s)
 npm run check-ingest   # boots the real server on a temp DB; full API flow (~30s)
 npm run check-consensus # fetch framework vs. stub sources on a local port
 npm run check-sources   # concrete fetchers vs. real captured fixtures
+npm run check-classification # consensus table + UNANIMOUS/SPLIT/CHAOS rules
 ```
 
 Further verification commands (`check-parsers`, `check-grading`, simulator
@@ -159,6 +162,7 @@ Before a branch is reported ready, verify — out loud, in the final message:
 | Entries parser — pasted text (D04) | merged | PR #4 — validated against a real Del Mar card (8 races, 81 entries, 0 warnings) |
 | Ingest UI + API (D06) | merged | PR #6 — paste/PDF → warnings-first read-only preview → transactional save; migration 002 adds `races.wager_menu` |
 | Consensus-fetch framework (D07) | merged | PR #7 — fetcher registry, robots/backoff/mismatch handling, audit trail, manual paste fallback w/ read-only preview |
+| Consensus table + classification (D09) | in review | PR #12, branch `classification` — chips + contrarian flags on the day view; classification re-runs after every fetch and manual confirm; migration 004 (`races.contrarian_flags`) |
 | SFTB fetcher (D08c) | merged | PR #9 — sitemap discovery + expected-order parsing; real fixture matches the program-PDF day. D08a CLOSED (dmtc picks page is a directory; covered by D05's Bottom Line extraction) and D08b CLOSED (ATR bot challenge; manual-paste only) — both by user decision 2026-09-01 |
 | Program-PDF parser (D05) | merged | PR #5 — real Del Mar program (10 races, 98 entries, Bottom Line, index validation); found the printed-scratch/renumbered-index pattern in the wild |
 

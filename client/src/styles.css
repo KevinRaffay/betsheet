@@ -274,4 +274,17 @@ html, body {
 
 .consensus { margin: 6px 0 18px; }
 .pick { display: inline-block; margin-right: 14px; white-space: nowrap; }
+.flagline { margin: 2px 0; }
+
+.chip {
+  display: inline-block;
+  padding: 2px 10px;
+  border-radius: 999px;
+  font-size: 12px;
+  font-weight: 700;
+  letter-spacing: 0.04em;
+}
+.chip--unanimous { background: var(--accent); color: var(--color-accent-text); }
+.chip--split { background: var(--gold); color: #241a02; }
+.chip--chaos { background: var(--loss); color: #fff; }
 

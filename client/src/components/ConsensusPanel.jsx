@@ -97,6 +97,35 @@ export default function ConsensusPanel({ dayId }) {
         </div>
       )}
 
+      {data?.races?.some((r) => r.classification) && (
+        <table className="grid">
+          <thead>
+            <tr><th>Race</th><th>Class</th><th>Ext. sources</th><th>Contrarian flags</th></tr>
+          </thead>
+          <tbody>
+            {data.races.map((r) => (
+              <tr key={r.number}>
+                <td className="dim">{r.number}</td>
+                <td>
+                  {r.classification
+                    ? <span className={`chip chip--${r.classification.toLowerCase()}`}>{r.classification}</span>
+                    : <span className="dim">—</span>}
+                </td>
+                <td className="dim">{r.externalSourceCount ?? ''}</td>
+                <td>
+                  {r.contrarianFlags.map((f, i) => (
+                    <div key={i} className="flagline">
+                      <span className="tag tag--gold">{f.type === 'algo_fades_favorite' ? 'FADE FAV' : 'LONGSHOT×2'}</span>
+                      {' '}#{f.programNumber} {f.horseName} <span className="dim">— {f.detail}</span>
+                    </div>
+                  ))}
+                </td>
+              </tr>
+            ))}
+          </tbody>
+        </table>
+      )}
+
       {byRace.size > 0 && (
         <table className="grid">
           <thead>
