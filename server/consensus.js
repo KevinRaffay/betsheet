@@ -32,6 +32,14 @@ const BACKOFF_WINDOW_HOURS = 6;
 
 const robotsCache = new Map(); // origin -> { rules: [prefixes], at: ms }
 
+/** The robots-respecting text fetch handed to fetchers' resolveUrl. */
+async function guardedFetchText(url) {
+  if (await robotsDisallows(url)) throw new Error(`disallowed by robots.txt: ${url}`);
+  const res = await fetchWithTimeout(url);
+  if (!res.ok) throw new Error(`HTTP ${res.status} for ${url}`);
+  return res.text();
+}
+
 async function robotsDisallows(url) {
   const { origin, pathname } = new URL(url);
   let entry = robotsCache.get(origin);
@@ -194,13 +202,33 @@ export async function runFetches(dayId, correlationId) {
 
     if (!fetcher.supports({ track: day.track, date: day.date })) continue;
 
+    if (!db.prepare('SELECT enabled FROM sources WHERE id = ?').get(sourceId).enabled) {
+      push('blocked', { fallbackReason: 'source disabled' });
+      continue;
+    }
+
     if (recentFailures(db, day.id, sourceId)) {
       push('blocked', { fallbackReason: `backing off after ${BACKOFF_AFTER_FAILURES} straight failures - paste this source manually` });
       continue;
     }
 
-    const url = fetcher.buildUrl({ track: day.track, date: day.date });
+    let url = null;
     try {
+      // A fetcher whose page URL is not constructible from track+date (blog
+      // posts, dated slugs) resolves it first; its sub-fetches go through
+      // the same robots guard.
+      if (fetcher.resolveUrl) {
+        url = await fetcher.resolveUrl(
+          { track: day.track, date: day.date },
+          { fetchText: guardedFetchText },
+        );
+        if (!url) {
+          push('http_error', { fallbackReason: 'no published page found for this track/date' });
+          continue;
+        }
+      } else {
+        url = fetcher.buildUrl({ track: day.track, date: day.date });
+      }
       if (await robotsDisallows(url)) {
         push('blocked', { url, fallbackReason: 'disallowed by robots.txt - paste this source manually' });
         continue;
