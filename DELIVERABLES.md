@@ -16,19 +16,21 @@ tracked externally — it must always reflect actual state.
 | D08a | Source fetcher: track picks page (e.g. dmtc.com) | 1 | — | planned | re-fetch action for race-day-morning posts |
 | D08b | Source fetcher: At The Races race-by-race guides | 1 | — | planned | top tip + "watch out for" per race |
 | D08c | Source fetcher: algorithmic sites (e.g. Sports from the Basement) | 1 | — | planned | expected order of finish |
+| D08d | Source fetcher: Wayback Machine (web.archive.org) — archived versions of each consensus source for historical dates | 1 | — | planned | addendum; wraps the other registered sources via the availability API; every attempt audited like any fetch; feeds PARTIAL/PROGRAM_ONLY backfill days |
 | D09 | Consensus table + race classification (UNANIMOUS/SPLIT/CHAOS, source-count cap, contrarian flags) | 1 | — | planned | |
-| D10 | Card-generation engine + decision trace (allocation, ticket rules, place-money rule, bankroll balancing) | 1 | — | planned | trace ships in the same PR as the engine |
+| D10 | Card-generation engine + decision trace (allocation, ticket rules, place-money rule, bankroll balancing) | 1 | — | planned | trace ships in the same PR as the engine; computes + writes `cards.consensus_completeness` (schema: migration 003) from sources actually used |
 | D11 | Desktop web card view | 1 | — | planned | per-race tables, teller calls, totals, warnings footer |
 | D12 | Results-chart parser — pasted Equibase text (WPS + exotics, scratches, "Also ran") | 2 | — | planned | second-highest priority after Phase 1 |
 | D13 | Results-chart parser — downloaded chart PDF | 2 | — | planned | |
 | D14 | Results ingest UI: paste/upload, preview with correction, link to race day | 2 | — | planned | |
 | D15 | Ticket grading engine: all bet types incl. exotics, parlays, scratch/refund rules | 2 | — | planned | |
-| D16 | P/L views: per-race, per-day, running across all cards; compare sheet variants | 2 | — | planned | |
+| D16 | P/L views: per-race, per-day, running across all cards; compare sheet variants | 2 | — | planned | every aggregate bucketed by consensus_completeness (invariant 12) — program-only backfill never pools with full-consensus |
 | D17 | Decision-trace export hook + trace schema docs (traces joined with graded results, JSON export) | 3 | — | planned | the LLM-optimization feed |
-| D18 | Strategy templates as reusable rules (lean/spread, place-money on/off, chaos trifecta box, fade-the-price exacta) | 3 | — | planned | |
-| D19 | Simulator: run each template against all stored cards with real payoffs; bankroll over time | 3 | — | planned | |
-| D20 | Distribution reporting: % losing days, max drawdown, single-ticket dependence flag (>80%) | 3 | — | planned | |
+| D18 | Strategy templates as reusable rules (lean/spread, place-money on/off, chaos trifecta box, fade-the-price exacta) | 3 | — | planned | rules split into a SIGNAL layer (classification-driven allocation) and a STRUCTURE layer (place-money, hedge cuts, exotic construction, allocation curves) so structure rules run without classification |
+| D19 | Simulator: run each template against all stored cards with real payoffs; bankroll over time | 3 | — | planned | structure-layer rules evaluable on ANY card regardless of missing signal data; results bucketed by completeness, buckets never pooled |
+| D20 | Distribution reporting: % losing days, max drawdown, single-ticket dependence flag (>80%) | 3 | — | planned | every distribution reported per consensus_completeness bucket (invariant 12) |
 | D21 | PDF export (landscape betting sheet) | 4 | — | planned | PDF lib chosen + justified in this PR |
 | D22 | here.now publishing: self-contained HTML, publish flow, QR/copy, same-slug republish, publish audit log | 4 | — | planned | anonymous 24h default; HERENOW_API_KEY for permanent |
 | D23 | Mobile at-track view: check-offs, scratch marking, actual-stake entry | 4 | — | planned | |
 | D24 | Discipline tracker: planned vs. actual stake, house-money escalation warnings | 4 | — | planned | data source is D23's actual-stake entry; schema ships in D03 |
+| D25 | Backtesting addendum encoding: `consensus_completeness` schema (migration 003), invariant 12, requirement/ledger updates for the Wayback fetcher and structure-layer simulation | 1 | `backtest-addendum` | in review | the compute logic lands in D10; bucketing lands in D16/D19/D20; the fetcher in D08d |
