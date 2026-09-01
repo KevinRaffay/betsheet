@@ -12,6 +12,7 @@
 import express from 'express';
 import crypto from 'node:crypto';
 import { getDb } from './db.js';
+import { gradeAllCards } from './grading.js';
 import { getLogger, newCorrelationId } from './logging.js';
 
 const log = getLogger('app');
@@ -20,6 +21,8 @@ const traceLog = getLogger('decision-trace');
 export const resultsRouter = express.Router();
 
 const lettersOnly = (s) => String(s ?? '').replace(/[^A-Za-z]/g, '').toUpperCase();
+const nameKey = (s) => String(s ?? '').toUpperCase().replace(/[‘’]/g, "'")
+  .replace(/\s+/g, ' ').trim();
 
 resultsRouter.post('/race-days/:id/results', (req, res) => {
   const correlationId = req.get('x-correlation-id') || newCorrelationId();
@@ -77,7 +80,19 @@ resultsRouter.post('/race-days/:id/results', (req, res) => {
         counts.exotics++;
       }
       for (const s of race.scratches ?? []) {
-        insScratch.run(day.id, race.number, s.programNumber ?? null, s.horseName ?? null);
+        // Chart scratches carry names, not numbers; grading refunds key on
+        // program numbers, so resolve against the day's entries here.
+        let pgm = s.programNumber ?? null;
+        if (pgm == null && s.horseName) {
+          const entry = db.prepare(`
+            SELECT e.program_number, e.horse_name FROM entries e
+            JOIN races r ON r.id = e.race_id
+            WHERE r.race_day_id = ? AND r.number = ?
+          `).all(day.id, race.number)
+            .find((e) => nameKey(e.horse_name) === nameKey(s.horseName));
+          pgm = entry?.program_number ?? null;
+        }
+        insScratch.run(day.id, race.number, pgm, s.horseName ?? null);
         counts.scratches++;
       }
     }
@@ -90,7 +105,12 @@ resultsRouter.post('/race-days/:id/results', (req, res) => {
   const event = { correlationId, raceDayId: day.id, track: day.track, date: day.date, ...counts };
   log.info('results_saved', event);
   traceLog.info('results_saved', event);
-  res.status(201).json({ correlationId, ...counts });
+
+  // Fresh results grade every existing card of the day automatically -
+  // the generate -> grade loop closes the moment the chart lands.
+  const graded = gradeAllCards(db, day.id, correlationId);
+
+  res.status(201).json({ correlationId, ...counts, gradedCards: graded });
 });
 
 resultsRouter.get('/race-days/:id/results', (req, res) => {

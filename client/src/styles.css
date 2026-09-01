@@ -348,6 +348,22 @@ label.btn,
 }
 .row--subtotal td:last-child { color: var(--color-text); }
 .card-footer p { margin: 6px 0; }
+
+/* ---- graded results on the sheet ---- */
+
+.btnrow { display: flex; gap: 8px; }
+.outcome {
+  font-size: 12px;
+  font-weight: 700;
+  letter-spacing: 0.04em;
+  white-space: nowrap;
+}
+.outcome--win { color: var(--accent); }
+.outcome--loss { color: var(--color-text-muted); }
+.outcome--refund { color: var(--accent-2); }
+.outcome--partial { color: var(--gold); }
+.pl--pos { color: var(--accent); font-weight: 600; white-space: nowrap; }
+.pl--neg { color: var(--loss); font-weight: 600; white-space: nowrap; }
 .danger-zone {
   margin-top: 48px;
   padding-top: 12px;
