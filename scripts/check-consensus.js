@@ -174,7 +174,18 @@ try {
   check('source for another track is skipped silently',
     !run1.results.some((r) => r.source === 'Stub Other Track'));
 
+  // Race 1 has TWO agreeing external sources (Stub Good Picks and Stub
+  // Resolver serve the same payload) -> genuinely UNANIMOUS; the pick-less
+  // races on a card with no program ranks fall to CHAOS.
+  check('fetch-consensus classifies the day (2 agreeing externals -> UNANIMOUS)', (() => {
+    const cls = Object.fromEntries((run1.classification ?? []).map((c) => [c.number, c.classification]));
+    return cls[1] === 'UNANIMOUS' && cls[3] === 'CHAOS';
+  })(), JSON.stringify(run1.classification));
+
   const c1 = await (await fetch(`${BASE}/api/race-days/${dayId}/consensus`)).json();
+  check('classification persisted and served with consensus',
+    c1.races?.find((r) => r.number === 1)?.classification === 'UNANIMOUS' &&
+    c1.races?.find((r) => r.number === 1)?.externalSourceCount === 2);
   check('picks resolved to entries (named pick matched to program number)', (() => {
     const cert = c1.picks.find((p) => p.horse_name === 'Certitude (FR)');
     return cert && cert.program_number === '5' && cert.entry_id != null && cert.pick_type === 'second';
