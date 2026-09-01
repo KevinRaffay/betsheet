@@ -131,7 +131,10 @@ ingestRouter.post('/race-days', (req, res) => {
   // already deleted it, and UNIQUE(track,date) leaves no other slot.
   if (existing && !existing.deleted_at && !p.replace) {
     return res.status(409).json({
-      error: `A race day for ${p.track} ${p.date} already exists.`,
+      error: `A race day for ${p.track} ${p.date} already exists. ` +
+        'To run different bankrolls or minimums on the same day, open it and ' +
+        'generate another card - each card carries its own parameters. ' +
+        'Replace only if the program data itself changed.',
       existingId: existing.id,
     });
   }

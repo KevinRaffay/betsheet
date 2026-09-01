@@ -73,7 +73,12 @@ export default function RaceDayView({ id, onBack, onOpenCard }) {
         {' '}· per-race min {day.per_race_min_cents != null ? `$${(day.per_race_min_cents / 100).toFixed(0)}` : '—'}
         {' '}· {day.races.length} races
       </p>
-      <CardsPanel dayId={day.id} onOpenCard={onOpenCard} />
+      <CardsPanel
+        dayId={day.id}
+        defaultBankrollCents={day.bankroll_cents}
+        defaultPerRaceMinCents={day.per_race_min_cents}
+        onOpenCard={onOpenCard}
+      />
       <ConsensusPanel dayId={day.id} />
       {day.races.map((race) => (
         <details className="race" key={race.id} open>
