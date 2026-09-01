@@ -31,7 +31,7 @@ map in the same PR.
 | Requirement | Deliverables |
 | --- | --- |
 | Automated fetch on card creation; day-of re-fetch/refresh | D07 |
-| Track picks page / At The Races / algorithmic sites fetchers with fixtures | D08a, D08b, D08c |
+| Track picks page / At The Races / algorithmic sites fetchers with fixtures | D08c (built). D08a closed — the dmtc picks page is a directory; the track handicapper's picks are D05's Bottom Line extraction. D08b closed — ATR is bot-protected; entered via D07 manual paste |
 | Track+date verification; discard mismatches | D07 |
 | Manual paste/upload fallback into the same consensus structure | D07 |
 | Fetch audit log; failed/stale sources visible in UI | D02, D07 |
