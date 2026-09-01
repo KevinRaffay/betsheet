@@ -1,0 +1,7 @@
+# Migration bytes must be stable across checkouts: the schema_migrations
+# tamper guard hashes them (canonically, but stable bytes keep diffs sane).
+server/migrations/*.sql text eol=lf
+
+# The committed fixtures are byte-compared against audited goldens; keep
+# their endings exactly as captured.
+tests/fixtures/** -text

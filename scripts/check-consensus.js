@@ -74,6 +74,8 @@ const stub = http.createServer((req, res) => {
   } else if (req.url === '/flaky') {
     res.statusCode = 500;
     res.end('boom');
+  } else if (req.url === '/sitemap-stub') {
+    res.end(`<urlset><url><loc>http://127.0.0.1:${STUB_PORT}/picks-good</loc></url></urlset>`);
   } else {
     res.statusCode = 404;
     res.end('not here');
@@ -102,6 +104,17 @@ export default [
   { id: 'stub-other-track', name: 'Stub Other Track', kind: 'track_picks',
     supports: ({ track }) => track === 'Santa Anita',
     buildUrl: () => base + '/picks-good', parse: jsonParse },
+  { id: 'stub-resolver', name: 'Stub Resolver', kind: 'algorithmic', ...common,
+    buildUrl: () => base + '/unused',
+    resolveUrl: async (_ctx, { fetchText }) => {
+      const xml = await fetchText(base + '/sitemap-stub');
+      return xml.match(/<loc>([^<]+)/)[1];
+    },
+    parse: jsonParse },
+  { id: 'stub-resolver-none', name: 'Stub Resolver None', kind: 'algorithmic', ...common,
+    buildUrl: () => base + '/unused',
+    resolveUrl: async () => null,
+    parse: jsonParse },
 ];
 `);
 
@@ -114,6 +127,7 @@ const server = spawn(process.execPath, [path.join(ROOT, 'server', 'index.js')], 
     BETSHEET_DB: path.join(tmp, 'check.sqlite'),
     BETSHEET_LOG_DIR: path.join(tmp, 'logs'),
     BETSHEET_EXTRA_FETCHERS: fetchersPath,
+    BETSHEET_DISABLE_BUILTIN_FETCHERS: '1', // stub-only run, never the network
   },
   stdio: ['ignore', 'pipe', 'pipe'],
 });
@@ -167,8 +181,13 @@ try {
   })(), JSON.stringify(c1.picks));
   check('unmatched pick kept and visible',
     c1.picks.some((p) => p.program_number === '99' && p.entry_id === null));
-  check('audit rows visible for every attempt', c1.attempts.length === 5,
+  check('audit rows visible for every attempt', c1.attempts.length === 7,
     `attempts=${c1.attempts.length}`);
+  check('resolveUrl fetcher discovers its page and stores picks',
+    outcome('Stub Resolver') === 'ok');
+  check('resolveUrl returning null -> visible no-page outcome',
+    outcome('Stub Resolver None') === 'http_error' &&
+    /no published page/.test(run1.results.find((r) => r.source === 'Stub Resolver None')?.fallbackReason ?? ''));
 
   // ---- runs 2 and 3: refresh replaces, failures accumulate ----
   await jpost(`/api/race-days/${dayId}/fetch-consensus`, {});
@@ -215,6 +234,17 @@ try {
 
   check('manual save without a preview payload -> 400',
     (await jpost(`/api/race-days/${dayId}/consensus/manual`, { sourceName: 'X' })).status === 400);
+
+  // ---- disabled source: skipped with a visible reason, restored after ----
+  const Database = (await import('better-sqlite3')).default;
+  const cdb = new Database(path.join(tmp, 'check.sqlite'));
+  cdb.prepare("UPDATE sources SET enabled = 0 WHERE name = 'Stub Good Picks'").run();
+  cdb.close();
+  const runDisabled = await (await jpost(`/api/race-days/${dayId}/fetch-consensus`, {})).json();
+  const disabled = runDisabled.results.find((r) => r.source === 'Stub Good Picks');
+  check('disabled source is skipped with a visible audit row',
+    disabled?.outcome === 'blocked' && /disabled/.test(disabled?.fallbackReason ?? ''),
+    JSON.stringify(disabled));
 } finally {
   server.kill();
   stub.close();

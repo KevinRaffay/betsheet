@@ -61,6 +61,29 @@ const tamperErr = throws(() => openDb(dbPath));
 check('tampered migration digest refuses to open',
   tamperErr && /append-only/.test(tamperErr.message), tamperErr?.message);
 
+// --- line-ending churn must self-heal, not refuse (the Windows autocrlf
+// false alarm: same content, CRLF instead of LF, hit in live use) ---
+{
+  const crypto = await import('node:crypto');
+  const db3path = path.join(tmp, 'check3.sqlite');
+  const db3 = openDb(db3path);
+  const mig = fs.readdirSync(path.join(process.cwd(), 'server', 'migrations'))
+    .filter((f) => f.endsWith('.sql')).sort()[0];
+  const sql = fs.readFileSync(path.join(process.cwd(), 'server', 'migrations', mig), 'utf8');
+  const lf = sql.replace(/\r\n/g, '\n');
+  const crlfHash = crypto.createHash('sha256').update(lf.replace(/\n/g, '\r\n')).digest('hex');
+  const canonicalHash = crypto.createHash('sha256').update(lf).digest('hex');
+  db3.prepare('UPDATE schema_migrations SET sha256 = ? WHERE name = ?').run(crlfHash, mig);
+  db3.close();
+  const healErr = throws(() => { const h = openDb(db3path); h.close(); });
+  check('line-ending variant of an applied migration self-heals', healErr === null,
+    healErr?.message);
+  const db3b = openDb(db3path);
+  check('self-heal rewrites the record to the canonical hash',
+    db3b.prepare('SELECT sha256 FROM schema_migrations WHERE name = ?').get(mig).sha256 === canonicalHash);
+  db3b.close();
+}
+
 // Fresh db (separate file) for the rest.
 const d = openDb(path.join(tmp, 'check2.sqlite'));
 
