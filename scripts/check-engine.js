@@ -290,12 +290,29 @@ try {
 
   const regen = await jpost(`/api/race-days/${saved.id}/cards`, { variant: 'default' });
   const cardsList = await (await fetch(`${BASE}/api/race-days/${saved.id}/cards`)).json();
-  check('regenerating the same variant replaces, never duplicates',
-    regen.status === 201 && cardsList.length === 1);
+  check('generation is append-only: same variant again = a NEW card, numbered per day',
+    regen.status === 201 && cardsList.length === 2 &&
+    cardsList.map((c) => c.card_number).sort().join(',') === '1,2',
+    JSON.stringify(cardsList.map((c) => [c.card_number, c.variant])));
 
-  const variant2 = await (await jpost(`/api/race-days/${saved.id}/cards`, { variant: 'spread', rules: { fadeThePrice: false } })).json();
+  const variant2 = await (await jpost(`/api/race-days/${saved.id}/cards`, {
+    variant: 'spread', rules: { fadeThePrice: false }, perRaceMinCents: 700,
+  })).json();
   const cardsList2 = await (await fetch(`${BASE}/api/race-days/${saved.id}/cards`)).json();
-  check('a second variant is stored beside the first', Number.isInteger(variant2.id) && cardsList2.length === 2);
+  check('a custom variant lands beside the others as card #3',
+    Number.isInteger(variant2.id) && cardsList2.length === 3 &&
+    cardsList2[0].card_number === 3); // list is newest-first
+
+  const spreadRow = cardsList2.find((c) => c.variant === 'spread');
+  check('the recipe rides the card row: variant, bankroll, per-race min, completeness, totals',
+    spreadRow && spreadRow.per_race_min_cents === 700 && spreadRow.bankroll_cents === 20000 &&
+    spreadRow.consensus_completeness === 'FULL' && spreadRow.tickets > 0 &&
+    spreadRow.total_cents === 20000, JSON.stringify(spreadRow));
+
+  const readSpread = await (await fetch(`${BASE}/api/cards/${variant2.id}`)).json();
+  check('card detail carries its own recipe (per-race min from the card, not the day)',
+    readSpread.card_number === 3 && readSpread.variant === 'spread' &&
+    readSpread.per_race_min_cents === 700);
 
   await new Promise((r) => setTimeout(r, 300));
   const traceFile = path.join(logDir, 'decision-trace.jsonl');
