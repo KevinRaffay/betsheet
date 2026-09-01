@@ -1,0 +1,53 @@
+// The consensus-source fetcher registry.
+//
+// A fetcher is one module describing how to get and read one source's picks:
+//
+//   {
+//     id: 'dmtc-picks',            // stable slug, used in logs and the DB
+//     name: 'Del Mar track picks', // display name (sources.name)
+//     kind: 'track_picks',         // sources.kind vocabulary (see schema)
+//     supports({ track, date }),   // -> bool: does this source cover the day?
+//     buildUrl({ track, date }),   // -> the URL to fetch
+//     parse(body, { track, date })  // -> {
+//       track?, date?,             //   what the PAGE says it covers, if it
+//                                  //   says; the runner discards mismatches
+//       races: [{ race, picks: [{ programNumber?, horseName?, pickType, note? }] }],
+//       warnings?: [...]
+//     }
+//   }
+//
+// pickType vocabulary is the consensus_picks CHECK constraint:
+// top / second / third / watch_out / contrarian.
+//
+// Concrete fetchers land one PR per source (D08a-c) and register here.
+// BETSHEET_EXTRA_FETCHERS (comma-separated module paths, each default-
+// exporting an array of fetchers) exists for the check scripts, which point
+// it at stub sources on a local port - the framework is exercised end to
+// end without touching the network.
+
+const fetchers = [];
+
+export function registerFetcher(f) {
+  for (const key of ['id', 'name', 'kind', 'supports', 'buildUrl', 'parse']) {
+    if (!f?.[key]) throw new Error(`fetcher is missing "${key}"`);
+  }
+  if (fetchers.some((x) => x.id === f.id)) {
+    throw new Error(`fetcher id "${f.id}" is already registered`);
+  }
+  fetchers.push(f);
+}
+
+export const listFetchers = () => [...fetchers];
+
+let extrasLoaded = false;
+
+/** Load BETSHEET_EXTRA_FETCHERS modules once. Called by the runner. */
+export async function loadExtraFetchers() {
+  if (extrasLoaded) return;
+  extrasLoaded = true;
+  const paths = (process.env.BETSHEET_EXTRA_FETCHERS ?? '').split(',').map((s) => s.trim()).filter(Boolean);
+  for (const p of paths) {
+    const mod = await import(p.startsWith('file:') ? p : `file://${p.replace(/\\/g, '/')}`);
+    for (const f of mod.default ?? []) registerFetcher(f);
+  }
+}

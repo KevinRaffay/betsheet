@@ -52,3 +52,23 @@ export function saveRaceDay(payload, correlationId) {
 
 export const listRaceDays = () => fetch('/api/race-days').then(asJson);
 export const getRaceDay = (id) => fetch(`/api/race-days/${id}`).then(asJson);
+
+export const fetchConsensus = (id) =>
+  fetch(`/api/race-days/${id}/fetch-consensus`, { method: 'POST' }).then(asJson);
+
+export const getConsensus = (id) =>
+  fetch(`/api/race-days/${id}/consensus`).then(asJson);
+
+export const manualPicksPreview = (id, sourceName, text) =>
+  fetch(`/api/race-days/${id}/consensus/manual-preview`, {
+    method: 'POST',
+    headers: { 'content-type': 'application/json' },
+    body: JSON.stringify({ sourceName, text }),
+  }).then(asJson);
+
+export const manualPicksSave = (id, sourceName, races) =>
+  fetch(`/api/race-days/${id}/consensus/manual`, {
+    method: 'POST',
+    headers: { 'content-type': 'application/json' },
+    body: JSON.stringify({ sourceName, races }),
+  }).then(asJson);
