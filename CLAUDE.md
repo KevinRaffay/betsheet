@@ -64,7 +64,9 @@ Breaking any of these is a bug regardless of what the tests say.
 
 | file | owns |
 | --- | --- |
-| `server/index.js` | the HTTP server: serves `dist/`, the `/api/*` endpoints, loopback binding. |
+| `server/index.js` | the HTTP server: serves `dist/`, the `/api/*` endpoints, loopback binding, `/api` request logging. |
+| `server/logging.js` | structured JSON-lines logging: the three streams (`app`, `fetch-audit`, `decision-trace`), size+day rotation, gzip/retention sweep, correlation IDs, `readRecent`. Writes are synchronous and never throw. |
+| `scripts/check-logging.js` | verification for logging: rotation, sweep, retention, torn lines, level gating. |
 | `client/src/App.jsx` | root component and theme application. |
 | `client/src/prefs.js` | per-user UI preferences in `localStorage` (theme). Never card data. |
 | `client/src/styles.css` | all styles: Radix Mauve imports, semantic tokens, light/dark themes, desktop-first layout. |
@@ -83,12 +85,13 @@ real entries/picks/chart samples with expected-JSON golden files.
 ## Commands
 
 ```bash
-npm start        # build + serve on 127.0.0.1:8788
-npm run dev      # vite :5175 + api :8788
+npm start              # build + serve on 127.0.0.1:8788
+npm run dev            # vite :5175 + api :8788
+npm run check-logging  # logging: rotation, sweep, retention, torn lines
 ```
 
-Verification commands (`check-parsers`, `check-grading`, simulator runs) are
-added by their PRs and listed here as they land.
+Further verification commands (`check-parsers`, `check-grading`, simulator
+runs) are added by their PRs and listed here as they land.
 
 ---
 
@@ -123,6 +126,7 @@ Before a branch is reported ready, verify — out loud, in the final message:
 | feature | state | notes |
 | --- | --- | --- |
 | Repo scaffold (D01) | in review | PR #1, branch `scaffold` — stack, styling system, server wiring, docs ledger |
+| Logging foundation (D02) | in review | PR #2, branch `logging` — three JSONL streams, size+day rotation, gzip/retention sweep, correlation IDs, `/api` request log |
 
 ---
 

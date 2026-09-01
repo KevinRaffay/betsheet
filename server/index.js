@@ -7,8 +7,10 @@ import 'dotenv/config';
 import express from 'express';
 import path from 'node:path';
 import { fileURLToPath, URL } from 'node:url';
+import { getLogger } from './logging.js';
 
 const ROOT = fileURLToPath(new URL('../', import.meta.url));
+const log = getLogger('app');
 // Namespaced on purpose: dev harnesses inject a generic PORT for the process
 // they launch (vite's), and reading it here made the API bind vite's port.
 const PORT = Number(process.env.BETSHEET_PORT) || 8788;
@@ -17,6 +19,22 @@ const HOST = '127.0.0.1';
 const app = express();
 app.use(express.json({ limit: '10mb' }));
 
+// Request log for /api only (static assets would be noise). A request that
+// belongs to a card session carries its correlation id in this header.
+app.use('/api', (req, res, next) => {
+  const started = Date.now();
+  res.on('finish', () => {
+    log.info('http_request', {
+      method: req.method,
+      path: req.originalUrl,
+      status: res.statusCode,
+      ms: Date.now() - started,
+      correlationId: req.get('x-correlation-id') || undefined,
+    });
+  });
+  next();
+});
+
 app.get('/api/health', (_req, res) => {
   res.json({ ok: true, app: 'betsheet', version: '0.1.0' });
 });
@@ -24,6 +42,7 @@ app.get('/api/health', (_req, res) => {
 app.use(express.static(path.join(ROOT, 'dist')));
 
 const server = app.listen(PORT, HOST, () => {
+  log.info('server_started', { host: HOST, port: PORT });
   console.log(`BetSheet listening on http://${HOST}:${PORT}`);
 });
 
