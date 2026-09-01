@@ -118,6 +118,9 @@ Breaking any of these is a bug regardless of what the tests say.
 | `shared/grading.js` | ticket grading, PURE: every bet type (WPS per $2, exotics per printed base, `/`-alternate chart legs, parlays chained off win prices, doubles/pick-N off the settling race's payoff row) and the documented scratch/refund policy — WPS refund, single-race exotics pro-rata combo refunds, multi-race pools conservatively refunded whole on a scratched-out leg, parlay legs pass through at factor 1. Outcomes: win / refund / partial / loss. The simulator replays this exact grader. |
 | `server/grading.js` | grading persistence: gradeAndPersist (replace-on-regrade into graded_tickets; `ticket_graded` per ticket + `card_graded` summary traced under the CARD's correlation id — the trace that recorded why a ticket exists also records what it earned), gradeAllCards (the auto-hook after a results save; card generation after results grades in-line too), POST /api/cards/:id/grade (409 until results land), GET .../grades. |
 | `scripts/check-grading.js` | grading verification: hand-computed synthetic cases for every bet type and refund rule, the REAL day graded pure (program golden -> card, chart golden -> grades; hand-audited payoffs pin the math), and a server round-trip (409 before results, auto-grade on save, read-back, regrade-replaces, trace events on file). |
+| `server/pl.js` | P/L reporting: GET /api/pl — per-completeness-bucket totals, every graded card as a row, ungraded cards listed separately, and deliberately NO pooled all-bucket total (invariant 13); GET /api/race-days/:id/pl — per-race × per-card breakdown for the variant compare (multi-race tickets under 'multi', 410 on deleted days). Every join filters `deleted_at IS NULL` (invariant 12). |
+| `client/src/components/PLView.jsx` | the P/L screen: bucket panels (P/L, ROI, cards/tickets), per-day card tables (row click opens the card), an expandable race-by-race matrix comparing a day's cards side by side, and the not-graded-yet list. |
+| `scripts/check-pl.js` | P/L verification against the real server: three-day scenario (FULL × 2 variants from the real fixtures, synthetic PROGRAM_ONLY, ungraded), bucket-sum isolation, no-pooled-total shape check, cross-agreement with the grading endpoint, per-race cells summing to card totals, soft-delete dropping out of every aggregate and restore bringing it back. |
 | `client/src/components/ResultsPanel.jsx` | the results section of a stored day: chart paste + PDF upload, warnings-first read-only preview, save/replace, per-race finish/exotics/scratches view. |
 | `server/pdf-text.js` | line-reconstructed text extraction from text-based PDFs (y-grouped, x-sorted) — the chart PDF path feeds the SAME parser as a paste. |
 | `scripts/check-charts.js` | chart-parser verification: golden + hand-checked payoffs + the program↔chart closure (every program entry is a finisher or a scratch). |
@@ -142,8 +145,8 @@ Breaking any of these is a bug regardless of what the tests say.
 
 Planned homes (each arrives with its PR — keep this table honest as they
 land): `server/fetchers/` — one module per consensus source (Wayback D08d
-pending). P/L views (D16) and the Phase 3 trace export / templates /
-simulator arrive with their PRs.
+pending). The Phase 3 trace export / templates / simulator arrive with
+their PRs.
 
 ---
 
@@ -163,6 +166,7 @@ npm run check-classification # consensus table + UNANIMOUS/SPLIT/CHAOS rules
 npm run check-engine    # card engine vs. the real goldens + server round-trip
 npm run check-charts    # results-chart parser vs. the real Equibase chart
 npm run check-grading   # ticket grading vs. hand-computed + real-day payoffs
+npm run check-pl        # P/L views: bucket isolation, per-race sums, delete/restore
 npm run reset -- --yes  # FACTORY RESET: wipe every record AND every log file
 ```
 
@@ -207,7 +211,8 @@ Before a branch is reported ready, verify — out loud, in the final message:
 | Entries parser — pasted text (D04) | merged | PR #4 — validated against a real Del Mar card (8 races, 81 entries, 0 warnings) |
 | Ingest UI + API (D06) | merged | PR #6 — paste/PDF → warnings-first read-only preview → transactional save; migration 002 adds `races.wager_menu` |
 | Consensus-fetch framework (D07) | merged | PR #7 — fetcher registry, robots/backoff/mismatch handling, audit trail, manual paste fallback w/ read-only preview |
-| Ticket grading engine (D15) | in review | PR #23, branch `grading` — shared/grading.js (pure) + server/grading.js; results save auto-grades every card; Result/P&L columns on the card view; validated on the real Del Mar day's printed payoffs |
+| P/L views (D16) | in review | branch `pl-views` — bucket panels + running card table + per-race variant-compare matrix; invariants 12/13 enforced by check-pl |
+| Ticket grading engine (D15) | merged | PR #23, branch `grading` — shared/grading.js (pure) + server/grading.js; results save auto-grades every card; Result/P&L columns on the card view; validated on the real Del Mar day's printed payoffs |
 | Results ingest UI (D14) | merged | PR #21, branch `results-ingest` — paste/PDF -> read-only preview -> persist; mismatched charts refused whole |
 | Chart-PDF ingestion (D13) | merged | PR #20, branch `chart-pdf` — pdf-text extraction + results parse endpoints (preview-only) |
 | Results-chart parser (D12) | merged | PR #19, branch `chart-parser` — Phase 2 opens; the real Equibase chart for the fixture day; program↔chart closure proven |
