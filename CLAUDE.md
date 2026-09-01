@@ -70,6 +70,9 @@ Breaking any of these is a bug regardless of what the tests say.
 | `server/db.js` | SQLite via better-sqlite3: `openDb` (applies migrations, WAL, FKs on, tamper guard), `getDb` singleton. |
 | `server/migrations/` | append-only numbered SQL migrations. `001-initial.sql` is the FULL schema, Phase 2–4 tables included. Money is integer cents; program numbers are TEXT ("1A"); results key on race *number* so a chart can land without a parsed program. |
 | `scripts/check-schema.js` | verification for the schema: tables, constraints, cascades, idempotence, tamper guard, whole-graph smoke insert. |
+| `shared/entries-parser.js` | pasted-entries parser (browser + Node): race headers, conditions, per-horse rows, scratches (SCR rows + SCRATCHED footer), also-eligibles, wager menus. Never throws; reports problems in `warnings` for the preview UI. |
+| `tests/fixtures/entries/` | entries fixtures: `dmtc-2026-09-03.txt` is a REAL Del Mar card captured from dmtc.com; `synthetic-coupled.txt` covers coupled "1A" entries and tab-less stats lines. Each `.txt` pairs with an audited `.expected.json` golden. |
+| `scripts/check-parsers.js` | parser verification: golden-file diffs PLUS independent hand-counted structural assertions on the real fixture, so regenerating a golden cannot bless a regression. |
 | `client/src/App.jsx` | root component and theme application. |
 | `client/src/prefs.js` | per-user UI preferences in `localStorage` (theme). Never card data. |
 | `client/src/styles.css` | all styles: Radix Mauve imports, semantic tokens, light/dark themes, desktop-first layout. |
@@ -92,6 +95,7 @@ npm start              # build + serve on 127.0.0.1:8788
 npm run dev            # vite :5175 + api :8788
 npm run check-logging  # logging: rotation, sweep, retention, torn lines
 npm run check-schema   # schema: constraints, cascades, migrations, tamper guard
+npm run check-parsers  # entries parser vs. fixtures (golden + hard assertions)
 ```
 
 Further verification commands (`check-parsers`, `check-grading`, simulator
@@ -132,6 +136,7 @@ Before a branch is reported ready, verify — out loud, in the final message:
 | Repo scaffold (D01) | in review | PR #1, branch `scaffold` — stack, styling system, server wiring, docs ledger |
 | Logging foundation (D02) | in review | PR #2, branch `logging` — three JSONL streams, size+day rotation, gzip/retention sweep, correlation IDs, `/api` request log |
 | SQLite schema + migrations (D03) | in review | PR #3, branch `schema` — full schema incl. Phase 2–4 tables, append-only migrations with tamper guard, money in cents |
+| Entries parser — pasted text (D04) | in review | PR #4, branch `entries-parser` — validated against a real Del Mar card (8 races, 81 entries, 0 warnings); handicapper-analysis extraction moves wholly to D05, where the program PDF actually carries it |
 
 ---
 
