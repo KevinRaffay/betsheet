@@ -1,5 +1,5 @@
 import React, { useEffect, useState } from 'react';
-import { getRaceDay } from '../api.js';
+import { deleteRaceDay, deletionPreview, getRaceDay } from '../api.js';
 import ConsensusPanel from './ConsensusPanel.jsx';
 import CardsPanel from './CardsPanel.jsx';
 
@@ -8,10 +8,34 @@ import CardsPanel from './CardsPanel.jsx';
 export default function RaceDayView({ id, onBack, onOpenCard }) {
   const [day, setDay] = useState(null);
   const [error, setError] = useState(null);
+  const [confirm, setConfirm] = useState(null); // deletion-preview counts
+  const [busy, setBusy] = useState(false);
 
   useEffect(() => {
     getRaceDay(id).then(setDay).catch((e) => setError(String(e.message)));
   }, [id]);
+
+  const askDelete = async () => {
+    setBusy(true);
+    try {
+      setConfirm(await deletionPreview(id));
+    } catch (e) {
+      setError(String(e.message));
+    } finally {
+      setBusy(false);
+    }
+  };
+
+  const doDelete = async () => {
+    setBusy(true);
+    try {
+      await deleteRaceDay(id);
+      onBack();
+    } catch (e) {
+      setError(String(e.message));
+      setBusy(false);
+    }
+  };
 
   if (error) return <p className="notice notice--error">{error}</p>;
   if (!day) return <p className="placeholder">Loading…</p>;
@@ -20,8 +44,30 @@ export default function RaceDayView({ id, onBack, onOpenCard }) {
     <section>
       <div className="pagehead">
         <h2>{day.track} — {day.date}</h2>
-        <button className="btn" onClick={onBack}>Back</button>
+        <div className="formrow formrow--tight">
+          <button className="btn btn--danger" disabled={busy} onClick={askDelete}>Delete race day</button>
+          <button className="btn" onClick={onBack}>Back</button>
+        </div>
       </div>
+
+      {confirm && (
+        <div className="notice notice--warn">
+          <p>
+            <strong>Delete {day.track} {day.date}?</strong> This removes from every
+            view: {confirm.races} races, {confirm.entries} entries, picks from{' '}
+            {confirm.sources} consensus source{confirm.sources === 1 ? '' : 's'},{' '}
+            {confirm.cards} card{confirm.cards === 1 ? '' : 's'} with {confirm.tickets} tickets.
+            The decision-trace and fetch-audit logs are kept intact. A deleted
+            day can be restored from the race-day list ("Show deleted").
+          </p>
+          <div className="formrow formrow--tight">
+            <button className="btn btn--danger" disabled={busy} onClick={doDelete}>
+              Delete it
+            </button>
+            <button className="btn" disabled={busy} onClick={() => setConfirm(null)}>Cancel</button>
+          </div>
+        </div>
+      )}
       <p className="dim">
         Bankroll {day.bankroll_cents != null ? `$${(day.bankroll_cents / 100).toFixed(0)}` : '—'}
         {' '}· per-race min {day.per_race_min_cents != null ? `$${(day.per_race_min_cents / 100).toFixed(0)}` : '—'}

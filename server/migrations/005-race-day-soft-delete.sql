@@ -1,0 +1,13 @@
+-- Soft delete for race days. NULL = live; a timestamp = deleted (and when).
+--
+-- The cascade is BY FILTER, not by flags on children: every child row
+-- (races, entries, consensus picks, cards, tickets, ...) is only reachable
+-- through its race_day_id join, so excluding deleted race days at the
+-- race_days level excludes the whole tree. Queries must filter
+-- `deleted_at IS NULL` by default (invariant 13) - including every future
+-- Phase 2/3 aggregate.
+--
+-- Decision-trace and fetch-audit LOG FILES are deliberately untouched by
+-- deletion: a deleted day's history stays readable under its correlation
+-- ids. The deletion itself is logged as its own trace event.
+ALTER TABLE race_days ADD COLUMN deleted_at TEXT;

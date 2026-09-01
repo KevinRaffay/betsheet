@@ -318,7 +318,20 @@ export function classifyAndPersist(db, day, correlationId) {
 
 export const consensusRouter = express.Router();
 
+// Mutations against a soft-deleted day are refused - restore it first.
+// Reads stay open so a deleted day remains inspectable.
+function deletedGuard(req, res) {
+  const row = getDb().prepare('SELECT deleted_at FROM race_days WHERE id = ?')
+    .get(Number(req.params.id));
+  if (row?.deleted_at) {
+    res.status(410).json({ error: 'This race day is deleted. Restore it before modifying it.' });
+    return true;
+  }
+  return false;
+}
+
 consensusRouter.post('/race-days/:id/fetch-consensus', async (req, res) => {
+  if (deletedGuard(req, res)) return;
   const correlationId = req.get('x-correlation-id') || newCorrelationId();
   const out = await runFetches(Number(req.params.id), correlationId);
   if (!out) return res.status(404).json({ error: 'No such race day.' });
@@ -332,6 +345,7 @@ consensusRouter.post('/race-days/:id/fetch-consensus', async (req, res) => {
 });
 
 consensusRouter.post('/race-days/:id/classify', (req, res) => {
+  if (deletedGuard(req, res)) return;
   const correlationId = req.get('x-correlation-id') || newCorrelationId();
   const db = getDb();
   const day = loadDay(db, Number(req.params.id));
@@ -383,6 +397,7 @@ consensusRouter.post('/race-days/:id/consensus/manual-preview', (req, res) => {
 });
 
 consensusRouter.post('/race-days/:id/consensus/manual', (req, res) => {
+  if (deletedGuard(req, res)) return;
   const correlationId = req.get('x-correlation-id') || newCorrelationId();
   const db = getDb();
   const day = loadDay(db, Number(req.params.id));
