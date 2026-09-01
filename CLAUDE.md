@@ -177,7 +177,7 @@ Before a branch is reported ready, verify — out loud, in the final message:
 | Entries parser — pasted text (D04) | merged | PR #4 — validated against a real Del Mar card (8 races, 81 entries, 0 warnings) |
 | Ingest UI + API (D06) | merged | PR #6 — paste/PDF → warnings-first read-only preview → transactional save; migration 002 adds `races.wager_menu` |
 | Consensus-fetch framework (D07) | merged | PR #7 — fetcher registry, robots/backoff/mismatch handling, audit trail, manual paste fallback w/ read-only preview |
-| Desktop card view (D11) | in review | branch `card-view` — the sheet per spec; GET /cards/:id now carries sources-used/unavailable + day scratches for the footer |
+| Desktop card view (D11) | in review | PR #14, branch `card-view` — the sheet per spec; GET /cards/:id now carries sources-used/unavailable + day scratches for the footer |
 | Card engine + decision trace (D10) | merged | PR #13 — lean allocation, all ticket rules, mandatory place-money sweep, exact bankroll, completeness, full trace to the decision-trace stream; conditions-text interleave fix in the program parser (goldens regenerated) |
 | Consensus table + classification (D09) | merged | PR #12 — chips + contrarian flags on the day view; classification re-runs after every fetch and manual confirm; migration 004 (`races.contrarian_flags`) |
 | SFTB fetcher (D08c) | merged | PR #9 — sitemap discovery + expected-order parsing; real fixture matches the program-PDF day. D08a CLOSED (dmtc picks page is a directory; covered by D05's Bottom Line extraction) and D08b CLOSED (ATR bot challenge; manual-paste only) — both by user decision 2026-09-01 |
