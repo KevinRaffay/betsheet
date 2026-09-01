@@ -204,5 +204,27 @@ export function readRecent(stream, { limit = 100, filter = null } = {}) {
   return out;
 }
 
+/**
+ * Factory reset support: remove every stream's active and rotated files
+ * and zero the in-memory counters. ONLY the explicit app reset calls this
+ * (invariant 12's one exception) - nothing else ever deletes log files.
+ * Returns the number of files removed.
+ */
+export function resetLogs() {
+  ensureDir();
+  let removed = 0;
+  for (const stream of STREAMS) {
+    const re = rotatedRe(stream);
+    for (const f of fs.readdirSync(CONFIG.dir)) {
+      if (f === `${stream}.jsonl` || re.test(f)) {
+        try { fs.unlinkSync(path.join(CONFIG.dir, f)); removed++; } catch { /* locked; skipped */ }
+      }
+    }
+    state.set(stream, { bytes: 0, day: dayOf(Date.now()) });
+  }
+  lastSweepDay = null;
+  return removed;
+}
+
 /** Exposed for the verification script only. */
 export const _config = CONFIG;

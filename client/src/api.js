@@ -61,6 +61,13 @@ export const deleteRaceDay = (id) =>
 export const restoreRaceDay = (id) =>
   fetch(`/api/race-days/${id}/restore`, { method: 'POST' }).then(asJson);
 
+export const resetAppApi = () =>
+  fetch('/api/reset', {
+    method: 'POST',
+    headers: { 'content-type': 'application/json' },
+    body: JSON.stringify({ confirm: 'RESET' }),
+  }).then(asJson);
+
 export const fetchConsensus = (id) =>
   fetch(`/api/race-days/${id}/fetch-consensus`, { method: 'POST' }).then(asJson);
 

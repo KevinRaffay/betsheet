@@ -190,6 +190,20 @@ check('join across the graph returns the graded ticket',
   joined && joined.track === 'Del Mar' && joined.pl_cents === 3750 &&
   joined.teller_call === 'Race 1, $15 win, 1A');
 
+// --- race-day ids are NEVER reused (the live tombstone-supersession bug:
+// delete max row -> plain rowid allocation hands the next insert the same
+// id, and the decision trace goes ambiguous) ---
+{
+  const a = d.prepare(`INSERT INTO race_days (track, date, correlation_id)
+    VALUES ('Reuse Check', '2026-01-01', 'cid-a')`).run().lastInsertRowid;
+  d.prepare('DELETE FROM race_days WHERE id = ?').run(a);
+  const b = d.prepare(`INSERT INTO race_days (track, date, correlation_id)
+    VALUES ('Reuse Check', '2026-01-01', 'cid-b')`).run().lastInsertRowid;
+  check('race_day ids are monotonic - a hard-deleted id is never reissued',
+    Number(b) > Number(a), `first=${a} second=${b}`);
+  d.prepare('DELETE FROM race_days WHERE id = ?').run(b);
+}
+
 // --- cascade delete: removing the day removes its dependents ---
 d.prepare('DELETE FROM race_days WHERE id = ?').run(day);
 const leftovers = ['races', 'entries', 'fetch_attempts', 'consensus_picks', 'cards',

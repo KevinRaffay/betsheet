@@ -218,10 +218,64 @@ try {
       races: pdfParsed.races,
     }),
   });
+  const reingestBody = await reingest.json();
   const finalList = await fetch(`${BASE}/api/race-days`).then((r) => r.json());
   const finalDeleted = await fetch(`${BASE}/api/race-days?deleted=1`).then((r) => r.json());
   check('re-ingesting over a deleted tombstone succeeds without replace, tombstone gone',
     reingest.status === 201 && finalList.length === 2 && finalDeleted.length === 0);
+
+  // The live bug: the superseding day must get a NEW id - the old id stays
+  // uniquely bound to the deleted day's logged history forever.
+  check('superseding day gets a fresh id, never the tombstone\'s',
+    Number(reingestBody.id) > Number(pdfDay.id),
+    `tombstone=${pdfDay.id} new=${reingestBody.id}`);
+
+  await new Promise((r) => setTimeout(r, 300));
+  const traceEvents2 = fs.readFileSync(traceFile, 'utf8').split('\n').filter(Boolean).map((l) => JSON.parse(l));
+  check('supersession documents itself in the decision trace',
+    traceEvents2.some((e) => e.event === 'race_day_superseded' &&
+      e.supersededRaceDayId === pdfDay.id && e.raceDayId === reingestBody.id &&
+      e.supersededWasDeleted === true && typeof e.supersededCorrelationId === 'string'));
+
+  // ---- factory reset: everything gone, logs included, auditable era start ----
+
+  const noConfirm = await fetch(`${BASE}/api/reset`, {
+    method: 'POST', headers: { 'content-type': 'application/json' }, body: '{}',
+  });
+  check('reset without the confirm token -> 400, nothing wiped',
+    noConfirm.status === 400 &&
+    (await fetch(`${BASE}/api/race-days`).then((r) => r.json())).length === 2);
+
+  const reset = await fetch(`${BASE}/api/reset`, {
+    method: 'POST', headers: { 'content-type': 'application/json' },
+    body: JSON.stringify({ confirm: 'RESET' }),
+  });
+  const resetBody = await reset.json();
+  check('reset: 200 with row counts and log-file count',
+    reset.status === 200 && resetBody.rowsRemoved.race_days === 2 &&
+    resetBody.rowsRemoved.entries > 0 && resetBody.logFilesRemoved >= 1,
+    JSON.stringify(resetBody));
+
+  const emptyLive = await fetch(`${BASE}/api/race-days`).then((r) => r.json());
+  const emptyDeleted = await fetch(`${BASE}/api/race-days?deleted=1`).then((r) => r.json());
+  check('after reset: no live and no deleted race days',
+    emptyLive.length === 0 && emptyDeleted.length === 0);
+
+  await new Promise((r) => setTimeout(r, 300));
+  const appLogFile = path.join(tmp, 'logs', 'app.jsonl');
+  const appEvents = fs.readFileSync(appLogFile, 'utf8').split('\n').filter(Boolean).map((l) => JSON.parse(l));
+  check('the fresh app log opens with the app_reset event (auditable era start)',
+    appEvents.length >= 1 && appEvents[0].event === 'app_reset' &&
+    appEvents[0].rowsRemoved.race_days === 2);
+  check('decision-trace log file is gone until something writes again',
+    !fs.existsSync(traceFile));
+
+  const freshSave = await fetch(`${BASE}/api/race-days`, {
+    method: 'POST', headers: { 'content-type': 'application/json' },
+    body: JSON.stringify(payload),
+  }).then((r) => r.json());
+  check('after reset: race-day ids restart at 1 (safe - the old logs went too)',
+    freshSave.id === 1);
 } finally {
   server.kill();
   await new Promise((r) => setTimeout(r, 300));

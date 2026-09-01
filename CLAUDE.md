@@ -66,7 +66,16 @@ Breaking any of these is a bug regardless of what the tests say.
     flags). Decision-trace and fetch-audit LOG FILES are never touched by
     deletion: a deleted day's history stays readable under its correlation
     ids, and the deletion itself is logged as a trace event. Restore is
-    always available from the deleted list.
+    always available from the deleted list. **Race-day ids are never
+    reused** (migration 006, AUTOINCREMENT): superseding a tombstone mints
+    a fresh id and logs `race_day_superseded` naming the old id/correlation
+    — found live when a superseded day inherited the deleted day's rowid
+    and the trace went ambiguous. The ONE exception to logs-are-never-
+    touched is the explicit factory reset (`npm run reset -- --yes` or the
+    Danger zone's confirmed "Wipe everything"): it deletes every record
+    AND every log file together, restarts the id sequence (safe only
+    because the logs go too), and opens the fresh app log with an
+    `app_reset` event.
 13. **Completeness buckets never pool.** Every card records a
     `consensus_completeness` level (FULL / PARTIAL / PROGRAM_ONLY) from the
     sources that actually contributed. All P/L, simulation, and distribution
@@ -85,7 +94,7 @@ Breaking any of these is a bug regardless of what the tests say.
 | `server/index.js` | the HTTP server: serves `dist/`, the `/api/*` endpoints, loopback binding, `/api` request logging. |
 | `server/logging.js` | structured JSON-lines logging: the three streams (`app`, `fetch-audit`, `decision-trace`), size+day rotation, gzip/retention sweep, correlation IDs, `readRecent`. Writes are synchronous and never throw. |
 | `scripts/check-logging.js` | verification for logging: rotation, sweep, retention, torn lines, level gating. |
-| `server/db.js` | SQLite via better-sqlite3: `openDb` (applies migrations, WAL, FKs on, tamper guard), `getDb` singleton. |
+| `server/db.js` | SQLite via better-sqlite3: `openDb` (applies migrations, WAL, FKs on, tamper guard), `getDb` singleton. A migration headed `-- betsheet:schema-rebuild` runs outside the wrapping transaction with FKs OFF (table rebuilds; DROP TABLE on a parent with FKs ON cascades deletes) and must pass `foreign_key_check` before commit. |
 | `server/migrations/` | append-only numbered SQL migrations. `001-initial.sql` is the FULL schema, Phase 2–4 tables included. Money is integer cents; program numbers are TEXT ("1A"); results key on race *number* so a chart can land without a parsed program. |
 | `scripts/check-schema.js` | verification for the schema: tables, constraints, cascades, idempotence, tamper guard, whole-graph smoke insert. |
 | `shared/entries-parser.js` | pasted-entries parser (browser + Node): race headers, conditions, per-horse rows, scratches (SCR rows + SCRATCHED footer), also-eligibles, wager menus. Never throws; reports problems in `warnings` for the preview UI. |
@@ -115,7 +124,9 @@ Breaking any of these is a bug regardless of what the tests say.
 | `client/src/api.js` | client half of the ingest API; carries the session's correlation id on every call. |
 | `client/src/App.jsx` | root component, theme application, view routing (list / new / day). |
 | `client/src/components/NewRaceDay.jsx` | the ingest screen: track/date/bankroll form, paste box + PDF upload, warnings-first READ-ONLY preview (corrections = fix the source, re-parse), save with replace-on-conflict. |
-| `client/src/components/RaceDayList.jsx` | home: stored race days table. |
+| `client/src/components/RaceDayList.jsx` | home: stored race days table, Show deleted toggle + restore, and the Danger zone (factory reset behind an explicit confirm). |
+| `server/reset.js` | factory reset shared by `POST /api/reset` (requires `{confirm:"RESET"}`) and the CLI: wipes every table in FK order, VACUUMs, restarts the race-day id sequence, removes every log file (`resetLogs` in logging.js), then logs `app_reset` as the new era's first event. |
+| `scripts/reset.js` | CLI factory reset; refuses without `--yes`. |
 | `client/src/components/RaceDayView.jsx` | read-only view of a stored day — what landed in the DB, not what the parser proposed. |
 | `client/src/prefs.js` | per-user UI preferences in `localStorage` (theme). Never card data. |
 | `client/src/styles.css` | all styles: Radix Mauve imports, semantic tokens, light/dark themes, desktop-first layout. |
@@ -142,6 +153,7 @@ npm run check-consensus # fetch framework vs. stub sources on a local port
 npm run check-sources   # concrete fetchers vs. real captured fixtures
 npm run check-classification # consensus table + UNANIMOUS/SPLIT/CHAOS rules
 npm run check-engine    # card engine vs. the real goldens + server round-trip
+npm run reset -- --yes  # FACTORY RESET: wipe every record AND every log file
 ```
 
 Further verification commands (`check-parsers`, `check-grading`, simulator
@@ -185,6 +197,7 @@ Before a branch is reported ready, verify — out loud, in the final message:
 | Entries parser — pasted text (D04) | merged | PR #4 — validated against a real Del Mar card (8 races, 81 entries, 0 warnings) |
 | Ingest UI + API (D06) | merged | PR #6 — paste/PDF → warnings-first read-only preview → transactional save; migration 002 adds `races.wager_menu` |
 | Consensus-fetch framework (D07) | merged | PR #7 — fetcher registry, robots/backoff/mismatch handling, audit trail, manual paste fallback w/ read-only preview |
+| Factory reset (D27) | in review | PR #16, branch `app-reset` — wipe all records + all logs behind explicit confirms (API token, CLI --yes, UI Danger zone); id sequence restarts; `app_reset` opens the new era's log |
 | Race-day soft delete (D26) | in review | PR #15, branch `race-day-delete` — deleted_at + filter cascade (invariant 12), confirmation dialog with counts, deleted list + restore, 410 guards on mutations, deletion/restore logged to decision-trace, logs never touched |
 | Desktop card view (D11) | in review | PR #14, branch `card-view` — the sheet per spec; GET /cards/:id now carries sources-used/unavailable + day scratches for the footer |
 | Card engine + decision trace (D10) | merged | PR #13 — lean allocation, all ticket rules, mandatory place-money sweep, exact bankroll, completeness, full trace to the decision-trace stream; conditions-text interleave fix in the program parser (goldens regenerated) |

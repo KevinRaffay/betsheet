@@ -136,11 +136,29 @@ ingestRouter.post('/race-days', (req, res) => {
     });
   }
 
+  const oldRow = existing
+    ? db.prepare('SELECT id, correlation_id, deleted_at FROM race_days WHERE id = ?').get(existing.id)
+    : null;
   const save = db.transaction(() => {
     if (existing) db.prepare('DELETE FROM race_days WHERE id = ?').run(existing.id);
     return insertRaceDay(db, p, correlationId);
   });
   const dayId = save();
+
+  // A replaced/superseded day documents itself in the trace: the old id and
+  // correlation id stay resolvable even though the row is gone, so log
+  // events referencing them read as "that day was superseded by this one".
+  if (oldRow) {
+    traceLog.info('race_day_superseded', {
+      correlationId,
+      raceDayId: dayId,
+      supersededRaceDayId: oldRow.id,
+      supersededCorrelationId: oldRow.correlation_id,
+      supersededWasDeleted: Boolean(oldRow.deleted_at),
+      track: p.track,
+      date: p.date,
+    });
+  }
 
   log.info('race_day_saved', {
     correlationId,
@@ -203,7 +221,16 @@ ingestRouter.delete('/race-days/:id', (req, res) => {
     cards: db.prepare('SELECT COUNT(*) n FROM cards WHERE race_day_id = ?').get(day.id).n,
     tickets: db.prepare('SELECT COUNT(*) n FROM tickets t JOIN cards c ON c.id = t.card_id WHERE c.race_day_id = ?').get(day.id).n,
   };
-  db.prepare("UPDATE race_days SET deleted_at = strftime('%Y-%m-%dT%H:%M:%SZ', 'now') WHERE id = ?").run(day.id);
+  // The write comes first, and the success event is only logged if the
+  // write demonstrably landed - the trace never asserts something that
+  // didn't happen.
+  const changes = db.prepare(
+    "UPDATE race_days SET deleted_at = strftime('%Y-%m-%dT%H:%M:%SZ', 'now') WHERE id = ? AND deleted_at IS NULL",
+  ).run(day.id).changes;
+  if (changes !== 1) {
+    log.error('race_day_delete_failed', { raceDayId: day.id, changes });
+    return res.status(500).json({ error: 'Delete did not persist; nothing was logged as deleted.' });
+  }
 
   const event = {
     correlationId: day.correlation_id,

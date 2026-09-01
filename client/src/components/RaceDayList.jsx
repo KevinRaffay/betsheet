@@ -1,5 +1,5 @@
 import React, { useEffect, useState } from 'react';
-import { listRaceDays, restoreRaceDay } from '../api.js';
+import { listRaceDays, resetAppApi, restoreRaceDay } from '../api.js';
 
 export default function RaceDayList({ onOpen, onNew, refreshKey }) {
   const [days, setDays] = useState(null);
@@ -16,6 +16,23 @@ export default function RaceDayList({ onOpen, onNew, refreshKey }) {
     setBusy(true);
     try {
       await restoreRaceDay(id);
+      await reload();
+    } catch (e) {
+      setError(String(e.message));
+    } finally {
+      setBusy(false);
+    }
+  };
+
+  const [confirmReset, setConfirmReset] = useState(false);
+  const [resetDone, setResetDone] = useState(null);
+  const handleReset = async () => {
+    setBusy(true);
+    setError(null);
+    try {
+      const out = await resetAppApi();
+      setConfirmReset(false);
+      setResetDone(out);
       await reload();
     } catch (e) {
       setError(String(e.message));
@@ -72,6 +89,39 @@ export default function RaceDayList({ onOpen, onNew, refreshKey }) {
             ))}
           </tbody>
         </table>
+      )}
+
+      {!showDeleted && (
+        <div className="danger-zone">
+          {resetDone && (
+            <p className="notice">
+              Reset complete — {Object.values(resetDone.rowsRemoved).reduce((a, n) => a + n, 0)} rows
+              and {resetDone.logFilesRemoved} log file{resetDone.logFilesRemoved === 1 ? '' : 's'} removed.
+              Clean slate.
+            </p>
+          )}
+          {!confirmReset ? (
+            <button className="btn btn--danger" disabled={busy} onClick={() => { setResetDone(null); setConfirmReset(true); }}>
+              Reset app…
+            </button>
+          ) : (
+            <div className="notice notice--warn">
+              <p>
+                <strong>Factory reset.</strong> This permanently deletes EVERY stored
+                record — race days (deleted ones included), entries, consensus picks,
+                cards, tickets, results, templates — <strong>and every log file</strong>,
+                decision traces and fetch audits included. Nothing is recoverable.
+                For a clean testing slate only.
+              </p>
+              <div className="formrow formrow--tight">
+                <button className="btn btn--danger" disabled={busy} onClick={handleReset}>
+                  Wipe everything
+                </button>
+                <button className="btn" disabled={busy} onClick={() => setConfirmReset(false)}>Cancel</button>
+              </div>
+            </div>
+          )}
+        </div>
       )}
     </section>
   );
