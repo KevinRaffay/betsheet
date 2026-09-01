@@ -24,7 +24,7 @@ map in the same PR.
 | Pasted entries text parsed per race/horse (all program fields) | D04 |
 | Program PDF parsing: jumbled columns via post-position sequence, index validation | D05 |
 | Handicapper analysis (e.g. DRF Bottom Line) → rankings + Best Bet flag | D05 (the pasted entries format carries no analysis section; the program PDF does) |
-| Parse preview with confirm/correct before saving | D06, D14 |
+| Parse preview (read-only) confirmed before saving; corrections at the source + re-parse | D06, D14 |
 
 ## Consensus (workflow step 2)
 

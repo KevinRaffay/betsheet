@@ -1,12 +1,10 @@
 import React, { useState } from 'react';
-import { morningLineToDecimal } from '@shared/entries-parser.js';
 import { parseEntriesText, parseProgramPdf, saveRaceDay } from '../api.js';
 
-const dollars = (cents) => (cents == null ? '' : (cents / 100).toFixed(0));
-
 // The ingest screen: paste entries text or upload a program PDF, review the
-// parse (warnings first), correct anything inline, then save. Nothing is
-// written until Save - the preview is the contract (invariant 9).
+// parse, then save. The preview is READ-ONLY - it shows exactly what Save
+// will write, warnings first. To correct something, fix the pasted text and
+// re-parse; the parser's output is never hand-edited in place.
 export default function NewRaceDay({ onSaved, onCancel }) {
   const [track, setTrack] = useState('');
   const [date, setDate] = useState('');
@@ -49,29 +47,6 @@ export default function NewRaceDay({ onSaved, onCancel }) {
     } finally {
       setBusy(false);
     }
-  };
-
-  const updateRace = (ri, field, value) => {
-    setParsed((p) => {
-      const races = p.races.map((r, i) => (i === ri ? { ...r, [field]: value } : r));
-      return { ...p, races };
-    });
-  };
-
-  const updateEntry = (ri, ei, field, value) => {
-    setParsed((p) => {
-      const races = p.races.map((r, i) => {
-        if (i !== ri) return r;
-        const entries = r.entries.map((e, j) => {
-          if (j !== ei) return e;
-          const next = { ...e, [field]: value };
-          if (field === 'morningLine') next.morningLineDecimal = morningLineToDecimal(value);
-          return next;
-        });
-        return { ...r, entries };
-      });
-      return { ...p, races };
-    });
   };
 
   const handleSave = async (replace = false) => {
@@ -171,6 +146,10 @@ export default function NewRaceDay({ onSaved, onCancel }) {
               Save race day
             </button>
           </div>
+          <p className="dim">
+            Read-only preview of exactly what Save will store. To correct
+            something, fix the pasted text and parse again.
+          </p>
 
           {parsed.warnings.length > 0 && (
             <div className="notice notice--warn">
@@ -181,17 +160,14 @@ export default function NewRaceDay({ onSaved, onCancel }) {
             </div>
           )}
 
-          {parsed.races.map((race, ri) => (
-            <RacePreview key={race.number} race={race} ri={ri}
-              updateRace={updateRace} updateEntry={updateEntry} />
-          ))}
+          {parsed.races.map((race) => <RacePreview key={race.number} race={race} />)}
         </>
       )}
     </section>
   );
 }
 
-function RacePreview({ race, ri, updateRace, updateEntry }) {
+function RacePreview({ race }) {
   return (
     <details className="race" open>
       <summary>
@@ -199,55 +175,36 @@ function RacePreview({ race, ri, updateRace, updateEntry }) {
         {' '}· {race.surface ?? '?'} · {race.distance ?? '?'} · {race.raceType ?? '?'}
         {' '}· post {race.postTime ?? '?'} · {race.entries.length} entries
       </summary>
-      <div className="formrow formrow--tight">
-        <label>Surface
-          <input value={race.surface ?? ''} onChange={(e) => updateRace(ri, 'surface', e.target.value)} />
-        </label>
-        <label>Distance
-          <input value={race.distance ?? ''} onChange={(e) => updateRace(ri, 'distance', e.target.value)} />
-        </label>
-        <label>Type
-          <input value={race.raceType ?? ''} onChange={(e) => updateRace(ri, 'raceType', e.target.value)} />
-        </label>
-        <label>Post time
-          <input value={race.postTime ?? ''} onChange={(e) => updateRace(ri, 'postTime', e.target.value)} />
-        </label>
-      </div>
+      {race.conditions && <p className="conditions">{race.conditions}</p>}
       <table className="grid">
         <thead>
           <tr>
             <th>#</th><th>PP</th><th>Horse</th><th>Jockey</th><th>Trainer</th>
-            <th>Wt</th><th>M/L</th><th>Rank</th><th>Scr</th>
+            <th>Wt</th><th>M/L</th><th>Rank</th>
           </tr>
         </thead>
         <tbody>
           {race.entries.map((e, ei) => (
             <tr key={ei} className={e.scratched ? 'row--scratched' : ''}>
-              <td><input className="in in--xs" value={e.programNumber ?? ''}
-                onChange={(ev) => updateEntry(ri, ei, 'programNumber', ev.target.value)} /></td>
+              <td>{e.programNumber ?? 'SCR'}</td>
               <td className="dim">{e.postPosition ?? ''}</td>
               <td>
-                <input className="in" value={e.horseName ?? ''}
-                  onChange={(ev) => updateEntry(ri, ei, 'horseName', ev.target.value)} />
+                {e.horseName}
                 {e.bestBet ? <span className="tag tag--gold">BEST BET</span> : null}
                 {e.alsoEligible ? <span className="tag">AE</span> : null}
                 {e.notToBeClaimed ? <span className="tag">NTC</span> : null}
+                {e.scratched ? <span className="tag tag--red">SCR</span> : null}
               </td>
-              <td><input className="in in--sm" value={e.jockey ?? ''}
-                onChange={(ev) => updateEntry(ri, ei, 'jockey', ev.target.value)} /></td>
-              <td><input className="in in--sm" value={e.trainer ?? ''}
-                onChange={(ev) => updateEntry(ri, ei, 'trainer', ev.target.value)} /></td>
-              <td><input className="in in--xs" value={e.weight ?? ''}
-                onChange={(ev) => updateEntry(ri, ei, 'weight', Number(ev.target.value) || null)} /></td>
-              <td><input className="in in--xs" value={e.morningLine ?? ''}
-                onChange={(ev) => updateEntry(ri, ei, 'morningLine', ev.target.value)} /></td>
+              <td>{e.jockey ?? ''}</td>
+              <td>{e.trainer ?? ''}</td>
+              <td>{e.weight ?? ''}</td>
+              <td>{e.morningLine ?? ''}</td>
               <td className="dim">{e.programRank ?? ''}</td>
-              <td><input type="checkbox" checked={Boolean(e.scratched)}
-                onChange={(ev) => updateEntry(ri, ei, 'scratched', ev.target.checked)} /></td>
             </tr>
           ))}
         </tbody>
       </table>
+      {race.wagerMenu && <p className="dim wager">{race.wagerMenu}</p>}
     </details>
   );
 }
