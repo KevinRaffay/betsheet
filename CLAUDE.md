@@ -163,7 +163,7 @@ Before a branch is reported ready, verify — out loud, in the final message:
 | Entries parser — pasted text (D04) | merged | PR #4 — validated against a real Del Mar card (8 races, 81 entries, 0 warnings) |
 | Ingest UI + API (D06) | merged | PR #6 — paste/PDF → warnings-first read-only preview → transactional save; migration 002 adds `races.wager_menu` |
 | Consensus-fetch framework (D07) | in review | PR #7, branch `consensus-framework` — fetcher registry, robots/backoff/mismatch handling, audit trail, manual paste fallback w/ read-only preview |
-| Backtesting addendum encoding (D25) | in review | branch `backtest-addendum` — `cards.consensus_completeness` (migration 003), invariant 12 (buckets never pool), Wayback fetcher planned as D08d, signal/structure layer split planned into D18/D19 |
+| Backtesting addendum encoding (D25) | in review | PR #8, branch `backtest-addendum` — `cards.consensus_completeness` (migration 003), invariant 12 (buckets never pool), Wayback fetcher planned as D08d, signal/structure layer split planned into D18/D19 |
 | Program-PDF parser (D05) | merged | PR #5 — real Del Mar program (10 races, 98 entries, Bottom Line, index validation); found the printed-scratch/renumbered-index pattern in the wild |
 
 ---
