@@ -191,6 +191,44 @@ try {
       method: 'POST', headers: { 'content-type': 'application/pdf' }, body: Buffer.from('nope'),
     })).status === 422);
 
+  // ---- results persistence: save, read back, replace, refuse mismatches ----
+
+  const jpost2 = (url, body) => fetch(BASE + url, {
+    method: 'POST', headers: { 'content-type': 'application/json' }, body: JSON.stringify(body),
+  });
+  const resultsPayload = {
+    track: chartParsed.track, date: chartParsed.date,
+    sourceKind: 'paste', races: chartParsed.races,
+  };
+  const pastedDayId = listBoth.find((d) => d.date === '2026-09-03').id;
+  const wrongDay = await jpost2(`/api/race-days/${pastedDayId}/results`, resultsPayload);
+  check('chart for the wrong date is refused whole (422)', wrongDay.status === 422);
+
+  const saveResultsRes = await jpost2(`/api/race-days/${pdfDay.id}/results`, resultsPayload);
+  const savedResults = await saveResultsRes.json();
+  check('results save: 201 with counts (90 finishers, 67 payoffs, 8 scratches)',
+    saveResultsRes.status === 201 && savedResults.results === 90 &&
+    savedResults.exotics === 67 && savedResults.scratches === 8,
+    JSON.stringify(savedResults));
+
+  const readResults = await fetch(`${BASE}/api/race-days/${pdfDay.id}/results`).then((r) => r.json());
+  check('results read back: winner, exacta, scratch, provenance chart row', (() => {
+    const winner = readResults.results.find((r) => r.race_number === 1 && r.finish_position === 1);
+    const exacta = readResults.exotics.find((x) => x.race_number === 1 && x.bet_type === 'exacta');
+    return winner?.horse_name === "Howie's Law" && winner?.win_cents === 280 &&
+      exacta?.combination === '1-6' && exacta?.payout_cents === 1030 &&
+      readResults.scratches.some((s) => s.horse_name === 'The Chosen Bride') &&
+      readResults.charts.length === 1 && readResults.charts[0].source_kind === 'paste';
+  })());
+
+  await jpost2(`/api/race-days/${pdfDay.id}/results`, resultsPayload);
+  const afterReplace = await fetch(`${BASE}/api/race-days/${pdfDay.id}/results`).then((r) => r.json());
+  check('re-saving replaces results but appends provenance',
+    afterReplace.results.length === 90 && afterReplace.charts.length === 2);
+
+  check('deletion preview now counts result rows',
+    (await fetch(`${BASE}/api/race-days/${pdfDay.id}/deletion-preview`).then((r) => r.json())).results === 90);
+
   // ---- soft delete: cascade by filter, logs intact, restore ----
 
   const preview = await fetch(`${BASE}/api/race-days/${pdfDay.id}/deletion-preview`).then((r) => r.json());
@@ -220,6 +258,8 @@ try {
     body: JSON.stringify({ sourceName: 'X', races: [] }),
   });
   check('manual paste against a deleted day -> 410', pasteOnDeleted.status === 410);
+  check('results save against a deleted day -> 410',
+    (await jpost2(`/api/race-days/${pdfDay.id}/results`, resultsPayload)).status === 410);
 
   await new Promise((r) => setTimeout(r, 300));
   const traceFile = path.join(tmp, 'logs', 'decision-trace.jsonl');

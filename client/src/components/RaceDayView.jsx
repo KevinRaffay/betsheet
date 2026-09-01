@@ -2,6 +2,7 @@ import React, { useEffect, useState } from 'react';
 import { deleteRaceDay, deletionPreview, getRaceDay } from '../api.js';
 import ConsensusPanel from './ConsensusPanel.jsx';
 import CardsPanel from './CardsPanel.jsx';
+import ResultsPanel from './ResultsPanel.jsx';
 
 // Read-only view of a stored race day - what actually landed in the
 // database, not what the parser proposed.
@@ -56,7 +57,8 @@ export default function RaceDayView({ id, onBack, onOpenCard }) {
             <strong>Delete {day.track} {day.date}?</strong> This removes from every
             view: {confirm.races} races, {confirm.entries} entries, picks from{' '}
             {confirm.sources} consensus source{confirm.sources === 1 ? '' : 's'},{' '}
-            {confirm.cards} card{confirm.cards === 1 ? '' : 's'} with {confirm.tickets} tickets.
+            {confirm.cards} card{confirm.cards === 1 ? '' : 's'} with {confirm.tickets} tickets,
+            {' '}{confirm.results ?? 0} result row{(confirm.results ?? 0) === 1 ? '' : 's'}.
             The decision-trace and fetch-audit logs are kept intact. A deleted
             day can be restored from the race-day list ("Show deleted").
           </p>
@@ -74,6 +76,7 @@ export default function RaceDayView({ id, onBack, onOpenCard }) {
         {' '}· {day.races.length} races
       </p>
       <CardsPanel dayId={day.id} onOpenCard={onOpenCard} />
+      <ResultsPanel dayId={day.id} />
       <ConsensusPanel dayId={day.id} />
       {day.races.map((race) => (
         <details className="race" key={race.id} open>

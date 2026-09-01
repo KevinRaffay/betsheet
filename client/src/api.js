@@ -61,6 +61,41 @@ export const deleteRaceDay = (id) =>
 export const restoreRaceDay = (id) =>
   fetch(`/api/race-days/${id}/restore`, { method: 'POST' }).then(asJson);
 
+export function parseResultsText(text, correlationId) {
+  return fetch('/api/parse/results-text', {
+    method: 'POST',
+    headers: {
+      'content-type': 'application/json',
+      ...(correlationId ? { 'x-correlation-id': correlationId } : {}),
+    },
+    body: JSON.stringify({ text }),
+  }).then(asJson);
+}
+
+export function parseResultsPdf(file, correlationId) {
+  return fetch('/api/parse/results-pdf', {
+    method: 'POST',
+    headers: {
+      'content-type': 'application/pdf',
+      ...(correlationId ? { 'x-correlation-id': correlationId } : {}),
+    },
+    body: file,
+  }).then(asJson);
+}
+
+export const saveResults = (dayId, payload, correlationId) =>
+  fetch(`/api/race-days/${dayId}/results`, {
+    method: 'POST',
+    headers: {
+      'content-type': 'application/json',
+      ...(correlationId ? { 'x-correlation-id': correlationId } : {}),
+    },
+    body: JSON.stringify(payload),
+  }).then(asJson);
+
+export const getResults = (dayId) =>
+  fetch(`/api/race-days/${dayId}/results`).then(asJson);
+
 export const resetAppApi = () =>
   fetch('/api/reset', {
     method: 'POST',
