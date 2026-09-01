@@ -13,9 +13,11 @@ export default defineConfig({
     },
   },
   server: {
-    port: 5175,
+    port: Number(process.env.BETSHEET_VITE_PORT) || 5175,
     fs: { allow: ['..'] },
-    proxy: { '/api': 'http://localhost:8788' },
+    // Tracks the API port so a second dev instance (or a verification run
+    // beside an already-running npm start) can move both ports together.
+    proxy: { '/api': `http://localhost:${Number(process.env.BETSHEET_PORT) || 8788}` },
   },
   build: {
     outDir: '../dist',

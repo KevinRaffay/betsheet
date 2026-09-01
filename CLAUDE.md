@@ -80,6 +80,11 @@ Breaking any of these is a bug regardless of what the tests say.
 | `scripts/check-program.js` | program-parser verification: golden diff + hand-checked assertions (98 entries, scratch overlays, stakes header, AE forms, not-to-be-claimed, Best Bet, index cross-check). |
 | `server/ingest.js` | the ingest API: `POST /api/parse/entries-text`, `POST /api/parse/program-pdf` (raw `application/pdf` body, no multipart dep), `POST /api/race-days` (validated, transactional, 409-on-duplicate with explicit replace), `GET /api/race-days[/:id]`. Preview-first: parse endpoints never write. |
 | `scripts/check-ingest.js` | end-to-end ingest verification: boots the real server on a temp DB and exercises parse → save → read-back → conflict → replace → bad payloads → the real program PDF over HTTP. |
+| `server/fetchers/index.js` | the consensus-fetcher registry and interface contract; concrete fetchers register here (D08a–c). `BETSHEET_EXTRA_FETCHERS` loads stub fetchers for the check scripts. |
+| `server/consensus.js` | the fetch runner: robots.txt respect (a disallowed path is never requested), backoff after repeated failures, track/date-mismatch discard, refresh-replaces semantics, resolution of picks to entries, the audit trail (fetch_attempts + fetch-audit stream), the manual paste preview/confirm routes. |
+| `shared/picks-parser.js` | manual-picks text parser ("Race 1: 4, 2, 7 \| watch: 9 \| contrarian: Name"), browser + Node, warnings contract. |
+| `client/src/components/ConsensusPanel.jsx` | the consensus section of a stored day: fetch/refresh, per-race picks by source, the manual paste fallback (read-only preview → confirm), and the always-visible fetch audit. |
+| `scripts/check-consensus.js` | framework verification against stub sources on a local port: ok/robots/404/mismatch/backoff/refresh/manual paths, plus picks- and robots-parser units. |
 | `client/src/api.js` | client half of the ingest API; carries the session's correlation id on every call. |
 | `client/src/App.jsx` | root component, theme application, view routing (list / new / day). |
 | `client/src/components/NewRaceDay.jsx` | the ingest screen: track/date/bankroll form, paste box + PDF upload, warnings-first READ-ONLY preview (corrections = fix the source, re-parse), save with replace-on-conflict. |
@@ -106,6 +111,7 @@ npm run check-schema   # schema: constraints, cascades, migrations, tamper guard
 npm run check-parsers  # entries parser vs. fixtures (golden + hard assertions)
 npm run check-program  # program-PDF parser vs. the real Del Mar program (~30s)
 npm run check-ingest   # boots the real server on a temp DB; full API flow (~30s)
+npm run check-consensus # fetch framework vs. stub sources on a local port
 ```
 
 Further verification commands (`check-parsers`, `check-grading`, simulator
@@ -147,7 +153,8 @@ Before a branch is reported ready, verify — out loud, in the final message:
 | Logging foundation (D02) | merged | PR #2 — three JSONL streams, size+day rotation, gzip/retention sweep, correlation IDs, `/api` request log |
 | SQLite schema + migrations (D03) | merged | PR #3 — full schema incl. Phase 2–4 tables, append-only migrations with tamper guard, money in cents |
 | Entries parser — pasted text (D04) | merged | PR #4 — validated against a real Del Mar card (8 races, 81 entries, 0 warnings) |
-| Ingest UI + API (D06) | in review | PR #6, branch `ingest-ui` — paste/PDF → warnings-first read-only preview → transactional save; migration 002 adds `races.wager_menu` |
+| Ingest UI + API (D06) | merged | PR #6 — paste/PDF → warnings-first read-only preview → transactional save; migration 002 adds `races.wager_menu` |
+| Consensus-fetch framework (D07) | in review | PR #7, branch `consensus-framework` — fetcher registry, robots/backoff/mismatch handling, audit trail, manual paste fallback w/ read-only preview |
 | Program-PDF parser (D05) | merged | PR #5 — real Del Mar program (10 races, 98 entries, Bottom Line, index validation); found the printed-scratch/renumbered-index pattern in the wild |
 
 ---

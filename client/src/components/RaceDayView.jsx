@@ -1,5 +1,6 @@
 import React, { useEffect, useState } from 'react';
 import { getRaceDay } from '../api.js';
+import ConsensusPanel from './ConsensusPanel.jsx';
 
 // Read-only view of a stored race day - what actually landed in the
 // database, not what the parser proposed.
@@ -25,6 +26,7 @@ export default function RaceDayView({ id, onBack }) {
         {' '}· per-race min {day.per_race_min_cents != null ? `$${(day.per_race_min_cents / 100).toFixed(0)}` : '—'}
         {' '}· {day.races.length} races
       </p>
+      <ConsensusPanel dayId={day.id} />
       {day.races.map((race) => (
         <details className="race" key={race.id} open>
           <summary>
