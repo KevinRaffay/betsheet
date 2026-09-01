@@ -8,6 +8,7 @@ import express from 'express';
 import { classifyDay } from '../shared/classification.js';
 import { generateCard } from '../shared/card-engine.js';
 import { getDb } from './db.js';
+import { gradeAndPersist } from './grading.js';
 import { getLogger, newCorrelationId } from './logging.js';
 
 const traceLog = getLogger('decision-trace');
@@ -148,7 +149,14 @@ cardsRouter.post('/race-days/:id/cards', (req, res) => {
     bankrollCents,
   });
 
-  res.status(201).json({ id: cardId, correlationId, ...result });
+  // A card generated after the chart already landed grades immediately -
+  // the backtesting loop needs no extra click.
+  const graded = gradeAndPersist(db, cardId, correlationId);
+
+  res.status(201).json({
+    id: cardId, correlationId, ...result,
+    gradeSummary: graded.error ? null : graded.summary,
+  });
 });
 
 cardsRouter.get('/race-days/:id/cards', (req, res) => {

@@ -96,6 +96,11 @@ export const saveResults = (dayId, payload, correlationId) =>
 export const getResults = (dayId) =>
   fetch(`/api/race-days/${dayId}/results`).then(asJson);
 
+export const gradeCardApi = (cardId) =>
+  fetch(`/api/cards/${cardId}/grade`, { method: 'POST' }).then(asJson);
+export const getGrades = (cardId) =>
+  fetch(`/api/cards/${cardId}/grades`).then(asJson);
+
 export const resetAppApi = () =>
   fetch('/api/reset', {
     method: 'POST',

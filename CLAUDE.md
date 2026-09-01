@@ -114,7 +114,10 @@ Breaking any of these is a bug regardless of what the tests say.
 | `tests/fixtures/sources/` | real captured source pages with audited goldens; `sftb-delmar-2026-08-30.html` is their post for the SAME day as the program-PDF fixture. |
 | `shared/chart-parser.js` | Equibase results-chart parser (browser + Node): per-race finishers with W/P/S payoff tiers, every mutuel row (split at the first $ into WPS half + exotic half; payout/pool peeled from the end; named pools, OF-style combos, two-winner legs, jackpot payouts without cents), scratches with reasons, claimed notes. Unmodeled wagers warn, never guess. |
 | `tests/fixtures/charts/` | the REAL Equibase chart for Del Mar 2026-08-30 (user-provided PDF + its extracted paste-text) with the audited golden — same day as the program and SFTB fixtures. |
-| `server/results.js` | results persistence: POST /api/race-days/:id/results (confirmed chart parse -> race_results/exotic_payoffs/result_scratches in one transaction, result_charts provenance appended, wrong-track/date refused whole, replace-on-resave, 410 on deleted days), GET .../results. |
+| `server/results.js` | results persistence: POST /api/race-days/:id/results (confirmed chart parse -> race_results/exotic_payoffs/result_scratches in one transaction, result_charts provenance appended, wrong-track/date refused whole, replace-on-resave, 410 on deleted days), GET .../results. Chart scratches carry names only, so program numbers are resolved against the day's entries at save (grading refunds key on them). A results save AUTO-GRADES every card of the day. |
+| `shared/grading.js` | ticket grading, PURE: every bet type (WPS per $2, exotics per printed base, `/`-alternate chart legs, parlays chained off win prices, doubles/pick-N off the settling race's payoff row) and the documented scratch/refund policy — WPS refund, single-race exotics pro-rata combo refunds, multi-race pools conservatively refunded whole on a scratched-out leg, parlay legs pass through at factor 1. Outcomes: win / refund / partial / loss. The simulator replays this exact grader. |
+| `server/grading.js` | grading persistence: gradeAndPersist (replace-on-regrade into graded_tickets; `ticket_graded` per ticket + `card_graded` summary traced under the CARD's correlation id — the trace that recorded why a ticket exists also records what it earned), gradeAllCards (the auto-hook after a results save; card generation after results grades in-line too), POST /api/cards/:id/grade (409 until results land), GET .../grades. |
+| `scripts/check-grading.js` | grading verification: hand-computed synthetic cases for every bet type and refund rule, the REAL day graded pure (program golden -> card, chart golden -> grades; hand-audited payoffs pin the math), and a server round-trip (409 before results, auto-grade on save, read-back, regrade-replaces, trace events on file). |
 | `client/src/components/ResultsPanel.jsx` | the results section of a stored day: chart paste + PDF upload, warnings-first read-only preview, save/replace, per-race finish/exotics/scratches view. |
 | `server/pdf-text.js` | line-reconstructed text extraction from text-based PDFs (y-grouped, x-sorted) — the chart PDF path feeds the SAME parser as a paste. |
 | `scripts/check-charts.js` | chart-parser verification: golden + hand-checked payoffs + the program↔chart closure (every program entry is a finisher or a scratch). |
@@ -138,10 +141,9 @@ Breaking any of these is a bug regardless of what the tests say.
 | `client/src/styles.css` | all styles: Radix Mauve imports, semantic tokens, light/dark themes, desktop-first layout. |
 
 Planned homes (each arrives with its PR — keep this table honest as they
-land): `server/fetchers/` — one module per consensus source. `shared/` also
-gains consensus classification, the card-generation engine and ticket
-grading, so the simulator exercises shipping code. `scripts/check-grading`
-arrives with D15.
+land): `server/fetchers/` — one module per consensus source (Wayback D08d
+pending). P/L views (D16) and the Phase 3 trace export / templates /
+simulator arrive with their PRs.
 
 ---
 
@@ -160,11 +162,12 @@ npm run check-sources   # concrete fetchers vs. real captured fixtures
 npm run check-classification # consensus table + UNANIMOUS/SPLIT/CHAOS rules
 npm run check-engine    # card engine vs. the real goldens + server round-trip
 npm run check-charts    # results-chart parser vs. the real Equibase chart
+npm run check-grading   # ticket grading vs. hand-computed + real-day payoffs
 npm run reset -- --yes  # FACTORY RESET: wipe every record AND every log file
 ```
 
-Further verification commands (`check-parsers`, `check-grading`, simulator
-runs) are added by their PRs and listed here as they land.
+Further verification commands (simulator runs, distribution reports) are
+added by their PRs and listed here as they land.
 
 ---
 
@@ -204,6 +207,7 @@ Before a branch is reported ready, verify — out loud, in the final message:
 | Entries parser — pasted text (D04) | merged | PR #4 — validated against a real Del Mar card (8 races, 81 entries, 0 warnings) |
 | Ingest UI + API (D06) | merged | PR #6 — paste/PDF → warnings-first read-only preview → transactional save; migration 002 adds `races.wager_menu` |
 | Consensus-fetch framework (D07) | merged | PR #7 — fetcher registry, robots/backoff/mismatch handling, audit trail, manual paste fallback w/ read-only preview |
+| Ticket grading engine (D15) | in review | PR #23, branch `grading` — shared/grading.js (pure) + server/grading.js; results save auto-grades every card; Result/P&L columns on the card view; validated on the real Del Mar day's printed payoffs |
 | Results ingest UI (D14) | merged | PR #21, branch `results-ingest` — paste/PDF -> read-only preview -> persist; mismatched charts refused whole |
 | Chart-PDF ingestion (D13) | merged | PR #20, branch `chart-pdf` — pdf-text extraction + results parse endpoints (preview-only) |
 | Results-chart parser (D12) | merged | PR #19, branch `chart-parser` — Phase 2 opens; the real Equibase chart for the fixture day; program↔chart closure proven |
