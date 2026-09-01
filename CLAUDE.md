@@ -202,7 +202,7 @@ Before a branch is reported ready, verify — out loud, in the final message:
 | Entries parser — pasted text (D04) | merged | PR #4 — validated against a real Del Mar card (8 races, 81 entries, 0 warnings) |
 | Ingest UI + API (D06) | merged | PR #6 — paste/PDF → warnings-first read-only preview → transactional save; migration 002 adds `races.wager_menu` |
 | Consensus-fetch framework (D07) | merged | PR #7 — fetcher registry, robots/backoff/mismatch handling, audit trail, manual paste fallback w/ read-only preview |
-| Chart-PDF ingestion (D13) | in review | branch `chart-pdf` — pdf-text extraction + results parse endpoints (preview-only) |
+| Chart-PDF ingestion (D13) | in review | PR #20, branch `chart-pdf` — pdf-text extraction + results parse endpoints (preview-only) |
 | Results-chart parser (D12) | merged | PR #19, branch `chart-parser` — Phase 2 opens; the real Equibase chart for the fixture day; program↔chart closure proven |
 | Card recipes + append-only generation (D28) | merged | PR #17, branch `card-recipes` — migration 007 (cards rebuild: AUTOINCREMENT id, per-day card_number, per_race_min_cents, UNIQUE(day,variant) dropped); list shows the full recipe |
 | Factory reset (D27) | merged | PR #16, branch `app-reset` — wipe all records + all logs behind explicit confirms (API token, CLI --yes, UI Danger zone); id sequence restarts; `app_reset` opens the new era's log |
