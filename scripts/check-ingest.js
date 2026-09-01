@@ -165,6 +165,32 @@ try {
   check('pdf day: best bet and program ranks persisted',
     bb?.horse_name === 'Run With Liberty' && bb?.program_rank === 1);
 
+  // ---- results-chart parse endpoints (preview only; nothing persists) ----
+
+  const chartText = fs.readFileSync(path.join(ROOT, 'tests', 'fixtures', 'charts', 'dmr-2026-08-30.txt'), 'utf8');
+  const chartTextRes = await fetch(`${BASE}/api/parse/results-text`, {
+    method: 'POST', headers: { 'content-type': 'application/json' },
+    body: JSON.stringify({ text: chartText }),
+  });
+  const chartParsed = await chartTextRes.json();
+  check('results-text endpoint: 10 races, winners with payouts',
+    chartTextRes.ok && chartParsed.races.length === 10 &&
+    chartParsed.races.every((r) => r.results[0]?.winCents > 0));
+
+  const chartPdf = fs.readFileSync(path.join(ROOT, 'tests', 'fixtures', 'charts', 'dmr-2026-08-30.pdf'));
+  const chartPdfRes = await fetch(`${BASE}/api/parse/results-pdf`, {
+    method: 'POST', headers: { 'content-type': 'application/pdf' }, body: chartPdf,
+  });
+  const chartPdfParsed = await chartPdfRes.json();
+  check('results-pdf endpoint parses identically to the pasted text', (() => {
+    const strip = (o) => JSON.stringify({ races: o.races, track: o.track, date: o.date });
+    return chartPdfRes.ok && strip(chartPdfParsed) === strip(chartParsed);
+  })());
+  check('corrupt results pdf -> 422, not a crash',
+    (await fetch(`${BASE}/api/parse/results-pdf`, {
+      method: 'POST', headers: { 'content-type': 'application/pdf' }, body: Buffer.from('nope'),
+    })).status === 422);
+
   // ---- soft delete: cascade by filter, logs intact, restore ----
 
   const preview = await fetch(`${BASE}/api/race-days/${pdfDay.id}/deletion-preview`).then((r) => r.json());
