@@ -159,7 +159,7 @@ Before a branch is reported ready, verify — out loud, in the final message:
 | Entries parser — pasted text (D04) | merged | PR #4 — validated against a real Del Mar card (8 races, 81 entries, 0 warnings) |
 | Ingest UI + API (D06) | merged | PR #6 — paste/PDF → warnings-first read-only preview → transactional save; migration 002 adds `races.wager_menu` |
 | Consensus-fetch framework (D07) | merged | PR #7 — fetcher registry, robots/backoff/mismatch handling, audit trail, manual paste fallback w/ read-only preview |
-| SFTB fetcher (D08c) | in review | branch `sftb-fetcher` — resequenced first among sources; sitemap discovery + expected-order parsing; real fixture matches the program-PDF day. D08a blocked (dmtc picks page is a directory — decision needed), D08b blocked (ATR bot challenge — manual-only) |
+| SFTB fetcher (D08c) | in review | PR #9, branch `sftb-fetcher` — resequenced first among sources; sitemap discovery + expected-order parsing; real fixture matches the program-PDF day. D08a blocked (dmtc picks page is a directory — decision needed), D08b blocked (ATR bot challenge — manual-only) |
 | Program-PDF parser (D05) | merged | PR #5 — real Del Mar program (10 races, 98 entries, Bottom Line, index validation); found the printed-scratch/renumbered-index pattern in the wild |
 
 ---
