@@ -11,6 +11,7 @@ import { getLogger } from './logging.js';
 import { ingestRouter } from './ingest.js';
 import { consensusRouter } from './consensus.js';
 import { cardsRouter } from './cards.js';
+import { resetRouter } from './reset.js';
 
 const ROOT = fileURLToPath(new URL('../', import.meta.url));
 const log = getLogger('app');
@@ -45,6 +46,7 @@ app.get('/api/health', (_req, res) => {
 app.use('/api', ingestRouter);
 app.use('/api', consensusRouter);
 app.use('/api', cardsRouter);
+app.use('/api', resetRouter);
 
 // JSON errors for the API, never Express's HTML error page. Registered
 // after the routers; `async` handlers above catch their own.

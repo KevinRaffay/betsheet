@@ -327,6 +327,12 @@ html, body {
 }
 .row--subtotal td:last-child { color: var(--color-text); }
 .card-footer p { margin: 6px 0; }
+.danger-zone {
+  margin-top: 48px;
+  padding-top: 12px;
+  border-top: 1px dashed var(--color-border);
+}
+
 .responsible {
   font-size: 12.5px;
   color: var(--color-text-muted);
