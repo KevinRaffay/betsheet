@@ -25,6 +25,8 @@
 // it at stub sources on a local port - the framework is exercised end to
 // end without touching the network.
 
+import sftbFetcher from './sftb.js';
+
 const fetchers = [];
 
 export function registerFetcher(f) {
@@ -38,6 +40,12 @@ export function registerFetcher(f) {
 }
 
 export const listFetchers = () => [...fetchers];
+
+// Built-in sources. Check scripts set BETSHEET_DISABLE_BUILTIN_FETCHERS so
+// their stub-only runs can never touch the network.
+if (!process.env.BETSHEET_DISABLE_BUILTIN_FETCHERS) {
+  registerFetcher(sftbFetcher);
+}
 
 let extrasLoaded = false;
 

@@ -84,7 +84,10 @@ Breaking any of these is a bug regardless of what the tests say.
 | `server/consensus.js` | the fetch runner: robots.txt respect (a disallowed path is never requested), backoff after repeated failures, track/date-mismatch discard, refresh-replaces semantics, resolution of picks to entries, the audit trail (fetch_attempts + fetch-audit stream), the manual paste preview/confirm routes. |
 | `shared/picks-parser.js` | manual-picks text parser ("Race 1: 4, 2, 7 \| watch: 9 \| contrarian: Name"), browser + Node, warnings contract. |
 | `client/src/components/ConsensusPanel.jsx` | the consensus section of a stored day: fetch/refresh, per-race picks by source, the manual paste fallback (read-only preview → confirm), and the always-visible fetch audit. |
-| `scripts/check-consensus.js` | framework verification against stub sources on a local port: ok/robots/404/mismatch/backoff/refresh/manual paths, plus picks- and robots-parser units. |
+| `scripts/check-consensus.js` | framework verification against stub sources on a local port: ok/robots/404/mismatch/backoff/refresh/manual/resolver/disabled paths, plus picks- and robots-parser units. Sets `BETSHEET_DISABLE_BUILTIN_FETCHERS` so it can never touch the network. |
+| `server/fetchers/sftb.js` | Sports from the Basement fetcher: sitemap URL discovery (post URLs carry the publish date, not the race date), expected-order tables → top/second/third picks, full order in the top pick's note (D09 contrarian detection), SCRATCH rows excluded. |
+| `tests/fixtures/sources/` | real captured source pages with audited goldens; `sftb-delmar-2026-08-30.html` is their post for the SAME day as the program-PDF fixture. |
+| `scripts/check-sources.js` | per-source verification, one section per fetcher: golden + hand-checked assertions + URL-discovery units, no network. |
 | `client/src/api.js` | client half of the ingest API; carries the session's correlation id on every call. |
 | `client/src/App.jsx` | root component, theme application, view routing (list / new / day). |
 | `client/src/components/NewRaceDay.jsx` | the ingest screen: track/date/bankroll form, paste box + PDF upload, warnings-first READ-ONLY preview (corrections = fix the source, re-parse), save with replace-on-conflict. |
@@ -112,6 +115,7 @@ npm run check-parsers  # entries parser vs. fixtures (golden + hard assertions)
 npm run check-program  # program-PDF parser vs. the real Del Mar program (~30s)
 npm run check-ingest   # boots the real server on a temp DB; full API flow (~30s)
 npm run check-consensus # fetch framework vs. stub sources on a local port
+npm run check-sources   # concrete fetchers vs. real captured fixtures
 ```
 
 Further verification commands (`check-parsers`, `check-grading`, simulator
@@ -154,7 +158,8 @@ Before a branch is reported ready, verify — out loud, in the final message:
 | SQLite schema + migrations (D03) | merged | PR #3 — full schema incl. Phase 2–4 tables, append-only migrations with tamper guard, money in cents |
 | Entries parser — pasted text (D04) | merged | PR #4 — validated against a real Del Mar card (8 races, 81 entries, 0 warnings) |
 | Ingest UI + API (D06) | merged | PR #6 — paste/PDF → warnings-first read-only preview → transactional save; migration 002 adds `races.wager_menu` |
-| Consensus-fetch framework (D07) | in review | PR #7, branch `consensus-framework` — fetcher registry, robots/backoff/mismatch handling, audit trail, manual paste fallback w/ read-only preview |
+| Consensus-fetch framework (D07) | merged | PR #7 — fetcher registry, robots/backoff/mismatch handling, audit trail, manual paste fallback w/ read-only preview |
+| SFTB fetcher (D08c) | in review | PR #9, branch `sftb-fetcher` — resequenced first among sources; sitemap discovery + expected-order parsing; real fixture matches the program-PDF day. D08a blocked (dmtc picks page is a directory — decision needed), D08b blocked (ATR bot challenge — manual-only) |
 | Program-PDF parser (D05) | merged | PR #5 — real Del Mar program (10 races, 98 entries, Bottom Line, index validation); found the printed-scratch/renumbered-index pattern in the wild |
 
 ---
