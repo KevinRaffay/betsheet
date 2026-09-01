@@ -23,6 +23,18 @@ app.get('/api/health', (_req, res) => {
 
 app.use(express.static(path.join(ROOT, 'dist')));
 
-app.listen(PORT, HOST, () => {
+const server = app.listen(PORT, HOST, () => {
   console.log(`BetSheet listening on http://${HOST}:${PORT}`);
+});
+
+server.on('error', (err) => {
+  if (err.code === 'EADDRINUSE') {
+    console.error(
+      `Port ${PORT} is already in use - another BetSheet instance ` +
+      `(or a leftover dev/preview server) is running.\n` +
+      `Stop it, or set BETSHEET_PORT to a different port.`,
+    );
+    process.exit(1);
+  }
+  throw err;
 });
