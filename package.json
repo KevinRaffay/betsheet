@@ -9,10 +9,12 @@
     "build": "vite build",
     "dev": "concurrently -k -n vite,api -c cyan,magenta \"vite\" \"node --watch server/index.js\"",
     "serve": "node server/index.js",
-    "check-logging": "node scripts/check-logging.js"
+    "check-logging": "node scripts/check-logging.js",
+    "check-schema": "node scripts/check-schema.js"
   },
   "dependencies": {
     "@radix-ui/colors": "^3.0.0",
+    "better-sqlite3": "^13.0.3",
     "dotenv": "^16.4.5",
     "express": "^4.19.2",
     "react": "^18.3.1",

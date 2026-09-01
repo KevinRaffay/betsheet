@@ -67,6 +67,9 @@ Breaking any of these is a bug regardless of what the tests say.
 | `server/index.js` | the HTTP server: serves `dist/`, the `/api/*` endpoints, loopback binding, `/api` request logging. |
 | `server/logging.js` | structured JSON-lines logging: the three streams (`app`, `fetch-audit`, `decision-trace`), size+day rotation, gzip/retention sweep, correlation IDs, `readRecent`. Writes are synchronous and never throw. |
 | `scripts/check-logging.js` | verification for logging: rotation, sweep, retention, torn lines, level gating. |
+| `server/db.js` | SQLite via better-sqlite3: `openDb` (applies migrations, WAL, FKs on, tamper guard), `getDb` singleton. |
+| `server/migrations/` | append-only numbered SQL migrations. `001-initial.sql` is the FULL schema, Phase 2–4 tables included. Money is integer cents; program numbers are TEXT ("1A"); results key on race *number* so a chart can land without a parsed program. |
+| `scripts/check-schema.js` | verification for the schema: tables, constraints, cascades, idempotence, tamper guard, whole-graph smoke insert. |
 | `client/src/App.jsx` | root component and theme application. |
 | `client/src/prefs.js` | per-user UI preferences in `localStorage` (theme). Never card data. |
 | `client/src/styles.css` | all styles: Radix Mauve imports, semantic tokens, light/dark themes, desktop-first layout. |
@@ -88,6 +91,7 @@ real entries/picks/chart samples with expected-JSON golden files.
 npm start              # build + serve on 127.0.0.1:8788
 npm run dev            # vite :5175 + api :8788
 npm run check-logging  # logging: rotation, sweep, retention, torn lines
+npm run check-schema   # schema: constraints, cascades, migrations, tamper guard
 ```
 
 Further verification commands (`check-parsers`, `check-grading`, simulator
@@ -127,6 +131,7 @@ Before a branch is reported ready, verify — out loud, in the final message:
 | --- | --- | --- |
 | Repo scaffold (D01) | in review | PR #1, branch `scaffold` — stack, styling system, server wiring, docs ledger |
 | Logging foundation (D02) | in review | PR #2, branch `logging` — three JSONL streams, size+day rotation, gzip/retention sweep, correlation IDs, `/api` request log |
+| SQLite schema + migrations (D03) | in review | branch `schema` — full schema incl. Phase 2–4 tables, append-only migrations with tamper guard, money in cents |
 
 ---
 
