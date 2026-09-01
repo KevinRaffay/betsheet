@@ -131,7 +131,7 @@ Before a branch is reported ready, verify — out loud, in the final message:
 | --- | --- | --- |
 | Repo scaffold (D01) | in review | PR #1, branch `scaffold` — stack, styling system, server wiring, docs ledger |
 | Logging foundation (D02) | in review | PR #2, branch `logging` — three JSONL streams, size+day rotation, gzip/retention sweep, correlation IDs, `/api` request log |
-| SQLite schema + migrations (D03) | in review | branch `schema` — full schema incl. Phase 2–4 tables, append-only migrations with tamper guard, money in cents |
+| SQLite schema + migrations (D03) | in review | PR #3, branch `schema` — full schema incl. Phase 2–4 tables, append-only migrations with tamper guard, money in cents |
 
 ---
 
