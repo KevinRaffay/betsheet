@@ -10,7 +10,8 @@
     "dev": "concurrently -k -n vite,api -c cyan,magenta \"vite\" \"node --watch server/index.js\"",
     "serve": "node server/index.js",
     "check-logging": "node scripts/check-logging.js",
-    "check-schema": "node scripts/check-schema.js"
+    "check-schema": "node scripts/check-schema.js",
+    "check-parsers": "node scripts/check-parsers.js"
   },
   "dependencies": {
     "@radix-ui/colors": "^3.0.0",
