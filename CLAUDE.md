@@ -48,9 +48,11 @@ Breaking any of these is a bug regardless of what the tests say.
 8. **One correlation ID per card session.** Every log event for a card's
    fetches, parses, generation, edits, grading and publishes carries it, so
    one card's history extracts as one coherent trace.
-9. **Parsers never save without a preview.** Every ingest path (entries,
-   picks, result charts) shows a parse preview the user confirms or corrects
-   before anything is written.
+9. **Parsers never save without a preview, and the preview is read-only.**
+   Every ingest path (entries, picks, result charts) shows exactly what Save
+   will store — warnings first — and the user confirms before anything is
+   written. Corrections happen at the source (fix the pasted text, re-parse),
+   never by hand-editing the parser's output in the preview.
 10. **The server binds 127.0.0.1.** BetSheet is local-only; sharing is the
     here.now publish feature's job (Phase 4). Published cards contain card
     data only, never personal information.
@@ -76,7 +78,13 @@ Breaking any of these is a bug regardless of what the tests say.
 | `server/program-parser.js` | program-PDF parser (Node, pdfjs-dist): race panels anchored by their "MM/DD/YYYY Race N" footer (simulcast pages have none), horse bands by nearest program-number y (never stream order), Bottom Line analysis → programRank + bestBet, alphabetical-index cross-validation incl. the printed-scratch/renumbered-index pattern. |
 | `tests/fixtures/programs/` | the REAL Del Mar program PDF for 2026-08-30 (12.2MB, committed — same precedent as life-swipe's SSA archive) plus its audited golden. |
 | `scripts/check-program.js` | program-parser verification: golden diff + hand-checked assertions (98 entries, scratch overlays, stakes header, AE forms, not-to-be-claimed, Best Bet, index cross-check). |
-| `client/src/App.jsx` | root component and theme application. |
+| `server/ingest.js` | the ingest API: `POST /api/parse/entries-text`, `POST /api/parse/program-pdf` (raw `application/pdf` body, no multipart dep), `POST /api/race-days` (validated, transactional, 409-on-duplicate with explicit replace), `GET /api/race-days[/:id]`. Preview-first: parse endpoints never write. |
+| `scripts/check-ingest.js` | end-to-end ingest verification: boots the real server on a temp DB and exercises parse → save → read-back → conflict → replace → bad payloads → the real program PDF over HTTP. |
+| `client/src/api.js` | client half of the ingest API; carries the session's correlation id on every call. |
+| `client/src/App.jsx` | root component, theme application, view routing (list / new / day). |
+| `client/src/components/NewRaceDay.jsx` | the ingest screen: track/date/bankroll form, paste box + PDF upload, warnings-first READ-ONLY preview (corrections = fix the source, re-parse), save with replace-on-conflict. |
+| `client/src/components/RaceDayList.jsx` | home: stored race days table. |
+| `client/src/components/RaceDayView.jsx` | read-only view of a stored day — what landed in the DB, not what the parser proposed. |
 | `client/src/prefs.js` | per-user UI preferences in `localStorage` (theme). Never card data. |
 | `client/src/styles.css` | all styles: Radix Mauve imports, semantic tokens, light/dark themes, desktop-first layout. |
 
@@ -97,6 +105,7 @@ npm run check-logging  # logging: rotation, sweep, retention, torn lines
 npm run check-schema   # schema: constraints, cascades, migrations, tamper guard
 npm run check-parsers  # entries parser vs. fixtures (golden + hard assertions)
 npm run check-program  # program-PDF parser vs. the real Del Mar program (~30s)
+npm run check-ingest   # boots the real server on a temp DB; full API flow (~30s)
 ```
 
 Further verification commands (`check-parsers`, `check-grading`, simulator
@@ -138,7 +147,8 @@ Before a branch is reported ready, verify — out loud, in the final message:
 | Logging foundation (D02) | merged | PR #2 — three JSONL streams, size+day rotation, gzip/retention sweep, correlation IDs, `/api` request log |
 | SQLite schema + migrations (D03) | merged | PR #3 — full schema incl. Phase 2–4 tables, append-only migrations with tamper guard, money in cents |
 | Entries parser — pasted text (D04) | merged | PR #4 — validated against a real Del Mar card (8 races, 81 entries, 0 warnings) |
-| Program-PDF parser (D05) | in review | PR #5, branch `pdf-parser` — real Del Mar program (10 races, 98 entries, Bottom Line, index validation); found the printed-scratch/renumbered-index pattern in the wild |
+| Ingest UI + API (D06) | in review | PR #6, branch `ingest-ui` — paste/PDF → warnings-first read-only preview → transactional save; migration 002 adds `races.wager_menu` |
+| Program-PDF parser (D05) | merged | PR #5 — real Del Mar program (10 races, 98 entries, Bottom Line, index validation); found the printed-scratch/renumbered-index pattern in the wild |
 
 ---
 
