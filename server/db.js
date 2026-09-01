@@ -27,7 +27,23 @@ const DEFAULT_PATH = process.env.BETSHEET_DB
 
 const log = getLogger('app');
 
-const digest = (text) => crypto.createHash('sha256').update(text).digest('hex');
+// Hashes are computed over CANONICAL text (CRLF folded to LF). Raw-byte
+// hashing shipped first and produced false tamper alarms on Windows: git's
+// autocrlf rewrites a migration's line endings whenever a branch switch
+// re-materializes the file, so the same content hashed two ways depending
+// on checkout history. Line endings are presentation, not content.
+const canonical = (text) => text.replace(/\r\n/g, '\n');
+const digest = (text) => crypto.createHash('sha256').update(canonical(text)).digest('hex');
+const rawDigest = (text) => crypto.createHash('sha256').update(text).digest('hex');
+
+// A record written by the raw-byte era matches one of the same content's
+// line-ending variants; anything else is a real edit.
+function isLegacyEndingVariant(prior, sql) {
+  const lf = canonical(sql);
+  return prior === rawDigest(sql) ||
+    prior === rawDigest(lf) ||
+    prior === rawDigest(lf.replace(/\n/g, '\r\n'));
+}
 
 function migrationFiles() {
   return fs.readdirSync(MIGRATIONS_DIR)
@@ -58,13 +74,20 @@ export function openDb(dbPath = DEFAULT_PATH) {
     const prior = applied.get(file);
     if (prior) {
       if (prior !== hash) {
-        // Close before throwing: an open handle on the refused database
-        // keeps the file locked on Windows.
-        db.close();
-        throw new Error(
-          `migration ${file} changed after being applied (recorded ${prior.slice(0, 12)}, ` +
-          `on disk ${hash.slice(0, 12)}). Shipped migrations are append-only - add a new file.`,
-        );
+        if (isLegacyEndingVariant(prior, sql)) {
+          // Same content, different line endings (or a raw-era record):
+          // self-heal the record to the canonical hash and move on.
+          db.prepare('UPDATE schema_migrations SET sha256 = ? WHERE name = ?').run(hash, file);
+          log.info('migration_hash_migrated', { migration: file, db: path.basename(dbPath) });
+        } else {
+          // Close before throwing: an open handle on the refused database
+          // keeps the file locked on Windows.
+          db.close();
+          throw new Error(
+            `migration ${file} changed after being applied (recorded ${prior.slice(0, 12)}, ` +
+            `on disk ${hash.slice(0, 12)}). Shipped migrations are append-only - add a new file.`,
+          );
+        }
       }
       continue;
     }
