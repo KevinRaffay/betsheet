@@ -122,7 +122,7 @@ Before a branch is reported ready, verify — out loud, in the final message:
 
 | feature | state | notes |
 | --- | --- | --- |
-| Repo scaffold (D01) | in review | branch `scaffold` — stack, styling system, server wiring, docs ledger |
+| Repo scaffold (D01) | in review | PR #1, branch `scaffold` — stack, styling system, server wiring, docs ledger |
 
 ---
 
