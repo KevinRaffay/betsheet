@@ -1,0 +1,106 @@
+/* BetSheet - desktop-first, no framework.
+   Radix Colors with Mauve neutral scale, paired light/dark themes, same
+   semantic-token system as life-swipe. Desktop web is the primary platform:
+   wide layouts, data-dense tables. The mobile at-track view (Phase 4) reuses
+   these tokens; nothing here should fight a responsive adaptation later. */
+
+@import '@radix-ui/colors/mauve.css';
+@import '@radix-ui/colors/mauve-dark.css';
+
+:root {
+  /* Brand accents - racing greens and saddle-cloth tones. */
+  --accent: #0e7a4d;      /* track green: primary actions, wins */
+  --accent-2: #1794d1;    /* infield blue: links, info */
+  --gold: #d9a208;        /* payout gold: highlights, cashed tickets */
+  --loss: #c93a3a;        /* losses, warnings */
+
+  /* Semantic tokens - light theme defaults (overridden by .dark-theme) */
+  --color-bg: var(--mauve-1);
+  --color-bg-subtle: var(--mauve-2);
+  --color-bg-raised: var(--mauve-3);
+  --color-border: var(--mauve-6);
+  --color-text: var(--mauve-12);
+  --color-text-muted: var(--mauve-10);
+  --color-accent: var(--accent);
+  --color-accent-text: #fff;
+
+  --radius: 10px;
+  --shell-max: 1440px;
+
+  color-scheme: light;
+}
+
+.dark-theme {
+  --color-bg: var(--mauve-1);
+  --color-bg-subtle: var(--mauve-3);
+  --color-bg-raised: var(--mauve-4);
+  --color-border: var(--mauve-6);
+  --color-text: var(--mauve-12);
+  --color-text-muted: var(--mauve-11);
+  --color-accent: #17a86b;
+  --color-accent-text: #06130c;
+
+  color-scheme: dark;
+}
+
+* { box-sizing: border-box; }
+
+html, body {
+  margin: 0;
+  padding: 0;
+  height: 100%;
+  background: var(--color-bg);
+  color: var(--color-text);
+  font-family: 'Segoe UI Variable Text', 'Segoe UI', system-ui, -apple-system,
+               'Inter', Roboto, 'Helvetica Neue', sans-serif;
+  -webkit-font-smoothing: antialiased;
+  text-rendering: optimizeLegibility;
+}
+
+#root { height: 100%; }
+
+.shell {
+  max-width: var(--shell-max);
+  margin: 0 auto;
+  padding: 0 24px;
+  min-height: 100%;
+  display: flex;
+  flex-direction: column;
+}
+
+.topbar {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  padding: 14px 0;
+  border-bottom: 1px solid var(--color-border);
+}
+
+.topbar__brand {
+  margin: 0;
+  font-size: 20px;
+  font-weight: 700;
+  letter-spacing: 0.02em;
+}
+
+.topbar__theme {
+  border: 1px solid var(--color-border);
+  background: var(--color-bg-subtle);
+  color: var(--color-text);
+  border-radius: var(--radius);
+  padding: 6px 14px;
+  font: inherit;
+  font-size: 13px;
+  cursor: pointer;
+}
+.topbar__theme:hover { background: var(--color-bg-raised); }
+
+.pane {
+  flex: 1;
+  padding: 24px 0;
+}
+
+.placeholder {
+  color: var(--color-text-muted);
+  max-width: 60ch;
+}
