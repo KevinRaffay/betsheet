@@ -61,6 +61,9 @@ cardsRouter.post('/race-days/:id/cards', (req, res) => {
   const db = getDb();
   const day = loadDayFull(db, Number(req.params.id));
   if (!day) return res.status(404).json({ error: 'No such race day.' });
+  if (day.deleted_at) {
+    return res.status(410).json({ error: 'This race day is deleted. Restore it before generating cards.' });
+  }
 
   const variant = String(req.body?.variant ?? 'default').trim() || 'default';
   const bankrollCents = Number(req.body?.bankrollCents ?? day.bankroll_cents);

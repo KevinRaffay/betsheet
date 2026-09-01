@@ -50,8 +50,16 @@ export function saveRaceDay(payload, correlationId) {
   }).then(asJson);
 }
 
-export const listRaceDays = () => fetch('/api/race-days').then(asJson);
+export const listRaceDays = (deleted = false) =>
+  fetch(`/api/race-days${deleted ? '?deleted=1' : ''}`).then(asJson);
 export const getRaceDay = (id) => fetch(`/api/race-days/${id}`).then(asJson);
+
+export const deletionPreview = (id) =>
+  fetch(`/api/race-days/${id}/deletion-preview`).then(asJson);
+export const deleteRaceDay = (id) =>
+  fetch(`/api/race-days/${id}`, { method: 'DELETE' }).then(asJson);
+export const restoreRaceDay = (id) =>
+  fetch(`/api/race-days/${id}/restore`, { method: 'POST' }).then(asJson);
 
 export const fetchConsensus = (id) =>
   fetch(`/api/race-days/${id}/fetch-consensus`, { method: 'POST' }).then(asJson);

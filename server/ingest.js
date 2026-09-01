@@ -14,6 +14,7 @@ import { getDb } from './db.js';
 import { getLogger, newCorrelationId } from './logging.js';
 
 const log = getLogger('app');
+const traceLog = getLogger('decision-trace');
 
 export const ingestRouter = express.Router();
 
@@ -123,9 +124,12 @@ ingestRouter.post('/race-days', (req, res) => {
   if (problems.length) return res.status(400).json({ error: problems.join('; ') });
 
   const db = getDb();
-  const existing = db.prepare('SELECT id FROM race_days WHERE track = ? AND date = ?')
+  const existing = db.prepare('SELECT id, deleted_at FROM race_days WHERE track = ? AND date = ?')
     .get(p.track, p.date);
-  if (existing && !p.replace) {
+  // A LIVE duplicate needs an explicit replace; a soft-deleted tombstone
+  // for the same track/date is superseded by re-ingesting - the user
+  // already deleted it, and UNIQUE(track,date) leaves no other slot.
+  if (existing && !existing.deleted_at && !p.replace) {
     return res.status(409).json({
       error: `A race day for ${p.track} ${p.date} already exists.`,
       existingId: existing.id,
@@ -150,19 +154,79 @@ ingestRouter.post('/race-days', (req, res) => {
   res.status(201).json({ id: dayId, correlationId, replaced: Boolean(existing) });
 });
 
-ingestRouter.get('/race-days', (_req, res) => {
+ingestRouter.get('/race-days', (req, res) => {
   const db = getDb();
+  const showDeleted = req.query.deleted === '1';
   const days = db.prepare(`
-    SELECT rd.id, rd.track, rd.date, rd.bankroll_cents, rd.created_at,
+    SELECT rd.id, rd.track, rd.date, rd.bankroll_cents, rd.created_at, rd.deleted_at,
            COUNT(DISTINCT r.id) AS races,
            COUNT(e.id) AS entries
     FROM race_days rd
     LEFT JOIN races r ON r.race_day_id = rd.id
     LEFT JOIN entries e ON e.race_id = r.id
+    WHERE rd.deleted_at IS ${showDeleted ? 'NOT NULL' : 'NULL'}
     GROUP BY rd.id
     ORDER BY rd.date DESC, rd.track
   `).all();
   res.json(days);
+});
+
+// What a deletion would remove - the confirmation dialog's numbers.
+ingestRouter.get('/race-days/:id/deletion-preview', (req, res) => {
+  const db = getDb();
+  const day = db.prepare('SELECT id FROM race_days WHERE id = ?').get(req.params.id);
+  if (!day) return res.status(404).json({ error: 'No such race day.' });
+  const one = (sql) => db.prepare(sql).get(day.id).n;
+  res.json({
+    races: one('SELECT COUNT(*) n FROM races WHERE race_day_id = ?'),
+    entries: one('SELECT COUNT(*) n FROM entries e JOIN races r ON r.id = e.race_id WHERE r.race_day_id = ?'),
+    sources: one(`SELECT COUNT(DISTINCT cp.source_id) n FROM consensus_picks cp
+                  JOIN races r ON r.id = cp.race_id WHERE r.race_day_id = ?`),
+    cards: one('SELECT COUNT(*) n FROM cards WHERE race_day_id = ?'),
+    tickets: one('SELECT COUNT(*) n FROM tickets t JOIN cards c ON c.id = t.card_id WHERE c.race_day_id = ?'),
+  });
+});
+
+// Soft delete: the row (and, by filter, its whole tree) disappears from
+// every default query. The decision-trace and fetch-audit LOG FILES are
+// deliberately untouched - a deleted day's history stays readable under
+// its correlation ids - and the deletion itself becomes a trace event.
+ingestRouter.delete('/race-days/:id', (req, res) => {
+  const db = getDb();
+  const day = db.prepare('SELECT * FROM race_days WHERE id = ?').get(req.params.id);
+  if (!day) return res.status(404).json({ error: 'No such race day.' });
+  if (day.deleted_at) return res.status(409).json({ error: 'Already deleted.' });
+
+  const counts = {
+    races: db.prepare('SELECT COUNT(*) n FROM races WHERE race_day_id = ?').get(day.id).n,
+    entries: db.prepare('SELECT COUNT(*) n FROM entries e JOIN races r ON r.id = e.race_id WHERE r.race_day_id = ?').get(day.id).n,
+    cards: db.prepare('SELECT COUNT(*) n FROM cards WHERE race_day_id = ?').get(day.id).n,
+    tickets: db.prepare('SELECT COUNT(*) n FROM tickets t JOIN cards c ON c.id = t.card_id WHERE c.race_day_id = ?').get(day.id).n,
+  };
+  db.prepare("UPDATE race_days SET deleted_at = strftime('%Y-%m-%dT%H:%M:%SZ', 'now') WHERE id = ?").run(day.id);
+
+  const event = {
+    correlationId: day.correlation_id,
+    raceDayId: day.id,
+    track: day.track,
+    date: day.date,
+    ...counts,
+  };
+  traceLog.info('race_day_deleted', event);
+  log.info('race_day_deleted', event);
+  res.json({ ok: true, ...counts });
+});
+
+ingestRouter.post('/race-days/:id/restore', (req, res) => {
+  const db = getDb();
+  const day = db.prepare('SELECT * FROM race_days WHERE id = ?').get(req.params.id);
+  if (!day) return res.status(404).json({ error: 'No such race day.' });
+  if (!day.deleted_at) return res.status(409).json({ error: 'Not deleted.' });
+  db.prepare('UPDATE race_days SET deleted_at = NULL WHERE id = ?').run(day.id);
+  const event = { correlationId: day.correlation_id, raceDayId: day.id, track: day.track, date: day.date };
+  traceLog.info('race_day_restored', event);
+  log.info('race_day_restored', event);
+  res.json({ ok: true });
 });
 
 ingestRouter.get('/race-days/:id', (req, res) => {

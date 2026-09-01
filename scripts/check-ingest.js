@@ -164,6 +164,64 @@ try {
   const bb = pdfDay.races.find((r) => r.number === 4).entries.find((e) => e.best_bet === 1);
   check('pdf day: best bet and program ranks persisted',
     bb?.horse_name === 'Run With Liberty' && bb?.program_rank === 1);
+
+  // ---- soft delete: cascade by filter, logs intact, restore ----
+
+  const preview = await fetch(`${BASE}/api/race-days/${pdfDay.id}/deletion-preview`).then((r) => r.json());
+  check('deletion preview counts the tree',
+    preview.races === 10 && preview.entries === 98 &&
+    Number.isInteger(preview.sources) && Number.isInteger(preview.cards) && Number.isInteger(preview.tickets),
+    JSON.stringify(preview));
+
+  const del = await fetch(`${BASE}/api/race-days/${pdfDay.id}`, { method: 'DELETE' });
+  check('soft delete: 200 with counts', del.status === 200 && (await del.json()).races === 10);
+
+  const listAfterDelete = await fetch(`${BASE}/api/race-days`).then((r) => r.json());
+  check('deleted day excluded from the default list',
+    !listAfterDelete.some((d) => d.id === pdfDay.id) && listAfterDelete.length === 1);
+
+  const deletedList = await fetch(`${BASE}/api/race-days?deleted=1`).then((r) => r.json());
+  check('deleted list shows it, with its deleted_at and counts intact',
+    deletedList.length === 1 && deletedList[0].id === pdfDay.id &&
+    deletedList[0].deleted_at != null && deletedList[0].entries === 98);
+
+  const genOnDeleted = await fetch(`${BASE}/api/race-days/${pdfDay.id}/cards`, {
+    method: 'POST', headers: { 'content-type': 'application/json' }, body: '{}',
+  });
+  check('mutations against a deleted day -> 410', genOnDeleted.status === 410);
+  const pasteOnDeleted = await fetch(`${BASE}/api/race-days/${pdfDay.id}/consensus/manual`, {
+    method: 'POST', headers: { 'content-type': 'application/json' },
+    body: JSON.stringify({ sourceName: 'X', races: [] }),
+  });
+  check('manual paste against a deleted day -> 410', pasteOnDeleted.status === 410);
+
+  await new Promise((r) => setTimeout(r, 300));
+  const traceFile = path.join(tmp, 'logs', 'decision-trace.jsonl');
+  const traceEvents = fs.existsSync(traceFile)
+    ? fs.readFileSync(traceFile, 'utf8').split('\n').filter(Boolean).map((l) => JSON.parse(l))
+    : [];
+  check('deletion logged to the decision-trace stream under the day\'s correlation id',
+    traceEvents.some((e) => e.event === 'race_day_deleted' && e.raceDayId === pdfDay.id &&
+      typeof e.correlationId === 'string' && e.entries === 98));
+
+  const restore = await fetch(`${BASE}/api/race-days/${pdfDay.id}/restore`, { method: 'POST' });
+  const listAfterRestore = await fetch(`${BASE}/api/race-days`).then((r) => r.json());
+  check('restore brings the day back to the default list',
+    restore.status === 200 && listAfterRestore.some((d) => d.id === pdfDay.id));
+
+  // A soft-deleted tombstone for a track/date is superseded by re-ingesting.
+  await fetch(`${BASE}/api/race-days/${pdfDay.id}`, { method: 'DELETE' });
+  const reingest = await fetch(`${BASE}/api/race-days`, {
+    method: 'POST', headers: { 'content-type': 'application/json' },
+    body: JSON.stringify({
+      track: 'Del Mar', date: pdfDay.date, bankrollCents: 20000, perRaceMinCents: 500,
+      races: pdfParsed.races,
+    }),
+  });
+  const finalList = await fetch(`${BASE}/api/race-days`).then((r) => r.json());
+  const finalDeleted = await fetch(`${BASE}/api/race-days?deleted=1`).then((r) => r.json());
+  check('re-ingesting over a deleted tombstone succeeds without replace, tombstone gone',
+    reingest.status === 201 && finalList.length === 2 && finalDeleted.length === 0);
 } finally {
   server.kill();
   await new Promise((r) => setTimeout(r, 300));
