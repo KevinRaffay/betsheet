@@ -133,6 +133,16 @@ const tpl = d.prepare(
 const card = d.prepare(`INSERT INTO cards (race_day_id, variant, strategy_template_id, bankroll_cents, status, correlation_id)
   VALUES (?, 'default', ?, 20000, 'final', 'cid-check')`).run(day, tpl).lastInsertRowid;
 
+check('completeness: defaults to the honest floor (PROGRAM_ONLY)',
+  d.prepare('SELECT consensus_completeness c FROM cards WHERE id = ?').get(card).c === 'PROGRAM_ONLY');
+check('completeness: CHECK rejects an unknown level',
+  !!throws(() => d.prepare(
+    "UPDATE cards SET consensus_completeness = 'MOSTLY_VIBES' WHERE id = ?",
+  ).run(card)));
+d.prepare("UPDATE cards SET consensus_completeness = 'FULL' WHERE id = ?").run(card);
+check('completeness: valid level accepted',
+  d.prepare('SELECT consensus_completeness c FROM cards WHERE id = ?').get(card).c === 'FULL');
+
 d.prepare(`INSERT INTO allocations (card_id, race_id, amount_cents, confidence, rule)
   VALUES (?, ?, 4000, 'SPLIT', 'mid_confidence_split')`).run(card, race);
 

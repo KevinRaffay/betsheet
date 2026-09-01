@@ -111,10 +111,18 @@ function parsePanel(items, footer, warnings) {
   // Conditions: the small-type block ending just above the first band; the
   // distance is its own item ("Seven Furlongs." / "One Mile.").
   const condItems = headerItems.filter((i) => i.h <= 9 && i.h >= 4);
-  const condText = norm(condItems
-    .filter((i) => !/^Track Record:/.test(i.s.trim()))
+  // Distance items are excluded from the conditions text when they are
+  // PURELY distance - the x-sort otherwise interleaves a standalone
+  // "Five Furlongs." into the middle of a conditions sentence ("...TWO
+  // Five Furlongs. YEARS OLD..."), which broke downstream text rules. An
+  // item carrying more than the distance ("One Mile. (Turf) Stretch
+  // Start.") stays: its (Turf) flag is content.
+  const distanceOnlyItems = new Set();
+  const buildCondText = () => norm(condItems
+    .filter((i) => !/^Track Record:/.test(i.s.trim()) && !distanceOnlyItems.has(i))
     .sort((a, b) => b.y - a.y || a.x - b.x)
     .map((i) => i.s).join(' '));
+  let condText = buildCondText();
 
   // Distance: typographically it is the trailing sentence of the conditions
   // paragraph. Usually one item ("Seven Furlongs." / "One Mile."), but a
@@ -126,13 +134,18 @@ function parsePanel(items, footer, warnings) {
   // A whole-item distance may carry a suffix ("One Mile. (Turf) Stretch
   // Start.") - capture the distance prefix, don't demand a clean item.
   const distPrefix = /^((?:About\s+)?[A-Za-z][\w/ -]{1,32}?\s(?:Furlongs?|Miles?)(?:\s[Aa]nd\s[\w/ -]{1,25}?(?:Furlongs?|Yards?))?)\.?(?:\s|$)/;
+  let wholeDistItem = null;
   let wholeDistMatch = null;
   for (const i of headerItems) {
     const m = i.s.trim().match(distPrefix);
-    if (m) { wholeDistMatch = m; break; }
+    if (m) { wholeDistItem = i; wholeDistMatch = m; break; }
   }
   if (wholeDistMatch) {
     race.distance = norm(wholeDistMatch[1]);
+    // Purely-distance item (nothing but the matched text + period)?
+    if (norm(wholeDistItem.s).replace(/\.$/, '') === race.distance) {
+      distanceOnlyItems.add(wholeDistItem);
+    }
   } else {
     const unit = headerItems.find((i) => /^(?:Furlongs?|Miles?)\.?$/.test(i.s.trim()));
     if (unit) {
@@ -140,9 +153,13 @@ function parsePanel(items, footer, warnings) {
         .filter((i) => i.y > unit.y && i.y < unit.y + 14 && i.x > unit.x &&
           /^(?:About\s+)?[A-Z][A-Za-z]+(?:\s[\w/ -]{1,20})?$/.test(i.s.trim()) && i.s.trim().length <= 24)
         .sort((a, b) => a.y - b.y)[0];
-      if (partner) race.distance = norm(`${partner.s} ${unit.s}`).replace(/\.$/, '');
+      if (partner) {
+        race.distance = norm(`${partner.s} ${unit.s}`).replace(/\.$/, '');
+        distanceOnlyItems.add(partner).add(unit);
+      }
     }
   }
+  if (distanceOnlyItems.size) condText = buildCondText();
 
   // The conditions body starts at the race-type sentence (ALL CAPS + PURSE),
   // or at "STAKES." for a stakes race whose purse is "$N Guaranteed".

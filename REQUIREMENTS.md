@@ -65,6 +65,15 @@ map in the same PR.
 | here.now publish: self-contained HTML, anon/permanent modes, QR/copy, re-publish, audit log | D22 |
 | Mobile at-track view: teller calls large/bold, check-offs, scratches, actual stakes | D23 |
 
+## Backtesting with historical data (addendum)
+
+| Requirement | Deliverables |
+| --- | --- |
+| Every card records consensus_completeness (FULL / PARTIAL / PROGRAM_ONLY) from sources actually used | D25 (schema, migration 003), D10 (computed + written at generation) |
+| All P/L, simulation and distribution reporting buckets by completeness; program-only backfill never pools with full-consensus in one aggregate | D16, D19, D20 (rule: invariant 12) |
+| Wayback Machine fetcher (web.archive.org) retrieves archived versions of each consensus source for historical dates; outcomes audited like any source | D08d (on the D07 framework) |
+| Simulator evaluates structure-layer rules (place-money, hedge cuts, exotic construction, allocation curves) independently of race classification, so historical cards benchmark bet construction even without signal data | D18 (layer split), D19 (evaluation) |
+
 ## Results, grading & simulation (workflow step 5)
 
 | Requirement | Deliverables |

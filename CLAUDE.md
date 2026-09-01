@@ -59,6 +59,14 @@ Breaking any of these is a bug regardless of what the tests say.
 11. **A failing source must be visible.** Every fetch attempt lands in the
     fetch audit log; a source going quiet must surface in the UI, never
     silently thin the cards.
+12. **Completeness buckets never pool.** Every card records a
+    `consensus_completeness` level (FULL / PARTIAL / PROGRAM_ONLY) from the
+    sources that actually contributed. All P/L, simulation, and distribution
+    reporting buckets by this level — a program-only backfill card and a
+    full-consensus card never share an aggregate. Structure-layer rules
+    (place-money, hedge cuts, exotic construction, allocation curves) are
+    benchmarkable on ANY bucket; signal-layer conclusions require the bucket
+    that actually had the signal.
 
 ---
 
@@ -90,6 +98,10 @@ Breaking any of these is a bug regardless of what the tests say.
 | `scripts/check-sources.js` | per-source verification, one section per fetcher: golden + hand-checked assertions + URL-discovery units, no network. |
 | `shared/classification.js` | the consensus table + UNANIMOUS/SPLIT/CHAOS call (invariant 4's 2-external-source floor, program-only defaults) and contrarian flags (`algo_fades_favorite` via the algo's full expected order, `corroborated_longshot` at 10-1+ from 2+ sources), plus per-horse source counts for the lean-mode coverage rule. Pure functions — the simulator replays them. |
 | `scripts/check-classification.js` | unit verification for classification: every rule with a case that catches its inversion. |
+| `shared/betmath.js` | every tunable number (`BET`), wager-menu parsing, payout math (win/parlay exact at ML; place/exotics as labeled ranges), teller-call formatting, combo/box costing. Change here, then `npm run check-engine`. |
+| `shared/card-engine.js` | the card engine, PURE: lean allocation (UNANIMOUS heaviest, 2yo-maiden guesswork minimum, chaos toward exotics), ticket construction (fade-the-price, keep-stacks flips, longshot-on-top, hedge cuts, 2+-source coverage, mid-price coverage, parlay + doubles reserve), the MANDATORY place-money sweep, exact-bankroll balancing, completeness, and the full decision trace. Structure-layer rules individually toggleable for simulation. |
+| `server/cards.js` | card API: `POST /api/race-days/:id/cards` (classifies fresh, generates, persists cards/allocations/tickets, streams every trace event to decision-trace under the card's correlation id, replaces same-variant), `GET /api/race-days/:id/cards`, `GET /api/cards/:id`. |
+| `scripts/check-engine.js` | engine verification: the real Del Mar goldens end to end (fade-the-price fires on the real 4/5 favorite), synthetic guaranteed cases, structure-layer toggles, trace-shape assertions, and a server round-trip that finds the card's trace in the log file. |
 | `client/src/api.js` | client half of the ingest API; carries the session's correlation id on every call. |
 | `client/src/App.jsx` | root component, theme application, view routing (list / new / day). |
 | `client/src/components/NewRaceDay.jsx` | the ingest screen: track/date/bankroll form, paste box + PDF upload, warnings-first READ-ONLY preview (corrections = fix the source, re-parse), save with replace-on-conflict. |
@@ -119,6 +131,7 @@ npm run check-ingest   # boots the real server on a temp DB; full API flow (~30s
 npm run check-consensus # fetch framework vs. stub sources on a local port
 npm run check-sources   # concrete fetchers vs. real captured fixtures
 npm run check-classification # consensus table + UNANIMOUS/SPLIT/CHAOS rules
+npm run check-engine    # card engine vs. the real goldens + server round-trip
 ```
 
 Further verification commands (`check-parsers`, `check-grading`, simulator
@@ -162,8 +175,10 @@ Before a branch is reported ready, verify — out loud, in the final message:
 | Entries parser — pasted text (D04) | merged | PR #4 — validated against a real Del Mar card (8 races, 81 entries, 0 warnings) |
 | Ingest UI + API (D06) | merged | PR #6 — paste/PDF → warnings-first read-only preview → transactional save; migration 002 adds `races.wager_menu` |
 | Consensus-fetch framework (D07) | merged | PR #7 — fetcher registry, robots/backoff/mismatch handling, audit trail, manual paste fallback w/ read-only preview |
-| Consensus table + classification (D09) | in review | PR #12, branch `classification` — chips + contrarian flags on the day view; classification re-runs after every fetch and manual confirm; migration 004 (`races.contrarian_flags`) |
+| Card engine + decision trace (D10) | in review | PR #13, branch `card-engine` — lean allocation, all ticket rules, mandatory place-money sweep, exact bankroll, completeness, full trace to the decision-trace stream; conditions-text interleave fix in the program parser (goldens regenerated) |
+| Consensus table + classification (D09) | merged | PR #12 — chips + contrarian flags on the day view; classification re-runs after every fetch and manual confirm; migration 004 (`races.contrarian_flags`) |
 | SFTB fetcher (D08c) | merged | PR #9 — sitemap discovery + expected-order parsing; real fixture matches the program-PDF day. D08a CLOSED (dmtc picks page is a directory; covered by D05's Bottom Line extraction) and D08b CLOSED (ATR bot challenge; manual-paste only) — both by user decision 2026-09-01 |
+| Backtesting addendum encoding (D25) | in review | PR #8, branch `backtest-addendum` — `cards.consensus_completeness` (migration 003), invariant 12 (buckets never pool), Wayback fetcher planned as D08d, signal/structure layer split planned into D18/D19. Completeness boundary user-confirmed 2026-09-01: FULL = every race ≥2 external sources |
 | Program-PDF parser (D05) | merged | PR #5 — real Del Mar program (10 races, 98 entries, Bottom Line, index validation); found the printed-scratch/renumbered-index pattern in the wild |
 
 ---
