@@ -48,8 +48,8 @@ export default function CardView({ cardId, onBack }) {
     <section className="card-sheet">
       <div className="pagehead">
         <h2>
-          {card.track} — {card.date}
-          {card.variant !== 'default' ? ` · ${card.variant}` : ''}
+          {card.track} — {card.date} · card #{card.card_number}
+          {card.variant !== 'default' ? ` (${card.variant})` : ''}
         </h2>
         <button className="btn" onClick={onBack}>Back</button>
       </div>

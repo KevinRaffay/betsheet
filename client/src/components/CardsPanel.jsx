@@ -44,16 +44,21 @@ export default function CardsPanel({ dayId, onOpenCard }) {
       {cards && cards.length > 0 && (
         <table className="grid grid--click">
           <thead>
-            <tr><th>Variant</th><th>Consensus</th><th>Tickets</th><th>Total</th><th>Bankroll</th><th>Generated</th></tr>
+            <tr>
+              <th>#</th><th>Variant</th><th>Bankroll</th><th>Per-race min</th>
+              <th>Consensus</th><th>Tickets</th><th>Day total</th><th>Generated</th>
+            </tr>
           </thead>
           <tbody>
             {cards.map((c) => (
               <tr key={c.id} onClick={() => onOpenCard(c.id)}>
+                <td><strong>#{c.card_number}</strong></td>
                 <td>{c.variant}</td>
+                <td>${(c.bankroll_cents / 100).toFixed(0)}</td>
+                <td>{c.per_race_min_cents != null ? `$${(c.per_race_min_cents / 100).toFixed(0)}` : '—'}</td>
                 <td>{c.consensus_completeness}</td>
                 <td>{c.tickets}</td>
                 <td>${(c.total_cents / 100).toFixed(0)}</td>
-                <td>${(c.bankroll_cents / 100).toFixed(0)}</td>
                 <td className="dim">{c.created_at}</td>
               </tr>
             ))}

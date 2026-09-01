@@ -130,8 +130,12 @@ const tpl = d.prepare(
   `INSERT INTO strategy_templates (name, rules) VALUES ('lean', '{"placeMoneyRule":true}')`,
 ).run().lastInsertRowid;
 
-const card = d.prepare(`INSERT INTO cards (race_day_id, variant, strategy_template_id, bankroll_cents, status, correlation_id)
-  VALUES (?, 'default', ?, 20000, 'final', 'cid-check')`).run(day, tpl).lastInsertRowid;
+const card = d.prepare(`INSERT INTO cards (race_day_id, card_number, variant, strategy_template_id, bankroll_cents, per_race_min_cents, status, correlation_id)
+  VALUES (?, 1, 'default', ?, 20000, 500, 'final', 'cid-check')`).run(day, tpl).lastInsertRowid;
+
+check('cards: per-day card_number is unique',
+  !!throws(() => d.prepare(`INSERT INTO cards (race_day_id, card_number, variant, bankroll_cents, correlation_id)
+    VALUES (?, 1, 'other', 20000, 'cid-dup')`).run(day)));
 
 check('completeness: defaults to the honest floor (PROGRAM_ONLY)',
   d.prepare('SELECT consensus_completeness c FROM cards WHERE id = ?').get(card).c === 'PROGRAM_ONLY');

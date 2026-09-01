@@ -92,17 +92,21 @@ cardsRouter.post('/race-days/:id/cards', (req, res) => {
     rules: req.body?.rules ?? {},
   });
 
-  // Persist: replace an existing card of the same variant for the day.
+  // Persist: APPEND-ONLY. Every generation is a new card row carrying its
+  // full recipe (bankroll, per-race min, variant, completeness) and the
+  // next card_number for its day - regenerating never overwrites, so
+  // variants and re-runs sit side by side and stay comparable.
   const raceIdByNumber = Object.fromEntries(day.races.map((r) => [r.number, r.id]));
   const save = db.transaction(() => {
-    const existing = db.prepare('SELECT id FROM cards WHERE race_day_id = ? AND variant = ?')
-      .get(day.id, variant);
-    if (existing) db.prepare('DELETE FROM cards WHERE id = ?').run(existing.id);
-
+    const cardNumber = db.prepare(
+      'SELECT COALESCE(MAX(card_number), 0) + 1 AS n FROM cards WHERE race_day_id = ?',
+    ).get(day.id).n;
     const cardId = db.prepare(`INSERT INTO cards
-        (race_day_id, variant, bankroll_cents, status, correlation_id, consensus_completeness)
-        VALUES (?, ?, ?, 'final', ?, ?)`)
-      .run(day.id, variant, bankrollCents, correlationId, result.completeness).lastInsertRowid;
+        (race_day_id, card_number, variant, bankroll_cents, per_race_min_cents,
+         status, correlation_id, consensus_completeness)
+        VALUES (?, ?, ?, ?, ?, 'final', ?, ?)`)
+      .run(day.id, cardNumber, variant, bankrollCents, perRaceMinCents,
+        correlationId, result.completeness).lastInsertRowid;
 
     const insAlloc = db.prepare(`INSERT INTO allocations
         (card_id, race_id, amount_cents, confidence, rule, thesis)
@@ -150,13 +154,14 @@ cardsRouter.post('/race-days/:id/cards', (req, res) => {
 cardsRouter.get('/race-days/:id/cards', (req, res) => {
   const db = getDb();
   const cards = db.prepare(`
-    SELECT c.id, c.variant, c.bankroll_cents, c.status, c.consensus_completeness,
-           c.created_at, COUNT(t.id) AS tickets, COALESCE(SUM(t.cost_cents), 0) AS total_cents
+    SELECT c.id, c.card_number, c.variant, c.bankroll_cents, c.per_race_min_cents,
+           c.status, c.consensus_completeness, c.created_at,
+           COUNT(t.id) AS tickets, COALESCE(SUM(t.cost_cents), 0) AS total_cents
     FROM cards c
     LEFT JOIN tickets t ON t.card_id = c.id
     WHERE c.race_day_id = ?
     GROUP BY c.id
-    ORDER BY c.created_at DESC
+    ORDER BY c.card_number DESC
   `).all(Number(req.params.id));
   res.json(cards);
 });
@@ -164,7 +169,8 @@ cardsRouter.get('/race-days/:id/cards', (req, res) => {
 cardsRouter.get('/cards/:id', (req, res) => {
   const db = getDb();
   const card = db.prepare(`
-    SELECT c.*, rd.track, rd.date, rd.per_race_min_cents
+    SELECT c.*, rd.track, rd.date,
+           COALESCE(c.per_race_min_cents, rd.per_race_min_cents) AS per_race_min_cents
     FROM cards c JOIN race_days rd ON rd.id = c.race_day_id
     WHERE c.id = ?
   `).get(Number(req.params.id));
