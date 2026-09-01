@@ -211,7 +211,7 @@ Before a branch is reported ready, verify — out loud, in the final message:
 | Entries parser — pasted text (D04) | merged | PR #4 — validated against a real Del Mar card (8 races, 81 entries, 0 warnings) |
 | Ingest UI + API (D06) | merged | PR #6 — paste/PDF → warnings-first read-only preview → transactional save; migration 002 adds `races.wager_menu` |
 | Consensus-fetch framework (D07) | merged | PR #7 — fetcher registry, robots/backoff/mismatch handling, audit trail, manual paste fallback w/ read-only preview |
-| P/L views (D16) | in review | branch `pl-views` — bucket panels + running card table + per-race variant-compare matrix; invariants 12/13 enforced by check-pl |
+| P/L views (D16) | in review | PR #24, branch `pl-views` — bucket panels + running card table + per-race variant-compare matrix; invariants 12/13 enforced by check-pl |
 | Ticket grading engine (D15) | merged | PR #23, branch `grading` — shared/grading.js (pure) + server/grading.js; results save auto-grades every card; Result/P&L columns on the card view; validated on the real Del Mar day's printed payoffs |
 | Results ingest UI (D14) | merged | PR #21, branch `results-ingest` — paste/PDF -> read-only preview -> persist; mismatched charts refused whole |
 | Chart-PDF ingestion (D13) | merged | PR #20, branch `chart-pdf` — pdf-text extraction + results parse endpoints (preview-only) |
