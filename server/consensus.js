@@ -18,6 +18,7 @@
 import express from 'express';
 import { listFetchers, loadExtraFetchers } from './fetchers/index.js';
 import { parsePicksText } from '../shared/picks-parser.js';
+import { classifyDay } from '../shared/classification.js';
 import { getDb } from './db.js';
 import { getLogger, newCorrelationId } from './logging.js';
 
@@ -269,6 +270,50 @@ export async function runFetches(dayId, correlationId) {
   return { day, results };
 }
 
+// ---------- classification (D09) ----------
+
+function picksByRaceNumber(db, day) {
+  const rows = db.prepare(`
+    SELECT cp.*, s.name AS source_name, s.kind AS source_kind, r.number AS race_number
+    FROM consensus_picks cp
+    JOIN sources s ON s.id = cp.source_id
+    JOIN races r ON r.id = cp.race_id
+    WHERE r.race_day_id = ?
+  `).all(day.id);
+  const byRace = {};
+  for (const row of rows) (byRace[row.race_number] ??= []).push(row);
+  return byRace;
+}
+
+/**
+ * Classify every race of a day from stored picks + program analysis, and
+ * persist classification, external-source count and contrarian flags onto
+ * the races. Re-run after every fetch/refresh and manual confirm so the
+ * classification always reflects the picks on file.
+ */
+export function classifyAndPersist(db, day, correlationId) {
+  const entriesByRace = Object.fromEntries(day.races.map((r) => [r.number, r.entries]));
+  const results = classifyDay(day.races.map((r) => r.number), entriesByRace, picksByRaceNumber(db, day));
+  const update = db.prepare(`UPDATE races
+      SET classification = ?, classification_source_count = ?, contrarian_flags = ?
+      WHERE race_day_id = ? AND number = ?`);
+  const tx = db.transaction(() => {
+    for (const r of results) {
+      update.run(r.classification, r.externalSourceCount,
+        r.contrarianFlags.length ? JSON.stringify(r.contrarianFlags) : null,
+        day.id, r.number);
+    }
+  });
+  tx();
+  log.info('day_classified', {
+    correlationId,
+    raceDayId: day.id,
+    classes: Object.fromEntries(results.map((r) => [r.number, r.classification])),
+    contrarianFlags: results.reduce((a, r) => a + r.contrarianFlags.length, 0),
+  });
+  return results;
+}
+
 // ---------- routes ----------
 
 export const consensusRouter = express.Router();
@@ -277,7 +322,21 @@ consensusRouter.post('/race-days/:id/fetch-consensus', async (req, res) => {
   const correlationId = req.get('x-correlation-id') || newCorrelationId();
   const out = await runFetches(Number(req.params.id), correlationId);
   if (!out) return res.status(404).json({ error: 'No such race day.' });
-  res.json({ correlationId, results: out.results, registered: listFetchers().length });
+  const classified = classifyAndPersist(getDb(), out.day, correlationId);
+  res.json({
+    correlationId,
+    results: out.results,
+    registered: listFetchers().length,
+    classification: classified.map((r) => ({ number: r.number, classification: r.classification })),
+  });
+});
+
+consensusRouter.post('/race-days/:id/classify', (req, res) => {
+  const correlationId = req.get('x-correlation-id') || newCorrelationId();
+  const db = getDb();
+  const day = loadDay(db, Number(req.params.id));
+  if (!day) return res.status(404).json({ error: 'No such race day.' });
+  res.json({ correlationId, races: classifyAndPersist(db, day, correlationId) });
 });
 
 consensusRouter.get('/race-days/:id/consensus', (req, res) => {
@@ -300,7 +359,13 @@ consensusRouter.get('/race-days/:id/consensus', (req, res) => {
     ORDER BY fa.id DESC
     LIMIT 100
   `).all(day.id);
-  res.json({ picks, attempts });
+  const races = day.races.map((r) => ({
+    number: r.number,
+    classification: r.classification,
+    externalSourceCount: r.classification_source_count,
+    contrarianFlags: r.contrarian_flags ? JSON.parse(r.contrarian_flags) : [],
+  }));
+  res.json({ picks, attempts, races });
 });
 
 // Manual fallback, preview-first (invariant 9): the preview parses and
@@ -334,5 +399,6 @@ consensusRouter.post('/race-days/:id/consensus/manual', (req, res) => {
     raceDayId: day.id, sourceId, correlationId,
     outcome: 'manual_paste', parseOk: 1, picksExtracted: count,
   });
+  classifyAndPersist(db, day, correlationId);
   res.status(201).json({ correlationId, picksStored: count });
 });
