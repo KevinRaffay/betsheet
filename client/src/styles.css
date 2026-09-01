@@ -287,4 +287,50 @@ html, body {
 .chip--unanimous { background: var(--accent); color: var(--color-accent-text); }
 .chip--split { background: var(--gold); color: #241a02; }
 .chip--chaos { background: var(--loss); color: #fff; }
+.chip--guess { background: var(--color-bg-raised); color: var(--color-text-muted); }
+
+/* ---- the betting card sheet ---- */
+
+.race--sheet { padding-bottom: 14px; }
+.race-sheet-head {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  flex-wrap: wrap;
+  padding: 8px 0 2px;
+  font-size: 15px;
+}
+.race-alloc {
+  margin-left: auto;
+  font-weight: 700;
+  color: var(--color-accent);
+}
+.thesis {
+  margin: 6px 0 2px;
+  font-size: 14px;
+  max-width: 110ch;
+}
+.trigger {
+  margin: 2px 0;
+  font-size: 13px;
+  color: var(--color-text-muted);
+}
+.teller {
+  font-weight: 700;
+  white-space: nowrap;
+}
+.bt { text-transform: capitalize; white-space: nowrap; }
+.row--subtotal td {
+  font-weight: 600;
+  border-bottom: none;
+  color: var(--color-text-muted);
+}
+.row--subtotal td:last-child { color: var(--color-text); }
+.card-footer p { margin: 6px 0; }
+.responsible {
+  font-size: 12.5px;
+  color: var(--color-text-muted);
+  border-top: 1px solid var(--color-border);
+  padding-top: 8px;
+}
 

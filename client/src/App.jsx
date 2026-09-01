@@ -3,6 +3,7 @@ import { getActiveTheme, getTheme, setTheme } from './prefs.js';
 import RaceDayList from './components/RaceDayList.jsx';
 import NewRaceDay from './components/NewRaceDay.jsx';
 import RaceDayView from './components/RaceDayView.jsx';
+import CardView from './components/CardView.jsx';
 
 export default function App() {
   const [theme, setThemeState] = useState(getActiveTheme());
@@ -52,7 +53,17 @@ export default function App() {
           />
         )}
         {view.name === 'day' && (
-          <RaceDayView id={view.id} onBack={() => setView({ name: 'list' })} />
+          <RaceDayView
+            id={view.id}
+            onBack={() => setView({ name: 'list' })}
+            onOpenCard={(cardId) => setView({ name: 'card', id: cardId, dayId: view.id })}
+          />
+        )}
+        {view.name === 'card' && (
+          <CardView
+            cardId={view.id}
+            onBack={() => setView({ name: 'day', id: view.dayId })}
+          />
         )}
       </main>
     </div>

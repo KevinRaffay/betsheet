@@ -175,5 +175,27 @@ cardsRouter.get('/cards/:id', (req, res) => {
   `).all(card.id);
   const tickets = db.prepare('SELECT * FROM tickets WHERE card_id = ? ORDER BY sequence').all(card.id)
     .map((t) => ({ ...t, selections: JSON.parse(t.selections), rule_tags: JSON.parse(t.rule_tags ?? '[]') }));
-  res.json({ ...card, allocations, tickets });
+
+  // Footer material: which sources fed this day (latest attempt each, with
+  // its timestamp) and the day's known scratches.
+  const attemptRows = db.prepare(`
+    SELECT s.name, fa.outcome, fa.ts, fa.fallback_reason
+    FROM fetch_attempts fa JOIN sources s ON s.id = fa.source_id
+    WHERE fa.race_day_id = ? ORDER BY fa.id
+  `).all(card.race_day_id);
+  const latest = new Map();
+  for (const r of attemptRows) latest.set(r.name, r);
+  const sources = { used: [], unavailable: [] };
+  for (const r of latest.values()) {
+    (['ok', 'manual_paste', 'manual_upload'].includes(r.outcome) ? sources.used : sources.unavailable)
+      .push({ name: r.name, ts: r.ts, outcome: r.outcome, reason: r.fallback_reason });
+  }
+  const scratches = db.prepare(`
+    SELECT r.number AS race_number, e.program_number, e.horse_name
+    FROM entries e JOIN races r ON r.id = e.race_id
+    WHERE r.race_day_id = ? AND e.scratched = 1
+    ORDER BY r.number
+  `).all(card.race_day_id);
+
+  res.json({ ...card, allocations, tickets, sources, scratches });
 });
