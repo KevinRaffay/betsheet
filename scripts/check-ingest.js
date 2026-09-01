@@ -218,10 +218,24 @@ try {
       races: pdfParsed.races,
     }),
   });
+  const reingestBody = await reingest.json();
   const finalList = await fetch(`${BASE}/api/race-days`).then((r) => r.json());
   const finalDeleted = await fetch(`${BASE}/api/race-days?deleted=1`).then((r) => r.json());
   check('re-ingesting over a deleted tombstone succeeds without replace, tombstone gone',
     reingest.status === 201 && finalList.length === 2 && finalDeleted.length === 0);
+
+  // The live bug: the superseding day must get a NEW id - the old id stays
+  // uniquely bound to the deleted day's logged history forever.
+  check('superseding day gets a fresh id, never the tombstone\'s',
+    Number(reingestBody.id) > Number(pdfDay.id),
+    `tombstone=${pdfDay.id} new=${reingestBody.id}`);
+
+  await new Promise((r) => setTimeout(r, 300));
+  const traceEvents2 = fs.readFileSync(traceFile, 'utf8').split('\n').filter(Boolean).map((l) => JSON.parse(l));
+  check('supersession documents itself in the decision trace',
+    traceEvents2.some((e) => e.event === 'race_day_superseded' &&
+      e.supersededRaceDayId === pdfDay.id && e.raceDayId === reingestBody.id &&
+      e.supersededWasDeleted === true && typeof e.supersededCorrelationId === 'string'));
 } finally {
   server.kill();
   await new Promise((r) => setTimeout(r, 300));

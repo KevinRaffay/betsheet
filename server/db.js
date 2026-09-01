@@ -91,11 +91,38 @@ export function openDb(dbPath = DEFAULT_PATH) {
       }
       continue;
     }
-    const run = db.transaction(() => {
-      db.exec(sql);
-      db.prepare('INSERT INTO schema_migrations (name, sha256) VALUES (?, ?)').run(file, hash);
-    });
-    run();
+    // A migration headed "-- betsheet:schema-rebuild" recreates a table
+    // (SQLite cannot ALTER a primary key). It must run with foreign keys
+    // OFF - with them ON, DROP TABLE on a parent cascades an implicit
+    // DELETE through the children - and the pragma is a no-op inside a
+    // transaction, so this path manages its own BEGIN/COMMIT and runs a
+    // foreign_key_check before committing.
+    if (/^--\s*betsheet:schema-rebuild\b/m.test(sql)) {
+      db.pragma('foreign_keys = OFF');
+      try {
+        db.exec('BEGIN');
+        try {
+          db.exec(sql);
+          const fkErrors = db.pragma('foreign_key_check');
+          if (fkErrors.length) {
+            throw new Error(`migration ${file} left ${fkErrors.length} dangling foreign key reference(s)`);
+          }
+          db.prepare('INSERT INTO schema_migrations (name, sha256) VALUES (?, ?)').run(file, hash);
+          db.exec('COMMIT');
+        } catch (err) {
+          db.exec('ROLLBACK');
+          throw err;
+        }
+      } finally {
+        db.pragma('foreign_keys = ON');
+      }
+    } else {
+      const run = db.transaction(() => {
+        db.exec(sql);
+        db.prepare('INSERT INTO schema_migrations (name, sha256) VALUES (?, ?)').run(file, hash);
+      });
+      run();
+    }
     log.info('migration_applied', { migration: file, db: path.basename(dbPath) });
   }
 

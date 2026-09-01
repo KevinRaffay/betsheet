@@ -66,7 +66,11 @@ Breaking any of these is a bug regardless of what the tests say.
     flags). Decision-trace and fetch-audit LOG FILES are never touched by
     deletion: a deleted day's history stays readable under its correlation
     ids, and the deletion itself is logged as a trace event. Restore is
-    always available from the deleted list.
+    always available from the deleted list. **Race-day ids are never
+    reused** (migration 006, AUTOINCREMENT): superseding a tombstone mints
+    a fresh id and logs `race_day_superseded` naming the old id/correlation
+    — found live when a superseded day inherited the deleted day's rowid
+    and the trace went ambiguous.
 13. **Completeness buckets never pool.** Every card records a
     `consensus_completeness` level (FULL / PARTIAL / PROGRAM_ONLY) from the
     sources that actually contributed. All P/L, simulation, and distribution
@@ -85,7 +89,7 @@ Breaking any of these is a bug regardless of what the tests say.
 | `server/index.js` | the HTTP server: serves `dist/`, the `/api/*` endpoints, loopback binding, `/api` request logging. |
 | `server/logging.js` | structured JSON-lines logging: the three streams (`app`, `fetch-audit`, `decision-trace`), size+day rotation, gzip/retention sweep, correlation IDs, `readRecent`. Writes are synchronous and never throw. |
 | `scripts/check-logging.js` | verification for logging: rotation, sweep, retention, torn lines, level gating. |
-| `server/db.js` | SQLite via better-sqlite3: `openDb` (applies migrations, WAL, FKs on, tamper guard), `getDb` singleton. |
+| `server/db.js` | SQLite via better-sqlite3: `openDb` (applies migrations, WAL, FKs on, tamper guard), `getDb` singleton. A migration headed `-- betsheet:schema-rebuild` runs outside the wrapping transaction with FKs OFF (table rebuilds; DROP TABLE on a parent with FKs ON cascades deletes) and must pass `foreign_key_check` before commit. |
 | `server/migrations/` | append-only numbered SQL migrations. `001-initial.sql` is the FULL schema, Phase 2–4 tables included. Money is integer cents; program numbers are TEXT ("1A"); results key on race *number* so a chart can land without a parsed program. |
 | `scripts/check-schema.js` | verification for the schema: tables, constraints, cascades, idempotence, tamper guard, whole-graph smoke insert. |
 | `shared/entries-parser.js` | pasted-entries parser (browser + Node): race headers, conditions, per-horse rows, scratches (SCR rows + SCRATCHED footer), also-eligibles, wager menus. Never throws; reports problems in `warnings` for the preview UI. |
