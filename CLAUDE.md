@@ -73,18 +73,18 @@ Breaking any of these is a bug regardless of what the tests say.
 | `shared/entries-parser.js` | pasted-entries parser (browser + Node): race headers, conditions, per-horse rows, scratches (SCR rows + SCRATCHED footer), also-eligibles, wager menus. Never throws; reports problems in `warnings` for the preview UI. |
 | `tests/fixtures/entries/` | entries fixtures: `dmtc-2026-09-03.txt` is a REAL Del Mar card captured from dmtc.com; `synthetic-coupled.txt` covers coupled "1A" entries and tab-less stats lines. Each `.txt` pairs with an audited `.expected.json` golden. |
 | `scripts/check-parsers.js` | parser verification: golden-file diffs PLUS independent hand-counted structural assertions on the real fixture, so regenerating a golden cannot bless a regression. |
+| `server/program-parser.js` | program-PDF parser (Node, pdfjs-dist): race panels anchored by their "MM/DD/YYYY Race N" footer (simulcast pages have none), horse bands by nearest program-number y (never stream order), Bottom Line analysis → programRank + bestBet, alphabetical-index cross-validation incl. the printed-scratch/renumbered-index pattern. |
+| `tests/fixtures/programs/` | the REAL Del Mar program PDF for 2026-08-30 (12.2MB, committed — same precedent as life-swipe's SSA archive) plus its audited golden. |
+| `scripts/check-program.js` | program-parser verification: golden diff + hand-checked assertions (98 entries, scratch overlays, stakes header, AE forms, not-to-be-claimed, Best Bet, index cross-check). |
 | `client/src/App.jsx` | root component and theme application. |
 | `client/src/prefs.js` | per-user UI preferences in `localStorage` (theme). Never card data. |
 | `client/src/styles.css` | all styles: Radix Mauve imports, semantic tokens, light/dark themes, desktop-first layout. |
 
-Planned homes (each arrives with its PR — keep this table honest as they land):
-`shared/` — parsers, consensus classification, card-generation engine, ticket
-grading; runs in Node and the browser so the simulator exercises shipping
-code. `server/logging.js` — structured JSON-lines streams with rotation.
-`server/db.js` + `server/migrations/` — SQLite via better-sqlite3.
-`server/fetchers/` — one module per consensus source. `scripts/` — CLI
-verification (`check-parsers`, later `check-grading`). `tests/fixtures/` —
-real entries/picks/chart samples with expected-JSON golden files.
+Planned homes (each arrives with its PR — keep this table honest as they
+land): `server/fetchers/` — one module per consensus source. `shared/` also
+gains consensus classification, the card-generation engine and ticket
+grading, so the simulator exercises shipping code. `scripts/check-grading`
+arrives with D15.
 
 ---
 
@@ -96,6 +96,7 @@ npm run dev            # vite :5175 + api :8788
 npm run check-logging  # logging: rotation, sweep, retention, torn lines
 npm run check-schema   # schema: constraints, cascades, migrations, tamper guard
 npm run check-parsers  # entries parser vs. fixtures (golden + hard assertions)
+npm run check-program  # program-PDF parser vs. the real Del Mar program (~30s)
 ```
 
 Further verification commands (`check-parsers`, `check-grading`, simulator
@@ -133,10 +134,11 @@ Before a branch is reported ready, verify — out loud, in the final message:
 
 | feature | state | notes |
 | --- | --- | --- |
-| Repo scaffold (D01) | in review | PR #1, branch `scaffold` — stack, styling system, server wiring, docs ledger |
-| Logging foundation (D02) | in review | PR #2, branch `logging` — three JSONL streams, size+day rotation, gzip/retention sweep, correlation IDs, `/api` request log |
-| SQLite schema + migrations (D03) | in review | PR #3, branch `schema` — full schema incl. Phase 2–4 tables, append-only migrations with tamper guard, money in cents |
-| Entries parser — pasted text (D04) | in review | PR #4, branch `entries-parser` — validated against a real Del Mar card (8 races, 81 entries, 0 warnings); handicapper-analysis extraction moves wholly to D05, where the program PDF actually carries it |
+| Repo scaffold (D01) | merged | PR #1 — stack, styling system, server wiring, docs ledger |
+| Logging foundation (D02) | merged | PR #2 — three JSONL streams, size+day rotation, gzip/retention sweep, correlation IDs, `/api` request log |
+| SQLite schema + migrations (D03) | merged | PR #3 — full schema incl. Phase 2–4 tables, append-only migrations with tamper guard, money in cents |
+| Entries parser — pasted text (D04) | merged | PR #4 — validated against a real Del Mar card (8 races, 81 entries, 0 warnings) |
+| Program-PDF parser (D05) | in review | branch `pdf-parser` — real Del Mar program (10 races, 98 entries, Bottom Line, index validation); found the printed-scratch/renumbered-index pattern in the wild |
 
 ---
 
