@@ -123,22 +123,43 @@ html, body {
 .btn {
   display: inline-block;
   border: 1px solid var(--color-border);
-  background: var(--color-bg-subtle);
+  background: var(--color-bg);
   color: var(--color-text);
   border-radius: var(--radius);
   padding: 7px 16px;
   font: inherit;
   font-size: 14px;
+  line-height: 1.2;
   cursor: pointer;
 }
-.btn:hover { background: var(--color-bg-raised); }
+.btn:hover:not(:disabled) {
+  background: var(--color-bg-raised);
+  border-color: var(--color-text-muted);
+}
 .btn:disabled { opacity: 0.5; cursor: default; }
+
+/* A label acting as a button (hidden file inputs). Wins over `.formrow
+   label`, whose muted color and column layout otherwise made these look
+   permanently disabled. */
+label.btn,
+.formrow label.btn {
+  display: inline-flex;
+  flex-direction: row;
+  align-items: center;
+  color: var(--color-text);
+  font-size: 14px;
+  gap: 0;
+}
 .btn--primary {
   background: var(--color-accent);
   border-color: var(--color-accent);
   color: var(--color-accent-text);
 }
-.btn--primary:hover:not(:disabled) { filter: brightness(1.08); background: var(--color-accent); }
+.btn--primary:hover:not(:disabled) {
+  filter: brightness(1.08);
+  background: var(--color-accent);
+  border-color: var(--color-accent);
+}
 .btn--danger { border-color: var(--loss); color: var(--loss); }
 
 /* ---- forms ---- */
