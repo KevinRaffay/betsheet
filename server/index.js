@@ -8,6 +8,7 @@ import express from 'express';
 import path from 'node:path';
 import { fileURLToPath, URL } from 'node:url';
 import { getLogger } from './logging.js';
+import { ingestRouter } from './ingest.js';
 
 const ROOT = fileURLToPath(new URL('../', import.meta.url));
 const log = getLogger('app');
@@ -37,6 +38,16 @@ app.use('/api', (req, res, next) => {
 
 app.get('/api/health', (_req, res) => {
   res.json({ ok: true, app: 'betsheet', version: '0.1.0' });
+});
+
+app.use('/api', ingestRouter);
+
+// JSON errors for the API, never Express's HTML error page. Registered
+// after the routers; `async` handlers above catch their own.
+// eslint-disable-next-line no-unused-vars
+app.use('/api', (err, _req, res, _next) => {
+  log.error('api_error', { error: String(err?.message ?? err) });
+  res.status(err?.status ?? 500).json({ error: String(err?.message ?? err) });
 });
 
 app.use(express.static(path.join(ROOT, 'dist')));

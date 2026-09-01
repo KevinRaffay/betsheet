@@ -1,8 +1,14 @@
 import React, { useEffect, useState } from 'react';
 import { getActiveTheme, getTheme, setTheme } from './prefs.js';
+import RaceDayList from './components/RaceDayList.jsx';
+import NewRaceDay from './components/NewRaceDay.jsx';
+import RaceDayView from './components/RaceDayView.jsx';
 
 export default function App() {
   const [theme, setThemeState] = useState(getActiveTheme());
+  // view: { name: 'list' } | { name: 'new' } | { name: 'day', id }
+  const [view, setView] = useState({ name: 'list' });
+  const [refreshKey, setRefreshKey] = useState(0);
 
   useEffect(() => {
     document.documentElement.classList.toggle('dark-theme', theme === 'dark');
@@ -26,16 +32,28 @@ export default function App() {
   return (
     <div className="shell">
       <header className="topbar">
-        <h1 className="topbar__brand">BetSheet</h1>
+        <h1 className="topbar__brand" onClick={() => setView({ name: 'list' })}>BetSheet</h1>
         <button className="topbar__theme" onClick={toggleTheme} title="Toggle theme">
           {theme === 'dark' ? 'Light' : 'Dark'}
         </button>
       </header>
       <main className="pane">
-        <p className="placeholder">
-          Card generation lands with the ingest and engine PRs. This scaffold
-          establishes the stack, styling system, and server wiring.
-        </p>
+        {view.name === 'list' && (
+          <RaceDayList
+            refreshKey={refreshKey}
+            onNew={() => setView({ name: 'new' })}
+            onOpen={(id) => setView({ name: 'day', id })}
+          />
+        )}
+        {view.name === 'new' && (
+          <NewRaceDay
+            onCancel={() => setView({ name: 'list' })}
+            onSaved={(id) => { setRefreshKey((k) => k + 1); setView({ name: 'day', id }); }}
+          />
+        )}
+        {view.name === 'day' && (
+          <RaceDayView id={view.id} onBack={() => setView({ name: 'list' })} />
+        )}
       </main>
     </div>
   );
