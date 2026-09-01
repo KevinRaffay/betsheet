@@ -9,7 +9,9 @@
 
 import express from 'express';
 import { parseEntries } from '../shared/entries-parser.js';
+import { parseChart } from '../shared/chart-parser.js';
 import { parseProgramPdf } from './program-parser.js';
+import { extractPdfLines } from './pdf-text.js';
 import { getDb } from './db.js';
 import { getLogger, newCorrelationId } from './logging.js';
 
@@ -60,6 +62,54 @@ ingestRouter.post(
     } catch (err) {
       // A corrupt/non-PDF upload is a user-facing message, not a crash.
       log.warn('parse_failed', { correlationId, kind: 'program_pdf', error: String(err?.message ?? err) });
+      res.status(422).json({ error: `Could not read that PDF: ${err?.message ?? err}` });
+    }
+  },
+);
+
+// ---------- results-chart parsing (preview only; D14 persists) ----------
+
+ingestRouter.post('/parse/results-text', (req, res) => {
+  const text = String(req.body?.text ?? '');
+  const correlationId = req.get('x-correlation-id') || newCorrelationId();
+  const parsed = parseChart(text);
+  log.info('parse_completed', {
+    correlationId,
+    kind: 'results_text',
+    bytes: text.length,
+    races: parsed.races.length,
+    finishers: parsed.races.reduce((a, r) => a + r.results.length, 0),
+    exotics: parsed.races.reduce((a, r) => a + r.exotics.length, 0),
+    warnings: parsed.warnings.length,
+  });
+  res.json({ correlationId, ...parsed });
+});
+
+// A downloaded chart PDF: its text layer IS the paste format, so the PDF
+// path extracts (server/pdf-text.js) and feeds the same parser.
+ingestRouter.post(
+  '/parse/results-pdf',
+  express.raw({ type: 'application/pdf', limit: '30mb' }),
+  async (req, res) => {
+    const correlationId = req.get('x-correlation-id') || newCorrelationId();
+    if (!Buffer.isBuffer(req.body) || req.body.length === 0) {
+      return res.status(400).json({ error: 'Send the chart PDF as a raw application/pdf body.' });
+    }
+    try {
+      const text = await extractPdfLines(new Uint8Array(req.body));
+      const parsed = parseChart(text);
+      log.info('parse_completed', {
+        correlationId,
+        kind: 'results_pdf',
+        bytes: req.body.length,
+        races: parsed.races.length,
+        finishers: parsed.races.reduce((a, r) => a + r.results.length, 0),
+        exotics: parsed.races.reduce((a, r) => a + r.exotics.length, 0),
+        warnings: parsed.warnings.length,
+      });
+      res.json({ correlationId, ...parsed });
+    } catch (err) {
+      log.warn('parse_failed', { correlationId, kind: 'results_pdf', error: String(err?.message ?? err) });
       res.status(422).json({ error: `Could not read that PDF: ${err?.message ?? err}` });
     }
   },

@@ -135,6 +135,19 @@ check('finishers + chart scratches account for every program entry', (() => {
   return [r.number, p.entries.length, r.results.length + r.scratches.length];
 })));
 
+// ---- the PDF path: extraction must reproduce the paste fixture ----
+
+{
+  const { extractPdfLines } = await import('../server/pdf-text.js');
+  const extracted = await extractPdfLines(path.join(FIX, 'charts', 'dmr-2026-08-30.pdf'));
+  check('pdf extraction reproduces the paste fixture byte for byte',
+    extracted.replace(/\r\n/g, '\n').trim() === text.replace(/\r\n/g, '\n').trim(),
+    `extracted ${extracted.length} bytes vs fixture ${text.length}`);
+  const fromPdf = parseChart(extracted);
+  check('pdf-extracted text parses identically to the golden',
+    !firstDiff(fromPdf, golden), firstDiff(fromPdf, golden) ?? '');
+}
+
 // ---- degenerate input ----
 
 check('empty input: warns, never throws',
