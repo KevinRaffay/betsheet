@@ -252,6 +252,7 @@ ingestRouter.get('/race-days/:id/deletion-preview', (req, res) => {
                   JOIN races r ON r.id = cp.race_id WHERE r.race_day_id = ?`),
     cards: one('SELECT COUNT(*) n FROM cards WHERE race_day_id = ?'),
     tickets: one('SELECT COUNT(*) n FROM tickets t JOIN cards c ON c.id = t.card_id WHERE c.race_day_id = ?'),
+    results: one('SELECT COUNT(*) n FROM race_results WHERE race_day_id = ?'),
   });
 });
 
