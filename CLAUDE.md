@@ -145,7 +145,7 @@ Before a branch is reported ready, verify — out loud, in the final message:
 | Logging foundation (D02) | merged | PR #2 — three JSONL streams, size+day rotation, gzip/retention sweep, correlation IDs, `/api` request log |
 | SQLite schema + migrations (D03) | merged | PR #3 — full schema incl. Phase 2–4 tables, append-only migrations with tamper guard, money in cents |
 | Entries parser — pasted text (D04) | merged | PR #4 — validated against a real Del Mar card (8 races, 81 entries, 0 warnings) |
-| Ingest UI + API (D06) | in review | branch `ingest-ui` — paste/PDF → warnings-first editable preview → transactional save; migration 002 adds `races.wager_menu` |
+| Ingest UI + API (D06) | in review | PR #6, branch `ingest-ui` — paste/PDF → warnings-first editable preview → transactional save; migration 002 adds `races.wager_menu` |
 | Program-PDF parser (D05) | merged | PR #5 — real Del Mar program (10 races, 98 entries, Bottom Line, index validation); found the printed-scratch/renumbered-index pattern in the wild |
 
 ---
