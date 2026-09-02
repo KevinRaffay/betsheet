@@ -23,7 +23,7 @@ plRouter.get('/pl', (req, res) => {
   const db = getDb();
 
   const cardRows = db.prepare(`
-    SELECT c.id AS cardId, c.race_day_id AS raceDayId, rd.track, rd.date,
+    SELECT c.id AS cardId, c.race_day_id AS raceDayId, rd.track, rd.date, rd.meet,
            c.card_number AS cardNumber, c.variant, st.name AS template,
            c.consensus_completeness AS completeness, c.bankroll_cents AS bankrollCents,
            c.engine_version AS engineVersion,
@@ -51,7 +51,12 @@ plRouter.get('/pl', (req, res) => {
   const selectedVersion = requested === 'all' ? 'all'
     : requested && engineVersions.includes(requested) ? requested
       : (engineVersions[0] ?? null);
-  const inSelection = (row) => selectedVersion === 'all' || row.engineVersion === selectedVersion;
+  // Meets (D43): ?meet=<DMR-2026-summer> narrows every figure to one meet;
+  // default 'all' (meets may pool - completeness buckets never do).
+  const meets = [...new Set(cardRows.map((r) => r.meet).filter(Boolean))].sort();
+  const requestedMeet = String(req.query.meet ?? '').trim();
+  const selectedMeet = requestedMeet && meets.includes(requestedMeet) ? requestedMeet : 'all';
+  const inSelection = (row) => (selectedVersion === 'all' || row.engineVersion === selectedVersion) && (selectedMeet === 'all' || row.meet === selectedMeet);
 
   const byBucket = new Map();
   for (const row of cardRows) {
@@ -72,7 +77,7 @@ plRouter.get('/pl', (req, res) => {
   const buckets = BUCKET_ORDER.filter((k) => byBucket.has(k)).map((k) => byBucket.get(k));
 
   const ungraded = db.prepare(`
-    SELECT c.id AS cardId, c.race_day_id AS raceDayId, rd.track, rd.date,
+    SELECT c.id AS cardId, c.race_day_id AS raceDayId, rd.track, rd.date, rd.meet,
            c.card_number AS cardNumber, c.variant, c.engine_version AS engineVersion,
            c.consensus_completeness AS completeness,
            COALESCE(SUM(t.cost_cents), 0) AS costCents
@@ -89,7 +94,7 @@ plRouter.get('/pl', (req, res) => {
     ORDER BY rd.date DESC, rd.track, c.card_number DESC
   `).all();
 
-  res.json({ buckets, cards: cardRows, ungraded, engineVersions, selectedVersion });
+  res.json({ buckets, cards: cardRows.filter((r) => selectedMeet === 'all' || r.meet === selectedMeet), ungraded: ungraded.filter((r) => selectedMeet === 'all' || r.meet === selectedMeet), engineVersions, selectedVersion, meets, selectedMeet });
 });
 
 // One day's cards side by side, broken down per race - the variant-compare

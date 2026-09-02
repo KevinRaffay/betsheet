@@ -28,31 +28,14 @@ const lettersOnly = (s) => String(s ?? '').replace(/[^A-Za-z]/g, '').toUpperCase
 const nameKey = (s) => String(s ?? '').toUpperCase().replace(/[‘’]/g, "'")
   .replace(/\s+/g, ' ').trim();
 
-resultsRouter.post('/race-days/:id/results', (req, res) => {
-  const correlationId = req.get('x-correlation-id') || newCorrelationId();
-  const db = getDb();
-  const day = db.prepare('SELECT * FROM race_days WHERE id = ?').get(Number(req.params.id));
-  if (!day) return res.status(404).json({ error: 'No such race day.' });
-  if (day.deleted_at) {
-    return res.status(410).json({ error: 'This race day is deleted. Restore it before saving results.' });
-  }
-
-  const p = req.body ?? {};
-  if (!Array.isArray(p.races) || p.races.length === 0) {
-    return res.status(400).json({ error: 'races (from the results preview) are required.' });
-  }
-  // The chart names its own track and date; a mismatch is refused whole.
-  if (p.date && p.date !== day.date) {
-    return res.status(422).json({
-      error: `This chart is for ${p.date}; the race day is ${day.date}. Wrong chart - nothing saved.`,
-    });
-  }
-  if (p.track && lettersOnly(p.track) !== lettersOnly(day.track)) {
-    return res.status(422).json({
-      error: `This chart is for ${p.track}; the race day is ${day.track}. Wrong chart - nothing saved.`,
-    });
-  }
-
+/**
+ * Persist a confirmed results parse for a day - the ONE writer of
+ * race_results / exotic_payoffs / result_scratches / result_charts, shared
+ * by the route and the batch backfill (D43). Replaces the day's results,
+ * appends provenance, regrades every card of the day. The caller has
+ * already checked the parse names this day's track and date.
+ */
+export function saveResults(db, day, p, correlationId) {
   const digest = crypto.createHash('sha256')
     .update(JSON.stringify(p.races)).digest('hex');
 
@@ -125,7 +108,37 @@ resultsRouter.post('/race-days/:id/results', (req, res) => {
   // the generate -> grade loop closes the moment the chart lands.
   const graded = gradeAllCards(db, day.id, correlationId);
 
-  res.status(201).json({ correlationId, ...counts, gradedCards: graded });
+  return { counts, gradedCards: graded };
+}
+
+resultsRouter.post('/race-days/:id/results', (req, res) => {
+  const correlationId = req.get('x-correlation-id') || newCorrelationId();
+  const db = getDb();
+  const day = db.prepare('SELECT * FROM race_days WHERE id = ?').get(Number(req.params.id));
+  if (!day) return res.status(404).json({ error: 'No such race day.' });
+  if (day.deleted_at) {
+    return res.status(410).json({ error: 'This race day is deleted. Restore it before saving results.' });
+  }
+
+  const p = req.body ?? {};
+  if (!Array.isArray(p.races) || p.races.length === 0) {
+    return res.status(400).json({ error: 'races (from the results preview) are required.' });
+  }
+  // The chart names its own track and date; a mismatch is refused whole.
+  if (p.date && p.date !== day.date) {
+    return res.status(422).json({
+      error: `This chart is for ${p.date}; the race day is ${day.date}. Wrong chart - nothing saved.`,
+    });
+  }
+  if (p.track && lettersOnly(p.track) !== lettersOnly(day.track)) {
+    return res.status(422).json({
+      error: `This chart is for ${p.track}; the race day is ${day.track}. Wrong chart - nothing saved.`,
+    });
+  }
+
+  const { counts, gradedCards } = saveResults(db, day, p, correlationId);
+
+  res.status(201).json({ correlationId, ...counts, gradedCards });
 });
 
 resultsRouter.get('/race-days/:id/results', (req, res) => {

@@ -6,6 +6,7 @@ import RaceDayView from './components/RaceDayView.jsx';
 import CardView from './components/CardView.jsx';
 import PLView from './components/PLView.jsx';
 import SimView from './components/SimView.jsx';
+import BackfillQueue from './components/BackfillQueue.jsx';
 
 export default function App() {
   const [theme, setThemeState] = useState(getActiveTheme());
@@ -48,6 +49,7 @@ export default function App() {
             onOpen={(id) => setView({ name: 'day', id })}
             onPL={() => setView({ name: 'pl' })}
             onSim={() => setView({ name: 'sim' })}
+            onBackfill={() => setView({ name: 'backfill' })}
           />
         )}
         {view.name === 'pl' && (
@@ -61,6 +63,12 @@ export default function App() {
           <SimView
             onBack={() => setView({ name: 'list' })}
             onOpenDay={(id) => setView({ name: 'day', id })}
+          />
+        )}
+        {view.name === 'backfill' && (
+          <BackfillQueue
+            onBack={() => setView({ name: 'list' })}
+            onOpenDay={(id) => { setRefreshKey((k) => k + 1); setView({ name: 'day', id }); }}
           />
         )}
         {view.name === 'new' && (

@@ -138,8 +138,8 @@ try {
 
   console.log('-- the running view (invariant 13) --');
   const pl = await jget('/api/pl');
-  check('response shape: buckets/cards/ungraded + the engine-version selector (D34) and NOTHING else - no pooled total',
-    JSON.stringify(Object.keys(pl).sort()) === JSON.stringify(['buckets', 'cards', 'engineVersions', 'selectedVersion', 'ungraded']) &&
+  check('response shape: buckets/cards/ungraded + the engine-version selector (D34) + the meet selector (D43) and NOTHING else - no pooled total',
+    JSON.stringify(Object.keys(pl).sort()) === JSON.stringify(['buckets', 'cards', 'engineVersions', 'meets', 'selectedMeet', 'selectedVersion', 'ungraded']) &&
     pl.selectedVersion === pl.engineVersions[0] && pl.engineVersions.length === 1);
   check('no bucket is a pooled pseudo-bucket',
     pl.buckets.every((b) => ['FULL', 'PARTIAL', 'PROGRAM_ONLY'].includes(b.completeness)));

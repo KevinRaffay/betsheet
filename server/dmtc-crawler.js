@@ -42,6 +42,12 @@ export function meetFor(date) {
   return null;
 }
 
+/** meetFor() for a Del Mar day (any spelling of the track), null for other tracks - until D35 canonicalizes track codes. */
+export function meetForDay(track, date) {
+  const key = String(track ?? '').toUpperCase().replace(/[^A-Z]/g, '');
+  return key === 'DELMAR' || key === 'DMR' ? meetFor(date) : null;
+}
+
 export const calendarUrl = (origin, year, month) => `${origin}/racing/${year}/${String(month).padStart(2, '0')}`;
 
 /** The three artifacts for one race day (verified URL patterns, 2026-09-01). */

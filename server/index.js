@@ -18,6 +18,7 @@ import { plRouter } from './pl.js';
 import { exportRouter } from './trace-export.js';
 import { seedTemplates, templatesRouter } from './templates.js';
 import { simulateRouter } from './simulate.js';
+import { backfillRouter } from './backfill.js';
 import { getDb } from './db.js';
 
 const ROOT = fileURLToPath(new URL('../', import.meta.url));
@@ -64,6 +65,7 @@ app.use('/api', plRouter);
 app.use('/api', exportRouter);
 app.use('/api', templatesRouter);
 app.use('/api', simulateRouter);
+app.use('/api', backfillRouter);
 
 // JSON errors for the API, never Express's HTML error page. Registered
 // after the routers; `async` handlers above catch their own.
