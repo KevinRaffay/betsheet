@@ -135,6 +135,8 @@ export default function CardView({ cardId, onBack }) {
       </div>
 
       {card.allocations.map((a) => {
+        const race = (card.races ?? []).find((r) => r.number === a.race_number);
+        const entries = race?.entries ?? [];
         const raceTickets = singles.filter((t) => {
           const races = t.selections.races ?? [];
           return races.length === 1 && races[0] === a.race_number;
@@ -161,6 +163,26 @@ export default function CardView({ cardId, onBack }) {
                 ▸ {f.type === 'algo_fades_favorite' ? 'FADE' : 'LONGSHOT×2'}: #{f.programNumber} {f.horseName} — {f.detail}
               </p>
             ))}
+            <details className="race-entries">
+              <summary>Entries ({entries.length})</summary>
+              <table className="grid grid--entries">
+                <thead>
+                  <tr><th>#</th><th>Horse</th><th>Jockey</th><th>Trainer</th><th>M/L</th><th>Rank</th></tr>
+                </thead>
+                <tbody>
+                  {entries.map((entry) => (
+                    <tr key={entry.id} className={entry.scratched ? 'row--scratched' : ''}>
+                      <td>{entry.program_number ?? '—'}</td>
+                      <td>{entry.horse_name}</td>
+                      <td>{entry.jockey ?? '—'}</td>
+                      <td>{entry.trainer ?? '—'}</td>
+                      <td>{entry.morning_line ?? '—'}</td>
+                      <td>{entry.program_rank ?? '—'}</td>
+                    </tr>
+                  ))}
+                </tbody>
+              </table>
+            </details>
             {raceTickets.length === 0
               ? <p className="dim">No tickets this race.</p>
               : (

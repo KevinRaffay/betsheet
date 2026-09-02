@@ -252,6 +252,9 @@ cardsRouter.get('/cards/:id', (req, res) => {
     WHERE a.card_id = ?
     ORDER BY r.number
   `).all(card.id);
+  const races = db.prepare('SELECT * FROM races WHERE race_day_id = ? ORDER BY number').all(card.race_day_id);
+  const entriesFor = db.prepare('SELECT * FROM entries WHERE race_id = ?');
+  for (const race of races) race.entries = entriesFor.all(race.id);
   const tickets = db.prepare('SELECT * FROM tickets WHERE card_id = ? ORDER BY sequence').all(card.id)
     .map((t) => ({ ...t, selections: JSON.parse(t.selections), rule_tags: JSON.parse(t.rule_tags ?? '[]') }));
 
@@ -276,5 +279,5 @@ cardsRouter.get('/cards/:id', (req, res) => {
     ORDER BY r.number
   `).all(card.race_day_id);
 
-  res.json({ ...card, allocations, tickets, sources, scratches });
+  res.json({ ...card, races, allocations, tickets, sources, scratches });
 });
