@@ -121,6 +121,10 @@ Breaking any of these is a bug regardless of what the tests say.
 | `server/pl.js` | P/L reporting: GET /api/pl — per-completeness-bucket totals, every graded card as a row, ungraded cards listed separately, and deliberately NO pooled all-bucket total (invariant 13); GET /api/race-days/:id/pl — per-race × per-card breakdown for the variant compare (multi-race tickets under 'multi', 410 on deleted days). Every join filters `deleted_at IS NULL` (invariant 12). |
 | `client/src/components/PLView.jsx` | the P/L screen: bucket panels (P/L, ROI, cards/tickets), per-day card tables (row click opens the card), an expandable race-by-race matrix comparing a day's cards side by side, and the not-graded-yet list. |
 | `scripts/check-pl.js` | P/L verification against the real server: three-day scenario (FULL × 2 variants from the real fixtures, synthetic PROGRAM_ONLY, ungraded), bucket-sum isolation, no-pooled-total shape check, cross-agreement with the grading endpoint, per-race cells summing to card totals, soft-delete dropping out of every aggregate and restore bringing it back. |
+| `server/trace-export.js` | the Phase 3 feed: GET /api/cards/:id/export builds one self-contained JSON per card — recipe, races + entries, consensus picks, sources, allocations, tickets joined with their grades, the day's results, and the card's full decision trace read back from the log files (active + rotated + gzipped) by correlation id / cardId. `traceStatus` (complete/partial/missing, proven by the engine's gap-free seq counter) flags log loss instead of exporting silence. Schema documented in docs/trace-schema.md; bump SCHEMA_VERSION on shape changes. 410 on deleted days. |
+| `scripts/export-trace.js` | CLI twin of the export endpoint (`npm run export-trace -- --card N [--out file]`); same document, no server needed. |
+| `docs/trace-schema.md` | the trace event catalog (envelope, every engine/grading/lifecycle event with fields) and the export document shape. check-export asserts every event type appearing in a real export is documented here. |
+| `scripts/check-export.js` | export verification: the server runs with a tiny log-rotation threshold so one card's trace provably spans multiple rotated files; asserts seq contiguity across rotation and gzip, grade joining, regrade appending (log keeps every pass), doc honesty, named download, 404/410 guards, CLI ≡ endpoint, and honest partial/missing flagging when trace files are lost. |
 | `client/src/components/ResultsPanel.jsx` | the results section of a stored day: chart paste + PDF upload, warnings-first read-only preview, save/replace, per-race finish/exotics/scratches view. |
 | `server/pdf-text.js` | line-reconstructed text extraction from text-based PDFs (y-grouped, x-sorted) — the chart PDF path feeds the SAME parser as a paste. |
 | `scripts/check-charts.js` | chart-parser verification: golden + hand-checked payoffs + the program↔chart closure (every program entry is a finisher or a scratch). |
@@ -167,6 +171,8 @@ npm run check-engine    # card engine vs. the real goldens + server round-trip
 npm run check-charts    # results-chart parser vs. the real Equibase chart
 npm run check-grading   # ticket grading vs. hand-computed + real-day payoffs
 npm run check-pl        # P/L views: bucket isolation, per-race sums, delete/restore
+npm run check-export    # trace export: rotation/gzip read-through, loss flagging
+npm run export-trace -- --card N [--out f]  # the LLM feed for one card
 npm run reset -- --yes  # FACTORY RESET: wipe every record AND every log file
 ```
 
@@ -211,7 +217,8 @@ Before a branch is reported ready, verify — out loud, in the final message:
 | Entries parser — pasted text (D04) | merged | PR #4 — validated against a real Del Mar card (8 races, 81 entries, 0 warnings) |
 | Ingest UI + API (D06) | merged | PR #6 — paste/PDF → warnings-first read-only preview → transactional save; migration 002 adds `races.wager_menu` |
 | Consensus-fetch framework (D07) | merged | PR #7 — fetcher registry, robots/backoff/mismatch handling, audit trail, manual paste fallback w/ read-only preview |
-| P/L views (D16) | in review | PR #24, branch `pl-views` — bucket panels + running card table + per-race variant-compare matrix; invariants 12/13 enforced by check-pl |
+| Decision-trace export (D17) | in review | branch `trace-export` — Phase 3 opens; per-card JSON feed (trace ⋈ grades ⋈ results), traceStatus honesty marker, CLI twin, docs/trace-schema.md |
+| P/L views (D16) | merged | PR #24, branch `pl-views` — bucket panels + running card table + per-race variant-compare matrix; invariants 12/13 enforced by check-pl |
 | Ticket grading engine (D15) | merged | PR #23, branch `grading` — shared/grading.js (pure) + server/grading.js; results save auto-grades every card; Result/P&L columns on the card view; validated on the real Del Mar day's printed payoffs |
 | Results ingest UI (D14) | merged | PR #21, branch `results-ingest` — paste/PDF -> read-only preview -> persist; mismatched charts refused whole |
 | Chart-PDF ingestion (D13) | merged | PR #20, branch `chart-pdf` — pdf-text extraction + results parse endpoints (preview-only) |
@@ -238,5 +245,6 @@ Before a branch is reported ready, verify — out loud, in the final message:
   this repo carries a local `user.name`/`user.email`.
 - **Ports**: BetSheet uses api :8788 / vite :5175. life-swipe owns :8787 and
   :5173/:5174 on this machine — don't squat on them.
+- **Two instances, two log dirs.** The betsheet-alt test instance (port 8902, its own DB) sets BETSHEET_LOG_DIR=server/logs-alt in C:/repos/.claude/launch.json. It used to share server/logs with the main instance - either side's factory reset silently wiped the other's decision traces (found live: exports came back traceStatus=missing). Never point two instances at one log dir.
 - **Equibase blocks scripted fetching.** Confirmed. Don't retry cleverly;
   the paste/PDF path is the design, not a fallback.

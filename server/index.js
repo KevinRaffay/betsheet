@@ -15,6 +15,7 @@ import { resetRouter } from './reset.js';
 import { resultsRouter } from './results.js';
 import { gradingRouter } from './grading.js';
 import { plRouter } from './pl.js';
+import { exportRouter } from './trace-export.js';
 
 const ROOT = fileURLToPath(new URL('../', import.meta.url));
 const log = getLogger('app');
@@ -53,6 +54,7 @@ app.use('/api', resetRouter);
 app.use('/api', resultsRouter);
 app.use('/api', gradingRouter);
 app.use('/api', plRouter);
+app.use('/api', exportRouter);
 
 // JSON errors for the API, never Express's HTML error page. Registered
 // after the routers; `async` handlers above catch their own.

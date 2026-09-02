@@ -141,6 +141,7 @@ html, body {
 /* A label acting as a button (hidden file inputs). Wins over `.formrow
    label`, whose muted color and column layout otherwise made these look
    permanently disabled. */
+a.btn { text-decoration: none; }
 label.btn,
 .formrow label.btn {
   display: inline-flex;

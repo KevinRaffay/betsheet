@@ -73,6 +73,7 @@ export default function CardView({ cardId, onBack }) {
           {card.variant !== 'default' ? ` (${card.variant})` : ''}
         </h2>
         <div className="btnrow">
+          <a className="btn" href={`/api/cards/${cardId}/export`}>Export JSON</a>
           <button className="btn" onClick={handleGrade} disabled={busy}>
             {graded ? 'Regrade vs results' : 'Grade vs results'}
           </button>
