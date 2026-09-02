@@ -88,3 +88,17 @@ map in the same PR.
 | Distributions: % losing days, max drawdown, single-ticket dependence (>80%) | D20 |
 | Decision traces joined with graded results, exportable for LLM analysis | D17 |
 | Discipline tracker (planned vs. actual, house-money warnings) | D24 (schema in D03) |
+
+## Backtest hygiene (addendum 2, 2026-09-02)
+
+| Requirement | Deliverables |
+| --- | --- |
+| Every card records the engine version that built it; regeneration is append-only and graded results are immutable per (card, engine_version) - improvement is measured by comparing versions (invariant 14) | D34 (schema, recipe, trace, P/L version filter), D28 (append-only generation), every engine PR (bumps the version) |
+| P/L buckets never pool across engine versions unless the user explicitly chooses all versions | D34 |
+| Canonical track codes: every ingest path normalizes the track at save; the one-day-per-track+date rule and the chart mismatch refusal key on the code | D35 |
+| Allocation integrity: a race's tickets land on its allocation - mandatory place money is carved out of the allocation, never added on top; the balancer's remainder is spread, never parked | D36 (carve-out), D30 (remainder spread) |
+| Every race in every program fixture parses a well-formed distance; an unparsed distance is a preview warning, never `?` | D37, D32 (grammar) |
+| The card footer lists program-time AND chart scratches after grading, labeled by source | D38 |
+| Effective wagered (wagered − refunds) and effective ROI reported beside nominal at card, day and bucket level; refunds visible | D39 |
+| Historical simulation can apply chart scratches before generation (at-the-window baseline), both modes reported | D19 (option) |
+| Single-ticket dependence reported gross and net; the flag driven by net | D20 |
