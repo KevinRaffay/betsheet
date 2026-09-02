@@ -47,6 +47,36 @@ check('all expected tables exist',
 check('foreign keys are ON', db.pragma('foreign_keys', { simple: true }) === 1);
 check('WAL mode', db.pragma('journal_mode', { simple: true }) === 'wal');
 
+check('race_days has a track_code column (D35, migration 014)',
+  db.prepare("SELECT COUNT(*) c FROM pragma_table_info('race_days') WHERE name = 'track_code'").get().c === 1);
+
+// --- track canonicalization backfill (D35): the migration's own SQL,
+// exercised directly against rows shaped like the ones it was written to
+// fix - saved before D35 existed, each spelled a different way. ---
+{
+  const migSql = fs.readFileSync(
+    path.join(process.cwd(), 'server', 'migrations', '014-track-canonicalization.sql'), 'utf8',
+  );
+  const backfillSql = migSql.split('\n').filter((l) => !l.trim().startsWith('--')).join('\n')
+    .split('ALTER TABLE race_days ADD COLUMN track_code TEXT;')[1];
+  const spellDb = openDb(path.join(tmp, 'check-track-spellings.sqlite'));
+  const insertRaw = (track, date) => spellDb.prepare(
+    'INSERT INTO race_days (track, date, correlation_id) VALUES (?, ?, ?)',
+  ).run(track, date, `cid-${date}`).lastInsertRowid;
+  insertRaw('Delmar', '2026-02-01');
+  insertRaw('DEL MAR', '2026-02-02');
+  insertRaw('DelMarRacing.com', '2026-02-03');
+  insertRaw('Some Track', '2026-02-04');
+  spellDb.exec(backfillSql);
+  const rows = spellDb.prepare('SELECT track, track_code, date FROM race_days ORDER BY date').all();
+  check('every known Del Mar spelling backfills to display "Del Mar" / code DMR',
+    rows.filter((r) => r.date <= '2026-02-03').every((r) => r.track === 'Del Mar' && r.track_code === 'DMR'),
+    JSON.stringify(rows));
+  check('an unrecognized track gets a derived, non-null code rather than staying blocked',
+    rows.find((r) => r.date === '2026-02-04')?.track_code === 'SOM');
+  spellDb.close();
+}
+
 // --- idempotence: re-open applies nothing new ---
 const count1 = db.prepare('SELECT COUNT(*) c FROM schema_migrations').get().c;
 db.close();

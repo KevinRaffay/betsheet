@@ -8,6 +8,7 @@
 // ingest session reads as one trace (invariant 8).
 
 import express from 'express';
+import { canonicalizeTrack } from '../shared/track-codes.js';
 import { parseEntries } from '../shared/entries-parser.js';
 import { parseChart } from '../shared/chart-parser.js';
 import { parseProgramPdf } from './program-parser.js';
@@ -29,10 +30,26 @@ const traceLog = getLogger('decision-trace');
 
 export const ingestRouter = express.Router();
 
+// D35: an unrecognized track still parses and saves - it gets a derived
+// code (canonicalizeTrack), never a block - but the preview names it so a
+// typo or a new track is visible before Save rather than surfacing later as
+// a silent classification/fetch miss (D53's root cause).
+function addTrackWarning(parsed) {
+  if (!parsed?.track || !Array.isArray(parsed.warnings)) return parsed;
+  const { recognized, code } = canonicalizeTrack(parsed.track);
+  if (!recognized) {
+    parsed.warnings.push({
+      type: 'unrecognized_track',
+      message: `"${parsed.track}" is not a known track; it will save under a derived code (${code}). Check the spelling above.`,
+    });
+  }
+  return parsed;
+}
+
 ingestRouter.post('/parse/entries-text', (req, res) => {
   const text = String(req.body?.text ?? '');
   const correlationId = req.get('x-correlation-id') || newCorrelationId();
-  const parsed = parseEntries(text);
+  const parsed = addTrackWarning(parseEntries(text));
   log.info('parse_completed', {
     correlationId,
     kind: 'entries_text',
@@ -58,7 +75,7 @@ ingestRouter.post(
         track: req.query.track || undefined,
         date: req.query.date || undefined,
       };
-      const parsed = await parseProgramPdf(new Uint8Array(req.body), expected);
+      const parsed = addTrackWarning(await parseProgramPdf(new Uint8Array(req.body), expected));
       log.info('parse_completed', {
         correlationId,
         kind: 'program_pdf',
@@ -130,17 +147,22 @@ const toInt = (v) => (v === null || v === undefined || v === '' ? null : Math.ro
 
 // Shared by the save route and the batch backfill (D43): one writer, so a
 // backfilled day and a clicked one are the same rows. `meet` is derived
-// from the track + date (DMR-<year>-summer / -fall), never typed.
+// from the track + date (DMR-<year>-summer / -fall), never typed. The track
+// is canonicalized here too (D35) - the ONE place a race day's track and
+// track_code are decided, regardless of which ingest path's spelling
+// (program panel letters, Bottom Line fallback, ML sheet header, ...) it
+// arrived with.
 export function insertRaceDay(db, payload, correlationId) {
   const entriesSource = ['program', 'ml_sheet', 'both'].includes(payload.entriesSource) ? payload.entriesSource : 'program';
   const bottomLineByRace = new Map((payload.analysis ?? [])
     .filter((chunk) => chunk && Number.isInteger(chunk.race) && chunk.text)
     .map((chunk) => [chunk.race, String(chunk.text)]));
+  const { code: trackCode, display: track } = canonicalizeTrack(payload.track);
   const dayInfo = db.prepare(`INSERT INTO race_days
-      (track, date, bankroll_cents, per_race_min_cents, correlation_id, entries_source, meet)
-      VALUES (?, ?, ?, ?, ?, ?, ?)`)
-    .run(payload.track, payload.date, toInt(payload.bankrollCents), toInt(payload.perRaceMinCents), correlationId, entriesSource,
-      meetForDay(payload.track, payload.date));
+      (track, track_code, date, bankroll_cents, per_race_min_cents, correlation_id, entries_source, meet)
+      VALUES (?, ?, ?, ?, ?, ?, ?, ?)`)
+    .run(track, trackCode, payload.date, toInt(payload.bankrollCents), toInt(payload.perRaceMinCents), correlationId, entriesSource,
+      meetForDay(track, payload.date));
   const dayId = dayInfo.lastInsertRowid;
 
   const insertRace = db.prepare(`INSERT INTO races
@@ -191,7 +213,7 @@ ingestRouter.post(
     }
     try {
       const expected = { track: req.query.track || undefined, date: req.query.date || undefined };
-      const parsed = await parseMlSheetPdf(new Uint8Array(req.body), expected);
+      const parsed = addTrackWarning(await parseMlSheetPdf(new Uint8Array(req.body), expected));
       log.info('parse_completed', {
         correlationId, kind: 'ml_sheet', bytes: req.body.length, races: parsed.races.length,
         entries: parsed.races.reduce((a, r) => a + r.entries.length, 0), warnings: parsed.warnings.length,
@@ -211,7 +233,7 @@ ingestRouter.post('/parse/merge', (req, res) => {
   const { ml, program } = req.body ?? {};
   if (!ml || !Array.isArray(ml.races)) return res.status(400).json({ error: 'ml (an ML sheet parse) is required.' });
   if (program != null && !Array.isArray(program.races)) return res.status(400).json({ error: 'program must be a program parse or null.' });
-  const merged = mergeMlAndProgram(ml, program ?? null);
+  const merged = addTrackWarning(mergeMlAndProgram(ml, program ?? null));
   log.info('merge_completed', {
     correlationId, entriesSource: merged.entriesSource, races: merged.races.length,
     disagreements: merged.warnings.filter((w) => w.type === 'program_ml_disagreement').length,
@@ -233,7 +255,8 @@ ingestRouter.post('/fetch/ml-sheet', async (req, res) => {
   const fetcher = listFetchers().find((f) => f.produces === 'entries' && f.supports({ track, date }));
   if (!fetcher) return res.status(404).json({ error: `No ML-sheet source is registered for ${track}. Upload the PDF instead.` });
   const db = getDb();
-  const day = db.prepare('SELECT id FROM race_days WHERE track = ? AND date = ? AND deleted_at IS NULL').get(track, date);
+  const day = db.prepare('SELECT id FROM race_days WHERE track_code = ? AND date = ? AND deleted_at IS NULL')
+    .get(canonicalizeTrack(track).code, date);
   const sourceId = upsertSource(db, fetcher);
   const audit = (outcome, extra = {}) => {
     fetchLog.info('fetch_attempt', { correlationId, source: fetcher.name, track, date, outcome, ...extra });
@@ -329,11 +352,14 @@ ingestRouter.post('/race-days', (req, res) => {
   if (problems.length) return res.status(400).json({ error: problems.join('; ') });
 
   const db = getDb();
-  const existing = db.prepare('SELECT id, deleted_at FROM race_days WHERE track = ? AND date = ?')
-    .get(p.track, p.date);
+  // The one-day-per-track+date rule keys on the canonical code (D35), not
+  // the raw text a parser happened to spell the track with - "Del Mar" and
+  // "Delmar" collide on the same date instead of silently coexisting.
+  const existing = db.prepare('SELECT id, deleted_at FROM race_days WHERE track_code = ? AND date = ?')
+    .get(canonicalizeTrack(p.track).code, p.date);
   // A LIVE duplicate needs an explicit replace; a soft-deleted tombstone
   // for the same track/date is superseded by re-ingesting - the user
-  // already deleted it, and UNIQUE(track,date) leaves no other slot.
+  // already deleted it, and the code+date pair leaves no other slot.
   if (existing && !existing.deleted_at && !p.replace) {
     return res.status(409).json({
       error: `A race day for ${p.track} ${p.date} already exists.`,
