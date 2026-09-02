@@ -100,7 +100,7 @@ map in the same PR.
 | Every race in every program fixture parses a well-formed distance; an unparsed distance is a preview warning, never `?` | D37, D32 (grammar) |
 | The card footer lists program-time AND chart scratches after grading, labeled by source | D38 |
 | Effective wagered (wagered − refunds) and effective ROI reported beside nominal at card, day and bucket level; refunds visible | D39 |
-| Historical simulation can apply chart scratches before generation (at-the-window baseline), both modes reported | D19 (option) |
+| Historical simulation can apply chart scratches before generation (at-the-window baseline), both modes reported | D50 (the D19 run option; compare groups by template AND mode, never pooled) |
 | Single-ticket dependence reported gross and net; the flag driven by net | D20 |
 
 ## Morning-line sheet (addendum 3, 2026-09-02)
