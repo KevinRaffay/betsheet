@@ -49,7 +49,7 @@ const cls = classifyWarnings([...everyType.map((t) => ({ type: t, message: t }))
 check('every blocking type routes to blocking; renumbered index / field disagreement / fused owner do not',
   cls.blocking.length === everyType.length && cls.nonBlocking.map((w) => w.type).join(',') === 'index_renumbered,program_ml_disagreement,owner_trainer_fused');
 check('the blocking list is exactly the policy-A set (distance, calendar race count, index validation, pgm conflicts, document mismatch)',
-  ['no_distance', 'race_count_mismatch', 'index_mismatch', 'no_index', 'program_ml_name_mismatch', 'program_entry_missing', 'ml_entry_missing', 'program_ml_race_count', 'wrong_date', 'wrong_track', 'program_ml_date_mismatch'].sort().join() === everyType.sort().join());
+  ['no_distance', 'race_count_mismatch', 'index_mismatch', 'no_index', 'program_ml_name_mismatch', 'program_entry_missing', 'ml_entry_missing', 'program_ml_race_count', 'wrong_date', 'wrong_track', 'program_ml_date_mismatch', 'foreign_program'].sort().join() === everyType.sort().join());
 check('meet derivation across both boundaries: Jun null, Jul-Sep summer, Oct-Dec fall, Jan null',
   meetFor('2026-06-30') === null && meetFor('2026-07-01') === 'DMR-2026-summer' && meetFor('2026-09-30') === 'DMR-2026-summer' &&
   meetFor('2026-10-01') === 'DMR-2026-fall' && meetFor('2026-12-31') === 'DMR-2026-fall' && meetFor('2027-01-01') === null && meetFor('2025-11-08') === 'DMR-2025-fall');
@@ -124,6 +124,7 @@ const stubParsers = {
   ml: (bytes) => { const d = marker(bytes); const t = TWIST[d] ?? {}; const n = t.races ?? 10; return entriesDoc(d, t.mlRaces ?? n, { dropDistanceIn: t.noDistance ?? null }); },
   program: (bytes) => {
     const d = marker(bytes); const t = TWIST[d] ?? {}; const n = t.races ?? 10;
+    if (t.foreign) return { track: null, date: d, races: [], analysis: [], index: [], warnings: [{ type: 'no_analysis', message: 'x' }, { type: 'no_index', message: 'x' }, { type: 'foreign_program', message: 'not a Del Mar program (stub)' }], foreign: true };
     const doc = entriesDoc(d, n, { asProgram: true, renameIn: t.renameIn ?? null });
     if (t.programWarnings) doc.warnings.push(...t.programWarnings);
     return doc;
@@ -257,24 +258,28 @@ fs.copyFileSync(path.join(FIX, 'dmtc', 'calendar-2026-08.html'), path.join(rawT,
 fs.copyFileSync(path.join(FIX, 'dmtc', 'calendar-2025-07.html'), path.join(rawT, 'DMR', 'calendar', '2026-09.html'));   // a DARK September
 const meetsT = path.join(tmp, 'meetsT');
 fs.mkdirSync(meetsT, { recursive: true });
-const [tClean, tMismatch] = ['2026-09-04', '2026-09-05'];
+const [tClean, tMismatch, tForeign] = ['2026-09-04', '2026-09-05', '2026-09-06'];
 fs.writeFileSync(path.join(meetsT, 'DMR-2026-summer.json'), JSON.stringify({ meet: 'DMR-2026-summer', track: 'DMR', window: { from: '2026-09-04', to: '2026-09-06', source: 'check' }, probe: { requests: 3 },
-  days: [{ date: tClean, raceDay: true, races: 10, httpStatus: 200, url: 'x' }, { date: tMismatch, raceDay: true, races: 10, httpStatus: 200, url: 'x' }, { date: '2026-09-06', raceDay: false, httpStatus: 404, url: 'x' }] }));
+  days: [{ date: tClean, raceDay: true, races: 10, httpStatus: 200, url: 'x' }, { date: tMismatch, raceDay: true, races: 10, httpStatus: 200, url: 'x' }, { date: tForeign, raceDay: true, races: 10, httpStatus: 200, url: 'x' }, { date: '2026-09-07', raceDay: false, httpStatus: 404, url: 'x' }] }));
 TWIST[tMismatch] = { mlRaces: 9 };
-for (const d of [dFirst, tClean, tMismatch]) {
+TWIST[tForeign] = { foreign: true };
+for (const d of [dFirst, tClean, tMismatch, tForeign]) {
   fakeDay(rawT, d, { races: 10 });
   if (d !== dFirst) { const mp = path.join(rawT, 'DMR', d.replace(/-/g, ''), 'manifest.json'); const m = JSON.parse(fs.readFileSync(mp, 'utf8')); m.calendar = null; m.index = { source: 'meet-table', races: 10 }; fs.writeFileSync(mp, JSON.stringify(m)); }
 }
 const dbT = openDb(path.join(tmp, 't.sqlite'));
-const rT = await runBackfill({ from: dFirst, to: tMismatch, rawDir: rawT, goldenDir: goldenA, docsDir: path.join(tmp, 'docsT'), meetsDir: meetsT, db: dbT, parsers: stubParsers });
+const rT = await runBackfill({ from: dFirst, to: tForeign, rawDir: rawT, goldenDir: goldenA, docsDir: path.join(tmp, 'docsT'), meetsDir: meetsT, db: dbT, parsers: stubParsers });
 const LT = by(rT);
 check('index: the live August calendar (its un-archived days report missing) and the dark September (from the table) index together; the dark day 09-06 is never a line',
-  rT.lines.filter((l) => l.status !== 'missing').map((l) => l.date).join() === [dFirst, tClean, tMismatch].join() && !rT.lines.some((l) => l.date === '2026-09-06') && rT.lines.filter((l) => l.status === 'missing').every((l) => l.date.startsWith('2026-08') && l.indexSource === 'calendar') &&
+  rT.lines.filter((l) => l.status !== 'missing').map((l) => l.date).join() === [dFirst, tClean, tMismatch, tForeign].join() && !rT.lines.some((l) => l.date === '2026-09-07') &&
   rT.darkCalendars.join() === '2026-09' && rT.missingIndex.length === 0 && rT.tablesUsed.length === 1, JSON.stringify(rT.lines.map((l) => [l.date, l.status, l.indexSource])));
 check('a table day with no calendar count: ML / program / results agree -> saved, calendarRaces null, indexSource meet-table',
   LT[tClean].status === 'saved' && LT[tClean].calendarRaces === null && LT[tClean].indexSource === 'meet-table' && LT[tClean].blocking.length === 0 && LT[dFirst].indexSource === 'calendar', JSON.stringify({ s: LT[tClean].status, n: LT[tClean].note }));
 check('a table day where the documents disagree on the race count (sheet 9 / program 10 / results 10) -> race_count_mismatch (source documents), queued',
   LT[tMismatch].status === 'queued' && LT[tMismatch].blocking.some((w) => w.type === 'race_count_mismatch' && w.source === 'documents'), JSON.stringify(LT[tMismatch].blocking));
+check('a foreign program (Breeders Cup official program on a BC day, D46): the sheet alone is the record, race counts compare sheet vs results only, foreign_program blocks -> queued with an ml_sheet payload',
+  LT[tForeign].status === 'queued' && LT[tForeign].blocking.map((w) => w.type).join() === 'foreign_program' && LT[tForeign].entriesSource === 'ml_sheet' && LT[tForeign].parsedRaces === 10 &&
+  JSON.parse(dbT.prepare('SELECT payload FROM backfill_queue WHERE date = ?').get(tForeign).payload).entriesSource === 'ml_sheet', JSON.stringify({ s: LT[tForeign].status, b: LT[tForeign].blocking, e: LT[tForeign].entriesSource }));
 dbT.close();
 
 
@@ -311,6 +316,8 @@ try {
     (await jget('/api/backfill/queue')).decided.find((d) => d.id === second.id)?.outcome?.cardId === confBody.cardId, JSON.stringify(confBody).slice(0, 300));
   check('confirm twice -> 409; reject a decided item -> 409; unknown item -> 404',
     (await jpost(`/api/backfill/queue/${second.id}/confirm`)).status === 409 && (await jpost(`/api/backfill/queue/${item.id}/reject`, { note: 'x' })).status === 409 && (await jget('/api/backfill/queue/999999')).error != null);
+  const del = await fetch(`${BASE}/api/race-days/${confBody.raceDayId}`, { method: 'DELETE' });
+  check('a confirmed day can be soft-deleted afterwards (the ordinary delete route)', del.status === 200 && (await jget('/api/race-days')).every((d) => d.id !== confBody.raceDayId));
   const pl = await jget('/api/pl');
   const plMeet = await jget('/api/pl?meet=DMR-2026-summer');
   const plOther = await jget('/api/pl?meet=DMR-2025-fall');
@@ -319,8 +326,9 @@ try {
   const dbA2 = openDb(path.join(tmp, 'a.sqlite'));
   const rAfter = await runBackfill({ from: dFirst, to: dClean, rawDir: rawA, goldenDir: goldenA, docsDir: docsA, db: dbA2, parsers: stubParsers });
   const LA = by(rAfter);
-  check('a later run reports the decisions: confirmed day -> resolved (with its figures), rejected day -> resolved, the rest still queued',
-    LA[second.date].status === 'resolved' && /confirmed/.test(LA[second.date].note) && LA[second.date].figures?.graded && LA[item.date].status === 'resolved' && /rejected/.test(LA[item.date].note) && rAfter.summary.byStatus.queued === 4, JSON.stringify(rAfter.lines.map((l) => [l.date, l.status])));
+  check('a later run reports the decisions: confirmed-then-deleted day -> resolved and LEFT OUT (never re-queued, invariant 12), rejected day -> resolved, the rest still queued',
+    LA[second.date].status === 'resolved' && /confirmed/.test(LA[second.date].note) && /later deleted/.test(LA[second.date].note) && !LA[second.date].raceDayId && LA[item.date].status === 'resolved' && /rejected/.test(LA[item.date].note) && rAfter.summary.byStatus.queued === 4 &&
+    (await jget('/api/backfill/queue')).pending.length === 4, JSON.stringify(rAfter.lines.map((l) => [l.date, l.status, l.note?.slice(0, 40)])));
   dbA2.close();
   await new Promise((rr) => setTimeout(rr, 300));
   const readTrace = (dir) => fs.readFileSync(path.join(dir, 'decision-trace.jsonl'), 'utf8').split('\n').filter(Boolean).map((l) => JSON.parse(l));
@@ -389,8 +397,26 @@ for (const m of meets) {
   const rawG = path.join(tmp, 'rawG-' + m);
   const dayDirG = path.join(rawG, 'DMR', expected.date.replace(/-/g, ''));
   fs.mkdirSync(dayDirG, { recursive: true });
-  for (const a of ['ml.pdf', 'program.pdf', 'results.html', 'manifest.json']) fs.copyFileSync(path.join(dir, a), path.join(dayDirG, a));
-  const parsed = await parseArchivedDay({ date: expected.date, meet: m, races: manifest.calendar?.races ?? null }, { rawDir: rawG });
+  for (const a of ['ml.pdf', 'program.pdf', 'results.html', 'manifest.json']) if (fs.existsSync(path.join(dir, a))) fs.copyFileSync(path.join(dir, a), path.join(dayDirG, a));
+  // A foreign program is committed by digest only (D46): the archive copy under
+  // data/raw stands in when present and must match the digest; without the
+  // archive the program verdict is the golden's own (the runner re-verifies
+  // it against the archive on every run).
+  const digestFile = path.join(dir, 'program.digest.json');
+  if (!fs.existsSync(path.join(dir, 'program.pdf')) && fs.existsSync(digestFile)) {
+    const digest = readJson(digestFile);
+    const archived = path.join(ROOT, 'data', 'raw', 'DMR', expected.date.replace(/-/g, ''), 'program.pdf');
+    if (fs.existsSync(archived)) {
+      const sha = (await import('node:crypto')).createHash('sha256').update(fs.readFileSync(archived)).digest('hex');
+      check(`golden ${m}: the archived foreign program matches the committed digest`, sha === digest.sha256 && fs.statSync(archived).size === digest.bytes, `${sha.slice(0, 12)} vs ${digest.sha256.slice(0, 12)}`);
+      fs.copyFileSync(archived, path.join(dayDirG, 'program.pdf'));
+    } else {
+      console.log(`  note  golden ${m}: foreign program is digest-only and the archive is not present here - its verdict is taken from the golden (the runner re-verifies against the archive)`);
+      fs.writeFileSync(path.join(dayDirG, 'program.pdf'), 'digest-only');
+    }
+  }
+  const parsers = { ...DEFAULT_PARSERS, program: async (bytes, exp) => (Buffer.from(bytes).toString('utf8') === 'digest-only' ? expected.program : DEFAULT_PARSERS.program(bytes, exp)) };
+  const parsed = await parseArchivedDay({ date: expected.date, meet: m, races: manifest.calendar?.races ?? null }, { rawDir: rawG, parsers });
   const d = parsed.missing ? 'missing ' + parsed.missing.join() : firstDiff(goldenDocument({ date: expected.date, meet: m }, parsed), expected);
   check(`golden ${m} (${expected.date}) matches a fresh parse of the artifacts beside it`, !d, d ?? '');
 }

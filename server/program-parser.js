@@ -695,5 +695,17 @@ export async function parseProgramPdf(source, expected = {}) {
     warnings.push({ type: 'wrong_track', message: `Program header reads "${trackText}", expected "${expected.track}".` });
   }
 
+  // A FOREIGN document (D46): the Breeders' Cup official program is served at
+  // the Del Mar program URL on Breeders' Cup days. It carries per-race
+  // footers but none of the Del Mar layout - no Bottom Line, no horse
+  // index - and its panels parse to duplicates and empties. Say so, drop
+  // the garbage, and let the caller fall back to the ML sheet; never hand
+  // back a half-parsed card as if it were the program.
+  const has = (t) => warnings.some((w) => w.type === t);
+  const broken = races.filter((r) => r.entries.length === 0).length;
+  if (has('no_analysis') && has('no_index') && (has('duplicate_race') || broken * 2 >= Math.max(1, races.length))) {
+    warnings.push({ type: 'foreign_program', message: `This is not a Del Mar program (no Bottom Line, no horse index, ${races.length} panels of which ${broken} empty${has('duplicate_race') ? ', duplicate race numbers' : ''}) - a foreign publication (e.g. the Breeders' Cup official program). Its races are discarded; the ML sheet is the only entries source.` });
+    return { track: trackText, date, races: [], analysis: [], index: [], warnings, foreign: true };
+  }
   return { track: trackText, date, races, analysis, index, warnings };
 }

@@ -1,0 +1,1121 @@
+{
+  "meet": "DMR-2025-fall",
+  "lastRun": {
+    "runId": "51ef7e28-cd24-4e82-80e2-96ecd86262bd",
+    "from": "2025-10-31",
+    "to": "2025-11-30",
+    "meet": null,
+    "dryRun": false,
+    "regenerate": false,
+    "engineVersion": "lean-1.1",
+    "template": "lean",
+    "bankrollCents": 20000,
+    "perRaceMinCents": 500,
+    "missingCalendars": [],
+    "missingIndex": [],
+    "darkCalendars": [
+      "2025-07",
+      "2025-08",
+      "2025-09",
+      "2025-10",
+      "2025-11",
+      "2025-12"
+    ],
+    "tablesUsed": [
+      "C:\\repos\\betsheet\\data\\meets\\DMR-2025-summer.json",
+      "C:\\repos\\betsheet\\data\\meets\\DMR-2025-fall.json"
+    ],
+    "halted": null,
+    "startedAt": "2026-09-02T13:28:39.372Z",
+    "finishedAt": "2026-09-02T13:28:39.522Z",
+    "summary": {
+      "days": 14,
+      "byStatus": {
+        "resolved": 2,
+        "skipped": 12
+      },
+      "warningsByType": {
+        "foreign_program (blocking)": 2
+      },
+      "plByBucket": {
+        "PROGRAM_ONLY": {
+          "days": 12,
+          "wageredCents": 240000,
+          "effectiveWageredCents": 228800,
+          "returnedCents": 190930,
+          "plCents": -49070
+        }
+      },
+      "crossSource": {
+        "days": 0,
+        "disagreements": 0
+      },
+      "unexplainedRegressions": 0
+    }
+  },
+  "lines": [
+    {
+      "date": "2025-10-31",
+      "meet": "DMR-2025-fall",
+      "correlationId": "8cc2d41d-8f1c-4548-ae03-15610ec56cca",
+      "indexSource": "meet-table",
+      "calendarRaces": null,
+      "status": "resolved",
+      "queueId": 1,
+      "note": "confirmed from the queue 2026-09-02T13:14:12Z - Breeders Cup day: the program URL serves the BC official program (foreign); saved sheet-only, ODDS_ONLY tier - no program analysis exists for this card; the saved day was later deleted - left out",
+      "blocking": [
+        {
+          "type": "foreign_program",
+          "message": "This is not a Del Mar program (no Bottom Line, no horse index, 14 panels of which 12 empty, duplicate race numbers) - a foreign publication (e.g. the Breeders' Cup official program). Its races are discarded; the ML sheet is the only entries source.",
+          "source": "program"
+        }
+      ],
+      "regression": null
+    },
+    {
+      "date": "2025-11-01",
+      "meet": "DMR-2025-fall",
+      "correlationId": "04d5b226-7fc1-4cfb-9eb9-8e66e0b3c711",
+      "indexSource": "meet-table",
+      "calendarRaces": null,
+      "status": "resolved",
+      "queueId": 2,
+      "note": "confirmed from the queue 2026-09-02T13:14:23Z - Breeders Cup day: the program URL serves the BC official program (foreign); saved sheet-only, ODDS_ONLY tier - no program analysis exists for this card; the saved day was later deleted - left out",
+      "blocking": [
+        {
+          "type": "foreign_program",
+          "message": "This is not a Del Mar program (no Bottom Line, no horse index, 31 panels of which 24 empty, duplicate race numbers) - a foreign publication (e.g. the Breeders' Cup official program). Its races are discarded; the ML sheet is the only entries source.",
+          "source": "program"
+        }
+      ],
+      "regression": null
+    },
+    {
+      "date": "2025-11-02",
+      "meet": "DMR-2025-fall",
+      "correlationId": "f8286a35-acf4-4894-a9a2-ad0c777bef68",
+      "indexSource": "meet-table",
+      "calendarRaces": null,
+      "blocking": [],
+      "nonBlocking": [
+        {
+          "type": "owner_trainer_fused",
+          "race": 8,
+          "message": "Program: Race 8: #1 Mischievous Bev - the owner line runs into the trainer column (\"Barnhart, Ahern or Firsthome Thoroughbreds, et al Adam Kitchingman(F Cano)\") and no other entry on the card names that trainer; trainer left blank.",
+          "source": "entries"
+        },
+        {
+          "type": "index_renumbered",
+          "race": 4,
+          "message": "Program: Race 4: the index numbers its field after the printed scratch (e.g. \"Ballyhooligan\" is 6 in the index, 7 on the page). Page numbering kept; confirm at the window.",
+          "source": "entries"
+        },
+        {
+          "type": "program_ml_disagreement",
+          "race": 4,
+          "field": "jockey",
+          "programNumber": "3",
+          "message": "Race 4: #3 Naudesnoodle - jockey is \"W Antongeorgi III\" on the ML sheet but \"William Antongeorgi\" in the program; the sheet wins.",
+          "source": "entries"
+        },
+        {
+          "type": "program_ml_disagreement",
+          "race": 6,
+          "field": "jockey",
+          "programNumber": "7",
+          "message": "Race 6: #7 Thirsty Trickster - jockey is \"W Antongeorgi III\" on the ML sheet but \"William Antongeorgi\" in the program; the sheet wins.",
+          "source": "entries"
+        },
+        {
+          "type": "program_ml_disagreement",
+          "race": 9,
+          "field": "jockey",
+          "programNumber": "3",
+          "message": "Race 9: #3 Proof He Rides - jockey is \"W Antongeorgi III\" on the ML sheet but \"William Antongeorgi\" in the program; the sheet wins.",
+          "source": "entries"
+        }
+      ],
+      "parsedRaces": 9,
+      "resultsRaces": 9,
+      "hasChart": false,
+      "entriesSource": "both",
+      "status": "saved",
+      "raceDayId": 59,
+      "cardId": 88,
+      "completeness": "PROGRAM_ONLY",
+      "engineVersion": "lean-1.1",
+      "resultsSource": "dmtc_html",
+      "results": {
+        "results": 60,
+        "exotics": 61,
+        "scratches": 2,
+        "unresolvedFinishers": 0
+      },
+      "balancerMoved": true,
+      "carveOutFired": false,
+      "figures": {
+        "wageredCents": 20000,
+        "returnedCents": 21170,
+        "plCents": 1170,
+        "refundedCents": 100,
+        "gradedTickets": 23,
+        "tickets": 23,
+        "effectiveWageredCents": 19900,
+        "graded": true
+      },
+      "crossSource": null,
+      "note": "5 non-blocking warning(s)",
+      "regression": null,
+      "lastSeenRunId": "f8286a35-acf4-4894-a9a2-ad0c777bef68",
+      "lastSeenStatus": "skipped"
+    },
+    {
+      "date": "2025-11-07",
+      "meet": "DMR-2025-fall",
+      "correlationId": "e778e914-9d25-43c2-8e4a-5d5160dfc146",
+      "indexSource": "meet-table",
+      "calendarRaces": null,
+      "blocking": [],
+      "nonBlocking": [
+        {
+          "type": "program_ml_disagreement",
+          "race": 6,
+          "field": "jockey",
+          "programNumber": "3",
+          "message": "Race 6: #3 Closing Time - jockey is \"W Antongeorgi III\" on the ML sheet but \"William Antongeorgi\" in the program; the sheet wins.",
+          "source": "entries"
+        },
+        {
+          "type": "program_ml_disagreement",
+          "race": 7,
+          "field": "jockey",
+          "programNumber": "5",
+          "message": "Race 7: #5 Clever Clover - jockey is \"W Antongeorgi III\" on the ML sheet but \"William Antongeorgi\" in the program; the sheet wins.",
+          "source": "entries"
+        },
+        {
+          "type": "program_ml_disagreement",
+          "race": 7,
+          "field": "jockey",
+          "programNumber": "10",
+          "message": "Race 7: #10 Please Focus - jockey is \"W Antongeorgi III\" on the ML sheet but \"William Antongeorgi\" in the program; the sheet wins.",
+          "source": "entries"
+        },
+        {
+          "type": "unrecognized_mutuel",
+          "race": 3,
+          "message": "Race 3: unrecognized wager \"Consolation Pick 3\" - stored as consolation_pick_3, never graded.",
+          "source": "results"
+        },
+        {
+          "type": "unrecognized_mutuel",
+          "race": 3,
+          "message": "Race 3: unrecognized wager \"Consolation Double\" - stored as consolation_double, never graded.",
+          "source": "results"
+        },
+        {
+          "type": "unrecognized_mutuel",
+          "race": 4,
+          "message": "Race 4: unrecognized wager \"Consolation Pick 3\" - stored as consolation_pick_3, never graded.",
+          "source": "results"
+        }
+      ],
+      "parsedRaces": 8,
+      "resultsRaces": 8,
+      "hasChart": false,
+      "entriesSource": "both",
+      "status": "saved",
+      "raceDayId": 60,
+      "cardId": 89,
+      "completeness": "PROGRAM_ONLY",
+      "engineVersion": "lean-1.1",
+      "resultsSource": "dmtc_html",
+      "results": {
+        "results": 63,
+        "exotics": 57,
+        "scratches": 9,
+        "unresolvedFinishers": 0
+      },
+      "balancerMoved": true,
+      "carveOutFired": false,
+      "figures": {
+        "wageredCents": 20000,
+        "returnedCents": 19810,
+        "plCents": -190,
+        "refundedCents": 1100,
+        "gradedTickets": 20,
+        "tickets": 20,
+        "effectiveWageredCents": 18900,
+        "graded": true
+      },
+      "crossSource": null,
+      "note": "6 non-blocking warning(s)",
+      "regression": null,
+      "lastSeenRunId": "e778e914-9d25-43c2-8e4a-5d5160dfc146",
+      "lastSeenStatus": "skipped"
+    },
+    {
+      "date": "2025-11-08",
+      "meet": "DMR-2025-fall",
+      "correlationId": "10c2d4a3-8aa1-432e-b961-8fe45a0df587",
+      "indexSource": "meet-table",
+      "calendarRaces": null,
+      "blocking": [],
+      "nonBlocking": [
+        {
+          "type": "owner_trainer_fused",
+          "race": 4,
+          "message": "Program: Race 4: #6 Like and Subscribe - the owner line runs into the trainer column (\"Barnhart, Ahern or Firsthome Thoroughbreds, et al Adam Kitchingman(F Cano)\") and no other entry on the card names that trainer; trainer left blank.",
+          "source": "entries"
+        },
+        {
+          "type": "owner_trainer_fused",
+          "race": 4,
+          "message": "Program: Race 4: #8 Khonsu - the owner line runs into the trainer column (\"Barnhart, Ahern or Firsthome Thoroughbreds, et al Adam Kitchingman(F Cano)\") and no other entry on the card names that trainer; trainer left blank.",
+          "source": "entries"
+        },
+        {
+          "type": "index_renumbered",
+          "race": 3,
+          "message": "Program: Race 3: the index numbers its field after the printed scratch (e.g. \"Autism Puzzle\" is 8 in the index, 9 on the page). Page numbering kept; confirm at the window.",
+          "source": "entries"
+        },
+        {
+          "type": "index_renumbered",
+          "race": 2,
+          "message": "Program: Race 2: the index numbers its field after the printed scratch (e.g. \"Voucher\" is 5 in the index, 6 on the page). Page numbering kept; confirm at the window.",
+          "source": "entries"
+        },
+        {
+          "type": "program_ml_disagreement",
+          "race": 9,
+          "field": "jockey",
+          "programNumber": "10",
+          "message": "Race 9: #10 Stolen Treasure - jockey is \"W Antongeorgi III\" on the ML sheet but \"William Antongeorgi\" in the program; the sheet wins.",
+          "source": "entries"
+        },
+        {
+          "type": "unrecognized_mutuel",
+          "race": 9,
+          "message": "Race 9: unrecognized wager \"Consolation Pick 3\" - stored as consolation_pick_3, never graded.",
+          "source": "results"
+        },
+        {
+          "type": "unrecognized_mutuel",
+          "race": 9,
+          "message": "Race 9: unrecognized wager \"Consolation Double\" - stored as consolation_double, never graded.",
+          "source": "results"
+        }
+      ],
+      "parsedRaces": 9,
+      "resultsRaces": 9,
+      "hasChart": false,
+      "entriesSource": "both",
+      "status": "saved",
+      "raceDayId": 61,
+      "cardId": 90,
+      "completeness": "PROGRAM_ONLY",
+      "engineVersion": "lean-1.1",
+      "resultsSource": "dmtc_html",
+      "results": {
+        "results": 68,
+        "exotics": 62,
+        "scratches": 8,
+        "unresolvedFinishers": 0
+      },
+      "balancerMoved": true,
+      "carveOutFired": false,
+      "figures": {
+        "wageredCents": 20000,
+        "returnedCents": 23290,
+        "plCents": 3290,
+        "refundedCents": 0,
+        "gradedTickets": 23,
+        "tickets": 23,
+        "effectiveWageredCents": 20000,
+        "graded": true
+      },
+      "crossSource": null,
+      "note": "7 non-blocking warning(s)",
+      "regression": null,
+      "lastSeenRunId": "10c2d4a3-8aa1-432e-b961-8fe45a0df587",
+      "lastSeenStatus": "skipped"
+    },
+    {
+      "date": "2025-11-09",
+      "meet": "DMR-2025-fall",
+      "correlationId": "85002ccb-2d38-447c-8f55-4c04f1dba9d3",
+      "indexSource": "meet-table",
+      "calendarRaces": null,
+      "blocking": [],
+      "nonBlocking": [
+        {
+          "type": "index_renumbered",
+          "race": 9,
+          "message": "Program: Race 9: the index numbers its field after the printed scratch (e.g. \"Exington\" is 4 in the index, 5 on the page). Page numbering kept; confirm at the window.",
+          "source": "entries"
+        },
+        {
+          "type": "program_ml_disagreement",
+          "race": 7,
+          "field": "jockey",
+          "programNumber": "7",
+          "message": "Race 7: #7 Trouble and Strife - jockey is \"W Antongeorgi III\" on the ML sheet but \"William Antongeorgi\" in the program; the sheet wins.",
+          "source": "entries"
+        },
+        {
+          "type": "program_ml_disagreement",
+          "race": 8,
+          "field": "jockey",
+          "programNumber": "4",
+          "message": "Race 8: #4 Grand Slam Smile - jockey is \"W Antongeorgi III\" on the ML sheet but \"William Antongeorgi\" in the program; the sheet wins.",
+          "source": "entries"
+        },
+        {
+          "type": "unrecognized_mutuel",
+          "race": 7,
+          "message": "Race 7: unrecognized wager \"Consolation Pick 3\" - stored as consolation_pick_3, never graded.",
+          "source": "results"
+        },
+        {
+          "type": "unrecognized_mutuel",
+          "race": 7,
+          "message": "Race 7: unrecognized wager \"Consolation Double\" - stored as consolation_double, never graded.",
+          "source": "results"
+        },
+        {
+          "type": "unrecognized_mutuel",
+          "race": 8,
+          "message": "Race 8: unrecognized wager \"Consolation Pick 3\" - stored as consolation_pick_3, never graded.",
+          "source": "results"
+        }
+      ],
+      "parsedRaces": 9,
+      "resultsRaces": 9,
+      "hasChart": false,
+      "entriesSource": "both",
+      "status": "saved",
+      "raceDayId": 62,
+      "cardId": 91,
+      "completeness": "PROGRAM_ONLY",
+      "engineVersion": "lean-1.1",
+      "resultsSource": "dmtc_html",
+      "results": {
+        "results": 68,
+        "exotics": 64,
+        "scratches": 10,
+        "unresolvedFinishers": 0
+      },
+      "balancerMoved": true,
+      "carveOutFired": false,
+      "figures": {
+        "wageredCents": 20000,
+        "returnedCents": 10520,
+        "plCents": -9480,
+        "refundedCents": 4000,
+        "gradedTickets": 24,
+        "tickets": 24,
+        "effectiveWageredCents": 16000,
+        "graded": true
+      },
+      "crossSource": null,
+      "note": "6 non-blocking warning(s)",
+      "regression": null,
+      "lastSeenRunId": "85002ccb-2d38-447c-8f55-4c04f1dba9d3",
+      "lastSeenStatus": "skipped"
+    },
+    {
+      "date": "2025-11-14",
+      "meet": "DMR-2025-fall",
+      "correlationId": "afd482f4-d6c1-437a-838e-cf1d7832883d",
+      "indexSource": "meet-table",
+      "calendarRaces": null,
+      "blocking": [],
+      "nonBlocking": [
+        {
+          "type": "index_renumbered",
+          "race": 7,
+          "message": "Program: Race 7: the index numbers its field after the printed scratch (e.g. \"Expressive Love\" is 9 in the index, 10 on the page). Page numbering kept; confirm at the window.",
+          "source": "entries"
+        }
+      ],
+      "parsedRaces": 8,
+      "resultsRaces": 8,
+      "hasChart": false,
+      "entriesSource": "both",
+      "status": "saved",
+      "raceDayId": 63,
+      "cardId": 92,
+      "completeness": "PROGRAM_ONLY",
+      "engineVersion": "lean-1.1",
+      "resultsSource": "dmtc_html",
+      "results": {
+        "results": 63,
+        "exotics": 54,
+        "scratches": 5,
+        "unresolvedFinishers": 0
+      },
+      "balancerMoved": true,
+      "carveOutFired": false,
+      "figures": {
+        "wageredCents": 20000,
+        "returnedCents": 13650,
+        "plCents": -6350,
+        "refundedCents": 100,
+        "gradedTickets": 21,
+        "tickets": 21,
+        "effectiveWageredCents": 19900,
+        "graded": true
+      },
+      "crossSource": null,
+      "note": "1 non-blocking warning(s)",
+      "regression": null,
+      "lastSeenRunId": "afd482f4-d6c1-437a-838e-cf1d7832883d",
+      "lastSeenStatus": "skipped"
+    },
+    {
+      "date": "2025-11-16",
+      "meet": "DMR-2025-fall",
+      "correlationId": "7477b1fe-b80f-41e3-9b7d-4ac32555a9b4",
+      "indexSource": "meet-table",
+      "calendarRaces": null,
+      "blocking": [],
+      "nonBlocking": [
+        {
+          "type": "program_ml_disagreement",
+          "race": 1,
+          "field": "jockey",
+          "programNumber": "2",
+          "message": "Race 1: #2 Charmz Away - jockey is \"A Escobedo\" on the ML sheet but \"Adrian Escobedo Waived\" in the program; the sheet wins.",
+          "source": "entries"
+        },
+        {
+          "type": "program_ml_disagreement",
+          "race": 6,
+          "field": "jockey",
+          "programNumber": "6",
+          "message": "Race 6: #6 Final Table Lady - jockey is \"W Antongeorgi III\" on the ML sheet but \"William Antongeorgi\" in the program; the sheet wins.",
+          "source": "entries"
+        },
+        {
+          "type": "program_ml_disagreement",
+          "race": 9,
+          "field": "jockey",
+          "programNumber": "4",
+          "message": "Race 9: #4 Big Juanito - jockey is \"W Antongeorgi III\" on the ML sheet but \"William Antongeorgi\" in the program; the sheet wins.",
+          "source": "entries"
+        },
+        {
+          "type": "unrecognized_mutuel",
+          "race": 3,
+          "message": "Race 3: unrecognized wager \"Consolation Pick 3\" - stored as consolation_pick_3, never graded.",
+          "source": "results"
+        },
+        {
+          "type": "unrecognized_mutuel",
+          "race": 3,
+          "message": "Race 3: unrecognized wager \"Consolation Double\" - stored as consolation_double, never graded.",
+          "source": "results"
+        },
+        {
+          "type": "unrecognized_mutuel",
+          "race": 4,
+          "message": "Race 4: unrecognized wager \"Consolation Pick 3\" - stored as consolation_pick_3, never graded.",
+          "source": "results"
+        },
+        {
+          "type": "unrecognized_mutuel",
+          "race": 7,
+          "message": "Race 7: unrecognized wager \"Consolation Pick 3\" - stored as consolation_pick_3, never graded.",
+          "source": "results"
+        },
+        {
+          "type": "unrecognized_mutuel",
+          "race": 7,
+          "message": "Race 7: unrecognized wager \"Consolation Double\" - stored as consolation_double, never graded.",
+          "source": "results"
+        },
+        {
+          "type": "unrecognized_mutuel",
+          "race": 8,
+          "message": "Race 8: unrecognized wager \"Consolation Pick 3\" - stored as consolation_pick_3, never graded.",
+          "source": "results"
+        }
+      ],
+      "parsedRaces": 9,
+      "resultsRaces": 9,
+      "hasChart": false,
+      "entriesSource": "both",
+      "status": "saved",
+      "raceDayId": 64,
+      "cardId": 93,
+      "completeness": "PROGRAM_ONLY",
+      "engineVersion": "lean-1.1",
+      "resultsSource": "dmtc_html",
+      "results": {
+        "results": 68,
+        "exotics": 66,
+        "scratches": 8,
+        "unresolvedFinishers": 0
+      },
+      "balancerMoved": true,
+      "carveOutFired": false,
+      "figures": {
+        "wageredCents": 20000,
+        "returnedCents": 36370,
+        "plCents": 16370,
+        "refundedCents": 900,
+        "gradedTickets": 27,
+        "tickets": 27,
+        "effectiveWageredCents": 19100,
+        "graded": true
+      },
+      "crossSource": null,
+      "note": "9 non-blocking warning(s)",
+      "regression": null,
+      "lastSeenRunId": "7477b1fe-b80f-41e3-9b7d-4ac32555a9b4",
+      "lastSeenStatus": "skipped"
+    },
+    {
+      "date": "2025-11-22",
+      "meet": "DMR-2025-fall",
+      "correlationId": "6b15366c-261d-41e6-aa6f-a587dade6bf1",
+      "indexSource": "meet-table",
+      "calendarRaces": null,
+      "blocking": [],
+      "nonBlocking": [],
+      "parsedRaces": 9,
+      "resultsRaces": 9,
+      "hasChart": false,
+      "entriesSource": "both",
+      "status": "saved",
+      "raceDayId": 65,
+      "cardId": 94,
+      "completeness": "PROGRAM_ONLY",
+      "engineVersion": "lean-1.1",
+      "resultsSource": "dmtc_html",
+      "results": {
+        "results": 67,
+        "exotics": 60,
+        "scratches": 3,
+        "unresolvedFinishers": 0
+      },
+      "balancerMoved": true,
+      "carveOutFired": false,
+      "figures": {
+        "wageredCents": 20000,
+        "returnedCents": 8640,
+        "plCents": -11360,
+        "refundedCents": 0,
+        "gradedTickets": 25,
+        "tickets": 25,
+        "effectiveWageredCents": 20000,
+        "graded": true
+      },
+      "crossSource": null,
+      "note": "clean parse",
+      "regression": null,
+      "lastSeenRunId": "6b15366c-261d-41e6-aa6f-a587dade6bf1",
+      "lastSeenStatus": "skipped"
+    },
+    {
+      "date": "2025-11-23",
+      "meet": "DMR-2025-fall",
+      "correlationId": "2136686f-3018-4772-8daf-7e635a6614b1",
+      "indexSource": "meet-table",
+      "calendarRaces": null,
+      "blocking": [],
+      "nonBlocking": [
+        {
+          "type": "index_renumbered",
+          "race": 3,
+          "message": "Program: Race 3: the index numbers its field after the printed scratch (e.g. \"Call Me Sir\" is 9 in the index, 10 on the page). Page numbering kept; confirm at the window.",
+          "source": "entries"
+        },
+        {
+          "type": "index_renumbered",
+          "race": 5,
+          "message": "Program: Race 5: the index numbers its field after the printed scratch (e.g. \"Current Affair\" is 8 in the index, 9 on the page). Page numbering kept; confirm at the window.",
+          "source": "entries"
+        },
+        {
+          "type": "program_ml_disagreement",
+          "race": 9,
+          "field": "jockey",
+          "programNumber": "1",
+          "message": "Race 9: #1 Winika - jockey is \"H Berrios\" on the ML sheet but \"Hector I. Berrios Waived\" in the program; the sheet wins.",
+          "source": "entries"
+        },
+        {
+          "type": "unrecognized_mutuel",
+          "race": 8,
+          "message": "Race 8: unrecognized wager \"Consolation Pick 3\" - stored as consolation_pick_3, never graded.",
+          "source": "results"
+        },
+        {
+          "type": "unrecognized_mutuel",
+          "race": 8,
+          "message": "Race 8: unrecognized wager \"Consolation Double\" - stored as consolation_double, never graded.",
+          "source": "results"
+        },
+        {
+          "type": "unrecognized_mutuel",
+          "race": 9,
+          "message": "Race 9: unrecognized wager \"Consolation Pick 3\" - stored as consolation_pick_3, never graded.",
+          "source": "results"
+        }
+      ],
+      "parsedRaces": 9,
+      "resultsRaces": 9,
+      "hasChart": false,
+      "entriesSource": "both",
+      "status": "saved",
+      "raceDayId": 66,
+      "cardId": 95,
+      "completeness": "PROGRAM_ONLY",
+      "engineVersion": "lean-1.1",
+      "resultsSource": "dmtc_html",
+      "results": {
+        "results": 74,
+        "exotics": 63,
+        "scratches": 8,
+        "unresolvedFinishers": 0
+      },
+      "balancerMoved": true,
+      "carveOutFired": false,
+      "figures": {
+        "wageredCents": 20000,
+        "returnedCents": 14470,
+        "plCents": -5530,
+        "refundedCents": 900,
+        "gradedTickets": 23,
+        "tickets": 23,
+        "effectiveWageredCents": 19100,
+        "graded": true
+      },
+      "crossSource": null,
+      "note": "6 non-blocking warning(s)",
+      "regression": null,
+      "lastSeenRunId": "2136686f-3018-4772-8daf-7e635a6614b1",
+      "lastSeenStatus": "skipped"
+    },
+    {
+      "date": "2025-11-24",
+      "meet": "DMR-2025-fall",
+      "correlationId": "a3af43e7-b631-49a2-9b5b-ff625abd54b3",
+      "indexSource": "meet-table",
+      "calendarRaces": null,
+      "blocking": [],
+      "nonBlocking": [
+        {
+          "type": "owner_trainer_fused",
+          "race": 4,
+          "message": "Program: Race 4: #3 Emirates Affair - the owner line runs into the trainer column (\"Paradise Farm Corp., Lambert or Schneider, et alRobert B. Hess Jr.(G. Morales)\") and no other entry on the card names that trainer; trainer left blank.",
+          "source": "entries"
+        },
+        {
+          "type": "program_ml_disagreement",
+          "race": 1,
+          "field": "jockey",
+          "programNumber": "5",
+          "message": "Race 1: #5 Manx Missile - jockey is \"W Antongeorgi III\" on the ML sheet but \"William Antongeorgi\" in the program; the sheet wins.",
+          "source": "entries"
+        },
+        {
+          "type": "program_ml_disagreement",
+          "race": 3,
+          "field": "jockey",
+          "programNumber": "4",
+          "message": "Race 3: #4 Katerini - jockey is \"A Aguilar\" on the ML sheet but \"Armando Aguilar Waived\" in the program; the sheet wins.",
+          "source": "entries"
+        },
+        {
+          "type": "program_ml_disagreement",
+          "race": 8,
+          "field": "jockey",
+          "programNumber": "5",
+          "message": "Race 8: #5 Stolen Treasure - jockey is \"W Antongeorgi III\" on the ML sheet but \"William Antongeorgi\" in the program; the sheet wins.",
+          "source": "entries"
+        },
+        {
+          "type": "program_ml_disagreement",
+          "race": 9,
+          "field": "jockey",
+          "programNumber": "13",
+          "message": "Race 9: #13 Runamileinmyshoes - jockey is \"W Antongeorgi III\" on the ML sheet but \"William Antongeorgi\" in the program; the sheet wins.",
+          "source": "entries"
+        }
+      ],
+      "parsedRaces": 9,
+      "resultsRaces": 9,
+      "hasChart": false,
+      "entriesSource": "both",
+      "status": "saved",
+      "raceDayId": 67,
+      "cardId": 96,
+      "completeness": "PROGRAM_ONLY",
+      "engineVersion": "lean-1.1",
+      "resultsSource": "dmtc_html",
+      "results": {
+        "results": 68,
+        "exotics": 59,
+        "scratches": 5,
+        "unresolvedFinishers": 0
+      },
+      "balancerMoved": true,
+      "carveOutFired": false,
+      "figures": {
+        "wageredCents": 20000,
+        "returnedCents": 9730,
+        "plCents": -10270,
+        "refundedCents": 2300,
+        "gradedTickets": 25,
+        "tickets": 25,
+        "effectiveWageredCents": 17700,
+        "graded": true
+      },
+      "crossSource": null,
+      "note": "5 non-blocking warning(s)",
+      "regression": null,
+      "lastSeenRunId": "a3af43e7-b631-49a2-9b5b-ff625abd54b3",
+      "lastSeenStatus": "skipped"
+    },
+    {
+      "date": "2025-11-28",
+      "meet": "DMR-2025-fall",
+      "correlationId": "ff55d42b-448e-4e4b-b983-a018c27d278c",
+      "indexSource": "meet-table",
+      "calendarRaces": null,
+      "blocking": [],
+      "nonBlocking": [
+        {
+          "type": "index_renumbered",
+          "race": 3,
+          "message": "Program: Race 3: the index numbers its field after the printed scratch (e.g. \"Lady Chic\" is 8 in the index, 9 on the page). Page numbering kept; confirm at the window.",
+          "source": "entries"
+        },
+        {
+          "type": "index_renumbered",
+          "race": 2,
+          "message": "Program: Race 2: the index numbers its field after the printed scratch (e.g. \"Mother's Prayer\" is 6 in the index, 7 on the page). Page numbering kept; confirm at the window.",
+          "source": "entries"
+        },
+        {
+          "type": "index_renumbered",
+          "race": 1,
+          "message": "Program: Race 1: the index numbers its field after the printed scratch (e.g. \"Tokala\" is 11 in the index, 12 on the page). Page numbering kept; confirm at the window.",
+          "source": "entries"
+        },
+        {
+          "type": "program_ml_disagreement",
+          "race": 3,
+          "field": "jockey",
+          "programNumber": "1",
+          "message": "Race 3: #1 Abazaami (GB) - jockey is \"W Antongeorgi III\" on the ML sheet but \"William Antongeorgi\" in the program; the sheet wins.",
+          "source": "entries"
+        },
+        {
+          "type": "program_ml_disagreement",
+          "race": 4,
+          "field": "jockey",
+          "programNumber": "4",
+          "message": "Race 4: #4 Syntax - jockey is \"W Antongeorgi III\" on the ML sheet but \"William Antongeorgi\" in the program; the sheet wins.",
+          "source": "entries"
+        },
+        {
+          "type": "program_ml_disagreement",
+          "race": 8,
+          "field": "jockey",
+          "programNumber": "9",
+          "message": "Race 8: #9 Epictetus - jockey is \"W Antongeorgi III\" on the ML sheet but \"William Antongeorgi\" in the program; the sheet wins.",
+          "source": "entries"
+        }
+      ],
+      "parsedRaces": 9,
+      "resultsRaces": 9,
+      "hasChart": false,
+      "entriesSource": "both",
+      "status": "saved",
+      "raceDayId": 68,
+      "cardId": 97,
+      "completeness": "PROGRAM_ONLY",
+      "engineVersion": "lean-1.1",
+      "resultsSource": "dmtc_html",
+      "results": {
+        "results": 70,
+        "exotics": 61,
+        "scratches": 11,
+        "unresolvedFinishers": 0
+      },
+      "balancerMoved": true,
+      "carveOutFired": false,
+      "figures": {
+        "wageredCents": 20000,
+        "returnedCents": 4200,
+        "plCents": -15800,
+        "refundedCents": 0,
+        "gradedTickets": 21,
+        "tickets": 21,
+        "effectiveWageredCents": 20000,
+        "graded": true
+      },
+      "crossSource": null,
+      "note": "6 non-blocking warning(s)",
+      "regression": null,
+      "lastSeenRunId": "ff55d42b-448e-4e4b-b983-a018c27d278c",
+      "lastSeenStatus": "skipped"
+    },
+    {
+      "date": "2025-11-29",
+      "meet": "DMR-2025-fall",
+      "correlationId": "67b073e7-9720-4543-9d4a-09bd29baa2d6",
+      "indexSource": "meet-table",
+      "calendarRaces": null,
+      "blocking": [],
+      "nonBlocking": [
+        {
+          "type": "index_renumbered",
+          "race": 1,
+          "message": "Program: Race 1: the index numbers its field after the printed scratch (e.g. \"Aleramo (IRE)\" is 3 in the index, 4 on the page). Page numbering kept; confirm at the window.",
+          "source": "entries"
+        },
+        {
+          "type": "index_renumbered",
+          "race": 11,
+          "message": "Program: Race 11: the index numbers its field after the printed scratch (e.g. \"Big Bet Jafinsafa\" is 7 in the index, 8 on the page). Page numbering kept; confirm at the window.",
+          "source": "entries"
+        },
+        {
+          "type": "index_renumbered",
+          "race": 3,
+          "message": "Program: Race 3: the index numbers its field after the printed scratch (e.g. \"Chair's Coin (IRE)\" is 12 in the index, 13 on the page). Page numbering kept; confirm at the window.",
+          "source": "entries"
+        },
+        {
+          "type": "index_renumbered",
+          "race": 9,
+          "message": "Program: Race 9: the index numbers its field after the printed scratch (e.g. \"Copp\" is 6 in the index, 7 on the page). Page numbering kept; confirm at the window.",
+          "source": "entries"
+        },
+        {
+          "type": "program_ml_disagreement",
+          "race": 11,
+          "field": "jockey",
+          "programNumber": "14",
+          "message": "Race 11: #14 Dakota Country - jockey is \"W Antongeorgi III\" on the ML sheet but \"William Antongeorgi\" in the program; the sheet wins.",
+          "source": "entries"
+        },
+        {
+          "type": "unrecognized_mutuel",
+          "race": 4,
+          "message": "Race 4: unrecognized wager \"Consolation Pick 3\" - stored as consolation_pick_3, never graded.",
+          "source": "results"
+        },
+        {
+          "type": "unrecognized_mutuel",
+          "race": 4,
+          "message": "Race 4: unrecognized wager \"Consolation Double\" - stored as consolation_double, never graded.",
+          "source": "results"
+        },
+        {
+          "type": "finish_order_conflict",
+          "race": 7,
+          "message": "Race 7: ORDER OF FINISH (4,1,5,8) disagrees with the WPS table (4,1,5).",
+          "source": "results"
+        },
+        {
+          "type": "unrecognized_mutuel",
+          "race": 11,
+          "message": "Race 11: unrecognized wager \"Consolation Pick 3\" - stored as consolation_pick_3, never graded.",
+          "source": "results"
+        },
+        {
+          "type": "unrecognized_mutuel",
+          "race": 11,
+          "message": "Race 11: unrecognized wager \"Consolation Double\" - stored as consolation_double, never graded.",
+          "source": "results"
+        }
+      ],
+      "parsedRaces": 11,
+      "resultsRaces": 11,
+      "hasChart": false,
+      "entriesSource": "both",
+      "status": "saved",
+      "raceDayId": 69,
+      "cardId": 98,
+      "completeness": "PROGRAM_ONLY",
+      "engineVersion": "lean-1.1",
+      "resultsSource": "dmtc_html",
+      "results": {
+        "results": 96,
+        "exotics": 77,
+        "scratches": 12,
+        "unresolvedFinishers": 0
+      },
+      "balancerMoved": true,
+      "carveOutFired": false,
+      "figures": {
+        "wageredCents": 20000,
+        "returnedCents": 16960,
+        "plCents": -3040,
+        "refundedCents": 1800,
+        "gradedTickets": 32,
+        "tickets": 32,
+        "effectiveWageredCents": 18200,
+        "graded": true
+      },
+      "crossSource": null,
+      "note": "10 non-blocking warning(s)",
+      "regression": null,
+      "lastSeenRunId": "67b073e7-9720-4543-9d4a-09bd29baa2d6",
+      "lastSeenStatus": "skipped"
+    },
+    {
+      "date": "2025-11-30",
+      "meet": "DMR-2025-fall",
+      "correlationId": "a4943390-0309-4316-b0e5-ef9f61c8f8b5",
+      "indexSource": "meet-table",
+      "calendarRaces": null,
+      "blocking": [],
+      "nonBlocking": [
+        {
+          "type": "incomplete_entry",
+          "race": 9,
+          "message": "Program: Race 9, program 1: missing jockey, morningLine.",
+          "source": "entries"
+        },
+        {
+          "type": "incomplete_entry",
+          "race": 9,
+          "message": "Program: Race 9, program 2: missing jockey, morningLine.",
+          "source": "entries"
+        },
+        {
+          "type": "incomplete_entry",
+          "race": 9,
+          "message": "Program: Race 9, program 3: missing jockey, morningLine.",
+          "source": "entries"
+        },
+        {
+          "type": "incomplete_entry",
+          "race": 9,
+          "message": "Program: Race 9, program 4: missing jockey, morningLine.",
+          "source": "entries"
+        },
+        {
+          "type": "incomplete_entry",
+          "race": 9,
+          "message": "Program: Race 9, program 5: missing jockey.",
+          "source": "entries"
+        },
+        {
+          "type": "incomplete_entry",
+          "race": 9,
+          "message": "Program: Race 9, program 7: missing jockey, morningLine.",
+          "source": "entries"
+        },
+        {
+          "type": "incomplete_entry",
+          "race": 9,
+          "message": "Program: Race 9, program 8: missing jockey, morningLine.",
+          "source": "entries"
+        },
+        {
+          "type": "incomplete_entry",
+          "race": 9,
+          "message": "Program: Race 9, program 9: missing jockey.",
+          "source": "entries"
+        },
+        {
+          "type": "incomplete_entry",
+          "race": 9,
+          "message": "Program: Race 9, program 10: missing jockey, morningLine.",
+          "source": "entries"
+        },
+        {
+          "type": "incomplete_entry",
+          "race": 9,
+          "message": "Program: Race 9, program 11: missing jockey.",
+          "source": "entries"
+        },
+        {
+          "type": "incomplete_entry",
+          "race": 9,
+          "message": "Program: Race 9, program 12: missing jockey, morningLine.",
+          "source": "entries"
+        },
+        {
+          "type": "incomplete_entry",
+          "race": 9,
+          "message": "Program: Race 9, program 13: missing jockey, morningLine.",
+          "source": "entries"
+        },
+        {
+          "type": "incomplete_entry",
+          "race": 9,
+          "message": "Program: Race 9, program 14: missing jockey.",
+          "source": "entries"
+        },
+        {
+          "type": "incomplete_entry",
+          "race": 9,
+          "message": "Program: Race 9, program 15: missing jockey, morningLine.",
+          "source": "entries"
+        },
+        {
+          "type": "incomplete_entry",
+          "race": 9,
+          "message": "Program: Race 9, program 16: missing jockey, morningLine.",
+          "source": "entries"
+        },
+        {
+          "type": "index_renumbered",
+          "race": 9,
+          "message": "Program: Race 9: the index numbers its field after the printed scratch (e.g. \"Army Man\" is 10 in the index, 11 on the page). Page numbering kept; confirm at the window.",
+          "source": "entries"
+        },
+        {
+          "type": "program_ml_disagreement",
+          "race": 4,
+          "field": "jockey",
+          "programNumber": "5",
+          "message": "Race 4: #5 Final Table Lady - jockey is \"W Antongeorgi III\" on the ML sheet but \"William Antongeorgi\" in the program; the sheet wins.",
+          "source": "entries"
+        }
+      ],
+      "parsedRaces": 9,
+      "resultsRaces": 9,
+      "hasChart": false,
+      "entriesSource": "both",
+      "status": "saved",
+      "raceDayId": 70,
+      "cardId": 99,
+      "completeness": "PROGRAM_ONLY",
+      "engineVersion": "lean-1.1",
+      "resultsSource": "dmtc_html",
+      "results": {
+        "results": 75,
+        "exotics": 62,
+        "scratches": 7,
+        "unresolvedFinishers": 0
+      },
+      "balancerMoved": true,
+      "carveOutFired": false,
+      "figures": {
+        "wageredCents": 20000,
+        "returnedCents": 12120,
+        "plCents": -7880,
+        "refundedCents": 0,
+        "gradedTickets": 26,
+        "tickets": 26,
+        "effectiveWageredCents": 20000,
+        "graded": true
+      },
+      "crossSource": null,
+      "note": "17 non-blocking warning(s)",
+      "regression": null,
+      "lastSeenRunId": "a4943390-0309-4316-b0e5-ef9f61c8f8b5",
+      "lastSeenStatus": "skipped"
+    }
+  ]
+}

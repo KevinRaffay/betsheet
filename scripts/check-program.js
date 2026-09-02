@@ -332,6 +332,28 @@ check('2025-07-18 R9: eleven entries in program order, #3 is Runkerry (not the a
   r9.distance === 'Six Furlongs' && r9.surface === 'DIRT' && r9.raceType === 'ALLOWANCE/CLAIMING' && r9.postTime === '6:00PM',
   r9 ? JSON.stringify(r9.entries.map((e) => [e.programNumber, e.horseName, e.programRank, e.scratched])) : 'no race 9');
 
+// --- fourth fixture: a FOREIGN document (tests/fixtures/backfill/DMR-2025-fall, the D46 golden) ---
+// On Breeders' Cup days the Del Mar program URL serves the Breeders' Cup
+// official program: per-race footers but no Bottom Line, no horse index,
+// panels that parse to duplicates and empties. The parser must say so and
+// hand back NO races - the ML sheet is the only entries source that day.
+console.log('-- foreign document: the Breeders Cup official program (2025-10-31) --');
+// The 42MB BC program is committed by DIGEST only (tests/fixtures/backfill/DMR-2025-fall/program.digest.json);
+// the archived copy under data/raw is parsed when present, else this assertion is noted as skipped.
+const DIGEST4 = JSON.parse(fs.readFileSync(path.join(ROOT, 'tests', 'fixtures', 'backfill', 'DMR-2025-fall', 'program.digest.json'), 'utf8'));
+const PDF4 = path.join(ROOT, 'data', 'raw', 'DMR', '20251031', 'program.pdf');
+if (fs.existsSync(PDF4)) {
+  const bytes4 = fs.readFileSync(PDF4);
+  check('2025-10-31: the archived Breeders Cup program matches the committed digest', (await import('node:crypto')).createHash('sha256').update(bytes4).digest('hex') === DIGEST4.sha256 && bytes4.length === DIGEST4.bytes);
+  const out4 = await parseProgramPdf(new Uint8Array(bytes4), { track: 'Del Mar', date: '2025-10-31' });
+  check('2025-10-31 Breeders Cup program: flagged foreign, zero races handed back, the reason spelled out (no Bottom Line, no index, empties, duplicates)',
+    out4.foreign === true && out4.races.length === 0 && out4.warnings.some((w) => w.type === 'foreign_program' && /no Bottom Line, no horse index/.test(w.message) && /duplicate race numbers/.test(w.message)) &&
+    out4.warnings.some((w) => w.type === 'no_analysis') && out4.warnings.some((w) => w.type === 'no_index'), JSON.stringify(out4.warnings.map((w) => w.type)));
+} else {
+  console.log('  note  2025-10-31 Breeders Cup program: digest-only fixture and data/raw archive not present - foreign-document parse skipped here (the backfill runner re-verifies it against the archive)');
+}
+check('a real Del Mar program is never flagged foreign (2026-08-30, 2025-07-18)', out.foreign === undefined && out3.foreign === undefined);
+
 if (failures) {
   console.error(`\ncheck-program: ${failures} failure(s)`);
   process.exit(1);
