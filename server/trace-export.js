@@ -92,7 +92,7 @@ export function buildCardExport(db, cardId) {
   const tickets = db.prepare(`
     SELECT t.*, gt.outcome, gt.returned_cents, gt.pl_cents, gt.details
     FROM tickets t
-    LEFT JOIN graded_tickets gt ON gt.ticket_id = t.id
+    LEFT JOIN graded_tickets_latest gt ON gt.ticket_id = t.id
     WHERE t.card_id = ? ORDER BY t.sequence
   `).all(card.id).map((t) => {
     const sel = JSON.parse(t.selections);
@@ -182,6 +182,7 @@ export function buildCardExport(db, cardId) {
       bankrollCents: card.bankroll_cents,
       perRaceMinCents: card.per_race_min_cents,
       consensusCompleteness: card.consensus_completeness,
+      engineVersion: card.engine_version,
       correlationId: card.correlation_id,
       createdAt: card.created_at,
     },

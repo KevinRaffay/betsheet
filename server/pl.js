@@ -15,19 +15,24 @@ const BUCKET_ORDER = ['FULL', 'PARTIAL', 'PROGRAM_ONLY'];
 
 // The running view: per-bucket totals + every graded card as a row, plus
 // the cards still waiting on results. Deliberately NO overall total.
-plRouter.get('/pl', (_req, res) => {
+// Engine versions (D34, invariant 14) never pool either: the buckets are
+// built from ONE engine version - ?engineVersion=<v>, default the version
+// of the most recently generated graded card - unless the caller asks for
+// ?engineVersion=all. Every card row still carries its own version.
+plRouter.get('/pl', (req, res) => {
   const db = getDb();
 
   const cardRows = db.prepare(`
     SELECT c.id AS cardId, c.race_day_id AS raceDayId, rd.track, rd.date,
            c.card_number AS cardNumber, c.variant, st.name AS template,
            c.consensus_completeness AS completeness, c.bankroll_cents AS bankrollCents,
+           c.engine_version AS engineVersion,
            SUM(t.cost_cents) AS costCents,
            SUM(gt.returned_cents) AS returnedCents,
            SUM(gt.pl_cents) AS plCents,
            SUM(CASE WHEN gt.outcome = 'win' THEN 1 ELSE 0 END) AS wins,
            COUNT(gt.ticket_id) AS tickets
-    FROM graded_tickets gt
+    FROM graded_tickets_latest gt
     JOIN tickets t ON t.id = gt.ticket_id
     JOIN cards c ON c.id = t.card_id
     LEFT JOIN strategy_templates st ON st.id = c.strategy_template_id
@@ -37,8 +42,20 @@ plRouter.get('/pl', (_req, res) => {
     ORDER BY rd.date DESC, rd.track, c.card_number DESC
   `).all();
 
+  // Versions present among graded cards, newest card first.
+  const engineVersions = [];
+  for (const row of [...cardRows].sort((a, b) => b.cardId - a.cardId)) {
+    if (!engineVersions.includes(row.engineVersion)) engineVersions.push(row.engineVersion);
+  }
+  const requested = String(req.query.engineVersion ?? '').trim();
+  const selectedVersion = requested === 'all' ? 'all'
+    : requested && engineVersions.includes(requested) ? requested
+      : (engineVersions[0] ?? null);
+  const inSelection = (row) => selectedVersion === 'all' || row.engineVersion === selectedVersion;
+
   const byBucket = new Map();
   for (const row of cardRows) {
+    if (!inSelection(row)) continue;
     if (!byBucket.has(row.completeness)) {
       byBucket.set(row.completeness, {
         completeness: row.completeness, cards: 0, tickets: 0,
@@ -56,7 +73,7 @@ plRouter.get('/pl', (_req, res) => {
 
   const ungraded = db.prepare(`
     SELECT c.id AS cardId, c.race_day_id AS raceDayId, rd.track, rd.date,
-           c.card_number AS cardNumber, c.variant,
+           c.card_number AS cardNumber, c.variant, c.engine_version AS engineVersion,
            c.consensus_completeness AS completeness,
            COALESCE(SUM(t.cost_cents), 0) AS costCents
     FROM cards c
@@ -64,7 +81,7 @@ plRouter.get('/pl', (_req, res) => {
     LEFT JOIN tickets t ON t.card_id = c.id
     WHERE rd.deleted_at IS NULL
       AND NOT EXISTS (
-        SELECT 1 FROM graded_tickets gt
+        SELECT 1 FROM graded_tickets_latest gt
         JOIN tickets tt ON tt.id = gt.ticket_id
         WHERE tt.card_id = c.id
       )
@@ -72,7 +89,7 @@ plRouter.get('/pl', (_req, res) => {
     ORDER BY rd.date DESC, rd.track, c.card_number DESC
   `).all();
 
-  res.json({ buckets, cards: cardRows, ungraded });
+  res.json({ buckets, cards: cardRows, ungraded, engineVersions, selectedVersion });
 });
 
 // One day's cards side by side, broken down per race - the variant-compare
@@ -87,7 +104,7 @@ plRouter.get('/race-days/:id/pl', (req, res) => {
 
   const cards = db.prepare(`
     SELECT c.id, c.card_number, c.variant, st.name AS template, c.bankroll_cents,
-           c.consensus_completeness, c.created_at
+           c.consensus_completeness, c.engine_version, c.created_at
     FROM cards c
     LEFT JOIN strategy_templates st ON st.id = c.strategy_template_id
     WHERE c.race_day_id = ? ORDER BY c.card_number
@@ -96,7 +113,7 @@ plRouter.get('/race-days/:id/pl', (req, res) => {
   const rows = db.prepare(`
     SELECT t.card_id, r.number AS race_number,
            t.cost_cents, gt.returned_cents, gt.pl_cents, gt.outcome
-    FROM graded_tickets gt
+    FROM graded_tickets_latest gt
     JOIN tickets t ON t.id = gt.ticket_id
     LEFT JOIN races r ON r.id = t.race_id
     WHERE t.card_id IN (SELECT id FROM cards WHERE race_day_id = ?)
@@ -128,7 +145,7 @@ plRouter.get('/race-days/:id/pl', (req, res) => {
     return {
       cardId: c.id, cardNumber: c.card_number, variant: c.variant, template: c.template,
       bankrollCents: c.bankroll_cents, completeness: c.consensus_completeness,
-      createdAt: c.created_at, graded: perRace.length > 0, perRace,
+      engineVersion: c.engine_version, createdAt: c.created_at, graded: perRace.length > 0, perRace,
       costCents: sum('costCents'), returnedCents: sum('returnedCents'), plCents: sum('plCents'),
     };
   });

@@ -143,10 +143,10 @@ cardsRouter.post('/race-days/:id/cards', (req, res) => {
     ).get(day.id).n;
     const cardId = db.prepare(`INSERT INTO cards
         (race_day_id, card_number, variant, strategy_template_id, bankroll_cents,
-         per_race_min_cents, status, correlation_id, consensus_completeness)
-        VALUES (?, ?, ?, ?, ?, ?, 'final', ?, ?)`)
+         per_race_min_cents, status, correlation_id, consensus_completeness, engine_version)
+        VALUES (?, ?, ?, ?, ?, ?, 'final', ?, ?, ?)`)
       .run(day.id, cardNumber, variant, templateIdFor(db, templateName), bankrollCents,
-        perRaceMinCents, correlationId, result.completeness).lastInsertRowid;
+        perRaceMinCents, correlationId, result.completeness, result.engineVersion).lastInsertRowid;
 
     const insAlloc = db.prepare(`INSERT INTO allocations
         (card_id, race_id, amount_cents, confidence, rule, thesis)
@@ -183,6 +183,7 @@ cardsRouter.post('/race-days/:id/cards', (req, res) => {
   appLog.info('card_generated', {
     correlationId, cardId, raceDayId: day.id, variant, template: templateName,
     completeness: result.completeness,
+    engineVersion: result.engineVersion,
     tickets: result.tickets.length,
     totalCents: result.tickets.reduce((a, t) => a + t.costCents, 0),
     bankrollCents,
@@ -202,7 +203,7 @@ cardsRouter.get('/race-days/:id/cards', (req, res) => {
   const db = getDb();
   const cards = db.prepare(`
     SELECT c.id, c.card_number, c.variant, st.name AS template,
-           c.bankroll_cents, c.per_race_min_cents,
+           c.bankroll_cents, c.per_race_min_cents, c.engine_version,
            c.status, c.consensus_completeness, c.created_at,
            COUNT(t.id) AS tickets, COALESCE(SUM(t.cost_cents), 0) AS total_cents
     FROM cards c

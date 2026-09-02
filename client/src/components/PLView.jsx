@@ -15,16 +15,19 @@ const BUCKET_CHIP = { FULL: 'unanimous', PARTIAL: 'split', PROGRAM_ONLY: 'chaos'
 
 // P/L across every stored card. Invariant 13 shapes this screen: every
 // number lives inside its consensus_completeness bucket and there is no
-// pooled all-bucket total anywhere on it.
+// pooled all-bucket total anywhere on it. Invariant 14 adds the engine
+// version: the buckets show ONE version (default: the latest graded) and
+// pool across versions only when the user picks "all versions".
 export default function PLView({ onBack, onOpenCard, onOpenDay }) {
   const [data, setData] = useState(null);
   const [error, setError] = useState(null);
   const [expandedDay, setExpandedDay] = useState(null); // raceDayId
   const [dayPL, setDayPL] = useState(null);
+  const [version, setVersion] = useState(''); // '' = server default (latest)
 
   useEffect(() => {
-    getPL().then(setData).catch((e) => setError(String(e.message)));
-  }, []);
+    getPL(version).then(setData).catch((e) => setError(String(e.message)));
+  }, [version]);
 
   const toggleDay = async (raceDayId) => {
     if (expandedDay === raceDayId) { setExpandedDay(null); setDayPL(null); return; }
@@ -56,7 +59,17 @@ export default function PLView({ onBack, onOpenCard, onOpenDay }) {
     <section>
       <div className="pagehead">
         <h2>P/L</h2>
-        <button className="btn" onClick={onBack}>Back</button>
+        <div className="btnrow">
+          {data.engineVersions.length > 0 && (
+            <label className="dim">Engine{' '}
+              <select className="in in--sm" value={data.selectedVersion ?? ''} onChange={(e) => setVersion(e.target.value)}>
+                {data.engineVersions.map((v) => <option key={v} value={v}>{v}</option>)}
+                <option value="all">all versions (pooled)</option>
+              </select>
+            </label>
+          )}
+          <button className="btn" onClick={onBack}>Back</button>
+        </div>
       </div>
 
       {data.cards.length === 0 && (
@@ -82,6 +95,9 @@ export default function PLView({ onBack, onOpenCard, onOpenDay }) {
           </div>
           <p className="dim">
             Buckets never pool: a program-only backfill card and a full-consensus card never share a total.
+            {data.selectedVersion === 'all'
+              ? ' Showing ALL engine versions pooled - you chose this; improvement is measured by comparing versions.'
+              : ` Showing engine ${data.selectedVersion} only.`}
           </p>
         </>
       )}
@@ -97,7 +113,7 @@ export default function PLView({ onBack, onOpenCard, onOpenDay }) {
           <table className="grid grid--click">
             <thead>
               <tr>
-                <th>Card</th><th>Template</th><th>Variant</th><th>Consensus</th><th>Bankroll</th>
+                <th>Card</th><th>Template</th><th>Variant</th><th>Engine</th><th>Consensus</th><th>Bankroll</th>
                 <th>Wagered</th><th>Returned</th><th>P/L</th><th>ROI</th><th>Hits</th>
               </tr>
             </thead>
@@ -107,6 +123,7 @@ export default function PLView({ onBack, onOpenCard, onOpenDay }) {
                   <td><strong>#{c.cardNumber}</strong></td>
                   <td>{c.template ?? '—'}</td>
                   <td>{c.variant}</td>
+                  <td><code>{c.engineVersion}</code></td>
                   <td><span className={`chip chip--${BUCKET_CHIP[c.completeness] ?? 'guess'}`}>{c.completeness}</span></td>
                   <td>{money(c.bankrollCents)}</td>
                   <td>{money(c.costCents)}</td>

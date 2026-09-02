@@ -35,7 +35,7 @@ engine event.
 
 | event | fields | meaning |
 | --- | --- | --- |
-| `inputs_snapshot` | `bankrollCents`, `perRaceMinCents`, `raceCount`, `entries[{race, entries}]`, `sourcesUsed`, `sourcesUnavailable`, `template`, `rules` | everything the run saw, first event (`seq` 0). `template` is the strategy-template name (D18, null for direct engine calls); `rules` is the full resolved rule set after template + explicit overrides. |
+| `inputs_snapshot` | `engineVersion`, `bankrollCents`, `perRaceMinCents`, `raceCount`, `entries[{race, entries}]`, `sourcesUsed`, `sourcesUnavailable`, `template`, `rules` | everything the run saw, first event (`seq` 0). `template` is the strategy-template name (D18, null for direct engine calls); `rules` is the full resolved rule set after template + explicit overrides. |
 | `consensus_table` | `race`, `table` | the per-horse vote table the classification was computed from |
 | `race_classified` | `race`, `classification` (UNANIMOUS/SPLIT/CHAOS/GUESS), `externalSourceCount`, `cappedFromUnanimous`, `topVotes`, `contrarianFlags` | the signal-layer call and the votes behind it |
 | `completeness_decided` | `completeness` (FULL/PARTIAL/PROGRAM_ONLY), `externalSourcesPerRace` | the card's consensus-completeness bucket (invariant 13) |
@@ -45,14 +45,14 @@ engine event.
 | `ticket_added` | `race` (null for multi-race), `races`, `betType`, `selections` (legs), `stakeCents`, `costCents`, `rules` (provenance tags) | one ticket landed on the card |
 | `remainder_distributed` | `remainderCents`, `passes`, `races[{race, amountCents, steps, ticket, withPlace, allocatedCents}]`, `undistributedCents` | how the gap between the bankroll and the constructed tickets was spread: round-robin $1 steps onto each race's primary win ticket (`withPlace` = the place-money pair moved with it, $2 a step), larger allocations first, at most one step per race per pass; guesswork races only when nothing else can take the money. Emitted only when there was a remainder. `undistributedCents` is non-zero only when minimums made an exact match impossible |
 | `bankroll_balanced` | `adjusted`, `remainingCents` | the exact-bankroll balancing pass (invariant 2); follows `remainder_distributed` |
-| `card_finalized` | `totalCents`, `bankrollCents`, `ticketCount`, `completeness`, `perRace[{race, allocatedCents, spentCents}]`, `warnings` | last generation event; totals as persisted |
+| `card_finalized` | `engineVersion`, `totalCents`, `bankrollCents`, `ticketCount`, `completeness`, `perRace[{race, allocatedCents, spentCents}]`, `warnings` | last generation event; totals as persisted |
 
 ### Grading (emitted by `server/grading.js`, under the CARD's correlationId)
 
 | event | fields | meaning |
 | --- | --- | --- |
-| `ticket_graded` | `cardId`, `ticketId`, `betType`, `races`, `legs`, `outcome` (win/refund/partial/loss), `costCents`, `returnedCents`, `plCents`, `note` | one ticket scored against the day's chart |
-| `card_graded` | `cardId`, `gradedBy` (the triggering session's correlationId), `costCents`, `returnedCents`, `plCents`, `outcomes`, `topTicketShare` | the card summary. A regrade replaces DB rows but appends here — the log keeps every grading pass |
+| `ticket_graded` | `cardId`, `ticketId`, `engineVersion` (the grader's version), `betType`, `races`, `legs`, `outcome` (win/refund/partial/loss), `costCents`, `returnedCents`, `plCents`, `note` | one ticket scored against the day's chart |
+| `card_graded` | `cardId`, `gradedBy` (the triggering session's correlationId), `engineVersion`, `costCents`, `returnedCents`, `plCents`, `outcomes`, `topTicketShare` | the card summary. A regrade replaces DB rows but appends here — the log keeps every grading pass |
 
 ### Simulation (emitted by `server/simulate.js`, one correlationId per POST /api/simulations)
 
@@ -76,13 +76,13 @@ One self-contained JSON object per card:
 | section | contents |
 | --- | --- |
 | `export` | `schema` (`betsheet.card-trace-export`), `schemaVersion`, `exportedAt`, `docs` |
-| `card` | id, cardNumber, variant, template (strategy-template name, D18), bankrollCents, perRaceMinCents, consensusCompleteness, correlationId, createdAt |
+| `card` | id, cardNumber, variant, template (strategy-template name, D18), engineVersion (D34; `lean-0` = pre-versioning), bankrollCents, perRaceMinCents, consensusCompleteness, correlationId, createdAt |
 | `raceDay` | id, track, date |
 | `sources` | `used` / `unavailable`, each `{name, ts, outcome, reason}` — latest attempt per source (invariant 11) |
 | `races` | per race: number, raceType, surface, distance, postTime, conditions, classification, contrarianFlags, wagerMenu, and full `entries` (programNumber, horseName, morningLine + decimal, programRank, bestBet, scratched) |
 | `consensus` | every stored pick: race, source, kind, pick_type, program_number, horse_name, note |
 | `allocations` | race, amountCents, confidence, rule, thesis (incl. TRIGGER lines) |
-| `tickets` | the card as persisted, each with its `grade` (`outcome`, `returnedCents`, `plCents`, `note`) or `grade: null` when the day has no results yet |
+| `tickets` | the card as persisted, each with its `grade` (`outcome`, `returnedCents`, `plCents`, `note`, from the LATEST grade set - invariant 14 keeps older versions' sets in graded_tickets) or `grade: null` when the day has no results yet |
 | `gradeSummary` | costCents, returnedCents, plCents, outcomes — or null when ungraded |
 | `results` | the day's stored chart: `finishers` (with W/P/S prices in cents), `exotics` (per printed base), `scratches` |
 | `traceStatus` | `complete` (the generation run's `seq` counter is present and gap-free through `card_finalized`), `partial` (some generation events lost — rotated past retention or a foreign log dir), or `missing` (no generation events found — e.g. the card predates a factory reset of a different instance's logs). Consumers should weigh `partial`/`missing` exports accordingly; the DB-backed sections (tickets, grades, results) are always current. |

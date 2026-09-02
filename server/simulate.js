@@ -11,6 +11,7 @@
 import express from 'express';
 import { TEMPLATES, resolveTemplate } from '../shared/templates.js';
 import { simulateDay, summarizeRun } from '../shared/simulation.js';
+import { ENGINE_VERSION } from '../shared/card-engine.js';
 import { getDb } from './db.js';
 import { assembleEngineInput, loadDayFull } from './cards.js';
 import { loadDayResultsFor } from './grading.js';
@@ -58,7 +59,7 @@ export function runTemplate(db, templateName, {
     rows.push({ raceDayId: id, track: day.track, date: day.date, ...sim });
   }
   const params = {
-    template: templateName, bankrollCents, perRaceMinCents, startingBankrollCents,
+    template: templateName, engineVersion: ENGINE_VERSION, bankrollCents, perRaceMinCents, startingBankrollCents,
     correlationId, days: rows.length,
   };
   const { buckets } = summarizeRun(rows, { startingBankrollCents });
