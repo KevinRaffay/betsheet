@@ -204,7 +204,8 @@ const stepsByRace = (c) => {
   const steps = Object.fromEntries(winRaces.map((r) => [r, rd?.races.find((x) => x.race === r)?.steps ?? 0]));
   return { rd, guess, steps };
 };
-const preBalanceTotal = (c) => c.trace.filter((e) => e.event === 'ticket_added').reduce((a, e) => a + e.costCents, 0);
+const preBalanceTotal = (c) => c.trace.filter((e) => e.event === 'ticket_added').reduce((a, e) => a + e.costCents, 0)
+  + c.trace.filter((e) => e.event === 'rule_fired' && e.rule === 'place_money_carve_out').reduce((a, e) => a + (e.toCents - e.fromCents), 0);
 
 for (const [label, c, bank] of [['$200', card, 20000], ['$173', odd, 17300], ['$300', gen(races, { bankrollCents: 30000 }), 30000]]) {
   const { rd, guess, steps } = stepsByRace(c);
@@ -213,10 +214,13 @@ for (const [label, c, bank] of [['$200', card, 20000], ['$173', odd, 17300], ['$
     rd && rd.remainderCents === remainder && rd.undistributedCents === 0 &&
     rd.races.reduce((a, r) => a + r.amountCents, 0) === remainder,
     JSON.stringify({ remainder, rd }));
-  check(`${label}: round-robin - no race is more than one step ahead of another`, (() => {
-    const v = Object.values(steps);
-    return v.length > 0 && Math.max(...v) - Math.min(...v) <= 1;
-  })(), JSON.stringify(steps));
+  check(`${label}: deficits first - a race is only pushed past its allocation once every race with a win ticket has reached its own`, (() => {
+    const fin = c.trace[c.trace.length - 1];
+    const rows = fin.perRace.filter((p) => Object.keys(steps).includes(String(p.race)));
+    const unit = (race) => (rd.races.find((r) => r.race === race)?.withPlace ? 200 : 100);
+    const over = rows.filter((p) => p.spentCents > p.allocatedCents + unit(p.race));
+    return rows.length > 0 && (over.length === 0 || rows.every((p) => p.spentCents >= p.allocatedCents - unit(p.race)));
+  })(), JSON.stringify(c.trace[c.trace.length - 1].perRace));
   check(`${label}: guesswork races stay at their minimum`,
     !rd.races.some((r) => guess.has(r.race)), JSON.stringify(rd.races));
   check(`${label}: bankroll_balanced follows remainder_distributed and reports adjusted`,
@@ -298,23 +302,32 @@ check('big remainder: 75 passes of $1 per race, traced per race', (() => {
 check('big remainder: win payouts recomputed for the topped-up stakes',
   bigGap.tickets.every((t) => t.estMinCents === winPayout(t.stakeCents, 3) && t.stakeCents === 10000));
 
-// The other direction: the mandatory place money can overspend a race;
-// the same round-robin trims wins back one step at a time.
+// The other direction. With the pair carved out of the allocation (D36) a
+// race no longer overspends by construction; it can only overspend when
+// ticket MINIMUMS exceed the allocation, and then nothing can be trimmed
+// below the $2 win floor - the balancer must say so, never fake a match.
 const overCls = classifyDay([1, 2], { 1: synthEntries, 2: synthEntries }, { 1: synthPicks[1], 2: synthPicks[1] });
 const over = generateCard({
+  bankrollCents: 1200, perRaceMinCents: 500,
+  races: [{ ...synthRace, classification: overCls[0] }, { ...synthRace, number: 2, classification: overCls[1] }],
+  rules: { parlays: false },
+});
+check('minimums bind: the shortfall is reported honestly - negative remainder, no win trimmed below $2, undistributed = remainder, the card warns', (() => {
+  const rd = over.trace.find((e) => e.event === 'remainder_distributed');
+  const total = over.tickets.reduce((a, t) => a + t.costCents, 0);
+  return total > 1200 && rd && rd.remainderCents === 1200 - total && rd.races.length === 0 && rd.undistributedCents === rd.remainderCents &&
+    over.tickets.filter((t) => t.betType === 'win').every((w) => w.stakeCents === 200) &&
+    over.warnings.some((w) => /exact match impossible/.test(w)) &&
+    over.trace.find((e) => e.event === 'bankroll_balanced').adjusted === false;
+})(), JSON.stringify(over.trace.find((e) => e.event === 'remainder_distributed')));
+const overOk = generateCard({
   bankrollCents: 6000, perRaceMinCents: 500,
   races: [{ ...synthRace, classification: overCls[0] }, { ...synthRace, number: 2, classification: overCls[1] }],
   rules: { parlays: false },
 });
-check('overspend: trimmed to the exact bankroll in $2 pair steps, spread across both races', (() => {
-  const rd = over.trace.find((e) => e.event === 'remainder_distributed');
-  const total = over.tickets.reduce((a, t) => a + t.costCents, 0);
-  return total === 6000 && rd && rd.remainderCents < 0 && rd.races.length === 2 &&
-    rd.races.every((r) => r.withPlace && r.amountCents < 0) &&
-    Math.abs(rd.races[0].steps - rd.races[1].steps) <= 1 &&
-    over.tickets.filter((t) => t.betType === 'win').every((w) =>
-      over.tickets.some((p) => p.betType === 'place' && p.raceNumbers[0] === w.raceNumbers[0] && p.stakeCents === w.stakeCents));
-})(), JSON.stringify(over.trace.find((e) => e.event === 'remainder_distributed')));
+check('two 10-1 unanimous races at $60: each lands exactly on its allocation with the pair inside it, nothing to balance',
+  overOk.trace[overOk.trace.length - 1].perRace.every((p) => p.spentCents === p.allocatedCents) && !overOk.trace.some((e) => e.event === 'remainder_distributed') &&
+  overOk.tickets.reduce((a, t) => a + t.costCents, 0) === 6000, JSON.stringify(overOk.trace[overOk.trace.length - 1].perRace));
 
 // ODDS_ONLY (D40): an ML-sheet-only day has no program ranks and no
 // external picks - the tier below PROGRAM_ONLY, and the engine ranks by
@@ -334,6 +347,54 @@ check('ODDS_ONLY: the morning-line favorite anchors the race (ml_order_fallback 
 check('ranked races unchanged: program ranks present -> the fallback never fires (synthetic day is FULL, two sources)',
   synthCard.completeness === 'FULL' && !synthCard.trace.some((e) => e.rule === 'ml_order_fallback') &&
   !card.trace.some((e) => e.rule === 'ml_order_fallback'));
+
+// ---------- allocation integrity (D36: the place-money carve-out) ----------
+// The mandatory place ticket is sized INSIDE the allocation, so a race
+// lands on its number before balancing; the balancer then tops deficits
+// up toward each allocation before spreading the rest, and names the races
+// it could not touch.
+console.log('-- allocation integrity (D36) --');
+const preBalanceSpend = (c, race) => c.trace.filter((e) => e.event === 'ticket_added' && e.race === race).reduce((a, e) => a + e.costCents, 0)
+  + (c.trace.find((e) => e.event === 'rule_fired' && e.rule === 'place_money_carve_out' && e.race === race) ? 0 : 0);
+check('carve-out fires on the real day for every 8-1+ win pick and is traced with the sizing', (() => {
+  const fired = card.trace.filter((e) => e.event === 'rule_fired' && e.rule === 'place_money_carve_out');
+  const paired = card.tickets.filter((t) => t.betType === 'win').filter((w) => entryOf(races, w.raceNumbers[0], w.legs[0][0]).morning_line_decimal >= 8);
+  return paired.length > 0 && paired.every((w) => fired.some((e) => e.race === w.raceNumbers[0] && e.horse === w.legs[0][0])) &&
+    fired.every((e) => e.toCents % 100 === 0 && e.toCents >= 200 && e.allocatedCents > 0);
+})(), JSON.stringify(card.trace.filter((e) => e.rule === 'place_money_carve_out').map((e) => [e.race, e.horse, e.fromCents, e.toCents])));
+check('every race with a win ticket lands within the documented tolerance of its allocation after balancing (one step + $1 per exotic) when the remainder covers the deficits', (() => {
+  const fin = card.trace[card.trace.length - 1];
+  const bad = [];
+  for (const pr of fin.perRace) {
+    const hasWin = card.tickets.some((t) => t.betType === 'win' && t.raceNumbers[0] === pr.race);
+    if (!hasWin) continue;
+    const exotics = card.tickets.filter((t) => t.raceNumbers.length === 1 && t.raceNumbers[0] === pr.race && !['win', 'place'].includes(t.betType)).length;
+    const tol = 200 + 100 * exotics;
+    const cls = card.allocations.find((a) => a.race === pr.race).confidence;
+    if (cls !== 'GUESS' && Math.abs(pr.spentCents - pr.allocatedCents) > tol) bad.push(`R${pr.race}: ${pr.spentCents} vs ${pr.allocatedCents} (tol ${tol})`);
+  }
+  return bad.length === 0;
+})(), (() => { const fin = card.trace[card.trace.length - 1]; return JSON.stringify(fin.perRace.map((p) => [p.race, p.allocatedCents, p.spentCents])); })());
+check('after balancing every 8-1+ win still has an equal place ticket and the card sums to the bankroll',
+  total(card) === 20000 && card.tickets.filter((t) => t.betType === 'win').every((w) => {
+    const e = entryOf(races, w.raceNumbers[0], w.legs[0][0]);
+    return e.morning_line_decimal < 8 || card.tickets.some((p) => p.betType === 'place' && p.raceNumbers[0] === w.raceNumbers[0] && p.legs[0][0] === w.legs[0][0] && p.stakeCents === w.stakeCents);
+  }));
+check('remainder_distributed lists the races it could not touch with a reason (R1 fade: no_win_ticket; R2/R5 guesswork_floor)', (() => {
+  const rd = card.trace.find((e) => e.event === 'remainder_distributed');
+  const sk = Object.fromEntries((rd?.skipped ?? []).map((s) => [s.race, s.reason]));
+  return sk[1] === 'no_win_ticket' && sk[2] === 'guesswork_floor' && sk[5] === 'guesswork_floor';
+})(), JSON.stringify(card.trace.find((e) => e.event === 'remainder_distributed')?.skipped));
+check('synthetic 10-1 unanimous race: win = place = floor((allocation - exotics) / 2); at most the $1 floor is left', (() => {
+  const fin = synthCard.trace[synthCard.trace.length - 1];
+  const w = synthCard.tickets.find((t) => t.betType === 'win'); const p = synthCard.tickets.find((t) => t.betType === 'place');
+  const exotics = synthCard.tickets.filter((t) => !['win', 'place'].includes(t.betType)).reduce((a, t) => a + t.costCents, 0);
+  const pr = fin.perRace[0];
+  const pairBudget = pr.allocatedCents - exotics;
+  return w && p && w.stakeCents === p.stakeCents && w.stakeCents === Math.floor(pairBudget / 2 / 100) * 100 &&
+    w.stakeCents + p.stakeCents + exotics === pr.spentCents && pr.allocatedCents - pr.spentCents <= 100;
+})(), JSON.stringify(synthCard.tickets.map((t) => [t.betType, t.stakeCents, t.costCents])));
+check('engine version bumped for the carve-out', ENGINE_VERSION === 'lean-1.1');
 
 const noFade = gen(realDay(), { rules: { fadeThePrice: false } });
 check('toggle: fadeThePrice off -> R1 gets a win bet again',
