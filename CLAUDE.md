@@ -248,6 +248,10 @@ added by their PRs and listed here as they land.
 - A PR description states what it delivers, how it was tested (with
   evidence), and any deviations from plan.
 - Too big to review = split it and add rows to DELIVERABLES.md.
+- **QA branch deliverables carry a `-QA` suffix on their ID** (`D44-QA`): a PR
+  merged from `qa` gets the suffix in DELIVERABLES.md, in the feature-status
+  table below and wherever the ID is cited, so the plain D-sequence stays
+  reserved for the planned deliverables (user rule, 2026-09-02).
 
 ## Definition of done
 
@@ -280,12 +284,12 @@ Before a branch is reported ready, verify — out loud, in the final message:
 | Backfill run DMR-2026-summer (D44) | merged | PR #42, branch `backfill-dmr-2026-summer` — 27 days Jul 17 - Aug 30 saved under lean-1.1, zero queued, golden 2026-07-17 committed, cross-source identical on 08-28/29/30, report docs/backfill/DMR-2026-summer.md; every backfilled card is PROGRAM_ONLY (no consensus source runs on archived days) |
 | Index source order + meet-dates table (D47) | merged | PR #43, branch `backfill-dmr-2025-summer` — indexRaceDays / probeMeetWindow / dmtc-probe, three-way race-count rule in the runner, dark 2025-07 calendar fixture |
 | Backfill run DMR-2025-summer (D45) | merged | PR #44, branch `backfill-dmr-2025-summer-run` — meet-dates table from the probe (31 race days), parser fixes for the 2025 print run (ad slug overprint, footer-anchored panel edge, 8pt numbers on 15-horse fields), golden 2025-07-18 committed, 31 saved / 0 queued, report docs/backfill/DMR-2025-summer.md |
-| Backfill run DMR-2025-fall (D46) | in review | PR #47, branch `backfill-dmr-2025-fall` — meet-dates table from the probe (14 race days), foreign_program detection (the Breeders' Cup official program on BC days; blocks -> queue -> confirmed sheet-only as ODDS_ONLY), golden 2025-10-31 committed (BC program by digest only), 12 saved + 2 resolved then dropped, report docs/backfill/DMR-2025-fall.md |
+| Backfill run DMR-2025-fall (D46) | merged | PR #47, branch `backfill-dmr-2025-fall` — meet-dates table from the probe (14 race days), foreign_program detection (the Breeders' Cup official program on BC days; blocks -> queue -> confirmed sheet-only as ODDS_ONLY), golden 2025-10-31 committed (BC program by digest only), 12 saved + 2 resolved then dropped, report docs/backfill/DMR-2025-fall.md |
 | dmtc.com crawler + raw archive (D41) | merged | PR #36, branch `dmtc-crawler` - calendar-indexed, polite, conditional, audited crawler; raw archive with manifests; `npm run dmtc-fetch`; the two real calendar pages are fixtures |
 | ML sheet as entries source of record (D40) | merged | PR #34, branch `ml-sheet-ingest` - ML/changes PDF parser + fetcher, program becomes analysis-only via the merge, ODDS_ONLY tier, engine `lean-1.0.1` (morning-line ranking fallback on rank-less races) |
 | Engine versioning (D34) | merged | PR #33, branch `engine-versioning` - `ENGINE_VERSION = lean-1.0`; migration 008; version on card rows, card header, P/L rows + version filter; trace events carry it; invariant 14 |
 | Simulator (D19) | merged | PR #31, branch `simulator` - every template replayed over every stored day with a chart; per-bucket compare + bankroll over time; runs append-only; `npm run check-sim` |
-| Browser routes | in progress | History API routes for `/`, `/new`, `/pl`, `/simulate`, `/day/:id`, and `/card/:id`; production server serves the client shell for direct navigation; `npm run check-routing` |
+| Browser routes (D44-QA) | merged | History API routes for `/`, `/new`, `/pl`, `/simulate`, `/day/:id`, and `/card/:id`; production server serves the client shell for direct navigation; `npm run check-routing` — PRs #45, #48 from `qa` |
 | Fused owner/trainer split (D33) | merged | PR #30, branch `owner-trainer-split` - 08-22 R9 #9 Kensington Lane arrived with "Philip D' Amato(M. Donald)" fused into the owner item and trainer null (pinned as a known gap by D32). Card-wide dictionary pass; the 08-22 golden changes in exactly that entry's owner/trainer, 08-30 byte-identical |
 | Program header fields (D32) | merged | PR #29, branch `program-header-fields` - on the 2026-08-22 program, stakes titles without the word "Stakes" (Green Flash Handicap, Del Mar Oaks, Pacific Classic, Del Mar Mile) fell back to conditions text as the race type, and three distances were wrong (R3 null on a line wrap, R7 read from conditions text, R11 from the title) plus R10 truncated to "One Mile" (Pacific Classic is a mile and a quarter). Rules rewritten as pure helpers pinned by the exact pdfjs text items; the 08-22 program is now the SECOND committed fixture with its own golden + 19 hand-checked assertions (branch carries D31 merged in, since the golden needs the track fallback) |
 | Strategy templates (D18) | merged | PR #26, branch `strategy-templates` — 6 named rule bundles + signal/structure layer map; allocationCurve made real (lean/spread); invariant-1 422 guard on the live endpoint; template on card rows, trace, P/L and export |
