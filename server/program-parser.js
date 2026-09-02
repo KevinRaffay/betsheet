@@ -128,6 +128,36 @@ export function stakesTitleFromHeader(headerItems) {
   return fallback ? norm(fallback.s) : null;
 }
 
+/**
+ * pdfjs fuses a long owner line into the trainer column as ONE text item
+ * when the two abut (08-22 R9 #9: "Agave Racing Stable, Medallion Racing
+ * or Trommer Philip D' Amato(M. Donald)"), so the band parser finds no
+ * trainer item and leaves trainer null. The split point is ambiguous from
+ * the text alone (is the trainer "D' Amato", "Philip D' Amato" or "Trommer
+ * Philip D' Amato"?), so the CARD is the dictionary: a trainer string that
+ * parsed cleanly on any other band of the day, matched at the end of the
+ * fused owner text, longest first. No match -> a warning, never a guess.
+ */
+export function splitFusedOwnerTrainer(races, warnings = []) {
+  const known = [...new Set(races.flatMap((r) => r.entries.map((e) => e.trainer)).filter(Boolean))]
+    .sort((a, b) => b.length - a.length);
+  for (const race of races) {
+    for (const e of race.entries) {
+      if (e.trainer || !e.owner) continue;
+      const hit = known.find((t) => e.owner.endsWith(` ${t}`));
+      if (hit) {
+        e.trainer = hit;
+        e.owner = e.owner.slice(0, -hit.length).trim();
+      } else if (/\([^()]+\)$/.test(e.owner)) {
+        warnings.push({
+          type: 'owner_trainer_fused', race: race.number,
+          message: `Race ${race.number}: #${e.programNumber} ${e.horseName} - the owner line runs into the trainer column ("${e.owner}") and no other entry on the card names that trainer; trainer left blank.`,
+        });
+      }
+    }
+  }
+}
+
 // ---------- race panels ----------
 
 function parsePanel(items, footer, warnings) {
@@ -524,6 +554,7 @@ export async function parseProgramPdf(source, expected = {}) {
   }
 
   races.sort((a, b) => a.number - b.number);
+  splitFusedOwnerTrainer(races, warnings);
 
   // No payoff box on the panels (the 2026-08-22 layout): fall back to the
   // Bottom Line header. Still nothing -> say so; the save form needs a track.
