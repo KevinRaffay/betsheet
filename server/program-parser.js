@@ -421,6 +421,18 @@ function parseIndex(text) {
 // ---------- top level ----------
 
 /**
+ * The handicapper column names the track in its header - "Del Mar Bottom
+ * Line By Brad Free". Title-case words only, so the ALL-CAPS best-bet line
+ * printed right before it ("BEST BET: RACE 9, KENSINGTON LANE") cannot bleed
+ * in. Programs that omit the payoff box (the spelled-out D E L M A R letters
+ * on every panel) still carry this header - the 2026-08-22 program did.
+ */
+export function trackFromBottomLine(text) {
+  const m = String(text ?? '').match(/((?:[A-Z][a-z][A-Za-z'.]*\s+){1,4})Bottom Line\b/);
+  return m ? m[1].trim().replace(/\s+/g, ' ') : null;
+}
+
+/**
  * Parse an official track program PDF.
  * `source`: file path or Uint8Array. Optional `expected`: { track, date }
  * for verification warnings (never a hard failure).
@@ -437,6 +449,7 @@ export async function parseProgramPdf(source, expected = {}) {
   let indexText = null;
   let date = null;
   let trackText = null;
+  let headerTrack = null;
 
   for (let p = 1; p <= doc.numPages; p++) {
     const items = await pageItems(doc, p);
@@ -462,6 +475,7 @@ export async function parseProgramPdf(source, expected = {}) {
     }
 
     const joined = joinedText(items);
+    if (!headerTrack) headerTrack = trackFromBottomLine(joined);
     if (/Bottom Line|RACE (ONE|TWO|THREE)\b/.test(joined) && /RACE\s+(ONE|TWO|THREE|FOUR|FIVE|SIX|SEVEN|EIGHT|NINE|TEN)\b/.test(joined)) {
       analysisPages.push(joined);
     }
@@ -471,6 +485,13 @@ export async function parseProgramPdf(source, expected = {}) {
   }
 
   races.sort((a, b) => a.number - b.number);
+
+  // No payoff box on the panels (the 2026-08-22 layout): fall back to the
+  // Bottom Line header. Still nothing -> say so; the save form needs a track.
+  if (!trackText && headerTrack) trackText = headerTrack;
+  if (!trackText) {
+    warnings.push({ type: 'no_track', message: 'The program never names its track in a form the parser recognizes - enter the track above before saving.' });
+  }
 
   // Duplicate race numbers would mean a simulcast panel slipped through.
   const seen = new Set();

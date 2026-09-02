@@ -10,7 +10,7 @@
 import fs from 'node:fs';
 import path from 'node:path';
 import { fileURLToPath, URL } from 'node:url';
-import { parseProgramPdf } from '../server/program-parser.js';
+import { parseProgramPdf, trackFromBottomLine } from '../server/program-parser.js';
 
 const ROOT = fileURLToPath(new URL('../', import.meta.url));
 const PDF = path.join(ROOT, 'tests', 'fixtures', 'programs', 'delmar-2026-08-30.pdf');
@@ -151,6 +151,17 @@ check('index: spot row (Agency, program 1, race 6)', (() => {
 
 // Expected-track/date verification fires on a mismatch.
 const wrong = await parseProgramPdf(PDF, { track: 'Santa Anita', date: '2026-09-01' });
+// --- track fallback: programs without the panel payoff box (D E L M A R
+// letters) name the track only in the "<Track> Bottom Line" header. Found
+// live with the 2026-08-22 program: track came back null and the ingest
+// form's Save stayed disabled with no explanation.
+check('track fallback: Bottom Line header yields the title-case track, ALL-CAPS best-bet line excluded',
+  trackFromBottomLine('SATURDAY, AUGUST 22, 2026 BEST BET: RACE 9, KENSINGTON LANE Del Mar Bottom Line By Brad Free') === 'Del Mar');
+check('track fallback: multi-word track', trackFromBottomLine('Santa Anita Bottom Line') === 'Santa Anita');
+check('track fallback: no header -> null', trackFromBottomLine('BEST BET: RACE 2, SOME HORSE') === null);
+check('track fallback: the panel letters still win on the fixture (golden unchanged)',
+  out.track === 'DELMAR' && !out.warnings.some((w) => w.type === 'no_track'));
+
 check('wrong expected date -> wrong_date warning',
   wrong.warnings.some((w) => w.type === 'wrong_date'));
 check('wrong expected track -> wrong_track warning',

@@ -71,6 +71,9 @@ export default function NewRaceDay({ onSaved, onCancel }) {
   };
 
   const entryCount = parsed ? parsed.races.reduce((a, r) => a + r.entries.length, 0) : 0;
+  // Save needs a track and a date; a program that names neither (or one the
+  // parser could not read) leaves the button disabled - say so, never guess.
+  const missing = [!track.trim() && 'Track', !date && 'Date'].filter(Boolean);
 
   return (
     <section>
@@ -146,6 +149,12 @@ export default function NewRaceDay({ onSaved, onCancel }) {
               Save race day
             </button>
           </div>
+          {missing.length > 0 && (
+            <p className="notice notice--warn">
+              Save is disabled until {missing.join(' and ')} {missing.length === 1 ? 'is' : 'are'} filled in above -
+              the parse could not read {missing.length === 1 ? 'it' : 'them'} from the program.
+            </p>
+          )}
           <p className="dim">
             Read-only preview of exactly what Save will store. To correct
             something, fix the pasted text and parse again.
