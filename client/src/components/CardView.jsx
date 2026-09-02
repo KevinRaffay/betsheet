@@ -163,6 +163,12 @@ export default function CardView({ cardId, onBack }) {
                 ▸ {f.type === 'algo_fades_favorite' ? 'FADE' : 'LONGSHOT×2'}: #{f.programNumber} {f.horseName} — {f.detail}
               </p>
             ))}
+            {race?.bottom_line && (
+              <details className="race-bottom-line">
+                <summary>Del Mar Bottom Line</summary>
+                <p>{race.bottom_line}</p>
+              </details>
+            )}
             <details className="race-entries">
               <summary>Entries ({entries.length})</summary>
               <table className="grid grid--entries">

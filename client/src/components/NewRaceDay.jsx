@@ -105,6 +105,7 @@ export default function NewRaceDay({ onSaved, onCancel }) {
         replace,
         entriesSource: parsed.entriesSource ?? 'program',
         races: parsed.races,
+        analysis: parsed.analysis,
       }, correlationId);
       onSaved(result.id);
     } catch (e) {
