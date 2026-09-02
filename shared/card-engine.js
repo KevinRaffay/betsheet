@@ -234,7 +234,7 @@ export function generateCard({ bankrollCents, perRaceMinCents, races, sourcesUse
   }
 
   // ----- bankroll balancing (invariant 2: exact sum, warn never block) -----
-  balance({ tickets, bankrollCents, emit, warnings, rules });
+  balance({ tickets, allocations, bankrollCents, emit });
 
   const totalCents = tickets.reduce((a, t) => a + t.costCents, 0);
   if (totalCents !== bankrollCents) {
@@ -442,40 +442,94 @@ const dedupeEntries = (list) => {
 };
 
 // ---------- balancing ----------
+//
+// Ticket minimums and stake rounding leave each race spending a little
+// more or less than its allocation; the difference is absorbed in win
+// stakes (they have no combinatorics). The remainder is spread ROUND-ROBIN:
+// each pass hands ONE $1 step to every race's primary win ticket (a win
+// bound by the place-money pairing moves with its place, $2 a step),
+// larger allocations first, so no race is ever more than one step ahead of
+// another. Guesswork races stay at their minimum unless nothing else can
+// take the money. Found live (every card since D10): the old rule parked
+// the whole remainder on the single biggest win ticket - card 16 R1 was
+// allocated $37, spent $65, $51 of it on one horse.
 
-function balance({ tickets, bankrollCents, emit }) {
+function balance({ tickets, allocations, bankrollCents, emit }) {
   const total = () => tickets.reduce((a, t) => a + t.costCents, 0);
-  let diff = bankrollCents - total();
-  if (diff === 0) return;
+  const remainderCents = bankrollCents - total();
+  if (remainderCents === 0) return;
+  let diff = remainderCents;
 
-  // Absorb the difference in win stakes (they have no combinatorics), in
-  // $1 steps, preferring bets NOT bound by the place-money pairing so the
-  // pair never goes out of sync; a paired win adjusts with its place.
-  const winTickets = tickets.filter((t) => t.betType === 'win')
-    .sort((a, b) => b.stakeCents - a.stakeCents);
-  for (const t of winTickets) {
-    if (diff === 0) break;
-    const paired = tickets.find((p) => p.betType === 'place' &&
-      p.raceNumbers[0] === t.raceNumbers[0] && p.legs[0][0] === t.legs[0][0] &&
-      p.stakeCents === t.stakeCents);
-    const unit = paired ? 200 : 100; // adjust pairs together
-    const steps = Math.trunc(diff / unit);
-    if (steps === 0) continue;
-    const delta = steps * (paired ? 100 : 100);
-    if (t.stakeCents + delta < 200) continue; // keep the $2 win minimum
-    t.stakeCents += delta;
-    t.costCents += delta;
-    // Win pays exact morning-line math - recompute, never approximate.
-    if (t.mlForPlaceRule != null) {
-      const p = winPayout(t.stakeCents, t.mlForPlaceRule);
-      t.est = [p, p];
-    }
-    if (paired) {
-      paired.stakeCents += delta;
-      paired.costCents += delta;
-    }
-    diff = bankrollCents - total();
+  // One candidate per race: its biggest win ticket (+ paired place).
+  const allocOf = new Map(allocations.map((a) => [a.race, a]));
+  const byRace = new Map();
+  for (const t of tickets) {
+    if (t.betType !== 'win') continue;
+    const race = t.raceNumbers[0];
+    const cur = byRace.get(race);
+    if (cur && cur.win.stakeCents >= t.stakeCents) continue;
+    const place = tickets.find((p) => p.betType === 'place' &&
+      p.raceNumbers[0] === race && p.legs[0][0] === t.legs[0][0] &&
+      p.stakeCents === t.stakeCents) ?? null;
+    byRace.set(race, {
+      race, win: t, place, unit: place ? 200 : 100,
+      allocatedCents: allocOf.get(race)?.amountCents ?? 0,
+      guess: allocOf.get(race)?.confidence === 'GUESS',
+      amountCents: 0, steps: 0,
+    });
   }
+  const candidates = [...byRace.values()]
+    .sort((a, b) => b.allocatedCents - a.allocatedCents || a.race - b.race);
+  const tiers = [candidates.filter((c) => !c.guess), candidates.filter((c) => c.guess)];
+
+  const dir = Math.sign(diff);
+  let passes = 0;
+  for (const tier of tiers) {
+    let moved = true;
+    while (moved && diff !== 0) {
+      moved = false;
+      for (const c of tier) {
+        if (Math.abs(diff) < c.unit) continue;
+        const next = c.win.stakeCents + dir * 100;
+        if (next < 200) continue; // keep the $2 win minimum
+        c.win.stakeCents = next;
+        c.win.costCents = next;
+        if (c.place) { c.place.stakeCents = next; c.place.costCents = next; }
+        c.amountCents += dir * c.unit;
+        c.steps++;
+        diff -= dir * c.unit;
+        moved = true;
+      }
+      if (moved) passes++;
+    }
+  }
+
+  // Payout estimates track the new stakes: win is exact morning-line
+  // math, place is the labeled range - recompute, never approximate.
+  for (const c of candidates) {
+    if (c.steps === 0) continue;
+    if (c.win.mlForPlaceRule != null) {
+      const p = winPayout(c.win.stakeCents, c.win.mlForPlaceRule);
+      c.win.est = [p, p];
+    }
+    if (c.place && c.place.mlForPlaceRule != null) {
+      c.place.est = placeEstimate(c.place.stakeCents, c.place.mlForPlaceRule);
+    }
+  }
+
+  emit('remainder_distributed', {
+    remainderCents,
+    passes,
+    races: candidates.filter((c) => c.steps > 0).map((c) => ({
+      race: c.race,
+      amountCents: c.amountCents,
+      steps: c.steps,
+      ticket: c.win.sequence,
+      withPlace: Boolean(c.place),
+      allocatedCents: c.allocatedCents,
+    })),
+    undistributedCents: diff,
+  });
   emit('bankroll_balanced', { adjusted: diff === 0, remainingCents: diff });
 }
 

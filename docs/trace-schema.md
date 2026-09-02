@@ -43,7 +43,8 @@ engine event.
 | `rule_suppressed` | `rule`, `reason` | a rule was disabled by the template (simulation) — the suppression itself is traced |
 | `allocation_decided` | `race`, `amountCents`, `confidence`, `rule` | the per-race allocation and which weighting produced it |
 | `ticket_added` | `race` (null for multi-race), `races`, `betType`, `selections` (legs), `stakeCents`, `costCents`, `rules` (provenance tags) | one ticket landed on the card |
-| `bankroll_balanced` | `adjusted`, `remainingCents` | the exact-bankroll balancing pass (invariant 2) |
+| `remainder_distributed` | `remainderCents`, `passes`, `races[{race, amountCents, steps, ticket, withPlace, allocatedCents}]`, `undistributedCents` | how the gap between the bankroll and the constructed tickets was spread: round-robin $1 steps onto each race's primary win ticket (`withPlace` = the place-money pair moved with it, $2 a step), larger allocations first, at most one step per race per pass; guesswork races only when nothing else can take the money. Emitted only when there was a remainder. `undistributedCents` is non-zero only when minimums made an exact match impossible |
+| `bankroll_balanced` | `adjusted`, `remainingCents` | the exact-bankroll balancing pass (invariant 2); follows `remainder_distributed` |
 | `card_finalized` | `totalCents`, `bankrollCents`, `ticketCount`, `completeness`, `perRace[{race, allocatedCents, spentCents}]`, `warnings` | last generation event; totals as persisted |
 
 ### Grading (emitted by `server/grading.js`, under the CARD's correlationId)
