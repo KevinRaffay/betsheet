@@ -3,6 +3,10 @@
         "/^node -e \"try \\{ require\\('better-sqlite3'\\); console\\.log\\('better-sqlite3 OK'\\) \\} catch \\(error\\) \\{ console\\.error\\(error\\.message\\); process\\.exitCode = 1 \\}\"$/": {
             "approve": true,
             "matchCommandLine": true
+        },
+        "/^git config --show-origin --get-regexp \"\\^\\(user\\\\\\.\\|include\\|core\\\\\\.repositoryformatversion\\)\"$/": {
+            "approve": true,
+            "matchCommandLine": true
         }
     },
     "workbench.colorCustomizations": {
