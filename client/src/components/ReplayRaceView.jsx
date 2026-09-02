@@ -182,7 +182,8 @@ export default function ReplayRaceView({ dayId, onBack, onOpenStanding }) {
         {!blind.locked && (
           <div className="formrow">
             <textarea className="in" rows={6} value={text} onChange={(e) => setText(e.target.value)}
-              placeholder={'Bet type\tselections\tstake\t[odds]\t[rationale]\ne.g. Win\t#2\t$25'} />
+              placeholder={'Bet type | selections | stake | [odds] | [rationale]\ne.g. Win | #2 | $25\nExacta Box | #4,#5 | $20'} />
+            <p className="dim">One ticket per line: bet type | selections | stake | odds (optional) | rationale (optional). Pasted from a spreadsheet works too - tabs are read the same way.</p>
             <div className="formrow formrow--tight">
               <button className="btn" disabled={busy || !text.trim()} onClick={handlePreview}>Preview</button>
               <button className="btn btn--primary" disabled={busy || !preview || preview.warnings.some((w) => w.blocking)} onClick={handleLock}>
