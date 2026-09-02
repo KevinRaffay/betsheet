@@ -55,7 +55,9 @@ export const DEFAULT_RULES = {
   allocationCurve: 'lean',
   // D48 knobs (template-driven, never a hardcoded branch): exotic ticket
   // construction on/off, win stake = the branch's share or the per-race
-  // minimum, and how many horses the split exacta box takes.
+  // minimum, and how many horses the split exacta box takes (0 = no split
+  // box at all, D49 straight-only; the mid-price straight exacta is its own
+  // knob, midPriceCoverage).
   exoticTickets: true,
   winStake: 'share',
   hedgeBoxDepth: 2,
@@ -446,8 +448,13 @@ function buildRaceTickets({ race, alloc, rules, addTicket, emit, warnings, perRa
     } else {
       emit('rule_fired', { rule: 'hedge_cut', race: race.number, cut: second.program_number, reason: 'thin backing - cut to the best one, not dutched' });
     }
+    // D49: hedgeBoxDepth 0 switches the split box OFF on its own (straight-only)
+    // while the mid-price straight exacta below still fires; the balancer
+    // then tops the race up toward its allocation through the win ticket.
+    const boxOff = Number(rules.hedgeBoxDepth) === 0;
     if (second && !exotics) sup('split_exacta_box', 'no_exotic_tickets');
-    if (second && exotics) {
+    else if (second && boxOff) sup('split_exacta_box', 'disabled_by_template');
+    if (second && exotics && !boxOff) {
       // The split exacta box: two horses under lean; a template may take the
       // top THREE program ranks (D48 box-depth-3), sized inside the same
       // share. With win stakes held at the minimum (exacta-primary) the box

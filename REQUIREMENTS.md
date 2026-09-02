@@ -72,7 +72,7 @@ map in the same PR.
 | Every card records consensus_completeness (FULL / PARTIAL / PROGRAM_ONLY) from sources actually used | D25 (schema, migration 003), D10 (computed + written at generation) |
 | All P/L, simulation and distribution reporting buckets by completeness; program-only backfill never pools with full-consensus in one aggregate | D16, D19, D20 (rule: invariant 12) |
 | Wayback Machine fetcher (web.archive.org) retrieves archived versions of each consensus source for historical dates; outcomes audited like any source | D08d (on the D07 framework) |
-| Simulator evaluates structure-layer rules (place-money, hedge cuts, exotic construction, allocation curves) independently of race classification, so historical cards benchmark bet construction even without signal data | D18 (layer split), D19 (evaluation) |
+| Simulator evaluates structure-layer rules (place-money, hedge cuts, exotic construction, allocation curves) independently of race classification, so historical cards benchmark bet construction even without signal data | D18 (layer split), D19 (evaluation), D48 (the templates that fire on PROGRAM_ONLY days), D49 (exotic construction isolated: split box vs mid-price straight exacta) |
 
 ## Results, grading & simulation (workflow step 5)
 

@@ -26,7 +26,7 @@ export const RULE_LAYERS = {
   allocationCurve: 'structure',
   exoticTickets: 'structure',   // D48: exacta / box / trifecta construction on or off
   winStake: 'structure',        // D48: 'share' (the branch's share of the allocation) or 'minimum'
-  hedgeBoxDepth: 'structure',   // D48: horses in the split exacta box (2 = lean)
+  hedgeBoxDepth: 'structure',   // D48: horses in the split exacta box (2 = lean; 0 = no split box, D49)
   coverageAdds: 'signal',   // fires off 2+-source counts
   parlays: 'signal',        // legs are picked BY the consensus
 };
@@ -80,6 +80,24 @@ export const TEMPLATES = {
   'best-bet-weighted': {
     description: 'SIMULATION ONLY - allocation keyed to the Bottom Line Best Bet flag: the Best Bet race takes the heavy weight, every other race flat; a day with no Best Bet is flat throughout.',
     rules: { allocationCurve: 'best-bet' },
+    simulationOnly: true,
+  },
+  // ---- D49: isolate the two exotic constructions that fire on a
+  // PROGRAM_ONLY day. Paired against lean on the 70-day corpus (runs
+  // #17-#26, 2026-09-02) no-exotics came out +$551 while every other
+  // template lost more, so the leak is in the exotics - these two say
+  // WHICH one: the split exacta box (the hedge_cut races) or the $1
+  // mid-price straight exacta. Each keeps the other construction exactly as
+  // lean builds it; the freed share lands on the win ticket through the
+  // balancer's deficit pass (place money still rides at 8-1+).
+  'box-only': {
+    description: 'SIMULATION ONLY - the split exacta box stays, the mid-price straight exacta is off; the freed money lands on the win ticket (place money still rides at 8-1+).',
+    rules: { midPriceCoverage: false },
+    simulationOnly: true,
+  },
+  'straight-only': {
+    description: 'SIMULATION ONLY - the mid-price straight exacta stays, the split exacta box is off (hedgeBoxDepth 0); the freed money lands on the win ticket (place money still rides at 8-1+).',
+    rules: { hedgeBoxDepth: 0 },
     simulationOnly: true,
   },
 };
