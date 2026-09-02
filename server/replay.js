@@ -138,7 +138,14 @@ function revealedPayload(db, card, race, raceNumber) {
     const rows = db.prepare('SELECT * FROM tickets WHERE card_id = ? AND race_id = ? ORDER BY sequence').all(targetCardId, race.id);
     const tickets = rows.map((t) => {
       const sel = JSON.parse(t.selections);
-      return { id: t.id, betType: t.bet_type, races: sel.races, legs: sel.legs, stakeCents: t.stake_cents, costCents: t.cost_cents };
+      // gradeCard/gradeTicket only read betType/races/legs/stakeCents/costCents;
+      // the display fields ride along untouched into each grade's `ticket`,
+      // so the client can render the actual card (teller call, rationale)
+      // beside its outcome without a second round trip.
+      return {
+        id: t.id, betType: t.bet_type, races: sel.races, legs: sel.legs, stakeCents: t.stake_cents, costCents: t.cost_cents,
+        tellerCall: t.teller_call, rationaleText: t.rationale_text, oddsAtBet: t.odds_at_bet,
+      };
     });
     return gradeCard(tickets, dayResults);
   };

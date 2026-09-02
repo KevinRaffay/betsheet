@@ -137,6 +137,10 @@ try {
   console.log('-- blind view after reveal: fields now present (re-navigating does not hide them) --');
   const blind1After = await jget(`/api/replay/days/${dayId}/races/1?cardId=${humanCardId}`);
   check('finishOrder/payoffs/humanGraded present now', Array.isArray(blind1After.finishOrder) && Array.isArray(blind1After.humanGraded));
+  check('the actual betting card is reconstructable: each graded ticket carries its tellerCall (not just outcome/plCents)', (() => {
+    const g = blind1After.humanGraded[0];
+    return g && g.ticket.tellerCall === 'Race 1, $25 win, 1' && g.ticket.betType === 'win' && g.outcome === 'win' && g.plCents === 6250;
+  })(), JSON.stringify(blind1After.humanGraded));
 
   console.log('-- classification toggle: default hidden, one-way once set --');
   const blind2 = await jget(`/api/replay/days/${dayId}/races/2?cardId=${humanCardId}`);

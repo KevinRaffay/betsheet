@@ -1,6 +1,6 @@
 import React, { useEffect, useState } from 'react';
 import {
-  closeReplayCard, getRaceDay, getReplayRace, lockHumanCard, previewHumanCard,
+  closeReplayCard, getRaceDay, getReplayRace, getReplaySummary, listCards, lockHumanCard, previewHumanCard,
   revealClassification, revealReplayRace,
 } from '../api.js';
 
@@ -32,10 +32,29 @@ export default function ReplayRaceView({ dayId, onBack, onOpenStanding }) {
 
   useEffect(() => {
     getRaceDay(dayId).then((d) => { setDayInfo(d); setTotalRaces(d.races.length); }).catch((e) => setError(String(e.message)));
+    // Resume the day's own human card on a fresh visit (a different tab, a
+    // reload, or navigating back from Standing) - otherwise a closed day
+    // would show as never-played every time you return to it. The latest
+    // card_number wins; starting a genuinely new playthrough isn't a UI
+    // action yet, so there's nothing to disambiguate.
+    setCardId(null);
+    listCards(dayId).then((cards) => {
+      const human = cards.filter((c) => c.template === 'human').sort((a, b) => b.card_number - a.card_number)[0];
+      if (human) setCardId(human.id);
+    }).catch(() => {});
   }, [dayId]);
 
   const reload = () => getReplayRace(dayId, raceNumber, cardId).then(setBlind).catch((e) => setError(String(e.message)));
   useEffect(() => { setPreview(null); setText(''); reload(); /* eslint-disable-next-line react-hooks/exhaustive-deps */ }, [raceNumber, cardId]);
+
+  // `summary.closed` is server truth, not "did I click Close in this tab" -
+  // a day closed in an earlier session (or by revealing every race without
+  // ever clicking Close) must still show as closed after a reload.
+  const refreshSummary = () => {
+    if (!cardId) { setSummary(null); return; }
+    getReplaySummary(cardId).then(setSummary).catch(() => {});
+  };
+  useEffect(refreshSummary, [cardId]); // eslint-disable-line react-hooks/exhaustive-deps
 
   const withBusy = (fn) => async (...args) => {
     setBusy(true); setError(null);
@@ -65,6 +84,7 @@ export default function ReplayRaceView({ dayId, onBack, onOpenStanding }) {
   const handleReveal = withBusy(async () => {
     await revealReplayRace(cardId, raceNumber);
     await reload();
+    refreshSummary(); // revealing the last remaining race can make the card closed without ever clicking Close
   });
 
   const handleRevealClassification = withBusy(async () => {
@@ -101,7 +121,7 @@ export default function ReplayRaceView({ dayId, onBack, onOpenStanding }) {
         {cardId && <> · card #{cardId} · running cost {money(blind.runningCardCostCents)}</>}
       </p>
 
-      {summary && (
+      {summary?.closed && (
         <div className="notice">
           <p><strong>Day closed.</strong> Blindness: <span className="chip chip--human">{BLINDNESS_LABEL[summary.blindness] ?? summary.blindness ?? 'undetermined'}</span></p>
           <p>
@@ -255,6 +275,21 @@ export default function ReplayRaceView({ dayId, onBack, onOpenStanding }) {
                 ))}
               </tbody>
             </table>
+            {blind.payoffs?.length > 0 && (
+              <table className="grid">
+                <thead><tr><th>Payoff</th><th>Combination</th><th>Base</th><th>Pays</th></tr></thead>
+                <tbody>
+                  {blind.payoffs.map((p, i) => (
+                    <tr key={i}>
+                      <td className="bt">{p.bet_type.replace(/_/g, ' ')}</td>
+                      <td>{p.combination}</td>
+                      <td className="dim">{money(p.base_cents)}</td>
+                      <td>{money(p.payout_cents)}</td>
+                    </tr>
+                  ))}
+                </tbody>
+              </table>
+            )}
             <p>
               <strong>Human this race:</strong> {money(blind.humanAllocatedCents)} allocated, race P/L {signed(blind.humanRacePl)}
             </p>
@@ -262,9 +297,67 @@ export default function ReplayRaceView({ dayId, onBack, onOpenStanding }) {
               <strong>Lean this race:</strong>{' '}
               {blind.leanGraded == null ? <span className="dim">no lean card on this day</span> : <>{money(blind.leanAllocatedCents)} allocated, race P/L {signed(blind.leanRacePl)}</>}
             </p>
+            {summary?.closed && (
+              <>
+                <GradedTicketsTable title="Human card, this race" graded={blind.humanGraded} />
+                <GradedTicketsTable title="Lean card, this race" graded={blind.leanGraded} />
+              </>
+            )}
           </div>
         )}
       </div>
     </section>
+  );
+}
+
+// The actual betting card, ticket by ticket, with the grader's outcome and
+// payout - shown only once the day is closed (mid-play the one-line race
+// P/L summary above is enough; the full card is for the after-the-fact
+// review). `graded`: [{ticket: {betType, legs, costCents, tellerCall,
+// rationaleText}, outcome, returnedCents, plCents, note}] from the grader,
+// or null when there's no card at all (e.g. no lean card on this day).
+function GradedTicketsTable({ title, graded }) {
+  if (graded == null) return <p className="dim">{title}: no card.</p>;
+  if (graded.length === 0) return <p className="dim">{title}: no tickets this race.</p>;
+  const totalCost = graded.reduce((a, g) => a + g.ticket.costCents, 0);
+  const totalReturned = graded.reduce((a, g) => a + g.returnedCents, 0);
+  return (
+    <>
+      <p><strong>{title}</strong></p>
+      <table className="grid">
+        <thead>
+          <tr><th>Bet type</th><th>Selections / rationale</th><th>Say to the teller</th><th>Cost</th><th>Result</th><th>P/L</th></tr>
+        </thead>
+        <tbody>
+          {graded.map((g, i) => (
+            <tr key={i}>
+              <td className="bt">{g.ticket.betType.replace(/_/g, ' ')}</td>
+              <td>
+                {g.ticket.legs.map((l) => l.join(',')).join(' / ')}
+                {g.ticket.rationaleText ? <span className="dim"> — {g.ticket.rationaleText}</span> : null}
+              </td>
+              <td className="teller">{g.ticket.tellerCall}</td>
+              <td>{money(g.ticket.costCents)}</td>
+              <td>
+                <span className={`outcome outcome--${g.outcome}`}>{g.outcome.toUpperCase()}</span>
+                {g.outcome !== 'loss' && <span className="dim"> {money(g.returnedCents)}</span>}
+                {g.note ? <span className="dim"> — {g.note}</span> : null}
+              </td>
+              <td className={g.plCents >= 0 ? 'pl--pos' : 'pl--neg'}>
+                {g.plCents >= 0 ? '+' : '−'}{money(Math.abs(g.plCents))}
+              </td>
+            </tr>
+          ))}
+          <tr className="row--subtotal">
+            <td colSpan={3}>Race total</td>
+            <td>{money(totalCost)}</td>
+            <td>{money(totalReturned)} back</td>
+            <td className={(totalReturned - totalCost) >= 0 ? 'pl--pos' : 'pl--neg'}>
+              {signed(totalReturned - totalCost)}
+            </td>
+          </tr>
+        </tbody>
+      </table>
+    </>
   );
 }
