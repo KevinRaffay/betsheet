@@ -20,6 +20,7 @@
 // artifacts to audit), and re-verifies that golden every run.
 
 import fs from 'node:fs';
+import crypto from 'node:crypto';
 import path from 'node:path';
 import express from 'express';
 import { fileURLToPath, URL } from 'node:url';
@@ -62,6 +63,7 @@ export const BLOCKING_TYPES = {
   wrong_date: 'document track/date mismatch',
   wrong_track: 'document track/date mismatch',
   program_ml_date_mismatch: 'document track/date mismatch',
+  foreign_program: 'the program is a foreign publication (not a Del Mar program) - the day would save sheet-only',
 };
 
 export function classifyWarnings(warnings) {
@@ -144,7 +146,10 @@ export async function parseArchivedDay(day, { rawDir, parsers = DEFAULT_PARSERS,
   const calendarRaces = manifest?.calendar?.races ?? (day.indexSource === 'meet-table' ? null : day.races ?? null);
   const ml = await parsers.ml(new Uint8Array(fs.readFileSync(files.ml)), expected);
   const program = await parsers.program(new Uint8Array(fs.readFileSync(files.program)), expected);
-  const merged = mergeMlAndProgram(ml, program);
+  // A foreign program (D46: the Breeders' Cup official program on BC days)
+  // contributes nothing: the sheet alone is the record (ODDS_ONLY) and the
+  // foreign_program warning blocks the auto-save so a human decides.
+  const merged = mergeMlAndProgram(ml, program.foreign ? null : program);
   const results = parsers.results(fs.readFileSync(files.results, 'utf8'), { races: calendarRaces });
   let chart = null;
   const chartTxt = path.join(dir, 'chart.txt');
@@ -157,14 +162,17 @@ export async function parseArchivedDay(day, { rawDir, parsers = DEFAULT_PARSERS,
   // calendar race-count check on both entries documents.
   const warnings = [
     ...merged.warnings.map((w) => ({ ...w, source: w.source ?? 'entries' })),
+    // A discarded (foreign) program contributes only its verdict; the empties
+    // and duplicates that led to it describe a document nobody is saving.
+    ...(program.foreign ? program.warnings.filter((w) => w.type === 'foreign_program').map((w) => ({ ...w, source: 'program' })) : []),
     ...results.warnings.map((w) => ({ ...w, source: 'results' })),
   ];
   if (calendarRaces == null) {
-    const n = [ml.races.length, program.races.length, results.races.length];
-    if (new Set(n).size > 1) warnings.push({ type: 'race_count_mismatch', source: 'documents', message: `No calendar count for ${day.date}: the ML sheet has ${n[0]} races, the program ${n[1]}, the results page ${n[2]} - they must agree.` });
+    const n = program.foreign ? [ml.races.length, results.races.length] : [ml.races.length, program.races.length, results.races.length];
+    if (new Set(n).size > 1) warnings.push({ type: 'race_count_mismatch', source: 'documents', message: `No calendar count for ${day.date}: the ML sheet has ${ml.races.length} races, the program ${program.foreign ? 'is foreign' : program.races.length}, the results page ${results.races.length} - they must agree.` });
   } else {
     if (ml.races.length !== calendarRaces) warnings.push({ type: 'race_count_mismatch', source: 'ml', message: `ML sheet has ${ml.races.length} races; the calendar says ${calendarRaces}.` });
-    if (program.races.length !== calendarRaces) warnings.push({ type: 'race_count_mismatch', source: 'program', message: `Program has ${program.races.length} races; the calendar says ${calendarRaces}.` });
+    if (!program.foreign && program.races.length !== calendarRaces) warnings.push({ type: 'race_count_mismatch', source: 'program', message: `Program has ${program.races.length} races; the calendar says ${calendarRaces}.` });
   }
   return { ml, program, merged, results, chart, warnings, calendarRaces };
 }
@@ -360,6 +368,11 @@ async function processDay(ctx) {
     return { ...base, status: 'queued', queueId: queued.id, correlationId: queued.correlation_id, note: `pending in the Backfill queue since ${queued.created_at}`,
       blocking: JSON.parse(queued.blocking), nonBlocking: JSON.parse(queued.warnings).filter((w) => !(w.type in BLOCKING_TYPES)) };
   }
+  if (queued?.status === 'confirmed') {
+    // Confirmed once, deleted since (soft): the deletion is the standing
+    // decision - the day stays out and is never re-queued (invariant 12).
+    return { ...base, status: 'resolved', queueId: queued.id, correlationId: queued.correlation_id, note: `${decision(queued)}; the saved day was later deleted - left out`, blocking: JSON.parse(queued.blocking) };
+  }
   if (queued?.status === 'rejected') {
     return { ...base, status: 'resolved', queueId: queued.id, correlationId: queued.correlation_id, note: decision(queued), blocking: JSON.parse(queued.blocking) };
   }
@@ -414,7 +427,15 @@ function writeCandidate(gp, doc, rawDir, date) {
   fs.writeFileSync(gp.candidate, JSON.stringify(doc, null, 2) + '\n');
   const dir = dayDir(rawDir, date);
   for (const f of [...Object.values(artifactFile), 'manifest.json']) {
-    if (fs.existsSync(path.join(dir, f))) fs.copyFileSync(path.join(dir, f), path.join(gp.dir, f));
+    const src = path.join(dir, f);
+    if (!fs.existsSync(src)) continue;
+    // A FOREIGN program (D46: the 42MB Breeders' Cup official program) is
+    // recorded by digest only - the golden freezes its verdict, not its bytes.
+    if (f === artifactFile.program && doc.program?.foreign) {
+      const bytes = fs.readFileSync(src);
+      fs.writeFileSync(path.join(gp.dir, 'program.digest.json'), JSON.stringify({ file: f, foreign: true, sha256: crypto.createHash('sha256').update(bytes).digest('hex'), bytes: bytes.length, note: 'foreign program (not a Del Mar program): not copied; the archive copy under data/raw is verified against this digest' }, null, 2) + String.fromCharCode(10));
+    }
+    fs.copyFileSync(src, path.join(gp.dir, f));
   }
 }
 

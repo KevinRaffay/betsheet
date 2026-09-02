@@ -56,7 +56,8 @@ Breaking any of these is a bug regardless of what the tests say.
    exception is the batch backfill (D43, user decision 2026-09-01, policy
    A):** a day whose parse has ZERO blocking warnings (unparsed distance,
    race-count mismatch vs the calendar, index validation failure, results
-   race-count mismatch, program/ML conflict on program numbers) is saved
+   race-count mismatch, program/ML conflict on program numbers, a foreign
+   program - D46: the Breeders' Cup official program on BC days) is saved
    without a click; any blocking warning sends the day to the review queue
    with its read-only preview, unsaved until confirmed in the UI.
    The race-count check uses the calendar count when the calendar carried
@@ -278,7 +279,8 @@ Before a branch is reported ready, verify — out loud, in the final message:
 | Batch backfill runner + Backfill queue (D43) | merged | PR #41, branch `backfill-runner` — migration 011 (`race_days.meet`, `backfill_queue`), server/backfill.js (policy A in code, commitDay through the routes' own writers, golden checkpoint per meet, cross-source in memory, per-meet report), queue API + view, P/L by meet, `npm run backfill`, `npm run check-backfill`; the routes now call the shared `insertRaceDay` / `saveResults` / `persistCard` |
 | Backfill run DMR-2026-summer (D44) | merged | PR #42, branch `backfill-dmr-2026-summer` — 27 days Jul 17 - Aug 30 saved under lean-1.1, zero queued, golden 2026-07-17 committed, cross-source identical on 08-28/29/30, report docs/backfill/DMR-2026-summer.md; every backfilled card is PROGRAM_ONLY (no consensus source runs on archived days) |
 | Index source order + meet-dates table (D47) | merged | PR #43, branch `backfill-dmr-2025-summer` — indexRaceDays / probeMeetWindow / dmtc-probe, three-way race-count rule in the runner, dark 2025-07 calendar fixture |
-| Backfill run DMR-2025-summer (D45) | in review | PR #44, branch `backfill-dmr-2025-summer-run` — meet-dates table from the probe (31 race days), parser fixes for the 2025 print run (ad slug overprint, footer-anchored panel edge, 8pt numbers on 15-horse fields), golden 2025-07-18 committed, 31 saved / 0 queued, report docs/backfill/DMR-2025-summer.md |
+| Backfill run DMR-2025-summer (D45) | merged | PR #44, branch `backfill-dmr-2025-summer-run` — meet-dates table from the probe (31 race days), parser fixes for the 2025 print run (ad slug overprint, footer-anchored panel edge, 8pt numbers on 15-horse fields), golden 2025-07-18 committed, 31 saved / 0 queued, report docs/backfill/DMR-2025-summer.md |
+| Backfill run DMR-2025-fall (D46) | in review | PR #47, branch `backfill-dmr-2025-fall` — meet-dates table from the probe (14 race days), foreign_program detection (the Breeders' Cup official program on BC days; blocks -> queue -> confirmed sheet-only as ODDS_ONLY), golden 2025-10-31 committed (BC program by digest only), 12 saved + 2 resolved then dropped, report docs/backfill/DMR-2025-fall.md |
 | dmtc.com crawler + raw archive (D41) | merged | PR #36, branch `dmtc-crawler` - calendar-indexed, polite, conditional, audited crawler; raw archive with manifests; `npm run dmtc-fetch`; the two real calendar pages are fixtures |
 | ML sheet as entries source of record (D40) | merged | PR #34, branch `ml-sheet-ingest` - ML/changes PDF parser + fetcher, program becomes analysis-only via the merge, ODDS_ONLY tier, engine `lean-1.0.1` (morning-line ranking fallback on rank-less races) |
 | Engine versioning (D34) | merged | PR #33, branch `engine-versioning` - `ENGINE_VERSION = lean-1.0`; migration 008; version on card rows, card header, P/L rows + version filter; trace events carry it; invariant 14 |
@@ -321,6 +323,14 @@ Before a branch is reported ready, verify — out loud, in the final message:
 - **BETSHEET_CONTACT** (in `.env`, gitignored) is the human named in the
   crawler's User-Agent - set it before any `dmtc-fetch` run; the UA says
   "set BETSHEET_CONTACT" otherwise.
+- **On Breeders' Cup days the Del Mar program URL serves the Breeders' Cup
+  official program** (104 pages, 42MB, no Bottom Line, no horse index).
+  program-parser.js flags it `foreign_program` and hands back no races; the
+  runner saves such a day sheet-only (ODDS_ONLY) and only after a human
+  confirms it in the Backfill queue (the type blocks). The golden records a
+  foreign program by digest only (program.digest.json), never its bytes;
+  a day confirmed from the queue and soft-deleted later stays out on every
+  rerun (the 2025 BC days were dropped this way).
 - **The 2025 programs carry an advertisement's print slug in the text layer**,
   overprinted (every item twice at the same coordinates). program-parser.js
   drops exact overprints before reading a panel and anchors the panel edge
