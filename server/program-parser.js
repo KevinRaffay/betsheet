@@ -59,6 +59,75 @@ async function pageItems(doc, pageNo) {
 
 const joinedText = (items) => items.map((i) => i.s).join(' ').replace(/\s+/g, ' ');
 
+// ---------- header fields ----------
+
+// Distance grammar: number words, a unit, an optional fraction tail -
+// "Seven Furlongs", "One Mile", "Five And One Half Furlongs", "One Mile
+// And One Quarter", "One Mile And Seventy Yards", "About Six Furlongs".
+// Anchored at the START of a text item and followed by its period, a
+// "(Turf)" flag or the item's end, so a conditions line ("Non-winners Of
+// Two Races At A Mile Or Over ...") or a stakes title ("Del Mar Mile
+// (Grade II)") can never be read as the distance - both happened on the
+// 2026-08-22 program.
+const DIST_WHOLE = /^((?:(?:One|Two|Three|Four|Five|Six|Seven|Eight|Nine|Ten|Eleven|Twelve|Seventy|Half|Quarter|And|About)\s+)+(?:Furlongs?|Miles?)(?:\s+And(?:\s+(?:One|Two|Three|Four|Five|Six|Seven|Eight|Nine|Ten|Eleven|Twelve|Seventy|Half|Quarter))*\s+(?:Sixteenth|Eighth|Quarter|Half|Furlongs?|Yards?))?)(?=\.|\s*\(|$)/;
+const DIST_UNIT = /^((?:Furlongs?|Miles?)(?:\s+And(?:\s+(?:One|Two|Three|Four|Five|Six|Seven|Eight|Nine|Ten|Eleven|Twelve|Seventy|Half|Quarter))*\s+(?:Sixteenth|Eighth|Quarter|Half|Furlongs?|Yards?))?)(?=\.|\s*\(|$)/;
+const DIST_WORDS = /^(?:About\s+)?(?:One|Two|Three|Four|Five|Six|Seven|Eight|Nine|Ten|Eleven|Twelve|Seventy|Half|Quarter)(?:\s+(?:One|Two|Three|Four|Five|Six|Seven|Eight|Nine|Ten|Eleven|Twelve|Seventy|Half|Quarter|And))*$/;
+
+/**
+ * The race distance from a panel's header items. Returns
+ * { distance, consumed } - `consumed` lists the items that were NOTHING but
+ * the distance (they are dropped from the conditions text) - or null.
+ */
+export function distanceFromHeader(headerItems) {
+  for (const i of headerItems) {
+    const m = i.s.trim().match(DIST_WHOLE);
+    if (!m) continue;
+    const distance = norm(m[1]);
+    const pure = norm(i.s).replace(/\.$/, '') === distance;
+    return { distance, consumed: pure ? [i] : [] };
+  }
+  // A line wrap can split the sentence: the number word ends one line far
+  // right ("Six" / "One") and the unit opens the next at the left edge
+  // ("Furlongs." / "Mile And One Sixteenth. (Turf) Chute Start...").
+  for (const unit of headerItems) {
+    const m = unit.s.trim().match(DIST_UNIT);
+    if (!m) continue;
+    const partner = headerItems
+      .filter((i) => i !== unit && i.y > unit.y && i.y < unit.y + 14 && i.x > unit.x &&
+        DIST_WORDS.test(i.s.trim()))
+      .sort((a, b) => a.y - b.y)[0];
+    if (!partner) continue;
+    const consumed = [partner];
+    if (norm(unit.s).replace(/\.$/, '') === norm(m[1])) consumed.push(unit);
+    return { distance: norm(`${partner.s} ${m[1]}`), consumed };
+  }
+  return null;
+}
+
+/**
+ * The stakes title is the header line right under "Nth Running of"
+ * ("49th Running of" / "Torrey Pines Stakes (Grade III)"). Titles need not
+ * contain the word Stakes - Green Flash Handicap, Del Mar Oaks, Pacific
+ * Classic - so the anchor comes first and the word match is only the
+ * fallback. A sponsor clause ("Presented by Longines") is dropped; the
+ * grade stays.
+ */
+export function stakesTitleFromHeader(headerItems) {
+  const anchor = headerItems.find((i) => /^\d+(?:st|nd|rd|th)\s+Running\s+of$/i.test(i.s.trim()));
+  if (anchor) {
+    const below = headerItems
+      .filter((i) => i.y < anchor.y && i.y > anchor.y - 14)
+      .sort((a, b) => b.y - a.y);
+    if (below.length) {
+      const line = below.filter((i) => Math.abs(i.y - below[0].y) < 2).sort((a, b) => a.x - b.x);
+      const title = norm(line.map((i) => i.s).join(' ')).replace(/\s+Presented by\s+.*?(?=\s*\(|$)/i, '');
+      if (title) return title;
+    }
+  }
+  const fallback = headerItems.find((i) => /Stakes/i.test(i.s) && !/Bet Slips|Pick|Parlay/i.test(i.s));
+  return fallback ? norm(fallback.s) : null;
+}
+
 // ---------- race panels ----------
 
 function parsePanel(items, footer, warnings) {
@@ -124,42 +193,12 @@ function parsePanel(items, footer, warnings) {
     .map((i) => i.s).join(' '));
   let condText = buildCondText();
 
-  // Distance: typographically it is the trailing sentence of the conditions
-  // paragraph. Usually one item ("Seven Furlongs." / "One Mile."), but a
-  // line wrap can SPLIT it - the number word ends one line far right and
-  // "Furlongs." opens the next at the left edge - and the two fragments
-  // interleave with conditions text in x-sorted order. So: whole item
-  // first, then reunite a bare unit item with the short word item just
-  // above-right of it.
-  // A whole-item distance may carry a suffix ("One Mile. (Turf) Stretch
-  // Start.") - capture the distance prefix, don't demand a clean item.
-  const distPrefix = /^((?:About\s+)?[A-Za-z][\w/ -]{1,32}?\s(?:Furlongs?|Miles?)(?:\s[Aa]nd\s[\w/ -]{1,25}?(?:Furlongs?|Yards?))?)\.?(?:\s|$)/;
-  let wholeDistItem = null;
-  let wholeDistMatch = null;
-  for (const i of headerItems) {
-    const m = i.s.trim().match(distPrefix);
-    if (m) { wholeDistItem = i; wholeDistMatch = m; break; }
+  const dist = distanceFromHeader(headerItems);
+  if (dist) {
+    race.distance = dist.distance;
+    dist.consumed.forEach((i) => distanceOnlyItems.add(i));
+    if (distanceOnlyItems.size) condText = buildCondText();
   }
-  if (wholeDistMatch) {
-    race.distance = norm(wholeDistMatch[1]);
-    // Purely-distance item (nothing but the matched text + period)?
-    if (norm(wholeDistItem.s).replace(/\.$/, '') === race.distance) {
-      distanceOnlyItems.add(wholeDistItem);
-    }
-  } else {
-    const unit = headerItems.find((i) => /^(?:Furlongs?|Miles?)\.?$/.test(i.s.trim()));
-    if (unit) {
-      const partner = headerItems
-        .filter((i) => i.y > unit.y && i.y < unit.y + 14 && i.x > unit.x &&
-          /^(?:About\s+)?[A-Z][A-Za-z]+(?:\s[\w/ -]{1,20})?$/.test(i.s.trim()) && i.s.trim().length <= 24)
-        .sort((a, b) => a.y - b.y)[0];
-      if (partner) {
-        race.distance = norm(`${partner.s} ${unit.s}`).replace(/\.$/, '');
-        distanceOnlyItems.add(partner).add(unit);
-      }
-    }
-  }
-  if (distanceOnlyItems.size) condText = buildCondText();
 
   // The conditions body starts at the race-type sentence (ALL CAPS + PURSE),
   // or at "STAKES." for a stakes race whose purse is "$N Guaranteed".
@@ -174,8 +213,8 @@ function parsePanel(items, footer, warnings) {
   } else if (/^STAKES\./.test(conditions)) {
     // Stakes pages carry a title line ("Torrey Pines Stakes (Grade III)")
     // and a "$150,000 Guaranteed" purse line in the header.
-    const title = headerItems.find((i) => /Stakes/i.test(i.s) && !/Bet Slips|Pick|Parlay/i.test(i.s));
-    race.raceType = title ? `STAKES - ${norm(title.s)}` : 'STAKES';
+    const title = stakesTitleFromHeader(headerItems);
+    race.raceType = title ? `STAKES - ${title}` : 'STAKES';
     const guaranteed = headerText.match(/\$([\d,]+)\s+Guaranteed/i);
     if (guaranteed) race.purseCents = moneyToCents(guaranteed[1]);
   }

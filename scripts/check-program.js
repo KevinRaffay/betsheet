@@ -3,14 +3,16 @@
 //
 // Same two-layer shape as check-parsers.js: a golden-file diff plus hard
 // structural assertions read off the printed program by hand, so
-// regenerating the golden cannot bless a regression. The fixture is the
-// REAL Del Mar program for Sunday 2026-08-30 (61 pages, 10 races,
-// 98 entries, Bottom Line analysis, alphabetical index).
+// regenerating the golden cannot bless a regression. Two REAL Del Mar
+// programs are the fixtures: Sunday 2026-08-30 (61 pages, 10 races, 98
+// entries, Bottom Line analysis, alphabetical index) and Saturday
+// 2026-08-22 (11 races, 122 entries, Pacific Classic day - a layout with
+// no panel payoff box and stakes titles without the word "Stakes").
 
 import fs from 'node:fs';
 import path from 'node:path';
 import { fileURLToPath, URL } from 'node:url';
-import { parseProgramPdf, trackFromBottomLine } from '../server/program-parser.js';
+import { parseProgramPdf, distanceFromHeader, stakesTitleFromHeader, trackFromBottomLine } from '../server/program-parser.js';
 
 const ROOT = fileURLToPath(new URL('../', import.meta.url));
 const PDF = path.join(ROOT, 'tests', 'fixtures', 'programs', 'delmar-2026-08-30.pdf');
@@ -151,6 +153,116 @@ check('index: spot row (Agency, program 1, race 6)', (() => {
 
 // Expected-track/date verification fires on a mismatch.
 const wrong = await parseProgramPdf(PDF, { track: 'Santa Anita', date: '2026-09-01' });
+// --- header fields from the 2026-08-22 program (hand-copied text items) ---
+// Its header lines are reproduced here exactly as pdfjs emitted them
+// (text, x, y) so each rule is pinned in isolation; the whole-file
+// assertions on that fixture follow further down.
+const it = (s, x, y) => ({ s, x, y, h: 6 });
+const h3 = [
+  it('Other Than Maiden, Claiming, Or Starter At A Mile Or Over Allowed 2 Lbs. Claiming Price $20,000', 334, 475),
+  it('One', 572, 465),
+  it('Mile And One Sixteenth. (Turf) Chute Start. (Rail at 0 Feet)', 334, 461),
+];
+check('distance: split across a line wrap ("One" / "Mile And One Sixteenth. (Turf)...")', (() => {
+  const d = distanceFromHeader(h3);
+  return d && d.distance === 'One Mile And One Sixteenth' && d.consumed.length === 1 && d.consumed[0].s === 'One';
+})(), JSON.stringify(distanceFromHeader(h3)));
+const h7 = [
+  it('Non-winners Of Two Races At A Mile Or Over Since May 22 Allowed 2 Lbs. Such A Race Since', 341, 462),
+  it('One Mile. (Turf) Stretch Start. (Rail at 0 Feet)', 429, 450),
+];
+check('distance: conditions text "...At A Mile Or Over" is never the distance',
+  distanceFromHeader(h7)?.distance === 'One Mile', JSON.stringify(distanceFromHeader(h7)));
+const h11 = [
+  it('40th Running of', 428, 503), it('Del Mar Mile (Grade II)', 417, 496), it('$300,000 Guaranteed', 419, 490),
+  it('STAKES. FOR THREE-YEAR-OLDS AND UPWARD. By subscription of $300 each, which shall', 331, 484),
+  it('One Mile. (Turf) Stretch Start. (Rail at 0', 464, 446),
+];
+check('distance: a stakes title ("Del Mar Mile") is never the distance',
+  distanceFromHeader(h11)?.distance === 'One Mile', JSON.stringify(distanceFromHeader(h11)));
+check('distance: fractions, no trailing period, purely-distance items consumed',
+  distanceFromHeader([it('One Mile And One Quarter.', 503, 388)])?.distance === 'One Mile And One Quarter' &&
+  distanceFromHeader([it('Five And One Half Furlongs.', 395, 448)])?.distance === 'Five And One Half Furlongs' &&
+  distanceFromHeader([it('One Mile', 557, 431)])?.distance === 'One Mile' &&
+  distanceFromHeader([it('Six Furlongs.', 394, 476)])?.consumed.length === 1 &&
+  distanceFromHeader([it('One Mile. (Turf)', 537, 466)])?.consumed.length === 0);
+check('distance: nothing distance-like -> null',
+  distanceFromHeader([it('STAKES. FOR FILLIES, THREE-YEAR-OLDS.', 331, 468), it('One Mile Or Over Since May 22', 331, 460)]) === null);
+check('stakes title: the line under "Nth Running of", sponsor dropped, grade kept',
+  stakesTitleFromHeader([it('24th Running of', 431, 499), it('Green Flash Handicap Presented by Longines (Grade II)', 362, 493),
+    it('$200,000 Guaranteed', 422, 487), it('STAKES. A HANDICAP FOR THREE-YEAR-OLDS AND UPWARD.', 336, 475)]) === 'Green Flash Handicap (Grade II)' &&
+  stakesTitleFromHeader([it('70th Running of', 428, 489), it('Del Mar Oaks Presented by Keeneland Sales (Grade I)', 362, 482),
+    it('$300,000 Guaranteed', 419, 475)]) === 'Del Mar Oaks (Grade I)' &&
+  stakesTitleFromHeader(h11) === 'Del Mar Mile (Grade II)' &&
+  stakesTitleFromHeader([it('36th Running of', 430, 508), it('Pacific Classic (Grade I)', 417, 502),
+    it('$1,000,000 Guaranteed', 419, 496)]) === 'Pacific Classic (Grade I)');
+check('stakes title: the /Stakes/ word match stays as the fallback without an anchor',
+  stakesTitleFromHeader([it('$2 WPS Parlay', 400, 540), it('Torrey Pines Stakes (Grade III)', 403, 459)]) === 'Torrey Pines Stakes (Grade III)' &&
+  stakesTitleFromHeader([it('$2 WPS Parlay', 400, 540)]) === null);
+check('R7 (fixture): the title is read via the "49th Running of" anchor, unchanged',
+  r7.raceType === 'STAKES - Torrey Pines Stakes (Grade III)');
+
+// --- second fixture: the REAL Del Mar program for Saturday 2026-08-22 ---
+// A different layout from 08-30: no payoff box on the panels (the track
+// comes from the Bottom Line header), four stakes without the word
+// "Stakes" in the title, a line-wrapped distance, an 11-race card topped
+// by the Pacific Classic. Same two layers: golden diff + hand checks.
+console.log('-- delmar-2026-08-22 --');
+const PDF2 = path.join(ROOT, 'tests', 'fixtures', 'programs', 'delmar-2026-08-22.pdf');
+const GOLDEN2 = path.join(ROOT, 'tests', 'fixtures', 'programs', 'delmar-2026-08-22.expected.json');
+const out2 = await parseProgramPdf(PDF2, { track: 'Del Mar', date: '2026-08-22' });
+const diff2 = firstDiff(out2, JSON.parse(fs.readFileSync(GOLDEN2, 'utf8')));
+check('golden: delmar-2026-08-22.pdf', !diff2, diff2 ?? '');
+check('08-22: date and track (track via the Bottom Line header, no no_track warning)',
+  out2.date === '2026-08-22' && out2.track === 'Del Mar' && !out2.warnings.some((w) => w.type === 'no_track'),
+  `${out2.date} ${out2.track}`);
+check('08-22: 11 races, numbered 1-11', out2.races.length === 11 && out2.races.every((r, i) => r.number === i + 1));
+check('08-22: 122 entries across the card', out2.races.reduce((a, r) => a + r.entries.length, 0) === 122);
+const counts2 = out2.races.map((r) => r.entries.length);
+check('08-22: entry counts per race', JSON.stringify(counts2) === '[11,14,13,7,10,11,14,9,10,11,12]', JSON.stringify(counts2));
+const types2 = out2.warnings.map((w) => `${w.type}:${w.race}`).sort().join(',');
+check('08-22: warnings are exactly the two index renumberings (races 2, 6)',
+  types2 === 'index_renumbered:2,index_renumbered:6', types2);
+const scr = (r) => out2.races[r - 1].entries.filter((e) => e.scratched).map((e) => `${e.programNumber} ${e.horseName}`).join('|');
+check('08-22: printed scratches - R2 Royal Lady (5) + Cotta Ride (7), R6 Blame Ashley (10), none elsewhere',
+  scr(2) === '5 Royal Lady|7 Cotta Ride' && scr(6) === '10 Blame Ashley' &&
+  out2.races.filter((r) => r.entries.some((e) => e.scratched)).length === 2, `${scr(2)} / ${scr(6)}`);
+check('08-22: surfaces alternate turf/dirt as printed', out2.races.map((r) => r.surface).join(',') ===
+  'TURF,DIRT,TURF,DIRT,TURF,DIRT,TURF,DIRT,TURF,DIRT,TURF');
+const dists2 = out2.races.map((r) => r.distance).join('|');
+check('08-22: distances (R3 line-wrapped, R6 five and a half, R10 mile and a quarter)',
+  dists2 === 'One Mile|Six Furlongs|One Mile And One Sixteenth|One Mile|Five Furlongs|Five And One Half Furlongs|One Mile|One Mile|One Mile|One Mile And One Quarter|One Mile', dists2);
+const titles2 = [5, 9, 10, 11].map((n) => out2.races[n - 1].raceType).join('|');
+check('08-22: stakes titles without the word Stakes, sponsor clauses dropped, grades kept',
+  titles2 === 'STAKES - Green Flash Handicap (Grade II)|STAKES - Del Mar Oaks (Grade I)|STAKES - Pacific Classic (Grade I)|STAKES - Del Mar Mile (Grade II)', titles2);
+check('08-22: stakes purses incl. the $1,000,000 Pacific Classic',
+  out2.races[4].purseCents === 200000_00 && out2.races[8].purseCents === 300000_00 &&
+  out2.races[9].purseCents === 1000000_00 && out2.races[10].purseCents === 300000_00);
+check('08-22: no race type carries conditions text',
+  out2.races.every((r) => r.raceType && r.raceType.length <= 60), JSON.stringify(out2.races.map((r) => r.raceType)));
+check('08-22: post times run 2:00PM to 7:18PM', out2.races[0].postTime === '2:00PM' && out2.races[10].postTime === '7:18PM');
+check('08-22: best bet Kensington Lane (IRE) - race 9, program 9, rank 1, 3/1 - and the only one', (() => {
+  const bets = out2.races.flatMap((r) => r.entries.filter((e) => e.bestBet).map((e) => ({ race: r.number, ...e })));
+  return bets.length === 1 && bets[0].race === 9 && bets[0].programNumber === '9' &&
+    bets[0].horseName === 'Kensington Lane (IRE)' && bets[0].programRank === 1 && bets[0].morningLine === '3/1';
+})());
+check('08-22: core fields on every live entry, ONE known gap - R9 #9 trainer glued into the owner line', (() => {
+  const gaps = out2.races.flatMap((r) => r.entries.filter((e) => !e.scratched &&
+    !(e.horseName && e.jockey && e.trainer && e.owner && e.weight && e.morningLine && e.morningLineDecimal > 0 && e.breeding))
+    .map((e) => `${r.number}:${e.programNumber}`));
+  const kl = out2.races[8].entries.find((e) => e.programNumber === '9');
+  return gaps.join(',') === '9:9' && kl.trainer === null && /D' Amato/.test(kl.owner);
+})());
+check('08-22: also-eligibles - one in R3, two in R7',
+  out2.races.map((r) => r.entries.filter((e) => e.alsoEligible).length).join(',') === '0,0,1,0,0,0,2,0,0,0,0');
+check('08-22: index 122 rows, 3 scratches',
+  out2.index.length === 122 && out2.index.filter((i) => i.scratched).length === 3);
+check('08-22: analysis - 11 race paragraphs, R3 names six horses',
+  out2.analysis.length === 11 && out2.analysis[2].picks.length === 6 && out2.analysis[2].picks[0] === 'King of Dragons');
+check('08-22: equipment changes - exactly the card\'s two (R1 #1, R3 #13, blinkers off)',
+  JSON.stringify(out2.races.flatMap((r) => r.entries.filter((e) => e.equipmentChange).map((e) => [r.number, e.programNumber, e.equipmentChange]))) ===
+  '[[1,"1","Blinkers Off"],[3,"13","Blinkers Off"]]');
+
 // --- track fallback: programs without the panel payoff box (D E L M A R
 // letters) name the track only in the "<Track> Bottom Line" header. Found
 // live with the 2026-08-22 program: track came back null and the ingest
