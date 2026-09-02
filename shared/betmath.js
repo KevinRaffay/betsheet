@@ -20,6 +20,10 @@ export const BET = {
   allocationCurves: {
     lean: { UNANIMOUS: 2.5, SPLIT: 1.5, CHAOS: 1.8 },   // the live methodology
     spread: { UNANIMOUS: 1.7, SPLIT: 1.5, CHAOS: 1.7 }, // flatter: trust agreement less
+    // D48: keyed to the program's Best Bet flag - the one confidence signal a
+    // PROGRAM_ONLY day carries. Flat across classifications; the Best Bet race
+    // takes the heavy weight. A day with no Best Bet is simply flat.
+    'best-bet': { UNANIMOUS: 1.5, SPLIT: 1.5, CHAOS: 1.5, bestBet: 3.0 },
   },
   chaosExoticShare: 0.65,     // chaos money leans toward exotics
 

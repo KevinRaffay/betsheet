@@ -206,3 +206,12 @@ export const confirmBackfillItem = (id, note) =>
   fetch(`/api/backfill/queue/${id}/confirm`, { method: 'POST', headers: { 'content-type': 'application/json' }, body: JSON.stringify({ note }) }).then(asJson);
 export const rejectBackfillItem = (id, note) =>
   fetch(`/api/backfill/queue/${id}/reject`, { method: 'POST', headers: { 'content-type': 'application/json' }, body: JSON.stringify({ note }) }).then(asJson);
+
+// Distributions (D20): losing days, drawdown, single-ticket dependence, per bucket.
+export const getDistribution = (engineVersion, meet) => {
+  const q = new URLSearchParams();
+  if (engineVersion) q.set('engineVersion', engineVersion);
+  if (meet && meet !== 'all') q.set('meet', meet);
+  const qs = q.toString();
+  return fetch(`/api/distribution${qs ? `?${qs}` : ''}`).then(asJson);
+};

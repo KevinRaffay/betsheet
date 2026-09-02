@@ -53,6 +53,12 @@ export const DEFAULT_RULES = {
   longshotOnTop: true,
   parlays: true,
   allocationCurve: 'lean',
+  // D48 knobs (template-driven, never a hardcoded branch): exotic ticket
+  // construction on/off, win stake = the branch's share or the per-race
+  // minimum, and how many horses the split exacta box takes.
+  exoticTickets: true,
+  winStake: 'share',
+  hedgeBoxDepth: 2,
 };
 
 export const FAILURE_MODE_WARNINGS = [
@@ -123,13 +129,23 @@ export function generateCard({ bankrollCents, perRaceMinCents, races, sourcesUse
     reserve = BET.parlayStakeCents +
       BET.doubleStakeCents * Math.min(BET.maxDoubles, Math.max(0, strongRaces.length - 1));
     emit('rule_fired', { rule: 'multi_race_reserve', reserveCents: reserve, strongRaces: strongRaces.map((r) => r.number) });
+  } else {
+    emit('rule_suppressed', { rule: 'multi_race_reserve', reason: !rules.parlays ? 'disabled_by_template' : 'fewer_than_two_strong_races', strongRaces: strongRaces.map((r) => r.number) });
   }
 
   // ----- allocation -----
   const guessRaces = races.filter(isGuessRace);
   const weighted = races.filter((r) => !isGuessRace(r));
   const curve = BET.allocationCurves[rules.allocationCurve] ?? BET.allocationCurves.lean;
-  const weightFor = (r) => curve[r.classification.classification] ?? 1.5;
+  // D48: a curve may key on the program's Best Bet flag (best-bet curve):
+  // the flagged race takes curve.bestBet, every other race its class weight.
+  const hasBestBet = (r) => r.entries.some((e) => e.best_bet && !e.scratched);
+  const weightFor = (r) => (curve.bestBet != null && hasBestBet(r) ? curve.bestBet : (curve[r.classification.classification] ?? 1.5));
+  if (curve.bestBet != null) {
+    const flagged = weighted.filter(hasBestBet);
+    for (const r of flagged) emit('rule_fired', { rule: 'best_bet_weight', race: r.number, weight: curve.bestBet, reason: 'the program Best Bet takes the heavy weight' });
+    if (!flagged.length) emit('rule_suppressed', { rule: 'best_bet_weight', reason: 'no_best_bet' });
+  }
   const guessTotal = guessRaces.length * perRaceMinCents;
   const pool = bankrollCents - guessTotal - reserve;
   const totalWeight = weighted.reduce((a, r) => a + weightFor(r), 0) || 1;
@@ -175,8 +191,11 @@ export function generateCard({ bankrollCents, perRaceMinCents, races, sourcesUse
 
   for (const alloc of allocations.sort((a, b) => a.race - b.race)) {
     const race = races.find((r) => r.number === alloc.race);
-    buildRaceTickets({ race, alloc, rules, addTicket, emit, warnings });
+    buildRaceTickets({ race, alloc, rules, addTicket, emit, warnings, perRaceMinCents });
     carveOutPlaceMoney({ race, alloc, tickets, rules, emit });
+  }
+  if (!races.some((r) => r.classification.classification === 'CHAOS')) {
+    emit('rule_suppressed', { rule: 'chaos_trifecta_box', reason: 'no_chaos_race' });
   }
 
   // ----- parlay + doubles from the reserve -----
@@ -219,7 +238,8 @@ export function generateCard({ bankrollCents, perRaceMinCents, races, sourcesUse
     for (const t of [...tickets]) {
       if (t.betType !== 'win') continue;
       const entryMl = t.mlForPlaceRule;
-      if (entryMl == null || entryMl < BET.placeMoneyThresholdMl) continue;
+      if (entryMl == null) { emit('rule_suppressed', { rule: 'place_money_rule', race: t.raceNumbers[0], horse: t.legs[0][0], reason: 'no_morning_line' }); continue; }
+      if (entryMl < BET.placeMoneyThresholdMl) { emit('rule_suppressed', { rule: 'place_money_rule', race: t.raceNumbers[0], horse: t.legs[0][0], ml: entryMl, reason: 'below_odds_threshold' }); continue; }
       const has = tickets.some((p) => p.betType === 'place' &&
         p.raceNumbers[0] === t.raceNumbers[0] && p.legs[0][0] === t.legs[0][0] &&
         p.stakeCents === t.stakeCents);
@@ -243,7 +263,7 @@ export function generateCard({ bankrollCents, perRaceMinCents, races, sourcesUse
       }
     }
   } else {
-    emit('rule_suppressed', { rule: 'place_money_rule', reason: 'disabled by template' });
+    emit('rule_suppressed', { rule: 'place_money_rule', reason: 'disabled_by_template' });
   }
 
   // ----- bankroll balancing (invariant 2: exact sum, warn never block) -----
@@ -326,7 +346,7 @@ function liveLongshots(race) {
     ((counts[e.program_number] ?? 0) >= 1 || (e.program_rank != null && e.program_rank <= 3) || mlRank(race, e) <= 3));
 }
 
-function buildRaceTickets({ race, alloc, rules, addTicket, emit, warnings }) {
+function buildRaceTickets({ race, alloc, rules, addTicket, emit, warnings, perRaceMinCents = 500 }) {
   const A = alloc.amountCents;
   const menu = parseWagerMenu(race.wager_menu);
   const cls = alloc.confidence;
@@ -343,11 +363,17 @@ function buildRaceTickets({ race, alloc, rules, addTicket, emit, warnings }) {
   const flags = race.classification.contrarianFlags ?? [];
   const counts = race.classification.sourceCounts ?? {};
   const usedPgms = new Set();
+  // D48: suppression verdicts (machine-readable reasons) and the knobs.
+  const sup = (rule, reason, extra = {}) => emit('rule_suppressed', { rule, race: race.number, reason, ...extra });
+  const exotics = rules.exoticTickets !== false;
+  const minWin = rules.winStake === 'minimum';
+  const winShare = (share) => (minWin ? perRaceMinCents : share);
+  const external = race.classification.externalSourceCount ?? 0;
 
   const win = (entry, stakeCents, rationale, tags) => {
     stakeCents = Math.max(menu.win, Math.round(stakeCents / 100) * 100);
     addTicket({
-      raceNumbers: [race.number], betType: 'win',
+      raceNumbers: [race.number], betType: 'win', holdStake: minWin,
       legs: [[entry.program_number]], stakeCents, costCents: stakeCents,
       est: [winPayout(stakeCents, ml(entry)), winPayout(stakeCents, ml(entry))],
       estIsRange: false, mlForPlaceRule: ml(entry), rationale,
@@ -368,14 +394,20 @@ function buildRaceTickets({ race, alloc, rules, addTicket, emit, warnings }) {
   };
 
   if (cls === 'GUESS') {
+    // Every rule answers on every race (D48): a guesswork race declines them all.
+    sup('fade_favorite_price', !rules.fadeThePrice ? 'disabled_by_template' : external === 0 ? 'no_algo_order' : 'not_unanimous');
+    sup('chaos_trifecta_box', 'not_chaos_classification');
+    sup('hedge_cut', 'not_split_classification');
     win(top, A, 'Guesswork race - minimum stake on the best-backed pick', ['guesswork_minimum']);
     alloc.thesis = 'Debut/guesswork race: nobody knows, so the card risks the minimum.';
     return;
   }
 
   if (cls === 'UNANIMOUS') {
+    sup('chaos_trifecta_box', 'not_chaos_classification');
+    sup('hedge_cut', 'not_split_classification');
     const shots = liveLongshots(race);
-    if (rules.fadeThePrice && ml(top) != null && ml(top) <= BET.oddsOnMl) {
+    if (rules.fadeThePrice && exotics && ml(top) != null && ml(top) <= BET.oddsOnMl) {
       emit('rule_fired', { rule: 'fade_favorite_price', race: race.number, favorite: top.program_number, ml: ml(top), reason: 'legit odds-on favorite is unbettable to win; goes on TOP of exactas instead' });
       emit('rule_suppressed', { rule: 'win_bet', race: race.number, reason: `top pick at ${ml(top)}-1 is below the ${BET.oddsOnMl}-1 win floor` });
       const unders = dedupeEntries([...(shots.length ? shots : []), second].filter(Boolean)).slice(0, 3);
@@ -384,13 +416,15 @@ function buildRaceTickets({ race, alloc, rules, addTicket, emit, warnings }) {
       if (rules.longshotOnTop && shot) {
         emit('rule_fired', { rule: 'longshot_on_top', race: race.number, horse: shot.program_number });
         exacta(shot, [top], A * 0.45, 'The flip: longshot on top for the lottery upside', ['longshot_on_top', 'keep_stacks']);
-      }
+      } else sup('longshot_on_top', !rules.longshotOnTop ? 'disabled_by_template' : 'no_live_longshot');
       alloc.thesis = `${top.horse_name} is legit but unbettable at ${top.morning_line}; the money is in the exotics under and over.`;
       alloc.triggers.push(`If #${top.program_number} drifts above even money, the win bet becomes playable.`);
       if (shot) alloc.triggers.push(`If #${shot.program_number} drifts past 15-1, added value on the flip.`);
     } else {
-      win(top, A * 0.45, 'Unanimous top pick - bet it hardest', ['unanimous_win']);
-      if (second) {
+      sup('fade_favorite_price', !rules.fadeThePrice ? 'disabled_by_template' : !exotics ? 'no_exotic_tickets' : ml(top) == null ? 'no_morning_line' : 'above_odds_on', { ml: ml(top) });
+      win(top, exotics ? winShare(A * 0.45) : winShare(A), 'Unanimous top pick - bet it hardest', ['unanimous_win']);
+      if (!exotics) sup('unanimous_exacta', 'no_exotic_tickets');
+      if (second && exotics) {
         exacta(top, [second], A * 0.33, 'Straight exacta on the thesis', ['unanimous_exacta']);
         exacta(second, [top], A * 0.22, 'The flip - same thesis, different order (keep stacks)', ['keep_stacks']);
       }
@@ -398,28 +432,51 @@ function buildRaceTickets({ race, alloc, rules, addTicket, emit, warnings }) {
     }
   } else if (cls === 'SPLIT') {
     const backers = (pgm) => race.classification.topVotes?.find((v) => v.programNumber === pgm)?.sources.length ?? 0;
-    win(top, A * 0.4, 'Better-backed side of the split', ['split_primary_win']);
-    if (second && rules.hedgeCut && backers(second.program_number) >= 2) {
-      win(second, A * 0.2, 'Second side carries real backing too', ['split_secondary_win']);
-    } else if (second) {
+    sup('chaos_trifecta_box', 'not_chaos_classification');
+    sup('fade_favorite_price', !rules.fadeThePrice ? 'disabled_by_template' : external === 0 ? 'no_algo_order' : 'not_unanimous');
+    win(top, exotics ? winShare(A * 0.4) : winShare(A), 'Better-backed side of the split', ['split_primary_win']);
+    if (!second) {
+      sup('hedge_cut', 'no_second_choice');
+    } else if (rules.hedgeCut && backers(second.program_number) >= 2) {
+      win(second, winShare(A * 0.2), 'Second side carries real backing too', ['split_secondary_win']);
+      sup('hedge_cut', 'sufficient_backing', { second: second.program_number, backers: backers(second.program_number) });
+    } else if (!rules.hedgeCut) {
+      win(second, winShare(A * 0.2), 'Second side bet too - hedge cut disabled', ['split_secondary_win']);
+      sup('hedge_cut', 'disabled_by_template', { second: second.program_number });
+    } else {
       emit('rule_fired', { rule: 'hedge_cut', race: race.number, cut: second.program_number, reason: 'thin backing - cut to the best one, not dutched' });
     }
-    if (second) {
-      const boxBase = Math.max(menu.exacta, Math.round((A * 0.4) / 2 / menu.exacta) * menu.exacta);
+    if (second && !exotics) sup('split_exacta_box', 'no_exotic_tickets');
+    if (second && exotics) {
+      // The split exacta box: two horses under lean; a template may take the
+      // top THREE program ranks (D48 box-depth-3), sized inside the same
+      // share. With win stakes held at the minimum (exacta-primary) the box
+      // absorbs the allocation instead, leaving room for the mid-price exacta.
+      const depth = Math.max(2, Number(rules.hedgeBoxDepth) || 2);
+      const third = depth >= 3 ? programPick(race, 3) : null;
+      const horses = dedupeEntries([top, second, third].filter(Boolean)).slice(0, depth);
+      if (depth >= 3 && horses.length < 3) sup('split_exacta_box', 'no_third_pick');
+      const combos = boxCost(1, horses.length, 2);
+      const budget = minWin ? Math.max(0, A - perRaceMinCents - menu.exacta) : A * 0.4;
+      const boxBase = Math.max(menu.exacta, (minWin ? Math.floor : Math.round)(budget / combos / menu.exacta) * menu.exacta);
       addTicket({
         raceNumbers: [race.number], betType: 'exacta_box',
-        legs: [[top.program_number, second.program_number]],
-        stakeCents: boxBase, costCents: boxCost(boxBase, 2, 2),
+        legs: [horses.map((h) => h.program_number)],
+        stakeCents: boxBase, costCents: boxCost(boxBase, horses.length, 2),
         est: exactaEstimate(boxBase, ml(top), ml(second)), estIsRange: true,
-        rationale: 'Exacta box across the split',
+        boxN: horses.length, boxUnit: menu.exacta, estMls: [ml(top), ml(second)],
+        rationale: horses.length > 2 ? 'Exacta box across the top three program ranks' : 'Exacta box across the split',
       }, ['split_exacta_box']);
-      usedPgms.add(top.program_number).add(second.program_number);
+      horses.forEach((h) => usedPgms.add(h.program_number));
     }
     alloc.thesis = `Sources split between ${top.horse_name} and ${second?.horse_name ?? 'the field'}; win the better-backed side, box the pair.`;
   } else { // CHAOS
-    win(top, Math.max(menu.win, A * 0.25), 'Small win on the best-backed pick in a wide-open race', ['chaos_anchor_win']);
+    sup('hedge_cut', 'not_split_classification');
+    sup('fade_favorite_price', !rules.fadeThePrice ? 'disabled_by_template' : external === 0 ? 'no_algo_order' : 'not_unanimous');
+    win(top, exotics ? winShare(Math.max(menu.win, A * 0.25)) : winShare(A), 'Small win on the best-backed pick in a wide-open race', ['chaos_anchor_win']);
     const shots = liveLongshots(race);
-    if (rules.chaosTrifectaBox) {
+    if (!rules.chaosTrifectaBox || !exotics) sup('chaos_trifecta_box', !rules.chaosTrifectaBox ? 'disabled_by_template' : 'no_exotic_tickets');
+    if (rules.chaosTrifectaBox && exotics) {
       const horses = dedupeEntries([top, second, shots[0], programPick(race, 3)].filter(Boolean)).slice(0, 4);
       if (horses.length >= 3) {
         const budget = A * (BET.chaosExoticShare - 0.2);
@@ -433,9 +490,10 @@ function buildRaceTickets({ race, alloc, rules, addTicket, emit, warnings }) {
           rationale: 'Chaos race: the exotics carry the upside',
         }, ['chaos_trifecta_box']);
         horses.forEach((h) => usedPgms.add(h.program_number));
-      }
+      } else sup('chaos_trifecta_box', 'insufficient_horses', { horses: horses.length });
     }
-    if (rules.longshotOnTop && shots[0]) {
+    if (!rules.longshotOnTop || !exotics || !shots[0]) sup('longshot_on_top', !rules.longshotOnTop ? 'disabled_by_template' : !exotics ? 'no_exotic_tickets' : 'no_live_longshot');
+    if (rules.longshotOnTop && exotics && shots[0]) {
       emit('rule_fired', { rule: 'longshot_on_top', race: race.number, horse: shots[0].program_number });
       exacta(shots[0], [top], A * 0.2, 'Longshot over the anchor - lottery upside', ['longshot_on_top']);
     }
@@ -449,25 +507,32 @@ function buildRaceTickets({ race, alloc, rules, addTicket, emit, warnings }) {
   }
 
   // Known failure mode #2: 2+-source horses get small coverage even lean.
-  if (rules.coverageAdds) {
+  if (!exotics) sup('two_source_coverage', 'no_exotic_tickets');
+  else if (!rules.coverageAdds) sup('two_source_coverage', 'disabled_by_template');
+  let coverageFired = false;
+  if (rules.coverageAdds && exotics) {
     for (const [pgm, n] of Object.entries(counts)) {
       if (n < 2 || usedPgms.has(pgm)) continue;
       const e = byNumber(race, pgm);
       if (!e) continue;
       emit('rule_fired', { rule: 'two_source_coverage', race: race.number, horse: pgm, sources: n });
       exacta(e, [top], Math.max(menu.exacta, BET.coverageStakeCents), `${n} sources flag #${pgm} - small coverage even in lean mode`, ['two_source_coverage']);
+      coverageFired = true;
     }
+    if (!coverageFired) sup('two_source_coverage', 'no_multi_source_horse');
   }
 
   // Mid-priced program horses stay in the exotic picture.
-  if (rules.midPriceCoverage) {
+  if (!exotics) sup('mid_price_coverage', 'no_exotic_tickets');
+  else if (!rules.midPriceCoverage) sup('mid_price_coverage', 'disabled_by_template');
+  if (rules.midPriceCoverage && exotics) {
     const [lo, hi] = BET.midPriceRange;
     const mid = race.entries.find((e) => !e.scratched && e.program_rank != null &&
       ml(e) >= lo && ml(e) <= hi && !usedPgms.has(e.program_number));
     if (mid) {
       emit('rule_fired', { rule: 'mid_price_coverage', race: race.number, horse: mid.program_number, ml: ml(mid), reason: 'unmentioned mid-priced program horse is how moonshots die' });
       exacta(top, [mid], menu.exacta, `Mid-priced program horse #${mid.program_number} under the top`, ['mid_price_coverage']);
-    }
+    } else sup('mid_price_coverage', 'no_mid_priced_horse');
   }
 }
 
@@ -536,8 +601,9 @@ function balance({ tickets, allocations, bankrollCents, emit }) {
   const spentIn = (race) => tickets.filter((t) => t.raceNumbers.length === 1 && t.raceNumbers[0] === race).reduce((a, t) => a + t.costCents, 0);
   const allocOf = new Map(allocations.map((a) => [a.race, a]));
   const byRace = new Map();
+  const heldRaces = new Set(tickets.filter((t) => t.betType === 'win' && t.holdStake).map((t) => t.raceNumbers[0]));
   for (const t of tickets) {
-    if (t.betType !== 'win') continue;
+    if (t.betType !== 'win' || t.holdStake) continue;
     const race = t.raceNumbers[0];
     const cur = byRace.get(race);
     if (cur && cur.win.stakeCents >= t.stakeCents) continue;
@@ -551,16 +617,45 @@ function balance({ tickets, allocations, bankrollCents, emit }) {
       amountCents: 0, steps: 0,
     });
   }
+  // D48: a race whose win stakes are HELD by the template (exacta-primary)
+  // absorbs remainder in its exacta box instead - one base unit a step.
+  for (const t of tickets) {
+    if (t.betType !== 'exacta_box' || !t.boxUnit) continue;
+    const race = t.raceNumbers[0];
+    if (!heldRaces.has(race) || byRace.has(race)) continue;
+    const straight = tickets.find((x) => x.betType === 'exacta' && x.raceNumbers.length === 1 && x.raceNumbers[0] === race && x.legs.length === 2 && x.legs[1].length === 1) ?? null;
+    byRace.set(race, { race, box: t, straight, unit: t.boxUnit * boxCost(1, t.boxN, 2), allocatedCents: allocOf.get(race)?.amountCents ?? 0, guess: false, amountCents: 0, steps: 0 });
+  }
   const candidates = [...byRace.values()]
     .sort((a, b) => b.allocatedCents - a.allocatedCents || a.race - b.race);
   const skipped = allocations
     .filter((a) => !byRace.has(a.race))
-    .map((a) => ({ race: a.race, reason: 'no_win_ticket' }));
+    .map((a) => ({ race: a.race, reason: heldRaces.has(a.race) ? 'stake_held_by_template' : 'no_win_ticket' }));
 
   const dir = Math.sign(diff);
   let passes = 0;
   const step = (c) => {
+    if (c.box && Math.abs(diff) < c.unit && c.straight) {
+      // Less than a box step left: the race's straight exacta takes $1 steps.
+      const unit = c.box.boxUnit;
+      if (Math.abs(diff) < unit) return false;
+      const nextBase = c.straight.stakeCents + dir * unit;
+      if (nextBase < unit) return false;
+      c.straight.stakeCents = nextBase; c.straight.costCents = comboCost(nextBase, c.straight.legs);
+      c.amountCents += dir * unit; c.steps++;
+      diff -= dir * unit;
+      return true;
+    }
     if (Math.abs(diff) < c.unit) return false;
+    if (c.box) {
+      const nextBase = c.box.stakeCents + dir * c.box.boxUnit;
+      if (nextBase < c.box.boxUnit) return false;
+      c.box.stakeCents = nextBase; c.box.costCents = boxCost(nextBase, c.box.boxN, 2);
+      c.box.est = exactaEstimate(nextBase, c.box.estMls[0], c.box.estMls[1]);
+      c.amountCents += dir * c.unit; c.steps++;
+      diff -= dir * c.unit;
+      return true;
+    }
     const next = c.win.stakeCents + dir * 100;
     if (next < 200) return false; // keep the $2 win minimum
     c.win.stakeCents = next; c.win.costCents = next;
@@ -595,7 +690,7 @@ function balance({ tickets, allocations, bankrollCents, emit }) {
   // Payout estimates track the new stakes: win is exact morning-line
   // math, place is the labeled range - recompute, never approximate.
   for (const c of candidates) {
-    if (c.steps === 0) continue;
+    if (c.steps === 0 || !c.win) continue;
     if (c.win.mlForPlaceRule != null) {
       const p = winPayout(c.win.stakeCents, c.win.mlForPlaceRule);
       c.win.est = [p, p];
@@ -612,7 +707,7 @@ function balance({ tickets, allocations, bankrollCents, emit }) {
       race: c.race,
       amountCents: c.amountCents,
       steps: c.steps,
-      ticket: c.win.sequence,
+      ticket: (c.win ?? c.box).sequence,
       withPlace: Boolean(c.place),
       allocatedCents: c.allocatedCents,
     })),
