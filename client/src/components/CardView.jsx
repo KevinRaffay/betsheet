@@ -111,7 +111,9 @@ export default function CardView({ cardId, onBack }) {
               <span className="dim">
                 post {a.post_time ?? '?'} · {a.surface ?? '?'} · {a.distance ?? '?'} · {a.race_type ?? '?'}
               </span>
-              <span className="race-alloc">{money(a.amount_cents)} allocated</span>
+              <span className="race-alloc">
+                {money(a.amount_cents)} allocated · {money(subtotal)} spent
+              </span>
             </div>
             {thesis && <p className="thesis">{thesis}</p>}
             {triggers.map((t, i) => <p className="trigger" key={i}>▸ {t}</p>)}

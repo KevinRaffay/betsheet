@@ -20,7 +20,7 @@ process.env.BETSHEET_LOG_DIR = path.join(tmp, 'unit-logs');
 
 const { classifyDay } = await import('../shared/classification.js');
 const { generateCard } = await import('../shared/card-engine.js');
-const { parseWagerMenu, winPayout } = await import('../shared/betmath.js');
+const { parseWagerMenu, winPayout, placeEstimate } = await import('../shared/betmath.js');
 
 let failures = 0;
 function check(name, ok, detail = '') {
@@ -191,6 +191,46 @@ check('trace: card_finalized totals match the tickets', (() => {
 check('trace: allocation_decided for every race',
   prog.races.every((r) => card.trace.some((e) => e.event === 'allocation_decided' && e.race === r.number)));
 
+// ---------- bankroll balancing: the remainder is spread, never parked ----------
+// Found live: every card since D10 parked the whole remainder on one win
+// ticket (card 16 R1: $37 allocated, $65 spent, $51 on one horse).
+
+console.log('-- remainder distribution --');
+const stepsByRace = (c) => {
+  const rd = c.trace.find((e) => e.event === 'remainder_distributed');
+  const guess = new Set(c.trace.filter((e) => e.event === 'allocation_decided' && e.confidence === 'GUESS').map((e) => e.race));
+  const winRaces = [...new Set(c.trace.filter((e) => e.event === 'ticket_added' && e.betType === 'win').map((e) => e.race))]
+    .filter((r) => !guess.has(r));
+  const steps = Object.fromEntries(winRaces.map((r) => [r, rd?.races.find((x) => x.race === r)?.steps ?? 0]));
+  return { rd, guess, steps };
+};
+const preBalanceTotal = (c) => c.trace.filter((e) => e.event === 'ticket_added').reduce((a, e) => a + e.costCents, 0);
+
+for (const [label, c, bank] of [['$200', card, 20000], ['$173', odd, 17300], ['$300', gen(races, { bankrollCents: 30000 }), 30000]]) {
+  const { rd, guess, steps } = stepsByRace(c);
+  const remainder = bank - preBalanceTotal(c);
+  check(`${label}: remainder_distributed traced, amounts sum to the pre-balance gap`,
+    rd && rd.remainderCents === remainder && rd.undistributedCents === 0 &&
+    rd.races.reduce((a, r) => a + r.amountCents, 0) === remainder,
+    JSON.stringify({ remainder, rd }));
+  check(`${label}: round-robin - no race is more than one step ahead of another`, (() => {
+    const v = Object.values(steps);
+    return v.length > 0 && Math.max(...v) - Math.min(...v) <= 1;
+  })(), JSON.stringify(steps));
+  check(`${label}: guesswork races stay at their minimum`,
+    !rd.races.some((r) => guess.has(r.race)), JSON.stringify(rd.races));
+  check(`${label}: bankroll_balanced follows remainder_distributed and reports adjusted`,
+    c.trace.findIndex((e) => e.event === 'bankroll_balanced') === c.trace.findIndex((e) => e.event === 'remainder_distributed') + 1 &&
+    c.trace.find((e) => e.event === 'bankroll_balanced').adjusted === true);
+}
+check('place estimates track the balanced stake (pair moved together)', card.tickets
+  .filter((t) => t.betType === 'place')
+  .every((t) => {
+    const e = entryOf(races, t.raceNumbers[0], t.legs[0][0]);
+    const [lo, hi] = placeEstimate(t.stakeCents, e.morning_line_decimal);
+    return t.estMinCents === lo && t.estMaxCents === hi;
+  }));
+
 // ---------- synthetic guarantees + structure-layer toggles ----------
 
 console.log('-- synthetic + toggles --');
@@ -217,6 +257,64 @@ const noPlace = generateCard({ bankrollCents: 5000, perRaceMinCents: 500, races:
 check('toggle: placeMoneyRule off (simulation only) -> no forced place, suppression traced',
   !noPlace.tickets.some((t) => t.ruleTags.includes('place_money_rule')) &&
   noPlace.trace.some((e) => e.event === 'rule_suppressed' && e.rule === 'place_money_rule'));
+
+// A large remainder: four CHAOS races, one win ticket each (every other
+// structure rule off), so 75% of every allocation is left over. The old
+// balancer put all $300 on one horse; round-robin lands $75 on each.
+const chaosEntries = [
+  { program_number: '1', horse_name: 'Alpha', morning_line: '3/1', morning_line_decimal: 3, program_rank: 1, best_bet: 0, scratched: 0 },
+  { program_number: '2', horse_name: 'Bravo', morning_line: '4/1', morning_line_decimal: 4, program_rank: 2, best_bet: 0, scratched: 0 },
+  { program_number: '3', horse_name: 'Charlie', morning_line: '9/2', morning_line_decimal: 4.5, program_rank: 3, best_bet: 0, scratched: 0 },
+];
+const chaosPicks = [
+  { source_name: 'A', source_kind: 'algorithmic', pick_type: 'top', program_number: '1', horse_name: 'Alpha', note: null },
+  { source_name: 'B', source_kind: 'manual', pick_type: 'top', program_number: '2', horse_name: 'Bravo', note: null },
+  { source_name: 'C', source_kind: 'manual', pick_type: 'top', program_number: '3', horse_name: 'Charlie', note: null },
+];
+const chaosNums = [1, 2, 3, 4];
+const chaosCls = classifyDay(chaosNums, Object.fromEntries(chaosNums.map((n) => [n, chaosEntries])), Object.fromEntries(chaosNums.map((n) => [n, chaosPicks])));
+const chaosRaces = chaosNums.map((n, i) => ({
+  number: n, race_type: 'CLAIMING', conditions: 'FOR FOUR YEAR OLDS AND UPWARD', wager_menu: null,
+  entries: chaosEntries, classification: chaosCls[i],
+}));
+const bigGap = generateCard({
+  bankrollCents: 40000, perRaceMinCents: 500, races: chaosRaces,
+  rules: { chaosTrifectaBox: false, longshotOnTop: false, coverageAdds: false, midPriceCoverage: false, parlays: false },
+});
+check('big remainder: precondition - four CHAOS races, one win ticket each, $300 left over',
+  chaosCls.every((c) => c.classification === 'CHAOS') &&
+  bigGap.tickets.length === 4 && bigGap.tickets.every((t) => t.betType === 'win') &&
+  preBalanceTotal(bigGap) === 10000,
+  JSON.stringify({ cls: chaosCls.map((c) => c.classification), tickets: bigGap.tickets.map((t) => [t.betType, t.stakeCents]) }));
+check('big remainder: every race spends exactly its allocation - $100 each, not $325 on one', (() => {
+  const fin = bigGap.trace[bigGap.trace.length - 1];
+  return fin.totalCents === 40000 && fin.perRace.every((r) => r.allocatedCents === 10000 && r.spentCents === 10000);
+})(), JSON.stringify(bigGap.trace[bigGap.trace.length - 1].perRace));
+check('big remainder: 75 passes of $1 per race, traced per race', (() => {
+  const rd = bigGap.trace.find((e) => e.event === 'remainder_distributed');
+  return rd.remainderCents === 30000 && rd.passes === 75 && rd.races.length === 4 &&
+    rd.races.every((r) => r.amountCents === 7500 && r.steps === 75 && r.withPlace === false);
+})());
+check('big remainder: win payouts recomputed for the topped-up stakes',
+  bigGap.tickets.every((t) => t.estMinCents === winPayout(t.stakeCents, 3) && t.stakeCents === 10000));
+
+// The other direction: the mandatory place money can overspend a race;
+// the same round-robin trims wins back one step at a time.
+const overCls = classifyDay([1, 2], { 1: synthEntries, 2: synthEntries }, { 1: synthPicks[1], 2: synthPicks[1] });
+const over = generateCard({
+  bankrollCents: 6000, perRaceMinCents: 500,
+  races: [{ ...synthRace, classification: overCls[0] }, { ...synthRace, number: 2, classification: overCls[1] }],
+  rules: { parlays: false },
+});
+check('overspend: trimmed to the exact bankroll in $2 pair steps, spread across both races', (() => {
+  const rd = over.trace.find((e) => e.event === 'remainder_distributed');
+  const total = over.tickets.reduce((a, t) => a + t.costCents, 0);
+  return total === 6000 && rd && rd.remainderCents < 0 && rd.races.length === 2 &&
+    rd.races.every((r) => r.withPlace && r.amountCents < 0) &&
+    Math.abs(rd.races[0].steps - rd.races[1].steps) <= 1 &&
+    over.tickets.filter((t) => t.betType === 'win').every((w) =>
+      over.tickets.some((p) => p.betType === 'place' && p.raceNumbers[0] === w.raceNumbers[0] && p.stakeCents === w.stakeCents));
+})(), JSON.stringify(over.trace.find((e) => e.event === 'remainder_distributed')));
 
 const noFade = gen(realDay(), { rules: { fadeThePrice: false } });
 check('toggle: fadeThePrice off -> R1 gets a win bet again',
