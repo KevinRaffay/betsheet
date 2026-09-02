@@ -182,6 +182,11 @@ export function dayPayload(day, parsed, { bankrollCents, perRaceMinCents }) {
   return {
     track: TRACK_NAME, date: day.date, bankrollCents, perRaceMinCents,
     entriesSource: parsed.merged.entriesSource ?? 'both', races: parsed.merged.races,
+    // D59: dropped here since before migration 012 (D48-QA) added the
+    // column - insertRaceDay (server/ingest.js) reads payload.analysis to
+    // populate races.bottom_line, and every day this runner has ever saved
+    // was missing it silently (payload.analysis ?? [] defaulted to empty).
+    analysis: parsed.merged.analysis ?? [],
   };
 }
 
