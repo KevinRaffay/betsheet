@@ -52,7 +52,13 @@ Breaking any of these is a bug regardless of what the tests say.
    Every ingest path (entries, picks, result charts) shows exactly what Save
    will store — warnings first — and the user confirms before anything is
    written. Corrections happen at the source (fix the pasted text, re-parse),
-   never by hand-editing the parser's output in the preview.
+   never by hand-editing the parser's output in the preview. **The ONE
+   exception is the batch backfill (D43, user decision 2026-09-01, policy
+   A):** a day whose parse has ZERO blocking warnings (unparsed distance,
+   race-count mismatch vs the calendar, index validation failure, results
+   race-count mismatch, program/ML conflict on program numbers) is saved
+   without a click; any blocking warning sends the day to the review queue
+   with its read-only preview, unsaved until confirmed in the UI.
 10. **The server binds 127.0.0.1.** BetSheet is local-only; sharing is the
     here.now publish feature's job (Phase 4). Published cards contain card
     data only, never personal information.
@@ -283,3 +289,10 @@ Before a branch is reported ready, verify — out loud, in the final message:
 - **Two instances, two log dirs.** The betsheet-alt test instance (port 8902, its own DB) sets BETSHEET_LOG_DIR=server/logs-alt in C:/repos/.claude/launch.json. It used to share server/logs with the main instance - either side's factory reset silently wiped the other's decision traces (found live: exports came back traceStatus=missing). Never point two instances at one log dir.
 - **Equibase blocks scripted fetching.** Confirmed. Don't retry cleverly;
   the paste/PDF path is the design, not a fallback.
+- **Backfill (D41-D43) runs only under a recorded engine version.** D34 is
+  merged (#33): every backfilled card carries `engine_version`; a run before
+  it would have stamped the whole corpus `lean-0`. Land D36 (carve-out) and
+  D35 (canonical track) before the first run too - see the D43 ledger row.
+  `race_days.meet` (D43 migration) is derived from the calendar date -
+  Del Mar runs summer (Jul-Sep) and fall (Nov) meets only - so summer and
+  fall corpora stay separable in P/L and distributions.
