@@ -164,6 +164,7 @@ Breaking any of these is a bug regardless of what the tests say.
 | `scripts/check-pl.js` | P/L verification against the real server: three-day scenario (FULL × 2 variants from the real fixtures, synthetic PROGRAM_ONLY, ungraded), bucket-sum isolation, no-pooled-total shape check, cross-agreement with the grading endpoint, per-race cells summing to card totals, soft-delete dropping out of every aggregate and restore bringing it back. |
 | `server/trace-export.js` | the Phase 3 feed: GET /api/cards/:id/export builds one self-contained JSON per card — recipe, races + entries, consensus picks, sources, allocations, tickets joined with their grades, the day's results, and the card's full decision trace read back from the log files (active + rotated + gzipped) by correlation id / cardId. `traceStatus` (complete/partial/missing, proven by the engine's gap-free seq counter) flags log loss instead of exporting silence. Schema documented in docs/trace-schema.md; bump SCHEMA_VERSION on shape changes. 410 on deleted days. |
 | `scripts/export-trace.js` | CLI twin of the export endpoint (`npm run export-trace -- --card N [--out file]`); same document, no server needed. |
+| `docs/findings/` | structure-layer findings per (engine version, bucket, corpus), written from run IDs; see "Findings" below. `lean-1.1-program-only.md` (D52) is the first. |
 | `docs/trace-schema.md` | the trace event catalog (envelope, every engine/grading/lifecycle event with fields) and the export document shape. check-export asserts every event type appearing in a real export is documented here. |
 | `scripts/check-export.js` | export verification: the server runs with a tiny log-rotation threshold so one card's trace provably spans multiple rotated files; asserts seq contiguity across rotation and gzip, grade joining, regrade appending (log keeps every pass), doc honesty, named download, 404/410 guards, CLI ≡ endpoint, and honest partial/missing flagging when trace files are lost. |
 | `shared/templates.js` | strategy templates (D18): 12 named rule bundles: lean / spread / no-fade / no-chaos-box / structure-only / no-place-money + the D48 simulation-only four (exacta-primary / no-exotics / box-depth-3 / best-bet-weighted) that vary what actually fires on PROGRAM_ONLY days + the D49 simulation-only pair (box-only = split exacta box kept, mid-price straight exacta off; straight-only = the reverse via `hedgeBoxDepth: 0`) that isolate WHICH exotic leaks + the RULE_LAYERS signal/structure map the simulator keys on (structure rules read prices and ranks, benchmarkable on any completeness bucket; signal rules consume consensus votes). Pure — the code is the source of truth. |
@@ -292,6 +293,7 @@ Before a branch is reported ready, verify — out loud, in the final message:
 | Backfill run DMR-2025-summer (D45) | merged | PR #44, branch `backfill-dmr-2025-summer-run` — meet-dates table from the probe (31 race days), parser fixes for the 2025 print run (ad slug overprint, footer-anchored panel edge, 8pt numbers on 15-horse fields), golden 2025-07-18 committed, 31 saved / 0 queued, report docs/backfill/DMR-2025-summer.md |
 | Backfill run DMR-2025-fall (D46) | merged | PR #47, branch `backfill-dmr-2025-fall` — meet-dates table from the probe (14 race days), foreign_program detection (the Breeders' Cup official program on BC days; blocks -> queue -> confirmed sheet-only as ODDS_ONLY), golden 2025-10-31 committed (BC program by digest only), 12 saved + 2 resolved then dropped, report docs/backfill/DMR-2025-fall.md |
 | Distribution reporting (D20) | merged | PR #51, branch `distributions` — shared/distribution.js + GET /api/distribution + Distributions view; per bucket: % losing days, max drawdown, single-ticket dependence gross and net (flag = net > 80%); one card per day per bucket; `npm run check-distribution` |
+| Findings: lean-1.1 on the PROGRAM_ONLY corpus (D52) | in review | branch `findings-lean-1-1` (stacked on #57) — docs/findings/lean-1.1-program-only.md from runs #27-#50 (every template, both scratch modes, all meets and per meet, paired day counts); the "Findings" section above with the per-version rule; no code |
 | SimView compare follow-up (D51) | in review | PR #57, branch `sim-compare-view` (stacked on #56) — meet selector, vs lean column with paired day counts, drawdown deltas, the Simulated templates section on Distributions; read-side only, no schema change, ENGINE_VERSION lean-1.1; `npm run check-sim` +8 |
 | Simulator chart-scratch mode (D50) | in review | PR #56, branch `sim-chart-scratches` (stacked on #55) — run option `applyChartScratchesBeforeGeneration`: cards built at the window, grading unchanged, mode stored on the run and grouped in the compare (never pooled), Mode column in SimView, trace flag; no engine change, ENGINE_VERSION lean-1.1; `npm run check-sim` +7 |
 | Exotic-isolation templates (D49) | in review | PR #55, branch `exotic-isolation-templates` — two simulation-only templates, box-only (`midPriceCoverage: false`) and straight-only (`hedgeBoxDepth: 0`, the one engine edit: depth 0 declines the split box as `disabled_by_template`, lean's depth-2 path untouched); four distinct ticket sets with lean and no-exotics on the PROGRAM_ONLY fixture, D36 tolerance held, lean byte-identical, ENGINE_VERSION stays lean-1.1 |
@@ -319,6 +321,28 @@ Before a branch is reported ready, verify — out loud, in the final message:
 | SFTB fetcher (D08c) | merged | PR #9 — sitemap discovery + expected-order parsing; real fixture matches the program-PDF day. D08a CLOSED (dmtc picks page is a directory; covered by D05's Bottom Line extraction) and D08b CLOSED (ATR bot challenge; manual-paste only) — both by user decision 2026-09-01 |
 | Backtesting addendum encoding (D25) | merged | PR #8, branch `backtest-addendum` — `cards.consensus_completeness` (migration 003), invariant 12 (buckets never pool), Wayback fetcher planned as D08d, signal/structure layer split planned into D18/D19. Completeness boundary user-confirmed 2026-09-01: FULL = every race ≥2 external sources |
 | Program-PDF parser (D05) | merged | PR #5 — real Del Mar program (10 races, 98 entries, Bottom Line, index validation); found the printed-scratch/renumbered-index pattern in the wild |
+
+---
+
+## Findings
+
+Structure-layer findings live in `docs/findings/`, one file per
+**(engine version, bucket, corpus)** - `docs/findings/lean-1.1-program-only.md`
+is the first (D52: engine `lean-1.1`, bucket PROGRAM_ONLY, the 70-day DMR
+2025-2026 corpus, runs #27-#50). Rules:
+
+- A findings file is written from simulation run IDs, both scratch modes
+  (D50), all meets and per meet (D51), and every number in it cites its run.
+  It states what is NOT concluded and the exact question the next corpus
+  must answer.
+- A findings file is **never edited after the engine version it describes
+  is superseded**. A new engine version gets a new file; the old one stays
+  as the record of what the old engine did. Corrections to a live file are
+  fine while its version is current, with the date.
+- No engine change is proposed without a findings file for the version it
+  would replace (REQUIREMENTS, backtest hygiene). `lean-1.2`, if it comes,
+  bumps the version, regenerates append-only under D34 and is compared by
+  version against `lean-1.1` - never by overwriting.
 
 ---
 
