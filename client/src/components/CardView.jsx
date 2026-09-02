@@ -85,7 +85,7 @@ export default function CardView({ cardId, onBack }) {
         <span className={`chip chip--${card.consensus_completeness === 'FULL' ? 'unanimous' : card.consensus_completeness === 'PARTIAL' ? 'split' : 'chaos'}`}>
           {card.consensus_completeness}
         </span>
-        {' '}consensus · template {card.template ?? '—'} · bankroll {money(card.bankroll_cents)}
+        {' '}consensus · template {card.template ?? '—'} · engine <code>{card.engine_version ?? 'lean-0'}</code> · bankroll {money(card.bankroll_cents)}
         {' '}· per-race min {money(card.per_race_min_cents)} · generated {card.created_at}
       </p>
 

@@ -19,7 +19,7 @@ const tmp = fs.mkdtempSync(path.join(os.tmpdir(), 'betsheet-enginecheck-'));
 process.env.BETSHEET_LOG_DIR = path.join(tmp, 'unit-logs');
 
 const { classifyDay } = await import('../shared/classification.js');
-const { generateCard } = await import('../shared/card-engine.js');
+const { generateCard, ENGINE_VERSION } = await import('../shared/card-engine.js');
 const { parseWagerMenu, winPayout, placeEstimate } = await import('../shared/betmath.js');
 
 let failures = 0;
@@ -411,6 +411,59 @@ try {
   check('card detail carries its own recipe (per-race min from the card, not the day)',
     readSpread.card_number === 3 && readSpread.variant === 'spread' &&
     readSpread.per_race_min_cents === 700);
+
+  console.log('-- engine versioning (D34, invariant 14) --');
+  const chartGolden = JSON.parse(fs.readFileSync(path.join(ROOT, 'tests/fixtures/charts/dmr-2026-08-30.expected.json'), 'utf8'));
+  check('every card row and detail carries the engine version; the pure result and trace agree',
+    genCard.engineVersion === ENGINE_VERSION && read.engine_version === ENGINE_VERSION &&
+    cardsList2.every((c) => c.engine_version === ENGINE_VERSION) &&
+    card.engineVersion === ENGINE_VERSION && card.trace[0].engineVersion === ENGINE_VERSION &&
+    card.trace[card.trace.length - 1].engineVersion === ENGINE_VERSION, `${genCard.engineVersion} / ${read.engine_version}`);
+  const resSave = await jpost(`/api/race-days/${saved.id}/results`, {
+    track: chartGolden.track, date: chartGolden.date, sourceKind: 'paste', races: chartGolden.races,
+  });
+  const gradesV1 = await (await fetch(`${BASE}/api/cards/${genCard.id}/grades`)).json();
+  check('results save auto-grades under the engine version', resSave.status === 201 &&
+    gradesV1.summary && gradesV1.summary.engineVersion === ENGINE_VERSION && gradesV1.grades.length === genCard.tickets.length);
+  // Simulate an older engine: mark the first card as pre-versioning, then
+  // regenerate - the regen is a NEW card row and the old grade is untouched.
+  const { openDb } = await import('../server/db.js');
+  const dbDirect = openDb(path.join(tmp, 'check.sqlite'));
+  dbDirect.prepare("UPDATE cards SET engine_version = 'lean-0' WHERE id = ?").run(genCard.id);
+  dbDirect.prepare("UPDATE graded_tickets SET engine_version = 'lean-0' WHERE ticket_id IN (SELECT id FROM tickets WHERE card_id = ?)").run(genCard.id);
+  const beforeRows = dbDirect.prepare(`SELECT gt.id, gt.ticket_id, gt.outcome, gt.pl_cents, gt.engine_version FROM graded_tickets gt
+    JOIN tickets t ON t.id = gt.ticket_id WHERE t.card_id = ? ORDER BY gt.id`).all(genCard.id);
+  const regenV = await (await jpost(`/api/race-days/${saved.id}/cards`, { variant: 'default' })).json();
+  const afterRows = dbDirect.prepare(`SELECT gt.id, gt.ticket_id, gt.outcome, gt.pl_cents, gt.engine_version FROM graded_tickets gt
+    JOIN tickets t ON t.id = gt.ticket_id WHERE t.card_id = ? ORDER BY gt.id`).all(genCard.id);
+  check('regen under a newer engine version is a NEW card row; the older card and its graded_tickets are untouched',
+    regenV.id !== genCard.id && regenV.engineVersion === ENGINE_VERSION &&
+    JSON.stringify(afterRows) === JSON.stringify(beforeRows) && beforeRows.length === genCard.tickets.length &&
+    dbDirect.prepare('SELECT engine_version FROM cards WHERE id = ?').get(genCard.id).engine_version === 'lean-0');
+  // Regrade semantics: same version replaces (row count constant), newer
+  // version appends (both sets stay), readers see the latest set.
+  const { gradeAndPersist } = await import('../server/grading.js');
+  const countFor = (v) => dbDirect.prepare(`SELECT COUNT(*) AS n FROM graded_tickets gt JOIN tickets t ON t.id = gt.ticket_id
+    WHERE t.card_id = ? AND gt.engine_version = ?`).get(genCard.id, v).n;
+  gradeAndPersist(dbDirect, genCard.id, 'check-regrade', { engineVersion: 'lean-0' });
+  const sameAgain = countFor('lean-0');
+  gradeAndPersist(dbDirect, genCard.id, 'check-regrade', { engineVersion: 'lean-9.9-test' });
+  const latestView = dbDirect.prepare(`SELECT DISTINCT gt.engine_version AS v FROM graded_tickets_latest gt
+    JOIN tickets t ON t.id = gt.ticket_id WHERE t.card_id = ?`).all(genCard.id).map((r) => r.v);
+  check('regrade: same version replaces (count unchanged), newer version appends (old set kept), latest view = newest set',
+    sameAgain === genCard.tickets.length && countFor('lean-0') === genCard.tickets.length &&
+    countFor('lean-9.9-test') === genCard.tickets.length && latestView.join(',') === 'lean-9.9-test');
+  const plDefault = await (await fetch(`${BASE}/api/pl`)).json();
+  const plAll = await (await fetch(`${BASE}/api/pl?engineVersion=all`)).json();
+  const plOld = await (await fetch(`${BASE}/api/pl?engineVersion=lean-0`)).json();
+  check('P/L: default buckets hold ONE version (the latest graded card\'s), rows carry versions, "all" pools only on request',
+    plDefault.selectedVersion === ENGINE_VERSION && plDefault.engineVersions.includes('lean-0') &&
+    plDefault.buckets.every((b) => b.cards === plDefault.cards.filter((c) => c.completeness === b.completeness && c.engineVersion === ENGINE_VERSION).length) &&
+    plOld.selectedVersion === 'lean-0' && plOld.buckets.reduce((a, b) => a + b.cards, 0) === 1 &&
+    plAll.selectedVersion === 'all' && plAll.buckets.reduce((a, b) => a + b.cards, 0) === plAll.cards.length &&
+    plAll.cards.length > plDefault.buckets.reduce((a, b) => a + b.cards, 0),
+    JSON.stringify({ def: plDefault.selectedVersion, versions: plDefault.engineVersions }));
+  dbDirect.close();
 
   await new Promise((r) => setTimeout(r, 300));
   const traceFile = path.join(logDir, 'decision-trace.jsonl');

@@ -35,6 +35,14 @@ import {
   comboCost, boxCost, dollars,
 } from './betmath.js';
 
+// The engine version (D34, invariant 14). ONE place in code; bump it in
+// every PR that changes generation, allocation, ticket construction or
+// grading behavior. Every card and every grade records the version it was
+// produced under, so "the algorithm improved" and "I regraded under
+// different rules" are distinguishable and never overwrite each other.
+// 'lean-0' is reserved for cards that predate versioning.
+export const ENGINE_VERSION = 'lean-1.0';
+
 export const DEFAULT_RULES = {
   placeMoneyRule: true,
   hedgeCut: true,
@@ -66,7 +74,7 @@ const isGuessRace = (race) => {
  *   classification: classifyDay() result for the race }]
  * Returns { completeness, allocations, tickets, warnings, trace }.
  */
-export function generateCard({ bankrollCents, perRaceMinCents, races, sourcesUsed = [], sourcesUnavailable = [], rules: ruleOverrides = {}, template = null }) {
+export function generateCard({ bankrollCents, perRaceMinCents, races, sourcesUsed = [], sourcesUnavailable = [], rules: ruleOverrides = {}, template = null, engineVersion = ENGINE_VERSION }) {
   const rules = { ...DEFAULT_RULES, ...ruleOverrides };
   const trace = [];
   const warnings = [];
@@ -74,6 +82,7 @@ export function generateCard({ bankrollCents, perRaceMinCents, races, sourcesUse
   const emit = (event, data) => trace.push({ seq: seq++, event, ...data });
 
   emit('inputs_snapshot', {
+    engineVersion,
     bankrollCents,
     perRaceMinCents,
     raceCount: races.length,
@@ -244,6 +253,7 @@ export function generateCard({ bankrollCents, perRaceMinCents, races, sourcesUse
 
   const finished = tickets.map(finishTicket);
   emit('card_finalized', {
+    engineVersion,
     totalCents,
     bankrollCents,
     ticketCount: finished.length,
@@ -257,7 +267,7 @@ export function generateCard({ bankrollCents, perRaceMinCents, races, sourcesUse
     warnings,
   });
 
-  return { completeness, allocations, tickets: finished, warnings, trace };
+  return { engineVersion, completeness, allocations, tickets: finished, warnings, trace };
 }
 
 // ---------- per-race construction ----------

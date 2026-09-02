@@ -60,7 +60,7 @@ export default function CardsPanel({ dayId, onOpenCard }) {
         <table className="grid grid--click">
           <thead>
             <tr>
-              <th>#</th><th>Template</th><th>Variant</th><th>Bankroll</th><th>Per-race min</th>
+              <th>#</th><th>Template</th><th>Variant</th><th>Engine</th><th>Bankroll</th><th>Per-race min</th>
               <th>Consensus</th><th>Tickets</th><th>Day total</th><th>Generated</th>
             </tr>
           </thead>
@@ -70,6 +70,7 @@ export default function CardsPanel({ dayId, onOpenCard }) {
                 <td><strong>#{c.card_number}</strong></td>
                 <td>{c.template ?? '—'}</td>
                 <td>{c.variant}</td>
+                <td><code>{c.engine_version ?? 'lean-0'}</code></td>
                 <td>${(c.bankroll_cents / 100).toFixed(0)}</td>
                 <td>{c.per_race_min_cents != null ? `$${(c.per_race_min_cents / 100).toFixed(0)}` : '—'}</td>
                 <td>{c.consensus_completeness}</td>
