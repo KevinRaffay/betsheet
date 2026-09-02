@@ -1,5 +1,6 @@
 import React, { useState } from 'react';
 import { fetchMlSheet, mergeParses, parseEntriesText, parseMlPdf, parseProgramPdf, saveRaceDay } from '../api.js';
+import ParsePreview from './ParsePreview.jsx';
 
 // The ingest screen: paste entries text or upload a program PDF, review the
 // parse, then save. The preview is READ-ONLY - it shows exactly what Save
@@ -224,61 +225,10 @@ export default function NewRaceDay({ onSaved, onCancel }) {
             something, fix the pasted text and parse again.
           </p>
 
-          {parsed.warnings.length > 0 && (
-            <div className="notice notice--warn">
-              <strong>{parsed.warnings.length} parse warning{parsed.warnings.length === 1 ? '' : 's'} — review before saving:</strong>
-              <ul>
-                {parsed.warnings.map((w, i) => <li key={i}>{w.message}</li>)}
-              </ul>
-            </div>
-          )}
-
-          {parsed.races.map((race) => <RacePreview key={race.number} race={race} />)}
+          <ParsePreview parsed={parsed} />
         </>
       )}
     </section>
-  );
-}
-
-function RacePreview({ race }) {
-  return (
-    <details className="race" open>
-      <summary>
-        <strong>Race {race.number}</strong>
-        {' '}· {race.surface ?? '?'} · {race.distance ?? '?'} · {race.raceType ?? '?'}
-        {' '}· post {race.postTime ?? '?'} · {race.entries.length} entries
-      </summary>
-      {race.conditions && <p className="conditions">{race.conditions}</p>}
-      <table className="grid">
-        <thead>
-          <tr>
-            <th>#</th><th>PP</th><th>Horse</th><th>Jockey</th><th>Trainer</th>
-            <th>Wt</th><th>M/L</th><th>Rank</th>
-          </tr>
-        </thead>
-        <tbody>
-          {race.entries.map((e, ei) => (
-            <tr key={ei} className={e.scratched ? 'row--scratched' : ''}>
-              <td>{e.programNumber ?? 'SCR'}</td>
-              <td className="dim">{e.postPosition ?? ''}</td>
-              <td>
-                {e.horseName}
-                {e.bestBet ? <span className="tag tag--gold">BEST BET</span> : null}
-                {e.alsoEligible ? <span className="tag">AE</span> : null}
-                {e.notToBeClaimed ? <span className="tag">NTC</span> : null}
-                {e.scratched ? <span className="tag tag--red">SCR</span> : null}
-              </td>
-              <td>{e.jockey ?? ''}</td>
-              <td>{e.trainer ?? ''}</td>
-              <td>{e.weight ?? ''}</td>
-              <td>{e.morningLine ?? ''}</td>
-              <td className="dim">{e.programRank ?? ''}</td>
-            </tr>
-          ))}
-        </tbody>
-      </table>
-      {race.wagerMenu && <p className="dim wager">{race.wagerMenu}</p>}
-    </details>
   );
 }
 

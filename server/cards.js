@@ -78,50 +78,18 @@ export function assembleEngineInput(db, day) {
   };
 }
 
-cardsRouter.post('/race-days/:id/cards', (req, res) => {
-  const correlationId = req.get('x-correlation-id') || newCorrelationId();
-  const db = getDb();
-  const day = loadDayFull(db, Number(req.params.id));
-  if (!day) return res.status(404).json({ error: 'No such race day.' });
-  if (day.deleted_at) {
-    return res.status(410).json({ error: 'This race day is deleted. Restore it before generating cards.' });
-  }
-
-  const variant = String(req.body?.variant ?? 'default').trim() || 'default';
-
-  // Strategy template (D18): a named rule bundle; explicit `rules` override
-  // on top of it. The persisting endpoint enforces invariant 1 - a LIVE
-  // card can never disable the place-money rule, so simulation-only
-  // templates (and raw overrides to the same effect) are refused here;
-  // the simulator runs the engine directly.
-  const templateName = String(req.body?.template ?? 'lean');
-  const templateRules = resolveTemplate(templateName);
-  if (!templateRules) {
-    return res.status(400).json({
-      error: `Unknown template "${templateName}". Templates: ${Object.keys(TEMPLATES).join(', ')}.`,
-    });
-  }
-  if (TEMPLATES[templateName].simulationOnly) {
-    return res.status(422).json({
-      error: `Template "${templateName}" is simulation-only; a live card cannot use it (invariant 1).`,
-    });
-  }
-  const rules = { ...templateRules, ...(req.body?.rules ?? {}) };
-  if (rules.placeMoneyRule === false) {
-    return res.status(422).json({
-      error: 'Invariant 1: a live card cannot disable the place-money rule. The simulator runs the engine directly for that measurement.',
-    });
-  }
-
-  const bankrollCents = Number(req.body?.bankrollCents ?? day.bankroll_cents);
-  const perRaceMinCents = Number(req.body?.perRaceMinCents ?? day.per_race_min_cents);
-  if (!Number.isInteger(bankrollCents) || bankrollCents <= 0) {
-    return res.status(400).json({ error: 'bankrollCents (or a bankroll on the race day) is required.' });
-  }
-  if (!Number.isInteger(perRaceMinCents) || perRaceMinCents <= 0) {
-    return res.status(400).json({ error: 'perRaceMinCents (or a per-race minimum on the race day) is required.' });
-  }
-
+/**
+ * Generate one card for a stored day and persist it - the ONE writer of
+ * cards / allocations / tickets, shared by the route and the batch
+ * backfill (D43) so a backfilled card is row-for-row what a click makes.
+ * Append-only (a new card_number every time), traced under
+ * `correlationId`, and graded at once when the day already has results.
+ */
+export function persistCard(db, day, {
+  correlationId, variant = 'default', templateName = 'lean', rules = null,
+  bankrollCents = day.bankroll_cents, perRaceMinCents = day.per_race_min_cents,
+} = {}) {
+  rules ??= resolveTemplate(templateName);
   // Signal layer: classify fresh from stored picks so the card always
   // reflects the picks on file at generation time.
   const result = generateCard({
@@ -191,7 +159,58 @@ cardsRouter.post('/race-days/:id/cards', (req, res) => {
 
   // A card generated after the chart already landed grades immediately -
   // the backtesting loop needs no extra click.
+
   const graded = gradeAndPersist(db, cardId, correlationId);
+  return { cardId, result, graded };
+}
+
+cardsRouter.post('/race-days/:id/cards', (req, res) => {
+  const correlationId = req.get('x-correlation-id') || newCorrelationId();
+  const db = getDb();
+  const day = loadDayFull(db, Number(req.params.id));
+  if (!day) return res.status(404).json({ error: 'No such race day.' });
+  if (day.deleted_at) {
+    return res.status(410).json({ error: 'This race day is deleted. Restore it before generating cards.' });
+  }
+
+  const variant = String(req.body?.variant ?? 'default').trim() || 'default';
+
+  // Strategy template (D18): a named rule bundle; explicit `rules` override
+  // on top of it. The persisting endpoint enforces invariant 1 - a LIVE
+  // card can never disable the place-money rule, so simulation-only
+  // templates (and raw overrides to the same effect) are refused here;
+  // the simulator runs the engine directly.
+  const templateName = String(req.body?.template ?? 'lean');
+  const templateRules = resolveTemplate(templateName);
+  if (!templateRules) {
+    return res.status(400).json({
+      error: `Unknown template "${templateName}". Templates: ${Object.keys(TEMPLATES).join(', ')}.`,
+    });
+  }
+  if (TEMPLATES[templateName].simulationOnly) {
+    return res.status(422).json({
+      error: `Template "${templateName}" is simulation-only; a live card cannot use it (invariant 1).`,
+    });
+  }
+  const rules = { ...templateRules, ...(req.body?.rules ?? {}) };
+  if (rules.placeMoneyRule === false) {
+    return res.status(422).json({
+      error: 'Invariant 1: a live card cannot disable the place-money rule. The simulator runs the engine directly for that measurement.',
+    });
+  }
+
+  const bankrollCents = Number(req.body?.bankrollCents ?? day.bankroll_cents);
+  const perRaceMinCents = Number(req.body?.perRaceMinCents ?? day.per_race_min_cents);
+  if (!Number.isInteger(bankrollCents) || bankrollCents <= 0) {
+    return res.status(400).json({ error: 'bankrollCents (or a bankroll on the race day) is required.' });
+  }
+  if (!Number.isInteger(perRaceMinCents) || perRaceMinCents <= 0) {
+    return res.status(400).json({ error: 'perRaceMinCents (or a per-race minimum on the race day) is required.' });
+  }
+
+  const { cardId, result, graded } = persistCard(db, day, {
+    correlationId, variant, templateName, rules, bankrollCents, perRaceMinCents,
+  });
 
   res.status(201).json({
     id: cardId, correlationId, ...result,

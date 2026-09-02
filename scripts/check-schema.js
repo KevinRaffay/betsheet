@@ -34,7 +34,7 @@ const tables = db.prepare(
 ).all().map((r) => r.name).sort();
 
 const expected = [
-  'actual_stakes', 'allocations', 'cards', 'consensus_picks', 'entries',
+  'actual_stakes', 'allocations', 'backfill_queue', 'cards', 'consensus_picks', 'entries',
   'exotic_payoffs', 'fetch_attempts', 'graded_tickets', 'publishes',
   'race_days', 'race_results', 'races', 'result_charts', 'result_scratches',
   'schema_migrations', 'simulation_results', 'simulation_runs', 'sources',

@@ -97,8 +97,13 @@ export const getResults = (dayId) =>
   fetch(`/api/race-days/${dayId}/results`).then(asJson);
 
 export const getTemplates = () => fetch('/api/templates').then(asJson);
-export const getPL = (engineVersion) =>
-  fetch(`/api/pl${engineVersion ? `?engineVersion=${encodeURIComponent(engineVersion)}` : ''}`).then(asJson);
+export const getPL = (engineVersion, meet) => {
+  const q = new URLSearchParams();
+  if (engineVersion) q.set('engineVersion', engineVersion);
+  if (meet && meet !== 'all') q.set('meet', meet);
+  const qs = q.toString();
+  return fetch(`/api/pl${qs ? `?${qs}` : ''}`).then(asJson);
+};
 export const getDayPL = (dayId) => fetch(`/api/race-days/${dayId}/pl`).then(asJson);
 
 export const gradeCardApi = (cardId) =>
@@ -193,3 +198,11 @@ export const resultsFromArchive = (dayId, correlationId) =>
     method: 'POST',
     headers: { ...(correlationId ? { 'x-correlation-id': correlationId } : {}) },
   }).then(asJson);
+
+// Backfill queue (D43): the review queue for batch-ingested days.
+export const getBackfillQueue = () => fetch('/api/backfill/queue').then(asJson);
+export const getBackfillItem = (id) => fetch(`/api/backfill/queue/${id}`).then(asJson);
+export const confirmBackfillItem = (id, note) =>
+  fetch(`/api/backfill/queue/${id}/confirm`, { method: 'POST', headers: { 'content-type': 'application/json' }, body: JSON.stringify({ note }) }).then(asJson);
+export const rejectBackfillItem = (id, note) =>
+  fetch(`/api/backfill/queue/${id}/reject`, { method: 'POST', headers: { 'content-type': 'application/json' }, body: JSON.stringify({ note }) }).then(asJson);

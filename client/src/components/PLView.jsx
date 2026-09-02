@@ -24,10 +24,11 @@ export default function PLView({ onBack, onOpenCard, onOpenDay }) {
   const [expandedDay, setExpandedDay] = useState(null); // raceDayId
   const [dayPL, setDayPL] = useState(null);
   const [version, setVersion] = useState(''); // '' = server default (latest)
+  const [meet, setMeet] = useState('all'); // D43: one meet, or all meets
 
   useEffect(() => {
-    getPL(version).then(setData).catch((e) => setError(String(e.message)));
-  }, [version]);
+    getPL(version, meet).then(setData).catch((e) => setError(String(e.message)));
+  }, [version, meet]);
 
   const toggleDay = async (raceDayId) => {
     if (expandedDay === raceDayId) { setExpandedDay(null); setDayPL(null); return; }
@@ -60,6 +61,14 @@ export default function PLView({ onBack, onOpenCard, onOpenDay }) {
       <div className="pagehead">
         <h2>P/L</h2>
         <div className="btnrow">
+          {data.meets && data.meets.length > 0 && (
+            <label className="dim">Meet{' '}
+              <select className="in in--sm" value={data.selectedMeet ?? 'all'} onChange={(e) => setMeet(e.target.value)}>
+                <option value="all">all meets</option>
+                {data.meets.map((m) => <option key={m} value={m}>{m}</option>)}
+              </select>
+            </label>
+          )}
           {data.engineVersions.length > 0 && (
             <label className="dim">Engine{' '}
               <select className="in in--sm" value={data.selectedVersion ?? ''} onChange={(e) => setVersion(e.target.value)}>

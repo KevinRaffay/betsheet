@@ -121,3 +121,6 @@ map in the same PR.
 | Per-meet fixtures and golden checkpoints: the runner halts at each meet's first race day until its golden is audited | D43 (the D32 pattern) |
 | `meet` on race_days (DMR-<year>-summer / -fall), with P/L and distribution grouping by meet | D43 (schema + runner), D16 / D20 (grouping) |
 | Every backfilled card carries the engine version it was generated under; D34 precedes any backfill run | D34, D43 |
+| The corpus itself is a deliverable: one row per meet, with preconditions, acceptance, a committed report (docs/backfill/<meet>.md), and the golden + queue decisions recorded | D44, D45, D46 |
+| No later meet starts until the earlier meet's report is reviewed (D44 -> D45 -> D46) | D44, D45, D46 |
+| Index source, in order: the track calendar when it carries race counts; else a committed meet-dates table built once by a bounded, audited probe of the publicly published meet window. Blind enumeration outside a published window is prohibited. Without a calendar count, sheet + program + results must agree on the race count (blocking) | D47 (D41 + D43 rule) |

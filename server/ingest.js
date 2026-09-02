@@ -14,7 +14,7 @@ import { parseProgramPdf } from './program-parser.js';
 import { parseMlSheetPdf } from './ml-sheet-parser.js';
 import { mergeMlAndProgram } from '../shared/entries-merge.js';
 import { parseDmtcResults } from '../shared/dmtc-results-parser.js';
-import { DEFAULT_RAW_DIR, dayDir, readManifest } from './dmtc-crawler.js';
+import { DEFAULT_RAW_DIR, dayDir, meetForDay, readManifest } from './dmtc-crawler.js';
 import fs from 'node:fs';
 import path from 'node:path';
 import { listFetchers, loadExtraFetchers } from './fetchers/index.js';
@@ -128,12 +128,16 @@ ingestRouter.post(
 
 const toInt = (v) => (v === null || v === undefined || v === '' ? null : Math.round(Number(v)));
 
-function insertRaceDay(db, payload, correlationId) {
+// Shared by the save route and the batch backfill (D43): one writer, so a
+// backfilled day and a clicked one are the same rows. `meet` is derived
+// from the track + date (DMR-<year>-summer / -fall), never typed.
+export function insertRaceDay(db, payload, correlationId) {
   const entriesSource = ['program', 'ml_sheet', 'both'].includes(payload.entriesSource) ? payload.entriesSource : 'program';
   const dayInfo = db.prepare(`INSERT INTO race_days
-      (track, date, bankroll_cents, per_race_min_cents, correlation_id, entries_source)
-      VALUES (?, ?, ?, ?, ?, ?)`)
-    .run(payload.track, payload.date, toInt(payload.bankrollCents), toInt(payload.perRaceMinCents), correlationId, entriesSource);
+      (track, date, bankroll_cents, per_race_min_cents, correlation_id, entries_source, meet)
+      VALUES (?, ?, ?, ?, ?, ?, ?)`)
+    .run(payload.track, payload.date, toInt(payload.bankrollCents), toInt(payload.perRaceMinCents), correlationId, entriesSource,
+      meetForDay(payload.track, payload.date));
   const dayId = dayInfo.lastInsertRowid;
 
   const insertRace = db.prepare(`INSERT INTO races

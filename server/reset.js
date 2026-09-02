@@ -22,7 +22,7 @@ const WIPE_ORDER = [
   'cards', 'simulation_results', 'simulation_runs', 'strategy_templates',
   'consensus_picks', 'fetch_attempts', 'sources',
   'result_scratches', 'exotic_payoffs', 'race_results', 'result_charts',
-  'entries', 'races', 'race_days',
+  'entries', 'races', 'race_days', 'backfill_queue',
 ];
 
 export function resetApp(db) {
