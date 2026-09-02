@@ -213,6 +213,37 @@ export const confirmBackfillItem = (id, note) =>
 export const rejectBackfillItem = (id, note) =>
   fetch(`/api/backfill/queue/${id}/reject`, { method: 'POST', headers: { 'content-type': 'application/json' }, body: JSON.stringify({ note }) }).then(asJson);
 
+// Human cards (D54): paste parser preview/lock/pass for one race.
+export const previewHumanCard = (dayId, race, text, cardId, correlationId) =>
+  fetch(`/api/race-days/${dayId}/human-cards/preview`, {
+    method: 'POST',
+    headers: { 'content-type': 'application/json', ...(correlationId ? { 'x-correlation-id': correlationId } : {}) },
+    body: JSON.stringify({ race, text, cardId }),
+  }).then(asJson);
+export const lockHumanCard = (dayId, { race, text, pass, bankrollCents, cardId }, correlationId) =>
+  fetch(`/api/race-days/${dayId}/human-cards`, {
+    method: 'POST',
+    headers: { 'content-type': 'application/json', ...(correlationId ? { 'x-correlation-id': correlationId } : {}) },
+    body: JSON.stringify({ race, text, pass, bankrollCents, cardId }),
+  }).then(asJson);
+
+// Replay (D55): the blind race-by-race view, reveal, close, standing.
+export const getReplayDays = (pool = 'recent') => fetch(`/api/replay/days?pool=${pool}`).then(asJson);
+export const getRandomReplayDay = (pool = 'recent') => fetch(`/api/replay/random?pool=${pool}`).then(asJson);
+export const getReplayRace = (dayId, race, cardId) =>
+  fetch(`/api/replay/days/${dayId}/races/${race}${cardId ? `?cardId=${cardId}` : ''}`).then(asJson);
+export const revealClassification = (cardId) =>
+  fetch(`/api/replay/cards/${cardId}/reveal-classification`, { method: 'POST' }).then(asJson);
+export const revealReplayRace = (cardId, race) =>
+  fetch(`/api/replay/cards/${cardId}/races/${race}/reveal`, { method: 'POST' }).then(asJson);
+export const closeReplayCard = (cardId) =>
+  fetch(`/api/replay/cards/${cardId}/close`, { method: 'POST' }).then(asJson);
+export const getReplaySummary = (cardId) => fetch(`/api/replay/cards/${cardId}/summary`).then(asJson);
+export const getReplayStanding = (meet) => {
+  const q = meet && meet !== 'all' ? `?meet=${encodeURIComponent(meet)}` : '';
+  return fetch(`/api/replay/standing${q}`).then(asJson);
+};
+
 // Distributions (D20): losing days, drawdown, single-ticket dependence, per bucket.
 export const getDistribution = (engineVersion, meet) => {
   const q = new URLSearchParams();

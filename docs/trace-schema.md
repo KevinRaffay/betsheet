@@ -64,6 +64,13 @@ A human's pasted tickets, not the engine, produced these - no `inputs_snapshot`/
 | `ticket_added` | `cardId`, `raceDayId`, `race`, `betType`, `selections` (legs), `stakeCents`, `costCents`, `rationaleText` | one human ticket landed on the card, carrying the pasted rationale verbatim |
 | `human_race_locked` | `cardId`, `raceDayId`, `race`, `pass` | one race's picks were locked (or explicitly passed) on a human card - the timestamp this event's `ts` field carries is the same one written to `human_race_state.picks_locked_at`, the fact a later blindness computation (D55) is derived from |
 
+### Replay (D55, emitted by `server/replay.js`, under the card's correlationId)
+
+| event | fields | meaning |
+| --- | --- | --- |
+| `human_race_revealed` | `cardId`, `raceDayId`, `race` | one race's results were revealed on a human card - the `ts` this event carries is the same one written to `human_race_state.results_revealed_at`, the other half of the blindness computation |
+| `human_card_closed` | `cardId`, `raceDayId` | `POST /api/replay/cards/:id/close` ran: every still-unlocked race became an explicit PASS, every locked-unrevealed race was revealed, all under ONE timestamp so a genuinely pre-committed day still computes PRE_COMMIT afterward. Makes the card eligible for the standing table (`shared/replay.js`'s `isCardClosed`) |
+
 ### Simulation (emitted by `server/simulate.js`, one correlationId per POST /api/simulations)
 
 | event | fields | meaning |

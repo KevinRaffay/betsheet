@@ -50,6 +50,9 @@ check('WAL mode', db.pragma('journal_mode', { simple: true }) === 'wal');
 check('race_days has a track_code column (D35, migration 014)',
   db.prepare("SELECT COUNT(*) c FROM pragma_table_info('race_days') WHERE name = 'track_code'").get().c === 1);
 
+check('cards has a saw_classification column, default 0 (D55, migration 017)',
+  db.prepare("SELECT COUNT(*) c FROM pragma_table_info('cards') WHERE name = 'saw_classification' AND \"dflt_value\" = '0'").get().c === 1);
+
 // --- track canonicalization backfill (D35): the migration's own SQL,
 // exercised directly against rows shaped like the ones it was written to
 // fix - saved before D35 existed, each spelled a different way. ---
