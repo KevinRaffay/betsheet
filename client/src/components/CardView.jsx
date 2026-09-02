@@ -1,6 +1,6 @@
 import React, { useEffect, useState } from 'react';
 import { FAILURE_MODE_WARNINGS } from '@shared/card-engine.js';
-import { getCard, getGrades, gradeCardApi } from '../api.js';
+import { deleteCard, getCard, getGrades, gradeCardApi } from '../api.js';
 
 const RESPONSIBLE_LINE =
   'Entertainment wagering with a pre-committed budget. No mid-card increases.';
@@ -24,7 +24,7 @@ const splitThesis = (text) => {
 
 // The betting card - the sheet itself. One table per race:
 // Bet Type | Selections / Rationale | Say to the teller | If it hits | Cost.
-export default function CardView({ cardId, onBack }) {
+export default function CardView({ cardId, onBack, onDeleted }) {
   const [card, setCard] = useState(null);
   const [gradeData, setGradeData] = useState(null);
   const [error, setError] = useState(null);
@@ -44,6 +44,19 @@ export default function CardView({ cardId, onBack }) {
     } catch (e) {
       setError(String(e.message));
     } finally {
+      setBusy(false);
+    }
+  };
+
+  const handleDelete = async () => {
+    if (!window.confirm('Permanently delete this card and all of its tickets, grades, and related records?')) return;
+    setBusy(true);
+    setError(null);
+    try {
+      await deleteCard(cardId);
+      onDeleted();
+    } catch (e) {
+      setError(String(e.message));
       setBusy(false);
     }
   };
@@ -76,6 +89,9 @@ export default function CardView({ cardId, onBack }) {
           <a className="btn" href={`/api/cards/${cardId}/export`}>Export JSON</a>
           <button className="btn" onClick={handleGrade} disabled={busy}>
             {graded ? 'Regrade vs results' : 'Grade vs results'}
+          </button>
+          <button className="btn btn--danger" onClick={handleDelete} disabled={busy}>
+            Delete card
           </button>
           <button className="btn" onClick={onBack}>Back</button>
         </div>

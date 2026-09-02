@@ -140,6 +140,11 @@ export const generateCardApi = (dayId, body = {}) =>
 
 export const listCards = (dayId) => fetch(`/api/race-days/${dayId}/cards`).then(asJson);
 export const getCard = (id) => fetch(`/api/cards/${id}`).then(asJson);
+export const deleteCard = (id) => fetch(`/api/cards/${id}`, {
+  method: 'DELETE',
+  headers: { 'content-type': 'application/json' },
+  body: JSON.stringify({ confirm: 'DELETE' }),
+}).then(asJson);
 
 export const manualPicksSave = (id, sourceName, races) =>
   fetch(`/api/race-days/${id}/consensus/manual`, {

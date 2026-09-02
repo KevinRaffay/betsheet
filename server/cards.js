@@ -235,6 +235,24 @@ cardsRouter.get('/race-days/:id/cards', (req, res) => {
   res.json(cards);
 });
 
+cardsRouter.delete('/cards/:id', (req, res) => {
+  if (req.body?.confirm !== 'DELETE') {
+    return res.status(400).json({ error: 'Card deletion requires confirm: "DELETE".' });
+  }
+  const db = getDb();
+  const cardId = Number(req.params.id);
+  const card = db.prepare('SELECT id, race_day_id, correlation_id FROM cards WHERE id = ?').get(cardId);
+  if (!card) return res.status(404).json({ error: 'No such card.' });
+
+  db.prepare('DELETE FROM cards WHERE id = ?').run(cardId);
+  appLog.info('card_deleted', {
+    cardId,
+    raceDayId: card.race_day_id,
+    correlationId: card.correlation_id,
+  });
+  res.json({ ok: true, id: cardId, raceDayId: card.race_day_id });
+});
+
 cardsRouter.get('/cards/:id', (req, res) => {
   const db = getDb();
   const card = db.prepare(`
