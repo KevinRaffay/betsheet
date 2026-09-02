@@ -5,6 +5,7 @@ import NewRaceDay from './components/NewRaceDay.jsx';
 import RaceDayView from './components/RaceDayView.jsx';
 import CardView from './components/CardView.jsx';
 import PLView from './components/PLView.jsx';
+import SimView from './components/SimView.jsx';
 
 export default function App() {
   const [theme, setThemeState] = useState(getActiveTheme());
@@ -46,6 +47,7 @@ export default function App() {
             onNew={() => setView({ name: 'new' })}
             onOpen={(id) => setView({ name: 'day', id })}
             onPL={() => setView({ name: 'pl' })}
+            onSim={() => setView({ name: 'sim' })}
           />
         )}
         {view.name === 'pl' && (
@@ -53,6 +55,12 @@ export default function App() {
             onBack={() => setView({ name: 'list' })}
             onOpenDay={(id) => setView({ name: 'day', id })}
             onOpenCard={(cardId, dayId) => setView({ name: 'card', id: cardId, dayId })}
+          />
+        )}
+        {view.name === 'sim' && (
+          <SimView
+            onBack={() => setView({ name: 'list' })}
+            onOpenDay={(id) => setView({ name: 'day', id })}
           />
         )}
         {view.name === 'new' && (

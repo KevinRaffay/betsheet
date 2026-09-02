@@ -18,7 +18,7 @@ const appLog = getLogger('app');
 
 export const cardsRouter = express.Router();
 
-function loadDayFull(db, id) {
+export function loadDayFull(db, id) {
   const day = db.prepare('SELECT * FROM race_days WHERE id = ?').get(id);
   if (!day) return null;
   const races = db.prepare('SELECT * FROM races WHERE race_day_id = ? ORDER BY number').all(day.id);
@@ -57,6 +57,25 @@ function sourceOutcomes(db, dayId) {
     (['ok', 'manual_paste', 'manual_upload'].includes(outcome) ? used : unavailable).push(name);
   }
   return { used, unavailable };
+}
+
+/**
+ * Everything the engine needs from a stored day besides the rule set: the
+ * races with a FRESH classification from the picks on file, and the
+ * sources-used / unavailable labels. Shared by live generation and the
+ * simulator so a simulated day is the exact computation a live card gets.
+ */
+export function assembleEngineInput(db, day) {
+  const entriesByRace = Object.fromEntries(day.races.map((r) => [r.number, r.entries]));
+  const classifications = classifyDay(
+    day.races.map((r) => r.number), entriesByRace, picksByRaceNumber(db, day.id));
+  const byNumber = Object.fromEntries(classifications.map((c) => [c.number, c]));
+  const { used, unavailable } = sourceOutcomes(db, day.id);
+  return {
+    races: day.races.map((r) => ({ ...r, classification: byNumber[r.number] })),
+    sourcesUsed: used,
+    sourcesUnavailable: unavailable,
+  };
 }
 
 cardsRouter.post('/race-days/:id/cards', (req, res) => {
@@ -105,18 +124,10 @@ cardsRouter.post('/race-days/:id/cards', (req, res) => {
 
   // Signal layer: classify fresh from stored picks so the card always
   // reflects the picks on file at generation time.
-  const entriesByRace = Object.fromEntries(day.races.map((r) => [r.number, r.entries]));
-  const classifications = classifyDay(
-    day.races.map((r) => r.number), entriesByRace, picksByRaceNumber(db, day.id));
-  const byNumber = Object.fromEntries(classifications.map((c) => [c.number, c]));
-
-  const { used, unavailable } = sourceOutcomes(db, day.id);
   const result = generateCard({
     bankrollCents,
     perRaceMinCents,
-    races: day.races.map((r) => ({ ...r, classification: byNumber[r.number] })),
-    sourcesUsed: used,
-    sourcesUnavailable: unavailable,
+    ...assembleEngineInput(db, day),
     rules,
     template: templateName,
   });

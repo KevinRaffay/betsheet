@@ -13,7 +13,7 @@ const traceLog = getLogger('decision-trace');
 
 export const gradingRouter = express.Router();
 
-function loadDayResultsFor(db, raceDayId) {
+export function loadDayResultsFor(db, raceDayId) {
   const rows = db.prepare('SELECT * FROM race_results WHERE race_day_id = ?').all(raceDayId);
   if (rows.length === 0) return null;
   const exotics = db.prepare('SELECT * FROM exotic_payoffs WHERE race_day_id = ?').all(raceDayId);
