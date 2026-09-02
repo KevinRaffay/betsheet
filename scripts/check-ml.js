@@ -34,6 +34,7 @@ function firstDiff(a, b, at = '$') {
 const { parseMlSheetPdf, distanceWords, parseSummary } = await import('../server/ml-sheet-parser.js');
 const { mergeMlAndProgram } = await import('../shared/entries-merge.js');
 const { mlSheetUrl } = await import('../server/fetchers/dmtc-ml.js');
+const { ENGINE_VERSION } = await import('../shared/card-engine.js');
 
 console.log('-- the real sheet: dmr-2026-08-16 --');
 const PDF = path.join(ROOT, 'tests', 'fixtures', 'ml-sheets', 'dmr-2026-08-16.pdf');
@@ -162,8 +163,8 @@ try {
   const attempts = await jget(`/api/race-days/${saved.id}/consensus`);
   check('fetch after the day exists: audited in fetch_attempts as well', refetch.status === 200 && JSON.stringify(attempts).includes('Stub ML sheet'));
   const card = await (await jpost(`/api/race-days/${saved.id}/cards`, { variant: 'default' })).json();
-  check('a card on an ML-only day lands in the ODDS_ONLY tier under engine lean-1.0.1, morning-line fallback traced',
-    card.completeness === 'ODDS_ONLY' && card.engineVersion === 'lean-1.0.1' && card.tickets.length > 0 &&
+  check('a card on an ML-only day lands in the ODDS_ONLY tier under the current engine version, morning-line fallback traced',
+    card.completeness === 'ODDS_ONLY' && card.engineVersion === ENGINE_VERSION && card.tickets.length > 0 &&
     card.trace.some((e) => e.event === 'rule_fired' && e.rule === 'ml_order_fallback'), JSON.stringify({ c: card.completeness, v: card.engineVersion, n: card.tickets?.length, err: card.error }));
   const pl = await jget('/api/pl');
   check('P/L: an ODDS_ONLY card waits ungraded in its own tier, never pooled', pl.ungraded.some((c) => c.cardId === card.id && c.completeness === 'ODDS_ONLY'));

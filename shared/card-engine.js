@@ -41,7 +41,7 @@ import {
 // produced under, so "the algorithm improved" and "I regraded under
 // different rules" are distinguishable and never overwrite each other.
 // 'lean-0' is reserved for cards that predate versioning.
-export const ENGINE_VERSION = 'lean-1.0.1';
+export const ENGINE_VERSION = 'lean-1.1';
 
 export const DEFAULT_RULES = {
   placeMoneyRule: true,
@@ -176,6 +176,7 @@ export function generateCard({ bankrollCents, perRaceMinCents, races, sourcesUse
   for (const alloc of allocations.sort((a, b) => a.race - b.race)) {
     const race = races.find((r) => r.number === alloc.race);
     buildRaceTickets({ race, alloc, rules, addTicket, emit, warnings });
+    carveOutPlaceMoney({ race, alloc, tickets, rules, emit });
   }
 
   // ----- parlay + doubles from the reserve -----
@@ -475,26 +476,64 @@ const dedupeEntries = (list) => {
   return list.filter((e) => e && !seen.has(e.program_number) && seen.add(e.program_number));
 };
 
+// ---------- place-money carve-out (D36, allocation integrity) ----------
+//
+// The mandatory place ticket (invariant 1) used to be ADDED on top of an
+// 8-1+ win bet, pushing the race past its allocation and making the
+// balancer shave every other race (2026-08-20 R5: $32 allocated, $44
+// spent). The pair is now carved OUT of the allocation: with E = the race's
+// exotic cost, the win tickets share (A - E) as before, except a win that
+// will carry place money counts twice - so a lone 8-1+ win gets
+// floor((A - E) / 2) and its place the same. The sweep then matches it.
+function carveOutPlaceMoney({ race, alloc, tickets, rules, emit }) {
+  if (!rules.placeMoneyRule) return;
+  const mine = tickets.filter((t) => t.raceNumbers.length === 1 && t.raceNumbers[0] === race.number);
+  const wins = mine.filter((t) => t.betType === 'win');
+  const paired = wins.filter((t) => t.mlForPlaceRule != null && t.mlForPlaceRule >= BET.placeMoneyThresholdMl);
+  if (!paired.length) return;
+  const exoticCost = mine.filter((t) => t.betType !== 'win' && t.betType !== 'place').reduce((a, t) => a + t.costCents, 0);
+  const budget = alloc.amountCents - exoticCost;
+  const weight = wins.reduce((a, t) => a + t.stakeCents * (paired.includes(t) ? 2 : 1), 0);
+  if (budget <= 0 || weight <= 0) return;
+  const k = budget / weight;
+  const menuWin = 200;
+  for (const t of wins) {
+    const before = t.stakeCents;
+    const next = Math.max(menuWin, Math.floor((before * k) / 100) * 100);
+    if (next === before) continue;
+    t.stakeCents = next;
+    t.costCents = next;
+    if (t.mlForPlaceRule != null) { const p = winPayout(next, t.mlForPlaceRule); t.est = [p, p]; }
+    emit('rule_fired', {
+      rule: 'place_money_carve_out', race: race.number, horse: t.legs[0][0],
+      fromCents: before, toCents: next, allocatedCents: alloc.amountCents, exoticCents: exoticCost,
+      reason: paired.includes(t)
+        ? `8-1+ win carries matching place money; the pair is sized inside the allocation (win = place = ${next / 100})`
+        : 'win money rescaled so the race lands on its allocation with the place pair carved out',
+    });
+  }
+}
+
 // ---------- balancing ----------
 //
-// Ticket minimums and stake rounding leave each race spending a little
-// more or less than its allocation; the difference is absorbed in win
-// stakes (they have no combinatorics). The remainder is spread ROUND-ROBIN:
-// each pass hands ONE $1 step to every race's primary win ticket (a win
-// bound by the place-money pairing moves with its place, $2 a step),
-// larger allocations first, so no race is ever more than one step ahead of
-// another. Guesswork races stay at their minimum unless nothing else can
-// take the money. Found live (every card since D10): the old rule parked
-// the whole remainder on the single biggest win ticket - card 16 R1 was
-// allocated $37, spent $65, $51 of it on one horse.
-
+// Ticket minimums and stake rounding leave each race a little off its
+// allocation; the difference is absorbed in win stakes (they have no
+// combinatorics). Two phases, both ONE $1 step per race per pass, a
+// place-money pair moving together at $2 a step:
+//   1. DEFICITS first - a race below its allocation is topped up toward
+//      it (largest deficit first), a race above it is trimmed toward it;
+//   2. the rest ROUND-ROBIN, larger allocations first, so no race is ever
+//      more than one step ahead of another (D30).
+// Guesswork races stay at their minimum unless nothing else can take the
+// money. Races that cannot take a step are listed as skipped with the
+// reason, so the trace says why money did not land there.
 function balance({ tickets, allocations, bankrollCents, emit }) {
   const total = () => tickets.reduce((a, t) => a + t.costCents, 0);
   const remainderCents = bankrollCents - total();
   if (remainderCents === 0) return;
   let diff = remainderCents;
 
-  // One candidate per race: its biggest win ticket (+ paired place).
+  const spentIn = (race) => tickets.filter((t) => t.raceNumbers.length === 1 && t.raceNumbers[0] === race).reduce((a, t) => a + t.costCents, 0);
   const allocOf = new Map(allocations.map((a) => [a.race, a]));
   const byRace = new Map();
   for (const t of tickets) {
@@ -514,28 +553,43 @@ function balance({ tickets, allocations, bankrollCents, emit }) {
   }
   const candidates = [...byRace.values()]
     .sort((a, b) => b.allocatedCents - a.allocatedCents || a.race - b.race);
-  const tiers = [candidates.filter((c) => !c.guess), candidates.filter((c) => c.guess)];
+  const skipped = allocations
+    .filter((a) => !byRace.has(a.race))
+    .map((a) => ({ race: a.race, reason: 'no_win_ticket' }));
 
   const dir = Math.sign(diff);
   let passes = 0;
-  for (const tier of tiers) {
-    let moved = true;
+  const step = (c) => {
+    if (Math.abs(diff) < c.unit) return false;
+    const next = c.win.stakeCents + dir * 100;
+    if (next < 200) return false; // keep the $2 win minimum
+    c.win.stakeCents = next; c.win.costCents = next;
+    if (c.place) { c.place.stakeCents = next; c.place.costCents = next; }
+    c.amountCents += dir * c.unit; c.steps++;
+    diff -= dir * c.unit;
+    return true;
+  };
+  // Phase 1: toward each race's own allocation (deficit when adding money,
+  // surplus when taking it back), guesswork races excluded.
+  const wanting = () => candidates.filter((c) => !c.guess && dir * (c.allocatedCents - spentIn(c.race)) >= c.unit)
+    .sort((a, b) => dir * ((b.allocatedCents - spentIn(b.race)) - (a.allocatedCents - spentIn(a.race))));
+  let moved = true;
+  while (moved && diff !== 0) {
+    moved = false;
+    for (const c of wanting()) if (step(c)) moved = true;
+    if (moved) passes++;
+  }
+  // Phase 2: whatever is left, round-robin, guesswork races last.
+  for (const tier of [candidates.filter((c) => !c.guess), candidates.filter((c) => c.guess)]) {
+    moved = true;
     while (moved && diff !== 0) {
       moved = false;
-      for (const c of tier) {
-        if (Math.abs(diff) < c.unit) continue;
-        const next = c.win.stakeCents + dir * 100;
-        if (next < 200) continue; // keep the $2 win minimum
-        c.win.stakeCents = next;
-        c.win.costCents = next;
-        if (c.place) { c.place.stakeCents = next; c.place.costCents = next; }
-        c.amountCents += dir * c.unit;
-        c.steps++;
-        diff -= dir * c.unit;
-        moved = true;
-      }
+      for (const c of tier) if (step(c)) moved = true;
       if (moved) passes++;
     }
+  }
+  for (const c of candidates) {
+    if (c.steps === 0 && c.guess) skipped.push({ race: c.race, reason: 'guesswork_floor' });
   }
 
   // Payout estimates track the new stakes: win is exact morning-line
@@ -562,6 +616,7 @@ function balance({ tickets, allocations, bankrollCents, emit }) {
       withPlace: Boolean(c.place),
       allocatedCents: c.allocatedCents,
     })),
+    skipped,
     undistributedCents: diff,
   });
   emit('bankroll_balanced', { adjusted: diff === 0, remainingCents: diff });
