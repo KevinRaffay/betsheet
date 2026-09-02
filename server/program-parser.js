@@ -160,17 +160,44 @@ export function splitFusedOwnerTrainer(races, warnings = []) {
 
 // ---------- race panels ----------
 
+// An advertisement pasted into the program (2025 print run: one 1/3-page ad
+// per card) brings its print-proof slug along in the text layer - and every
+// one of those items is OVERPRINTED: the same string twice at the same
+// coordinates. Real program text is never doubled, so exact duplicates are
+// dropped (both copies) before a panel is read; left in, the ad's "OK"
+// became a horse's name and its "Round 1" moved the panel's left edge.
+function dropOverprint(items) {
+  const key = (i) => `${i.s}|${Math.round(i.x)}|${Math.round(i.y)}`;
+  const seen = new Map();
+  for (const i of items) seen.set(key(i), (seen.get(key(i)) ?? 0) + 1);
+  return items.filter((i) => seen.get(key(i)) === 1);
+}
+
 function parsePanel(items, footer, warnings) {
   const mid = 306; // spread halves of a 612pt-wide page
   const right = footer.x >= mid;
-  const panel = items.filter((i) => (right ? i.x >= mid : i.x < mid));
+  const panel = dropOverprint(items.filter((i) => (right ? i.x >= mid : i.x < mid)));
   const number = Number(footer.s.match(FOOTER)[4]);
 
-  const leftEdge = Math.min(...panel.map((i) => i.x));
+  // The panel's left edge is the FOOTER's x: the footer prints flush with
+  // the program-number column on every panel seen (2025 and 2026 print
+  // runs). It used to be the smallest x on the half-spread, which an
+  // advertisement's stray text (2025 print run, one 1/3-page ad per card:
+  // its print slug leaked into the text layer 9pt left of the column)
+  // dragged left until no number 'hugged' the edge and the race parsed
+  // empty. The minimum stays as the fallback for a panel whose numbers do
+  // not sit on the footer's x.
+  const tallNumber = (i) => /^\d+A?$/.test(i.s.trim()) && i.h >= 10;
+  const minX = Math.min(...panel.map((i) => i.x));
+  // A 15-horse field (2025 stakes cards) prints its numbers smaller (h 8.6)
+  // than the 10pt floor; on the footer's x a pure number is a program number
+  // from 8pt up. The 10pt floor stays for the min-x fallback.
+  const onFooter = (i) => /^\d+A?$/.test(i.s.trim()) && Math.abs(i.x - footer.x) < 6 && i.h >= 8;
+  const leftEdge = panel.some(onFooter) ? footer.x : minX;
 
   // Program numbers: tall pure numbers hugging the panel's left edge.
   const pgms = panel
-    .filter((i) => /^\d+A?$/.test(i.s.trim()) && i.x < leftEdge + 6 && i.h >= 10)
+    .filter((i) => (leftEdge === footer.x ? onFooter(i) : tallNumber(i) && Math.abs(i.x - leftEdge) < 6))
     .sort((a, b) => b.y - a.y);
 
   const race = {

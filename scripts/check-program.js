@@ -314,6 +314,24 @@ check('wrong expected date -> wrong_date warning',
 check('wrong expected track -> wrong_track warning',
   wrong.warnings.some((w) => w.type === 'wrong_track'));
 
+// --- third fixture: the 2025 print run (tests/fixtures/backfill/DMR-2025-summer, the D45 golden) ---
+// One 1/3-page advertisement per card brings its print-proof slug into the
+// text layer, OVERPRINTED (every item twice at the same coordinates). Before
+// the fix its "Round 1" moved race 9's left edge (the race parsed EMPTY on 22
+// of 31 days of the meet) and its "OK" became a horse's name.
+console.log('-- 2025 print run: advertisement slug on the race-9 spread --');
+const PDF3 = path.join(ROOT, 'tests', 'fixtures', 'backfill', 'DMR-2025-summer', 'program.pdf');
+const out3 = await parseProgramPdf(PDF3, { track: 'Del Mar', date: '2025-07-18' });
+const r9 = out3.races.find((r) => r.number === 9);
+check('2025-07-18: 10 races, 110 entries, no empty race, no index mismatch (the ad slug is dropped)',
+  out3.races.length === 10 && out3.races.reduce((a, r) => a + r.entries.length, 0) === 110 && !out3.warnings.some((w) => w.type === 'empty_race' || w.type === 'index_mismatch'),
+  JSON.stringify(out3.warnings.map((w) => w.type)));
+check('2025-07-18 R9: eleven entries in program order, #3 is Runkerry (not the ad "OK"), #7 Case Hit scratched, ranks 4/8/7, Six Furlongs dirt allowance/claiming at 6:00PM',
+  r9 && r9.entries.length === 11 && r9.entries.map((e) => e.programNumber).join() === '1,2,3,4,5,6,7,8,9,10,11' && r9.entries[2].horseName === 'Runkerry' && r9.entries[2].jockey === 'Cristobal Herrera' &&
+  r9.entries[6].horseName === 'Case Hit' && r9.entries[6].scratched && r9.entries.filter((e) => e.programRank).map((e) => `${e.programNumber}:${e.programRank}`).join() === '4:1,7:3,8:2' &&
+  r9.distance === 'Six Furlongs' && r9.surface === 'DIRT' && r9.raceType === 'ALLOWANCE/CLAIMING' && r9.postTime === '6:00PM',
+  r9 ? JSON.stringify(r9.entries.map((e) => [e.programNumber, e.horseName, e.programRank, e.scratched])) : 'no race 9');
+
 if (failures) {
   console.error(`\ncheck-program: ${failures} failure(s)`);
   process.exit(1);
