@@ -158,6 +158,12 @@ try {
 
   console.log('-- warnings matrix (via preview - non-destructive) --');
   const w = async (text) => (await preview(dayId, 1, text)).warnings;
+  console.log('-- regression: box selections separated by "/" (found live) --');
+  check('"#1 / #6" exacta box parses as two horses, no warnings', await (async () => {
+    const p = await preview(dayId, 1, 'Exacta Box\t#4 / #5\t$20');
+    return p.warnings.length === 0 && p.tickets.length === 1 &&
+      p.tickets[0].legs[0].sort().join(',') === '4,5';
+  })());
   check('name mismatch -> non-blocking, names the real entry', await (async () => {
     const ws = await w('Win\t#2 Not Tahini\t$25');
     return ws.length === 1 && ws[0].type === 'name_mismatch' && ws[0].blocking === false && ws[0].message.includes('Tahini');
