@@ -141,10 +141,13 @@ export function parseHumanPicksText({ text, race, entries = [], wagerMenu = null
       continue;
     }
 
-    // Selections -> legs (straight bets split on '/'; box types take one leg).
+    // Selections -> legs. Straight bets split on '/' for POSITION (leg 1,
+    // leg 2, ...); box types take one leg with no positional meaning at
+    // all, so a human writing "#1 / #6" means the same thing as "#1,#6" -
+    // both ',' and '/' are accepted as equivalent horse separators there.
     const isBox = BOX_TYPES.has(betType);
     const legs = isBox
-      ? [rawSelections.split(',').map((t) => t.trim()).filter(Boolean)]
+      ? [rawSelections.split(/[,/]/).map((t) => t.trim()).filter(Boolean)]
       : rawSelections.split('/').map((leg) => leg.split(',').map((t) => t.trim()).filter(Boolean));
 
     let blocked = false;
