@@ -41,7 +41,7 @@ async function guardedFetchText(url) {
   return res.text();
 }
 
-async function robotsDisallows(url) {
+export async function robotsDisallows(url) {
   const { origin, pathname } = new URL(url);
   let entry = robotsCache.get(origin);
   if (!entry || Date.now() - entry.at > 60 * 60 * 1000) {
@@ -73,7 +73,7 @@ export function parseRobots(text) {
   return rules;
 }
 
-function fetchWithTimeout(url) {
+export function fetchWithTimeout(url) {
   const ctl = new AbortController();
   const timer = setTimeout(() => ctl.abort(), FETCH_TIMEOUT_MS);
   return fetch(url, {
@@ -85,13 +85,13 @@ function fetchWithTimeout(url) {
 
 // ---------- sources + audit ----------
 
-function upsertSource(db, { name, kind }) {
+export function upsertSource(db, { name, kind }) {
   const existing = db.prepare('SELECT id FROM sources WHERE name = ?').get(name);
   if (existing) return existing.id;
   return db.prepare('INSERT INTO sources (name, kind) VALUES (?, ?)').run(name, kind).lastInsertRowid;
 }
 
-function recordAttempt(db, fields) {
+export function recordAttempt(db, fields) {
   db.prepare(`INSERT INTO fetch_attempts
       (race_day_id, source_id, url, http_status, outcome, bytes, parse_ok,
        picks_extracted, fallback_reason, correlation_id)
@@ -201,6 +201,7 @@ export async function runFetches(dayId, correlationId) {
       results.push({ source: fetcher.name, outcome, ...extra });
     };
 
+    if (fetcher.produces === 'entries') continue; // driven by ingest.js (D40)
     if (!fetcher.supports({ track: day.track, date: day.date })) continue;
 
     if (!db.prepare('SELECT enabled FROM sources WHERE id = ?').get(sourceId).enabled) {

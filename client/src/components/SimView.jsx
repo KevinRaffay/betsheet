@@ -10,8 +10,8 @@ const signed = (cents) => (
 );
 const roi = (plCents, costCents) =>
   (costCents > 0 ? `${plCents >= 0 ? '+' : ''}${(100 * plCents / costCents).toFixed(1)}%` : '—');
-const BUCKET_CHIP = { FULL: 'unanimous', PARTIAL: 'split', PROGRAM_ONLY: 'chaos' };
-const BUCKET_ORDER = ['FULL', 'PARTIAL', 'PROGRAM_ONLY'];
+const BUCKET_CHIP = { FULL: 'unanimous', PARTIAL: 'split', PROGRAM_ONLY: 'chaos', ODDS_ONLY: 'guess' };
+const BUCKET_ORDER = ['FULL', 'PARTIAL', 'PROGRAM_ONLY', 'ODDS_ONLY'];
 
 // The simulator (D19): every strategy template replayed against every
 // stored day that has a chart, the latest run per template side by side.

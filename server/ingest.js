@@ -11,11 +11,16 @@ import express from 'express';
 import { parseEntries } from '../shared/entries-parser.js';
 import { parseChart } from '../shared/chart-parser.js';
 import { parseProgramPdf } from './program-parser.js';
+import { parseMlSheetPdf } from './ml-sheet-parser.js';
+import { mergeMlAndProgram } from '../shared/entries-merge.js';
+import { listFetchers, loadExtraFetchers } from './fetchers/index.js';
+import { fetchWithTimeout, recordAttempt, robotsDisallows, upsertSource } from './consensus.js';
 import { extractPdfLines } from './pdf-text.js';
 import { getDb } from './db.js';
 import { getLogger, newCorrelationId } from './logging.js';
 
 const log = getLogger('app');
+const fetchLog = getLogger('fetch-audit');
 const traceLog = getLogger('decision-trace');
 
 export const ingestRouter = express.Router();
@@ -120,10 +125,11 @@ ingestRouter.post(
 const toInt = (v) => (v === null || v === undefined || v === '' ? null : Math.round(Number(v)));
 
 function insertRaceDay(db, payload, correlationId) {
+  const entriesSource = ['program', 'ml_sheet', 'both'].includes(payload.entriesSource) ? payload.entriesSource : 'program';
   const dayInfo = db.prepare(`INSERT INTO race_days
-      (track, date, bankroll_cents, per_race_min_cents, correlation_id)
-      VALUES (?, ?, ?, ?, ?)`)
-    .run(payload.track, payload.date, toInt(payload.bankrollCents), toInt(payload.perRaceMinCents), correlationId);
+      (track, date, bankroll_cents, per_race_min_cents, correlation_id, entries_source)
+      VALUES (?, ?, ?, ?, ?, ?)`)
+    .run(payload.track, payload.date, toInt(payload.bankrollCents), toInt(payload.perRaceMinCents), correlationId, entriesSource);
   const dayId = dayInfo.lastInsertRowid;
 
   const insertRace = db.prepare(`INSERT INTO races
@@ -159,6 +165,100 @@ function insertRaceDay(db, payload, correlationId) {
   }
   return dayId;
 }
+
+// ---------- ML sheet (D40): the entries source of record ----------
+
+// Parse an uploaded ML/changes PDF. Preview only - never writes.
+ingestRouter.post(
+  '/parse/ml-pdf',
+  express.raw({ type: 'application/pdf', limit: '30mb' }),
+  async (req, res) => {
+    const correlationId = req.get('x-correlation-id') || newCorrelationId();
+    if (!Buffer.isBuffer(req.body) || req.body.length === 0) {
+      return res.status(400).json({ error: 'Send the PDF as a raw application/pdf body.' });
+    }
+    try {
+      const expected = { track: req.query.track || undefined, date: req.query.date || undefined };
+      const parsed = await parseMlSheetPdf(new Uint8Array(req.body), expected);
+      log.info('parse_completed', {
+        correlationId, kind: 'ml_sheet', bytes: req.body.length, races: parsed.races.length,
+        entries: parsed.races.reduce((a, r) => a + r.entries.length, 0), warnings: parsed.warnings.length,
+      });
+      res.json({ correlationId, entriesSource: 'ml_sheet', ...parsed });
+    } catch (err) {
+      log.warn('parse_failed', { correlationId, kind: 'ml_sheet', error: String(err?.message ?? err) });
+      res.status(422).json({ error: `Could not read that PDF: ${err?.message ?? err}` });
+    }
+  },
+);
+
+// Merge an ML sheet parse with a program parse: the sheet is the record,
+// the program contributes analysis; every disagreement is a warning.
+ingestRouter.post('/parse/merge', (req, res) => {
+  const correlationId = req.get('x-correlation-id') || newCorrelationId();
+  const { ml, program } = req.body ?? {};
+  if (!ml || !Array.isArray(ml.races)) return res.status(400).json({ error: 'ml (an ML sheet parse) is required.' });
+  if (program != null && !Array.isArray(program.races)) return res.status(400).json({ error: 'program must be a program parse or null.' });
+  const merged = mergeMlAndProgram(ml, program ?? null);
+  log.info('merge_completed', {
+    correlationId, entriesSource: merged.entriesSource, races: merged.races.length,
+    disagreements: merged.warnings.filter((w) => w.type === 'program_ml_disagreement').length,
+    warnings: merged.warnings.length,
+  });
+  res.json({ correlationId, ...merged });
+});
+
+// Fetch the ML sheet from the track for a track/date and return its parse
+// (preview only). Audited like every fetch (invariant 11): always to the
+// fetch-audit stream, and to fetch_attempts too when the day already
+// exists (the table keys on a race day).
+ingestRouter.post('/fetch/ml-sheet', async (req, res) => {
+  const correlationId = req.get('x-correlation-id') || newCorrelationId();
+  const track = String(req.body?.track ?? '').trim();
+  const date = String(req.body?.date ?? '').trim();
+  if (!track || !/^\d{4}-\d{2}-\d{2}$/.test(date)) return res.status(400).json({ error: 'track and date (yyyy-mm-dd) are required.' });
+  await loadExtraFetchers();
+  const fetcher = listFetchers().find((f) => f.produces === 'entries' && f.supports({ track, date }));
+  if (!fetcher) return res.status(404).json({ error: `No ML-sheet source is registered for ${track}. Upload the PDF instead.` });
+  const db = getDb();
+  const day = db.prepare('SELECT id FROM race_days WHERE track = ? AND date = ? AND deleted_at IS NULL').get(track, date);
+  const sourceId = upsertSource(db, fetcher);
+  const audit = (outcome, extra = {}) => {
+    fetchLog.info('fetch_attempt', { correlationId, source: fetcher.name, track, date, outcome, ...extra });
+    if (day) recordAttempt(db, { raceDayId: day.id, sourceId, correlationId, outcome, ...extra });
+  };
+  const url = fetcher.buildUrl({ track, date });
+  if (!url) { audit('http_error', { fallbackReason: 'no URL for this date' }); return res.status(400).json({ error: 'No URL for that date.' }); }
+  try {
+    if (await robotsDisallows(url)) {
+      audit('blocked', { url, fallbackReason: 'disallowed by robots.txt - upload the PDF manually' });
+      return res.status(403).json({ error: 'robots.txt disallows fetching the ML sheet; upload the PDF instead.', url });
+    }
+    const r = await fetchWithTimeout(url);
+    if (!r.ok) {
+      audit('http_error', { url, httpStatus: r.status, fallbackReason: `HTTP ${r.status}` });
+      return res.status(r.status === 404 ? 404 : 502).json({ error: `The track answered HTTP ${r.status} for ${url}.`, url });
+    }
+    const bytes = new Uint8Array(await r.arrayBuffer());
+    let parsed;
+    try {
+      parsed = await parseMlSheetPdf(bytes, { track, date });
+    } catch (err) {
+      audit('parse_error', { url, httpStatus: r.status, bytes: bytes.length, parseOk: 0, fallbackReason: String(err?.message ?? err) });
+      return res.status(422).json({ error: `Fetched the sheet but could not read it: ${err?.message ?? err}`, url });
+    }
+    const mismatch = parsed.warnings.find((w) => w.type === 'wrong_date' || w.type === 'wrong_track');
+    if (mismatch) {
+      audit('track_date_mismatch', { url, httpStatus: r.status, bytes: bytes.length, parseOk: 1, fallbackReason: mismatch.message });
+      return res.status(422).json({ error: mismatch.message, url });
+    }
+    audit('ok', { url, httpStatus: r.status, bytes: bytes.length, parseOk: 1, picksExtracted: parsed.races.reduce((a, x) => a + x.entries.length, 0) });
+    res.json({ correlationId, entriesSource: 'ml_sheet', fetchedFrom: url, ...parsed });
+  } catch (err) {
+    audit('network_error', { url, fallbackReason: String(err?.message ?? err) });
+    res.status(502).json({ error: `Could not reach the track: ${err?.message ?? err}`, url });
+  }
+});
 
 ingestRouter.post('/race-days', (req, res) => {
   const correlationId = req.get('x-correlation-id') || newCorrelationId();
@@ -217,6 +317,7 @@ ingestRouter.post('/race-days', (req, res) => {
     date: p.date,
     races: p.races.length,
     entries: p.races.reduce((a, r) => a + r.entries.length, 0),
+    entriesSource: p.entriesSource ?? 'program',
     replaced: Boolean(existing),
   });
   res.status(201).json({ id: dayId, correlationId, replaced: Boolean(existing) });
