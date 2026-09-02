@@ -122,30 +122,83 @@ export function writeManifest(rawDir, date, manifest) {
 }
 export const artifactFile = { program: 'program.pdf', ml: 'ml.pdf', results: 'results.html' };
 
-// ---------- the runner ----------
+// ---------- the index: calendar first, then the committed meet-dates table ----------
 
 import { recordAttempt, robotsDisallows, upsertSource } from './consensus.js';
 import { getLogger } from './logging.js';
+import { parseDmtcResults } from '../shared/dmtc-results-parser.js';
+
+export const DEFAULT_MEETS_DIR = path.join(ROOT, 'data', 'meets');
+/** A probe window is bounded by construction: a meet never runs longer than this. */
+export const MAX_PROBE_DAYS = 92;
+
+export function meetTablePath(meetsDir, meet) { return path.join(meetsDir, `${meet}.json`); }
+
+/** Every committed meet-dates table (data/meets/*.json). */
+export function readMeetTables(meetsDir = DEFAULT_MEETS_DIR) {
+  if (!fs.existsSync(meetsDir)) return [];
+  return fs.readdirSync(meetsDir).filter((f) => /^DMR-\d{4}-(summer|fall)\.json$/.test(f)).sort()
+    .map((f) => ({ file: path.join(meetsDir, f), ...JSON.parse(fs.readFileSync(path.join(meetsDir, f), 'utf8')) }));
+}
+
+/**
+ * Race days for [from, to], in date order. Index source, in order (user
+ * decision 2026-09-02): (1) the archived track calendar for the month when
+ * it carries race days with counts; (2) the committed meet-dates table
+ * (data/meets/<meet>.json, built once by probeMeetWindow) when the archived
+ * calendar for that month is dark - dmtc.com renders past seasons with no
+ * racing at all. A month with no archived calendar is `missingCalendars`
+ * (fetch it first); a dark month with no table is `missingIndex`. Never a
+ * date that neither source names.
+ */
+export function indexRaceDays({ rawDir = DEFAULT_RAW_DIR, meetsDir = DEFAULT_MEETS_DIR, from = '0000-00-00', to = '9999-12-31' } = {}) {
+  const calDir = path.join(rawDir, TRACK_CODE, 'calendar');
+  const archived = fs.existsSync(calDir) ? fs.readdirSync(calDir).map((f) => f.match(/^(\d{4})-(\d{2})\.html$/)).filter(Boolean).map((m) => `${m[1]}-${m[2]}`).sort() : [];
+  const inRange = (m) => m >= from.slice(0, 7) && m <= to.slice(0, 7);
+  const months = archived.filter(inRange);
+  const wanted = from === '0000-00-00' ? months : monthsBetween(from, to).map(({ year, month }) => `${year}-${String(month).padStart(2, '0')}`);
+  const tables = readMeetTables(meetsDir);
+  const out = { days: [], months, missingCalendars: wanted.filter((m) => !archived.includes(m)), darkCalendars: [], tablesUsed: [], missingIndex: [] };
+  for (const key of months) {
+    const [y, m] = key.split('-').map(Number);
+    const cal = parseCalendar(fs.readFileSync(path.join(calDir, `${key}.html`), 'utf8'), { year: y, month: m });
+    if (cal.length > 0) { out.days.push(...cal.map((d) => ({ ...d, indexSource: 'calendar' }))); continue; }
+    out.darkCalendars.push(key);
+    const fromTables = [];
+    for (const t of tables) {
+      for (const d of t.days ?? []) {
+        if (!d.raceDay || d.date.slice(0, 7) !== key) continue;
+        fromTables.push({ date: d.date, meet: t.meet ?? meetFor(d.date), races: d.races ?? null, stakes: [], firstPost: null, resultsUrl: d.url ?? null, programUrl: null, indexSource: 'meet-table', indexFile: t.file });
+        if (!out.tablesUsed.includes(t.file)) out.tablesUsed.push(t.file);
+      }
+    }
+    if (fromTables.length === 0) out.missingIndex.push(key);
+    out.days.push(...fromTables);
+  }
+  out.days = out.days.filter((d) => d.date >= from && d.date <= to).sort((a, b) => a.date.localeCompare(b.date));
+  return out;
+}
+
+// ---------- the polite client every entry point shares ----------
 
 const fetchLog = getLogger('fetch-audit');
 const SOURCE = { name: 'dmtc.com crawler', kind: 'program' };
 const MAX_STRIKES = 3;
 const sleep = (ms) => new Promise((r) => setTimeout(r, ms));
 
+export function newReport(extra = {}) {
+  return { calendars: [], missingCalendars: [], darkCalendars: [], missingIndex: [], days: [], planned: [], events: [], performed: 0, archived: 0, skipped: 0, blocked: 0, errors: 0, haltedReason: null, ...extra };
+}
+
 /**
- * Crawl [from, to]. `what` lists artifact kinds ('program', 'ml',
- * 'results') and/or 'calendar'. Calendars are always ensured first (they
- * are the index); a dry run reads only ARCHIVED calendars and reports the
- * months still to fetch. Returns the report; every request is an event.
+ * One polite HTTP client: robots per URL (a disallowed kind is disabled for
+ * the run), >= minGapMs between requests, identifying User-Agent,
+ * conditional headers on refresh, 429/5xx backoff, halt after MAX_STRIKES
+ * straight failures. EVERY request lands in the fetch-audit stream (and in
+ * fetch_attempts once the race day exists). Shared by crawl() and
+ * probeMeetWindow() so a probe is as polite and as audited as a fetch.
  */
-export async function crawl({
-  from, to, what = KINDS, refresh = false, dryRun = false, origin = DEFAULT_ORIGIN, rawDir = DEFAULT_RAW_DIR,
-  db = null, correlationId = null, minGapMs = 1000, onEvent = () => {},
-}) {
-  const report = {
-    dryRun, calendars: [], missingCalendars: [], days: [], planned: [], events: [],
-    performed: 0, archived: 0, skipped: 0, blocked: 0, errors: 0, haltedReason: null,
-  };
+function politeClient({ report, db = null, correlationId = null, refresh = false, minGapMs = 1000, onEvent = () => {} }) {
   const disabledKinds = new Set();
   let lastRequestAt = 0;
   let strikes = 0;
@@ -154,7 +207,6 @@ export async function crawl({
     ? db.prepare(`SELECT id, correlation_id FROM race_days WHERE date = ? AND deleted_at IS NULL
         AND lower(replace(track, ' ', '')) = 'delmar'`).get(date)
     : null);
-
   const event = (e) => { report.events.push(e); onEvent(e); };
   const audit = (date, kind, url, outcome, extra = {}) => {
     const day = date && /^\d{4}-\d{2}-\d{2}$/.test(date) ? dayRow(date) : null;
@@ -165,8 +217,6 @@ export async function crawl({
       recordAttempt(db, { raceDayId: day.id, sourceId, correlationId: cid, url, outcome: mapped, httpStatus: extra.httpStatus ?? null, bytes: extra.bytes ?? null, fallbackReason: extra.detail ?? null });
     }
   };
-
-  // One polite request: robots, spacing, UA, conditional headers, backoff.
   // Returns { status, body, headers } or null (blocked / halted).
   async function request(date, kind, url, prior) {
     if (disabledKinds.has(kind)) { event({ date, kind, url, outcome: 'blocked', detail: 'kind disabled by robots.txt for this run' }); report.blocked++; return null; }
@@ -213,10 +263,108 @@ export async function crawl({
     }
     return null;
   }
+  // robots.txt is the first request of a run and counts toward the spacing.
+  const start = async (origin) => { await robotsDisallows(origin + '/'); lastRequestAt = Date.now(); };
+  return { request, event, audit, start };
+}
 
-  // robots.txt is the first request of the run and counts toward the
-  // spacing like any other (it is cached per origin afterwards).
-  if (!dryRun) { await robotsDisallows(origin + '/'); lastRequestAt = Date.now(); }
+const archivedArtifact = (url, body, headers, now) => ({
+  url, fetched_at: now, sha256: sha256(body), bytes: body.length, http_status: 200,
+  etag: headers.get('etag'), last_modified: headers.get('last-modified'), content_type: headers.get('content-type'),
+});
+
+// ---------- the window probe: builds a meet-dates table once ----------
+
+/**
+ * Bounded probe of a PUBLISHED meet window [from, to] (both inside `meet`,
+ * at most MAX_PROBE_DAYS): one results-page request per date, polite rate,
+ * every request audited. A 200 whose page parses to >= 1 race is a race
+ * day (its results page is archived on the spot, with a manifest); a 404
+ * or a page with no races is a dark day. Writes data/meets/<meet>.json
+ * with every date's evidence (status, race count, url) only when the
+ * whole window was probed. Blind enumeration outside a published window
+ * stays prohibited: the window is an input the caller must justify in
+ * `source`, and the table records it.
+ */
+export async function probeMeetWindow({
+  meet, from, to, source, origin = DEFAULT_ORIGIN, rawDir = DEFAULT_RAW_DIR, meetsDir = DEFAULT_MEETS_DIR,
+  db = null, correlationId = null, minGapMs = 1000, dryRun = false, onEvent = () => {},
+}) {
+  if (!/^\d{4}-\d{2}-\d{2}$/.test(from ?? '') || !/^\d{4}-\d{2}-\d{2}$/.test(to ?? '') || to < from) throw new Error('probe: from/to must be yyyy-mm-dd with from <= to');
+  if (!meet || meetFor(from) !== meet || meetFor(to) !== meet) throw new Error(`probe: the window ${from}..${to} must lie inside the meet ${meet} (${meetFor(from)} .. ${meetFor(to)})`);
+  const span = Math.round((Date.parse(to) - Date.parse(from)) / 86400000) + 1;
+  if (span > MAX_PROBE_DAYS) throw new Error(`probe: ${span} days exceeds the ${MAX_PROBE_DAYS}-day bound of one meet window`);
+  if (!String(source ?? '').trim()) throw new Error('probe: --source must say where the published window comes from');
+  const dates = [];
+  for (let t = Date.parse(from); t <= Date.parse(to); t += 86400000) dates.push(new Date(t).toISOString().slice(0, 10));
+  const report = newReport({ dryRun, meet, from, to, source, dates: dates.length, probed: [], raceDays: 0, darkDays: 0, tablePath: meetTablePath(meetsDir, meet) });
+  if (dryRun) { for (const d of dates) report.events.push({ date: d, kind: 'probe', url: artifactUrls(origin, d).results, outcome: 'planned' }); report.events.forEach(onEvent); return report; }
+  const client = politeClient({ report, db, correlationId, minGapMs, onEvent });
+  const startedAt = new Date().toISOString();
+  await client.start(origin);
+  for (const date of dates) {
+    const url = artifactUrls(origin, date).results;
+    const r = await client.request(date, 'probe', url, null);
+    if (report.haltedReason) return report;
+    const now = new Date().toISOString();
+    const entry = { date, source: 'results-page-probe', url, httpStatus: r?.status ?? null, races: null, raceDay: false, checkedAt: now };
+    if (r?.status === 200) {
+      const html = r.body.toString('utf8');
+      const parsed = parseDmtcResults(html);
+      if (parsed.races.length > 0) {
+        entry.raceDay = true; entry.races = parsed.races.length; report.raceDays++;
+        const manifest = readManifest(rawDir, date) ?? { track: TRACK_CODE, date, meet, calendar: null, artifacts: {} };
+        manifest.meet = meet;
+        manifest.index = { source: 'meet-table', races: entry.races, probedAt: now };
+        manifest.artifacts.results = archivedArtifact(url, r.body, r.headers, now);
+        fs.mkdirSync(dayDir(rawDir, date), { recursive: true });
+        fs.writeFileSync(path.join(dayDir(rawDir, date), artifactFile.results), r.body);
+        writeManifest(rawDir, date, manifest);
+        report.archived++;
+        client.event({ date, kind: 'probe', url, outcome: 'race_day', httpStatus: 200, bytes: r.body.length, detail: `${entry.races} races - results archived` });
+        client.audit(date, 'probe', url, 'ok', { httpStatus: 200, bytes: r.body.length, detail: `race day, ${entry.races} races` });
+      } else {
+        report.darkDays++;
+        client.event({ date, kind: 'probe', url, outcome: 'dark', httpStatus: 200, detail: 'page carries no races' });
+        client.audit(date, 'probe', url, 'ok', { httpStatus: 200, bytes: r.body.length, detail: 'dark day (no races on the page)' });
+      }
+    } else if (r) {
+      report.darkDays++;
+      client.event({ date, kind: 'probe', url, outcome: 'dark', httpStatus: r.status, detail: `HTTP ${r.status}` });
+      client.audit(date, 'probe', url, 'http_error', { httpStatus: r.status, detail: 'dark day (no results page)' });
+    } else {
+      entry.httpStatus = null; entry.blocked = true;
+    }
+    report.probed.push(entry);
+  }
+  const table = {
+    meet, track: TRACK_CODE, window: { from, to, source },
+    probe: { correlationId, startedAt, finishedAt: new Date().toISOString(), requests: report.performed, userAgent: userAgent(), origin },
+    days: report.probed,
+  };
+  fs.mkdirSync(meetsDir, { recursive: true });
+  fs.writeFileSync(report.tablePath, JSON.stringify(table, null, 2) + '\n');
+  return report;
+}
+
+// ---------- the crawl ----------
+
+/**
+ * Crawl [from, to]. `what` lists artifact kinds ('program', 'ml',
+ * 'results') and/or 'calendar'. Calendars are always ensured first (they
+ * are the index); where an archived calendar month is dark the committed
+ * meet-dates table indexes it (see indexRaceDays). A dry run reads only
+ * ARCHIVED calendars and tables and reports the months still to fetch.
+ * Returns the report; every request is an event.
+ */
+export async function crawl({
+  from, to, what = KINDS, refresh = false, dryRun = false, origin = DEFAULT_ORIGIN, rawDir = DEFAULT_RAW_DIR, meetsDir = DEFAULT_MEETS_DIR,
+  db = null, correlationId = null, minGapMs = 1000, onEvent = () => {},
+}) {
+  const report = newReport({ dryRun });
+  const client = politeClient({ report, db, correlationId, refresh, minGapMs, onEvent });
+  const { request, event, audit } = client;
+  if (!dryRun) await client.start(origin);
 
   // ----- calendars (the index) -----
   const wantKinds = what.filter((k) => KINDS.includes(k));
@@ -246,25 +394,25 @@ export async function crawl({
   }
   if (what.length === 1 && what[0] === 'calendar') return report;
 
-  // ----- the plan -----
-  for (const { month } of report.calendars) {
-    const [y, m] = month.split('-').map(Number);
-    const html = fs.readFileSync(calendarPath(rawDir, y, m), 'utf8');
-    for (const day of parseCalendar(html, { year: y, month: m })) {
-      if (day.date < from || day.date > to) continue;
-      report.days.push(day);
-      const manifest = readManifest(rawDir, day.date) ?? { track: TRACK_CODE, date: day.date, meet: day.meet, calendar: null, artifacts: {} };
-      manifest.calendar = { races: day.races, stakes: day.stakes, firstPost: day.firstPost };
-      manifest.meet = day.meet;
-      const urls = artifactUrls(origin, day.date);
-      for (const kind of wantKinds) {
-        const prior = manifest.artifacts[kind];
-        const file = path.join(dayDir(rawDir, day.date), artifactFile[kind]);
-        if (prior?.sha256 && fs.existsSync(file) && !refresh) { report.skipped++; event({ date: day.date, kind, url: urls[kind], outcome: 'skipped', detail: 'archived' }); continue; }
-        report.planned.push({ date: day.date, kind, url: urls[kind], prior: prior ?? null, manifest, file });
-      }
-      if (!dryRun) writeManifest(rawDir, day.date, manifest);
+  // ----- the plan: calendar days, or the meet table where the calendar is dark -----
+  const index = indexRaceDays({ rawDir, meetsDir, from, to });
+  report.darkCalendars = index.darkCalendars;
+  report.missingIndex = index.missingIndex;
+  for (const key of index.missingIndex) event({ date: key, kind: 'index', url: null, outcome: 'missing', detail: 'calendar is dark and no meet-dates table covers it - run dmtc-probe for the published meet window' });
+  for (const day of index.days) {
+    report.days.push(day);
+    const manifest = readManifest(rawDir, day.date) ?? { track: TRACK_CODE, date: day.date, meet: day.meet, calendar: null, artifacts: {} };
+    manifest.meet = day.meet;
+    if (day.indexSource === 'calendar') manifest.calendar = { races: day.races, stakes: day.stakes, firstPost: day.firstPost };
+    else { manifest.calendar = null; manifest.index = { ...(manifest.index ?? {}), source: 'meet-table', races: day.races ?? null, file: path.basename(day.indexFile ?? '') }; }
+    const urls = artifactUrls(origin, day.date);
+    for (const kind of wantKinds) {
+      const prior = manifest.artifacts[kind];
+      const file = path.join(dayDir(rawDir, day.date), artifactFile[kind]);
+      if (prior?.sha256 && fs.existsSync(file) && !refresh) { report.skipped++; event({ date: day.date, kind, url: urls[kind], outcome: 'skipped', detail: 'archived' }); continue; }
+      report.planned.push({ date: day.date, kind, url: urls[kind], prior: prior ?? null, manifest, file });
     }
+    if (!dryRun) writeManifest(rawDir, day.date, manifest);
   }
   if (dryRun) { for (const p of report.planned) event({ date: p.date, kind: p.kind, url: p.url, outcome: 'planned' }); return report; }
 
@@ -281,10 +429,7 @@ export async function crawl({
     } else if (r.status === 200) {
       fs.mkdirSync(path.dirname(p.file), { recursive: true });
       fs.writeFileSync(p.file, r.body);
-      p.manifest.artifacts[p.kind] = {
-        url: p.url, fetched_at: now, sha256: sha256(r.body), bytes: r.body.length, http_status: 200,
-        etag: r.headers.get('etag'), last_modified: r.headers.get('last-modified'), content_type: r.headers.get('content-type'),
-      };
+      p.manifest.artifacts[p.kind] = archivedArtifact(p.url, r.body, r.headers, now);
       report.archived++;
       event({ date: p.date, kind: p.kind, url: p.url, outcome: 'archived', httpStatus: 200, bytes: r.body.length });
       audit(p.date, p.kind, p.url, 'ok', { httpStatus: 200, bytes: r.body.length });

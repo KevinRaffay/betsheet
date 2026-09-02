@@ -37,12 +37,15 @@ function firstDiff(a, b, at = '$') {
 }
 
 const crawler = await import('../server/dmtc-crawler.js');
-const { parseCalendar, meetFor, monthsBetween, artifactUrls, crawl, readManifest, userAgent } = crawler;
+const { parseCalendar, meetFor, monthsBetween, artifactUrls, crawl, readManifest, userAgent, probeMeetWindow, indexRaceDays } = crawler;
 const { openDb } = await import('../server/db.js');
 
 console.log('-- calendar parser (real pages) --');
 const aug = fs.readFileSync(path.join(ROOT, 'tests/fixtures/dmtc/calendar-2026-08.html'), 'utf8');
 const sep = fs.readFileSync(path.join(ROOT, 'tests/fixtures/dmtc/calendar-2026-09.html'), 'utf8');
+const dark = fs.readFileSync(path.join(ROOT, 'tests/fixtures/dmtc/calendar-2025-07.html'), 'utf8');
+const res30 = fs.readFileSync(path.join(ROOT, 'tests/fixtures/dmtc/results-2026-08-30.html'), 'utf8');
+const res29 = fs.readFileSync(path.join(ROOT, 'tests/fixtures/dmtc/results-2026-08-29.html'), 'utf8');
 const augDays = parseCalendar(aug, { year: 2026, month: 8 });
 const sepDays = parseCalendar(sep, { year: 2026, month: 9 });
 const augGolden = JSON.parse(fs.readFileSync(path.join(ROOT, 'tests/fixtures/dmtc/calendar-2026-08.expected.json'), 'utf8'));
@@ -75,6 +78,11 @@ const stub = http.createServer((req, res) => {
   if (req.headers['if-none-match'] || req.headers['if-modified-since']) condHeaders.push([req.url, req.headers['if-none-match'] ?? null]);
   if (req.url === '/robots.txt') return res.end('User-agent: *\nDisallow: /data/pdf\n');
   if (req.url === '/racing/2026/08') return res.end(aug);
+  if (req.url === '/racing/2025/07' || req.url === '/racing/2025/08') return res.end(dark);
+  if (req.url === '/racing/results/2025-07-18') return res.end(res30);
+  if (req.url === '/racing/results/2025-07-19') return res.end('<html><body>Del Mar results - no races</body></html>');
+  if (req.url === '/racing/results/2025-07-21') return res.end(res29);
+  if (req.url === '/racing/programs/20250718.pdf') { res.setHeader('content-type', 'application/pdf'); return res.end(Buffer.from('%PDF-1.4 stub program 20250718')); }
   if (req.url === '/racing/programs/20260830.pdf') {
     if (req.headers['if-none-match'] === ETAG) { res.statusCode = 304; return res.end(); }
     res.setHeader('etag', ETAG); res.setHeader('content-type', 'application/pdf'); return res.end(PROG);
@@ -131,6 +139,50 @@ try {
   check('fetch-audit stream: every request incl. the blocked ML, under the run correlation id before the day existed',
     auditLines.some((e) => e.outcome === 'blocked' && e.kind === 'ml') && auditLines.some((e) => e.kind === 'calendar' && e.outcome === 'ok') &&
     auditLines.filter((e) => e.correlationId === 'run-cid').length >= 8 && auditLines.some((e) => e.correlationId === 'day-cid'), `lines=${auditLines.length}`);
+  // ---------- index source 2: a dark past-season calendar -> the bounded window probe -> the meet-dates table ----------
+  console.log('-- past season: dark calendar, window probe, meet-dates table --');
+  check('the REAL July 2025 calendar page is dark: zero race days (every cell calendar-dark or plain)', parseCalendar(dark, { year: 2025, month: 7 }).length === 0 && /calendar-dark/.test(dark));
+  const meetsDir = path.join(tmp, 'meets');
+  const probeBase = { origin, rawDir, meetsDir, db, correlationId: 'probe-cid', minGapMs: 250, meet: 'DMR-2025-summer', from: '2025-07-18', to: '2025-07-21', source: 'stub: published window (check)' };
+  for (const [name, bad] of [['outside the meet', { meet: 'DMR-2025-fall' }], ['longer than one meet', { to: '2025-10-30', meet: 'DMR-2025-summer' }], ['no source', { source: '' }]]) {
+    let threw = false; try { await probeMeetWindow({ ...probeBase, ...bad }); } catch { threw = true; }
+    check(`probe refuses a window ${name}`, threw);
+  }
+  const hitsBefore = Object.keys(hits).filter((u) => u.includes('2025')).length;
+  const pdry = await probeMeetWindow({ ...probeBase, dryRun: true });
+  check('probe dry run: the four dates planned, zero requests, no table', pdry.performed === 0 && pdry.events.filter((e) => e.outcome === 'planned').length === 4 && Object.keys(hits).filter((u) => u.includes('2025')).length === hitsBefore && !fs.existsSync(pdry.tablePath));
+  const s0 = stamps.length;
+  const probe = await probeMeetWindow(probeBase);
+  const pgaps = stamps.slice(s0 + 1).map((t, i) => t - stamps[s0 + i]);
+  check('probe: one results-page request per date in the window, polite spacing, nothing else requested',
+    probe.performed === 4 && ['2025-07-18', '2025-07-19', '2025-07-20', '2025-07-21'].every((d) => hits[`/racing/results/${d}`] === 1) && pgaps.every((g) => g >= 240) &&
+    !Object.keys(hits).some((u) => /2025-07-(17|22)/.test(u)), JSON.stringify({ n: probe.performed, gaps: pgaps }));
+  const table = JSON.parse(fs.readFileSync(probe.tablePath, 'utf8'));
+  check('table: every date with its evidence (status, race count, url); race days 07-18 (10) + 07-21 (10); dark 07-19 (200, no races) + 07-20 (404); window + source + probe facts recorded',
+    table.meet === 'DMR-2025-summer' && table.window.source === probeBase.source && table.probe.requests === 4 && /BetSheet/.test(table.probe.userAgent) && table.days.length === 4 &&
+    table.days[0].raceDay && table.days[0].races === 10 && table.days[0].httpStatus === 200 && !table.days[1].raceDay && table.days[1].httpStatus === 200 && !table.days[2].raceDay && table.days[2].httpStatus === 404 &&
+    table.days[3].raceDay && table.days[3].races === 10 && table.days.every((d) => /results\/2025-07-/.test(d.url)), JSON.stringify(table.days));
+  const m18 = readManifest(rawDir, '2025-07-18');
+  check('probe archives each race day results page on the spot; manifest: calendar null, index meet-table with the count, artifact facts',
+    fs.existsSync(path.join(rawDir, 'DMR', '20250718', 'results.html')) && m18.calendar === null && m18.index.source === 'meet-table' && m18.index.races === 10 && m18.artifacts.results.http_status === 200 && m18.artifacts.results.sha256 &&
+    !fs.existsSync(path.join(rawDir, 'DMR', '20250719')) && !fs.existsSync(path.join(rawDir, 'DMR', '20250720')), JSON.stringify(m18));
+  const cal25 = await crawl({ ...base, from: '2025-07-01', to: '2025-08-31', what: ['calendar'] });
+  check('the past-season calendars archive like any month (the index is still calendar-first)', cal25.calendars.length === 2 && cal25.calendars.every((c) => c.fetched) && hits['/racing/2025/07'] === 1);
+  const idx = indexRaceDays({ rawDir, meetsDir, from: '2025-07-01', to: '2025-08-31' });
+  check('indexRaceDays: the dark July month is indexed from the table (two race days, source meet-table); dark August has no table -> missingIndex; never a date neither source names',
+    idx.darkCalendars.join() === '2025-07,2025-08' && idx.missingIndex.join() === '2025-08' && idx.days.map((d) => d.date).join() === '2025-07-18,2025-07-21' && idx.days.every((d) => d.indexSource === 'meet-table' && d.meet === 'DMR-2025-summer') && idx.tablesUsed.length === 1, JSON.stringify(idx));
+  const idx26 = indexRaceDays({ rawDir, meetsDir, from: '2026-08-01', to: '2026-08-31' });
+  check('indexRaceDays: a calendar month WITH race days is used as is (source calendar), the table ignored', idx26.days.length === 18 && idx26.days.every((d) => d.indexSource === 'calendar') && idx26.darkCalendars.length === 0);
+  const pcrawl = await crawl({ ...base, meetsDir, from: '2025-07-18', to: '2025-07-21', what: ['program', 'results'] });
+  check('crawl over the probed window: plans the two race days only, results already archived (skipped), programs fetched, manifest keeps calendar null + meet-table index',
+    pcrawl.days.length === 2 && pcrawl.skipped === 2 && pcrawl.planned.length === 2 && hits['/racing/programs/20250718.pdf'] === 1 && readManifest(rawDir, '2025-07-18').artifacts.program.http_status === 200 &&
+    readManifest(rawDir, '2025-07-18').index.source === 'meet-table' && readManifest(rawDir, '2025-07-18').calendar === null && pcrawl.darkCalendars.join() === '2025-07', JSON.stringify({ days: pcrawl.days.length, skipped: pcrawl.skipped, planned: pcrawl.planned.length }));
+  const acrawl = await crawl({ ...base, meetsDir, from: '2025-08-01', to: '2025-08-31', what: ['results'] });
+  check('crawl over a dark month with no table: zero days, missingIndex names the month, no artifact request', acrawl.days.length === 0 && acrawl.missingIndex.join() === '2025-08' && acrawl.planned.length === 0 && !Object.keys(hits).some((u) => u.includes('2025-08-')));
+  const probeAudit = fs.readFileSync(path.join(tmp, 'logs', 'fetch-audit.jsonl'), 'utf8').split('\n').filter(Boolean).map((l) => JSON.parse(l)).filter((e) => e.kind === 'probe');
+  check('fetch-audit: every probe request logged (kind probe) under the probe correlation id, race days ok, 404 as http_error',
+    probeAudit.length === 4 && probeAudit.every((e) => e.correlationId === 'probe-cid') && probeAudit.filter((e) => e.outcome === 'ok').length === 3 && probeAudit.some((e) => e.outcome === 'http_error' && e.httpStatus === 404), JSON.stringify(probeAudit.map((e) => [e.date, e.outcome])));
+
 } finally {
   stub.close(); db.close();
   try { fs.rmSync(tmp, { recursive: true, force: true }); } catch { /* win locks */ }
