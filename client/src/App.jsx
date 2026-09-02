@@ -9,6 +9,9 @@ import SimView from './components/SimView.jsx';
 import { parseRoute, pathForView } from './routes.js';
 import BackfillQueue from './components/BackfillQueue.jsx';
 import DistributionView from './components/DistributionView.jsx';
+import ReplayDayPicker from './components/ReplayDayPicker.jsx';
+import ReplayRaceView from './components/ReplayRaceView.jsx';
+import ReplayStanding from './components/ReplayStanding.jsx';
 
 export default function App() {
   const [theme, setThemeState] = useState(getActiveTheme());
@@ -68,7 +71,25 @@ export default function App() {
             onSim={() => navigate({ name: 'sim' })}
             onBackfill={() => navigate({ name: 'backfill' })}
             onDistribution={() => navigate({ name: 'distribution' })}
+            onReplay={() => navigate({ name: 'replay' })}
           />
+        )}
+        {view.name === 'replay' && (
+          <ReplayDayPicker
+            onBack={() => navigate({ name: 'list' })}
+            onOpenDay={(id) => navigate({ name: 'replayDay', id })}
+            onOpenStanding={() => navigate({ name: 'replayStanding' })}
+          />
+        )}
+        {view.name === 'replayDay' && (
+          <ReplayRaceView
+            dayId={view.id}
+            onBack={() => navigate({ name: 'replay' })}
+            onOpenStanding={() => navigate({ name: 'replayStanding' })}
+          />
+        )}
+        {view.name === 'replayStanding' && (
+          <ReplayStanding onBack={() => navigate({ name: 'replay' })} />
         )}
         {view.name === 'pl' && (
           <PLView

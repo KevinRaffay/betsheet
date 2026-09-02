@@ -89,6 +89,7 @@ map in the same PR.
 | Decision traces joined with graded results, exportable for LLM analysis | D17 |
 | Discipline tracker (planned vs. actual, house-money warnings) | D24 (schema in D03) |
 | A human's pasted tickets become a first-class card (same tables, same grader), in a `HUMAN` completeness bucket that never pools with an engine bucket; no card generation or grading change | D54 |
+| A human can play any stored day blind, race by race, and is compared against lean on the same day; blindness (pre-commit / sequential / non-blind) is recorded from timestamps and never pooled | D54, D55 |
 
 ## Backtest hygiene (addendum 2, 2026-09-02)
 
