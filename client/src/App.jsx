@@ -8,6 +8,7 @@ import PLView from './components/PLView.jsx';
 import SimView from './components/SimView.jsx';
 import { parseRoute, pathForView } from './routes.js';
 import BackfillQueue from './components/BackfillQueue.jsx';
+import DistributionView from './components/DistributionView.jsx';
 
 export default function App() {
   const [theme, setThemeState] = useState(getActiveTheme());
@@ -66,6 +67,7 @@ export default function App() {
             onPL={() => navigate({ name: 'pl' })}
             onSim={() => navigate({ name: 'sim' })}
             onBackfill={() => navigate({ name: 'backfill' })}
+            onDistribution={() => navigate({ name: 'distribution' })}
           />
         )}
         {view.name === 'pl' && (
@@ -77,6 +79,12 @@ export default function App() {
         )}
         {view.name === 'sim' && (
           <SimView
+            onBack={() => navigate({ name: 'list' })}
+            onOpenDay={(id) => navigate({ name: 'day', id })}
+          />
+        )}
+        {view.name === 'distribution' && (
+          <DistributionView
             onBack={() => navigate({ name: 'list' })}
             onOpenDay={(id) => navigate({ name: 'day', id })}
           />
