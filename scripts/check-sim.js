@@ -53,13 +53,15 @@ const synthDay = {
 const synthChart = {
   track: 'SANTA ANITA', date: '2026-08-30',
   races: [
+    // D50: Beta Cruiser is a CHART scratch (name only, resolved to #2 at
+    // save exactly as grading does). Lean as generated boxes 1-2 and gets a
+    // partial refund; built at the window it never names #2.
     { number: 1, results: [
       { programNumber: '1', horseName: 'Alpha Marker', finishPosition: 1, winCents: 600, placeCents: 340, showCents: 280 },
       { programNumber: '3', horseName: 'Gamma Ray Burst', finishPosition: 2, winCents: null, placeCents: 700, showCents: 420 },
-      { programNumber: '2', horseName: 'Beta Cruiser', finishPosition: 3, winCents: null, placeCents: null, showCents: 300 },
     ], exotics: [
       { betType: 'exacta', baseCents: 100, combination: '1-3', payoutCents: 1980, poolCents: 100000 },
-    ], scratches: [] },
+    ], scratches: [{ horseName: 'Beta Cruiser', reason: 'Veterinarian' }] },
     { number: 2, results: [
       { programNumber: '2', horseName: 'Epsilon Star', finishPosition: 1, winCents: 1200, placeCents: 600, showCents: 440 },
       { programNumber: '1', horseName: 'Delta Blues', finishPosition: 2, winCents: null, placeCents: 320, showCents: 280 },
@@ -197,15 +199,109 @@ try {
   const ticketKey = (det) => JSON.stringify(det.ticketDetails.map((t) => [t.betType, t.races, t.legs, t.stakeCents, t.costCents]));
   const leanBdet = await jget(`/api/simulations/${lean.runId}/days/${dayB.id}`);
   const d48 = {};
-  for (const n of ['exacta-primary', 'no-exotics', 'box-depth-3', 'best-bet-weighted']) d48[n] = await jget(`/api/simulations/${runBody.runs.find((r) => r.template === n).runId}/days/${dayB.id}`);
-  check('D48 templates all ran (simulation allows what the live endpoint refuses) and every one differs from lean on the PROGRAM_ONLY day',
+  for (const n of ['exacta-primary', 'no-exotics', 'box-depth-3', 'best-bet-weighted', 'box-only', 'straight-only']) d48[n] = await jget(`/api/simulations/${runBody.runs.find((r) => r.template === n).runId}/days/${dayB.id}`);
+  check('D48 + D49 templates all ran (simulation allows what the live endpoint refuses) and every one differs from lean on the PROGRAM_ONLY day',
     Object.values(d48).every((det) => det.ticketDetails.length > 0) && Object.entries(d48).every(([, det]) => ticketKey(det) !== ticketKey(leanBdet)),
     JSON.stringify(Object.fromEntries(Object.entries(d48).map(([n, det]) => [n, det.ticketDetails.map((t) => t.betType + ':' + t.stakeCents)]))));
+  // D49: the isolation pair - box-only has no straight exacta, straight-only
+  // no exacta box, and the two differ from each other and from no-exotics.
+  check('D49 on the PROGRAM_ONLY day: box-only = win/place + exacta_box only, straight-only = win/place + straight exacta only; four distinct ticket sets with lean and no-exotics; each still the whole bankroll',
+    d48['box-only'].ticketDetails.every((t) => ['win', 'place', 'exacta_box'].includes(t.betType)) && d48['box-only'].ticketDetails.some((t) => t.betType === 'exacta_box') &&
+    d48['straight-only'].ticketDetails.every((t) => ['win', 'place', 'exacta'].includes(t.betType)) && d48['straight-only'].ticketDetails.some((t) => t.betType === 'exacta') &&
+    new Set([leanBdet, d48['no-exotics'], d48['box-only'], d48['straight-only']].map(ticketKey)).size === 4 &&
+    d48['box-only'].costCents === 5000 && d48['straight-only'].costCents === 5000,
+    JSON.stringify({ box: d48['box-only'].ticketDetails.map((t) => t.betType), straight: d48['straight-only'].ticketDetails.map((t) => t.betType) }));
   check('D48 no-exotics on the PROGRAM_ONLY day: win / place only; exacta-primary: win tickets at the per-race minimum and no place ticket',
     d48['no-exotics'].ticketDetails.every((t) => ['win', 'place'].includes(t.betType)) && d48['exacta-primary'].ticketDetails.filter((t) => t.betType === 'win').every((t) => t.stakeCents === 500) && !d48['exacta-primary'].ticketDetails.some((t) => t.betType === 'place'));
   const soB = await jget(`/api/simulations/${runBody.runs.find((r) => r.template === 'structure-only').runId}/days/${dayB.id}`);
   check('structure-only on the PROGRAM_ONLY day: single-race tickets only, still a whole day',
     soB.ticketDetails.length > 0 && soB.ticketDetails.every((t) => t.races.length === 1) && soB.costCents === 5000);
+
+  console.log('-- D51: the compare view - meet selector, vs lean, paired day counts --');
+  // Day A is Del Mar (meet DMR-2026-summer), day B Santa Anita (no meet), so
+  // the meet filter provably drops the PROGRAM_ONLY bucket out of every row.
+  const cmp51 = await jget('/api/simulations/compare');
+  const rowOf = (c, name, mode = 'as_generated') => c.templates.find((t) => t.template === name && t.mode === mode);
+  const bk = (row, k) => row?.buckets.find((b) => b.completeness === k);
+  check('compare carries the meets present among simulated days (day A: DMR-2026-summer; day B has none) and selectedMeet all by default',
+    cmp51.meets.join() === 'DMR-2026-summer' && cmp51.selectedMeet === 'all' && cmp51.templates.every((t) => t.meet === 'all'), JSON.stringify(cmp51.meets));
+  const leanRow = rowOf(cmp51, 'lean');
+  const nfRow = rowOf(cmp51, 'no-fade');
+  const nfRun = runBody.runs.find((r) => r.template === 'no-fade');
+  const bucketPl = (run, k) => run.buckets.find((b) => b.completeness === k).plCents;
+  check('vs lean arithmetic (FULL, lean vs no-fade): delta = no-fade P/L - lean P/L from the runs themselves; losing-day share and drawdown deltas are the row minus the lean row; the lean row is the baseline itself (vsLean null, no delta)',
+    bk(leanRow, 'FULL').baseline === 'self' && bk(leanRow, 'FULL').vsLean === null &&
+    bk(nfRow, 'FULL').baseline === 'lean' && bk(nfRow, 'FULL').vsLean.leanRunId === lean.runId &&
+    bk(nfRow, 'FULL').vsLean.plDeltaCents === bucketPl(nfRun, 'FULL') - bucketPl(lean, 'FULL') &&
+    Math.abs(bk(nfRow, 'FULL').vsLean.losingDayPctDelta - (bk(nfRow, 'FULL').losingDayPct - bk(leanRow, 'FULL').losingDayPct)) < 1e-9 &&
+    bk(nfRow, 'FULL').vsLean.maxDrawdownDeltaCents === bk(nfRow, 'FULL').maxDrawdown.cents - bk(leanRow, 'FULL').maxDrawdown.cents,
+    JSON.stringify({ lean: bk(leanRow, 'FULL'), noFade: bk(nfRow, 'FULL') }));
+  check('shape figures on every row come from the stored per-day P/L: losing-day share = losingDays / days, drawdown = the deepest fall of the running P/L (one day: max(0, -P/L))',
+    cmp51.templates.every((t) => t.buckets.every((b) => Math.abs(b.losingDayPct - b.losingDays / b.days) < 1e-9 && b.maxDrawdown.cents === Math.max(0, -b.plCents))));
+  check('paired day counts: better + worse + tied = the days both runs simulated in the bucket (= the bucket day count here), and with ONE paired day the sign of the delta decides which',
+    cmp51.templates.filter((t) => t.template !== 'lean').every((t) => t.buckets.every((b) => {
+      const p = b.vsLean.paired; const d = b.vsLean.plDeltaCents;
+      return p.better + p.worse + p.tied === p.days && p.days === b.days && (d > 0 ? p.better === 1 : d < 0 ? p.worse === 1 : p.tied === 1);
+    })), JSON.stringify(cmp51.templates.map((t) => [t.template, t.buckets.map((b) => [b.completeness, b.vsLean?.plDeltaCents, b.vsLean?.paired])])));
+  check('the D18 templates that tie lean on the PROGRAM_ONLY day read delta $0, tied on 1; at least one D48/D49 template differs there',
+    ['spread', 'no-fade', 'no-chaos-box', 'structure-only'].every((n) => bk(rowOf(cmp51, n), 'PROGRAM_ONLY').vsLean.plDeltaCents === 0 && bk(rowOf(cmp51, n), 'PROGRAM_ONLY').vsLean.paired.tied === 1) &&
+    ['exacta-primary', 'no-exotics', 'box-depth-3', 'best-bet-weighted', 'box-only', 'straight-only'].some((n) => bk(rowOf(cmp51, n), 'PROGRAM_ONLY').vsLean.paired.tied === 0));
+  const cmpMeet = await jget('/api/simulations/compare?meet=DMR-2026-summer');
+  check('?meet=DMR-2026-summer changes the rows and the deltas: the PROGRAM_ONLY bucket (the Santa Anita day, no meet) drops out of EVERY row, FULL keeps its day and its delta, rows say which meet they read',
+    cmpMeet.selectedMeet === 'DMR-2026-summer' && cmpMeet.templates.length === cmp51.templates.length &&
+    cmpMeet.templates.every((t) => t.meet === 'DMR-2026-summer' && !t.buckets.some((b) => b.completeness === 'PROGRAM_ONLY')) &&
+    bk(rowOf(cmpMeet, 'lean'), 'FULL').days === 1 && bk(rowOf(cmpMeet, 'no-fade'), 'FULL').vsLean.plDeltaCents === bk(nfRow, 'FULL').vsLean.plDeltaCents,
+    JSON.stringify(cmpMeet.templates.map((t) => [t.template, t.buckets.map((b) => b.completeness)])));
+  check('an unknown meet falls back to all meets', (await jget('/api/simulations/compare?meet=nope')).selectedMeet === 'all');
+  // A mode with no lean run: spread alone in scratch mode -> its row has no baseline.
+  const spreadScratch = await (await jpost('/api/simulations', { templates: ['spread'], applyChartScratchesBeforeGeneration: true })).json();
+  const cmpNB = await jget('/api/simulations/compare');
+  check('a run whose mode has no lean run reads "no baseline" (baseline none, vsLean null) on every bucket while the same template\'s as-generated row still compares to lean',
+    spreadScratch.runs[0].mode === 'chart_scratches_applied' &&
+    rowOf(cmpNB, 'spread', 'chart_scratches_applied').buckets.length === 2 && rowOf(cmpNB, 'spread', 'chart_scratches_applied').buckets.every((b) => b.baseline === 'none' && b.vsLean === null) &&
+    bk(rowOf(cmpNB, 'spread'), 'FULL').baseline === 'lean',
+    JSON.stringify(rowOf(cmpNB, 'spread', 'chart_scratches_applied')?.buckets.map((b) => [b.completeness, b.baseline])));
+
+  console.log('-- D50: chart scratches applied before generation (the at-the-window baseline) --');
+  // The default mode is what every check above measured: identical to the
+  // live card, refunds included. Day B's chart scratches #2 (a name-only
+  // chart scratch resolved at save), so lean as generated boxes 1-2 and
+  // gets a partial refund there.
+  check('default mode: runs record applyChartScratchesBeforeGeneration=false, mode as_generated, and lean as generated carries the refund on day B (the box named the chart-scratched #2)',
+    runBody.runs.every((r) => r.applyChartScratchesBeforeGeneration === false && r.mode === 'as_generated') &&
+    (leanBdet.outcomes.refund ?? 0) + (leanBdet.outcomes.partial ?? 0) > 0 && leanBdet.ticketDetails.some((t) => t.races[0] === 1 && t.legs.flat().includes('2')),
+    JSON.stringify(leanBdet.outcomes));
+  const scratchRun = await (await jpost('/api/simulations', { templates: ['lean'], applyChartScratchesBeforeGeneration: true })).json();
+  const sLean = scratchRun.runs[0];
+  check('scratch mode: the run records the flag, mode chart_scratches_applied, a scratch count, and still covers exactly the two days with results (day C skipped either way)',
+    sLean.applyChartScratchesBeforeGeneration === true && sLean.mode === 'chart_scratches_applied' && sLean.scratchesApplied > 0 && sLean.daysInRun === 2 && sLean.days.length === 2,
+    JSON.stringify({ flag: sLean.applyChartScratchesBeforeGeneration, mode: sLean.mode, n: sLean.scratchesApplied, days: sLean.daysInRun }));
+  const sB = await jget(`/api/simulations/${sLean.runId}/days/${dayB.id}`);
+  check('scratch mode on day B: no ticket names the chart-scratched #2, zero refunds / partials at grading, the day is still the whole bankroll, and the ticket set differs from the as-generated one',
+    !sB.ticketDetails.some((t) => t.races.includes(1) && t.legs.flat().includes('2')) && !sB.outcomes.refund && !sB.outcomes.partial &&
+    sB.costCents === 5000 && ticketKey(sB) !== ticketKey(leanBdet),
+    JSON.stringify({ outcomes: sB.outcomes, tickets: sB.ticketDetails.map((t) => t.betType + ':' + t.legs.flat().join('/')) }));
+  // Day A: the REAL chart's scratches (R2 x4, R5, R8, R10 x2), resolved by name against the real program's entries.
+  const chartScratched = new Map();
+  for (const r of chart.races) for (const s of r.scratches ?? []) {
+    const e = prog.races.find((x) => x.number === r.number)?.entries.find((x) => x.horseName.toUpperCase() === s.horseName.toUpperCase());
+    if (e) chartScratched.set(`${r.number}|${e.programNumber}`, s.horseName);
+  }
+  const sA = await jget(`/api/simulations/${sLean.runId}/days/${dayA.id}`);
+  const namesScratched = (det) => det.ticketDetails.flatMap((t) => t.races.flatMap((race, i) => (t.legs[i] ?? []).filter((p) => chartScratched.has(`${race}|${p}`)).map((p) => `R${race} #${p}`)));
+  check(`scratch mode on the real day: the chart's ${chartScratched.size} scratches resolve to program numbers, no ticket names any of them, zero refunds / partials at grading`,
+    chartScratched.size >= 6 && namesScratched(sA).length === 0 && !sA.outcomes.refund && !sA.outcomes.partial && sA.ticketDetails.length > 0,
+    JSON.stringify({ named: namesScratched(sA), outcomes: sA.outcomes }));
+  check('the stored day is untouched: the default-mode identity with the live card still holds on a fresh as-generated run after the scratch run',
+    (await (await jpost('/api/simulations', { templates: ['lean'] })).json()).runs[0].days.find((d) => d.raceDayId === dayA.id).plCents === liveA1.summary.plCents);
+  check('a non-boolean applyChartScratchesBeforeGeneration -> 400', (await jpost('/api/simulations', { applyChartScratchesBeforeGeneration: 'yes' })).status === 400);
+  const cmpModes = await jget('/api/simulations/compare');
+  check('compare groups by (template, mode): lean has TWO rows - as_generated and chart_scratches_applied - never pooled; so does spread (the D51 no-baseline run, now with lean beside it); every other template one row',
+    cmpModes.templates.filter((t) => t.template === 'lean').map((t) => t.mode).sort().join() === 'as_generated,chart_scratches_applied' &&
+    cmpModes.templates.filter((t) => t.template === 'lean' && t.mode === 'chart_scratches_applied')[0].runId === sLean.runId &&
+    cmpModes.templates.length === names.length + 2 && names.filter((n) => n !== 'lean' && n !== 'spread').every((n) => cmpModes.templates.filter((t) => t.template === n).length === 1) &&
+    cmpModes.templates.find((t) => t.template === 'spread' && t.mode === 'chart_scratches_applied').buckets.every((b) => b.baseline === 'lean' && b.vsLean.leanRunId === sLean.runId),
+    JSON.stringify(cmpModes.templates.map((t) => [t.template, t.mode, t.runId])));
 
   console.log('-- overrides, listing, compare, append-only --');
   const over = await (await jpost('/api/simulations', { templates: ['lean'], bankrollCents: 10000, startingBankrollCents: 50000 })).json();
@@ -216,11 +312,12 @@ try {
   check('unknown template -> 400', (await jpost('/api/simulations', { templates: ['nope'] })).status === 400);
   check('bad bankroll -> 400', (await jpost('/api/simulations', { bankrollCents: -5 })).status === 400);
   const list = await jget('/api/simulations');
-  check('GET /simulations: every run, newest first', list.runs.length === names.length + 1 && list.runs[0].runId === over.runs[0].runId);
+  check('GET /simulations: every run, newest first', list.runs.length === names.length + 4 && list.runs[0].runId === over.runs[0].runId);
   const cmp = await jget('/api/simulations/compare');
-  check('compare: the latest run per template - lean is the override run, the rest the first pass',
-    cmp.templates.length === names.length && cmp.templates.map((t) => t.template).join(',') === names.join(',') &&
-    cmp.templates.find((t) => t.template === 'lean').runId === over.runs[0].runId &&
+  const cmpAsGen = cmp.templates.filter((t) => t.mode === 'as_generated');
+  check('compare: the latest run per (template, mode) - as-generated lean is the override run, the rest the first pass, the scratch-mode lean and spread rows stay beside them',
+    cmpAsGen.length === names.length && cmpAsGen.map((t) => t.template).join(',') === names.join(',') &&
+    cmpAsGen.find((t) => t.template === 'lean').runId === over.runs[0].runId && cmp.templates.length === names.length + 2 &&
     cmp.templates.every((t) => Array.isArray(t.buckets) && !('days' in t)));
   check('runs are append-only: the earlier lean run still reads back unchanged',
     (await jget(`/api/simulations/${lean.runId}`)).buckets[0].plCents === lean.buckets[0].plCents && over.runs[0].runId > lean.runId);
@@ -247,6 +344,10 @@ try {
   check('decision-trace: one simulation_run event per run under the POST correlation id, naming template, buckets and days',
     simEvents.length === names.length && simEvents.every((e) => runBody.runs.some((r) => r.runId === e.runId && r.template === e.template) &&
       Array.isArray(e.buckets) && e.days.length === 2), `events=${simEvents.length}`);
+  const scratchEvent = traceLines.find((l) => l.event === 'simulation_run' && l.runId === sLean.runId);
+  check('decision-trace: the scratch-mode run carries applyChartScratchesBeforeGeneration=true (top level + params) and the default runs false',
+    scratchEvent?.applyChartScratchesBeforeGeneration === true && scratchEvent.params.applyChartScratchesBeforeGeneration === true && scratchEvent.params.scratchesApplied > 0 &&
+    simEvents.every((e) => e.applyChartScratchesBeforeGeneration === false), JSON.stringify(scratchEvent?.params));
 } finally {
   server.kill();
   await new Promise((rr) => setTimeout(rr, 300));

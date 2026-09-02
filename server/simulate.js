@@ -11,6 +11,7 @@
 import express from 'express';
 import { TEMPLATES, resolveTemplate } from '../shared/templates.js';
 import { simulateDay, summarizeRun } from '../shared/simulation.js';
+import { maxDrawdown } from '../shared/distribution.js';
 import { ENGINE_VERSION } from '../shared/card-engine.js';
 import { getDb } from './db.js';
 import { assembleEngineInput, loadDayFull } from './cards.js';
@@ -34,21 +35,54 @@ function eligibleDayIds(db) {
 }
 
 /**
+ * D50: the day's chart scratches (result_scratches, already resolved to
+ * program numbers by name at save - the same rows grading refunds key on)
+ * applied to the stored entries BEFORE generation, so the card is built as
+ * it would have been at the window. Rows that never resolved to a program
+ * number are skipped here exactly as grading skips them. The stored day is
+ * never touched - this is a copy for one simulated card.
+ */
+export function applyChartScratches(db, day) {
+  const rows = db.prepare('SELECT race_number, program_number FROM result_scratches WHERE race_day_id = ? AND program_number IS NOT NULL').all(day.id);
+  const scratched = new Set(rows.map((r) => `${r.race_number}|${r.program_number}`));
+  let applied = 0;
+  const races = day.races.map((r) => ({
+    ...r,
+    entries: r.entries.map((e) => {
+      if (e.scratched || !scratched.has(`${r.number}|${e.program_number}`)) return e;
+      applied++;
+      return { ...e, scratched: 1 };
+    }),
+  }));
+  return { day: { ...day, races }, applied };
+}
+
+/**
  * Run one template over every eligible day and persist the run.
  * `bankrollCents` / `perRaceMinCents` override the day's own recipe when
  * given (one bankroll across the whole history); `startingBankrollCents`
- * only shapes the bankroll-over-time series. Returns the run id.
+ * only shapes the bankroll-over-time series. `applyChartScratchesBeforeGeneration`
+ * (D50, default false) builds each card with the chart's scratches already
+ * applied - the at-the-window baseline; grading is unchanged either way.
+ * Returns the run id.
  */
 export function runTemplate(db, templateName, {
   bankrollCents = null, perRaceMinCents = null, startingBankrollCents = null, correlationId,
+  applyChartScratchesBeforeGeneration = false,
 } = {}) {
   const rules = resolveTemplate(templateName);
   if (!rules) throw new Error(`Unknown template "${templateName}".`);
   const rows = [];
+  let scratchesApplied = 0;
   for (const id of eligibleDayIds(db)) {
-    const day = loadDayFull(db, id);
+    let day = loadDayFull(db, id);
     const dayResults = loadDayResultsFor(db, id);
     if (!dayResults) continue;
+    if (applyChartScratchesBeforeGeneration) {
+      const r = applyChartScratches(db, day);
+      day = r.day;
+      scratchesApplied += r.applied;
+    }
     const sim = simulateDay({
       bankrollCents: bankrollCents ?? day.bankroll_cents,
       perRaceMinCents: perRaceMinCents ?? day.per_race_min_cents,
@@ -60,6 +94,8 @@ export function runTemplate(db, templateName, {
   }
   const params = {
     template: templateName, engineVersion: ENGINE_VERSION, bankrollCents, perRaceMinCents, startingBankrollCents,
+    applyChartScratchesBeforeGeneration: Boolean(applyChartScratchesBeforeGeneration),
+    scratchesApplied: applyChartScratchesBeforeGeneration ? scratchesApplied : 0,
     correlationId, days: rows.length,
   };
   const { buckets } = summarizeRun(rows, { startingBankrollCents });
@@ -84,19 +120,24 @@ export function runTemplate(db, templateName, {
   // day's P/L. The per-ticket detail lives in simulation_results and is
   // reproducible - the engine and grader are pure.
   traceLog.info('simulation_run', {
-    correlationId, runId, template: templateName, params, buckets: summary.buckets,
+    correlationId, runId, template: templateName, params,
+    applyChartScratchesBeforeGeneration: params.applyChartScratchesBeforeGeneration,
+    buckets: summary.buckets,
     days: rows.map((r) => ({ raceDayId: r.raceDayId, date: r.date, track: r.track, completeness: r.completeness, plCents: r.plCents })),
   });
-  log.info('simulation_run', { correlationId, runId, template: templateName, days: rows.length });
+  log.info('simulation_run', { correlationId, runId, template: templateName, days: rows.length, applyChartScratchesBeforeGeneration: params.applyChartScratchesBeforeGeneration });
   return runId;
 }
+
+/** The mode label the UI and the compare grouping use (D50). */
+export const scratchMode = (applied) => (applied ? 'chart_scratches_applied' : 'as_generated');
 
 /**
  * One run read back. Soft-deleted days drop out (invariant 12) and the
  * buckets are re-rolled from the surviving rows, so the stored summary is
  * only what the run saw at the time - the read is always current.
  */
-function readRun(db, runId, { withDays = true } = {}) {
+function readRun(db, runId, { withDays = true, meet = null } = {}) {
   const run = db.prepare(`
     SELECT sr.*, st.name AS template FROM simulation_runs sr
     JOIN strategy_templates st ON st.id = sr.strategy_template_id
@@ -104,28 +145,93 @@ function readRun(db, runId, { withDays = true } = {}) {
   `).get(runId);
   if (!run) return null;
   const params = JSON.parse(run.params ?? '{}');
+  // D51: an optional meet narrows the read to that meet's days (the same
+  // `?meet=` semantics as P/L and Distributions); the buckets re-roll on
+  // the surviving rows. Meets may pool ('all'); completeness buckets never.
   const rows = db.prepare(`
-    SELECT s.race_day_id, s.pl_cents, s.details, rd.track, rd.date
+    SELECT s.race_day_id, s.pl_cents, s.details, rd.track, rd.date, rd.meet
     FROM simulation_results s JOIN race_days rd ON rd.id = s.race_day_id
-    WHERE s.run_id = ? AND rd.deleted_at IS NULL
-  `).all(runId);
+    WHERE s.run_id = ? AND rd.deleted_at IS NULL ${meet ? 'AND rd.meet = ?' : ''}
+  `).all(...(meet ? [runId, meet] : [runId]));
   const days = rows.map((r) => {
     const d = JSON.parse(r.details ?? '{}');
     return {
-      raceDayId: r.race_day_id, track: r.track, date: r.date, completeness: d.completeness,
+      raceDayId: r.race_day_id, track: r.track, date: r.date, meet: r.meet, completeness: d.completeness,
       costCents: d.costCents, returnedCents: d.returnedCents, plCents: r.pl_cents,
       tickets: d.tickets, wins: d.wins, outcomes: d.outcomes, topTicketShare: d.topTicketShare,
     };
   }).sort((a, b) => a.date.localeCompare(b.date) || a.track.localeCompare(b.track) || a.raceDayId - b.raceDayId);
   const { buckets } = summarizeRun(days, { startingBankrollCents: params.startingBankrollCents ?? null });
+  const applied = Boolean(params.applyChartScratchesBeforeGeneration);
   const out = {
     runId: run.id, template: run.template,
     simulationOnly: Boolean(TEMPLATES[run.template]?.simulationOnly),
+    applyChartScratchesBeforeGeneration: applied, mode: scratchMode(applied),
+    scratchesApplied: params.scratchesApplied ?? 0,
     params, startedAt: run.started_at, finishedAt: run.finished_at,
-    daysInRun: params.days ?? rows.length, buckets,
+    daysInRun: params.days ?? rows.length, meet: meet ?? 'all', buckets,
   };
   if (withDays) out.days = days;
   return out;
+}
+
+/** Meets present among simulated, non-deleted days (D51). */
+function simulatedMeets(db) {
+  return db.prepare(`
+    SELECT DISTINCT rd.meet FROM simulation_results s
+    JOIN race_days rd ON rd.id = s.race_day_id
+    WHERE rd.deleted_at IS NULL AND rd.meet IS NOT NULL
+    ORDER BY rd.meet
+  `).all().map((r) => r.meet);
+}
+
+/**
+ * D51: one compare row for a run - its buckets with the shape figures
+ * (losing-day share, max drawdown of the running P/L, both cheap from the
+ * per-day rows the run already stores) and the "vs lean" comparison
+ * against `lean`, the lean run of the SAME mode and meet selection:
+ *   baseline 'lean'  -> vsLean = { plDeltaCents, paired {better, worse,
+ *                       tied, days} over the days BOTH runs simulated in
+ *                       the bucket, losingDayPctDelta, maxDrawdownDeltaCents }
+ *   baseline 'self'  -> the lean row itself (vsLean null - the UI leaves it blank)
+ *   baseline 'none'  -> no lean run in this mode / no lean days in this
+ *                       bucket (vsLean null - the UI reads "no baseline")
+ * Read-side only; nothing here is stored.
+ */
+export function compareRow(run, lean) {
+  const shapeOf = (b) => ({ losingDayPct: b.days ? b.losingDays / b.days : 0, maxDrawdown: maxDrawdown(b.series) });
+  const daysOf = (r, k) => new Map(r.days.filter((d) => d.completeness === k).map((d) => [d.raceDayId, d.plCents]));
+  const buckets = run.buckets.map((b) => {
+    const { series, ...rest } = b;
+    const shape = shapeOf(b);
+    let baseline = 'none';
+    let vsLean = null;
+    const lb = lean?.buckets.find((x) => x.completeness === b.completeness);
+    if (lean && lean.runId === run.runId) baseline = 'self';
+    else if (lb) {
+      baseline = 'lean';
+      const mine = daysOf(run, b.completeness);
+      const theirs = daysOf(lean, b.completeness);
+      const paired = { better: 0, worse: 0, tied: 0, days: 0 };
+      for (const [id, pl] of mine) {
+        if (!theirs.has(id)) continue;
+        paired.days++;
+        const d = pl - theirs.get(id);
+        if (d > 0) paired.better++; else if (d < 0) paired.worse++; else paired.tied++;
+      }
+      const leanShape = shapeOf(lb);
+      vsLean = {
+        leanRunId: lean.runId,
+        plDeltaCents: b.plCents - lb.plCents,
+        paired,
+        losingDayPctDelta: shape.losingDayPct - leanShape.losingDayPct,
+        maxDrawdownDeltaCents: shape.maxDrawdown.cents - leanShape.maxDrawdown.cents,
+      };
+    }
+    return { ...rest, ...shape, baseline, vsLean };
+  });
+  const { days, ...rest } = run;
+  return { ...rest, buckets };
 }
 
 const centsOrNull = (v, name) => {
@@ -150,6 +256,13 @@ simulateRouter.post('/simulations', (req, res) => {
     if (error) return res.status(400).json({ error });
     opts[k] = value;
   }
+  // D50: the at-the-window mode. A boolean or absent; anything else is a
+  // caller error - the two modes must never be confused.
+  const apply = req.body?.applyChartScratchesBeforeGeneration;
+  if (apply != null && typeof apply !== 'boolean') {
+    return res.status(400).json({ error: 'applyChartScratchesBeforeGeneration must be true or false.' });
+  }
+  opts.applyChartScratchesBeforeGeneration = apply === true;
   const runs = names.map((n) => readRun(db, runTemplate(db, n, opts)));
   res.status(201).json({ correlationId, runs });
 });
@@ -161,19 +274,32 @@ simulateRouter.get('/simulations', (_req, res) => {
   res.json({ runs: ids.map((id) => readRun(db, id, { withDays: false })) });
 });
 
-// The compare surface: the latest run per template, side by side.
-simulateRouter.get('/simulations/compare', (_req, res) => {
+// The compare surface: the latest run per (template, scratch mode), side by
+// side. D50: the two modes are different experiments (a card built on the
+// program's entries vs one built at the window) and are never pooled - a
+// template that ran in both modes gets two rows.
+// D51: `?meet=` narrows every row to one meet (default all meets); every
+// row carries its shape figures and the vs-lean comparison (compareRow).
+simulateRouter.get('/simulations/compare', (req, res) => {
   const db = getDb();
+  const meets = simulatedMeets(db);
+  const requestedMeet = String(req.query.meet ?? '').trim();
+  const selectedMeet = requestedMeet && meets.includes(requestedMeet) ? requestedMeet : 'all';
+  const meet = selectedMeet === 'all' ? null : selectedMeet;
   const latest = db.prepare(`
-    SELECT MAX(sr.id) AS id, st.name AS template FROM simulation_runs sr
+    SELECT MAX(sr.id) AS id, st.name AS template,
+           COALESCE(json_extract(sr.params, '$.applyChartScratchesBeforeGeneration'), 0) AS applied
+    FROM simulation_runs sr
     JOIN strategy_templates st ON st.id = sr.strategy_template_id
-    GROUP BY sr.strategy_template_id
+    GROUP BY sr.strategy_template_id, applied
   `).all();
   const order = Object.keys(TEMPLATES);
-  const templates = latest
-    .sort((a, b) => order.indexOf(a.template) - order.indexOf(b.template))
-    .map((r) => readRun(db, r.id, { withDays: false }));
-  res.json({ templates });
+  const runs = latest
+    .sort((a, b) => (order.indexOf(a.template) - order.indexOf(b.template)) || (a.applied - b.applied))
+    .map((r) => readRun(db, r.id, { meet }));
+  const leanByMode = new Map(runs.filter((r) => r.template === 'lean').map((r) => [r.mode, r]));
+  const templates = runs.map((r) => compareRow(r, leanByMode.get(r.mode) ?? null));
+  res.json({ templates, meets, selectedMeet });
 });
 
 simulateRouter.get('/simulations/:id', (req, res) => {

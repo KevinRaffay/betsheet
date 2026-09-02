@@ -1,5 +1,5 @@
 import React, { useEffect, useState } from 'react';
-import { getDistribution } from '../api.js';
+import { getDistribution, getSimulationCompare } from '../api.js';
 
 const money = (cents) => (cents == null ? '—' : cents % 100 === 0 ? `$${cents / 100}` : `$${(cents / 100).toFixed(2)}`);
 const signed = (cents) => (
@@ -19,9 +19,13 @@ export default function DistributionView({ onBack, onOpenDay }) {
   const [version, setVersion] = useState('');
   const [meet, setMeet] = useState('all');
   const [onlyFlagged, setOnlyFlagged] = useState(false);
+  // D51: the simulated templates' shape (losing-day share, max drawdown)
+  // vs lean, from the latest run per (template, mode) under the same meet.
+  const [simCompare, setSimCompare] = useState(null);
 
   useEffect(() => {
     getDistribution(version, meet).then(setData).catch((e) => setError(String(e.message)));
+    getSimulationCompare(meet).then(setSimCompare).catch(() => setSimCompare(null));
   }, [version, meet]);
 
   if (error) return <p className="notice notice--error">{error}</p>;
@@ -81,6 +85,8 @@ export default function DistributionView({ onBack, onOpenDay }) {
         {' '}Dependence: gross = top ticket ÷ total returned (refunds included); net = the ticket with the largest net ÷ the day&apos;s net profit, winning days only (a refund can top the gross list but never the net one). The flag is net.
       </p>
 
+      {simCompare?.templates?.length > 0 && <SimulatedShape compare={simCompare} />}
+
       {data.days.length > 0 && (
         <>
           <div className="pagehead">
@@ -115,5 +121,51 @@ export default function DistributionView({ onBack, onOpenDay }) {
         </>
       )}
     </section>
+  );
+}
+
+// D51: the simulated templates' distribution beside the live one - losing-day
+// share and max drawdown per bucket for the latest run per (template, mode),
+// each with its delta against the lean row of the same bucket, mode and
+// meet (blank on lean, "no baseline" when the mode has no lean run). Cheap:
+// both figures come from the per-day P/L rows the runs already store.
+function SimulatedShape({ compare }) {
+  const buckets = ['FULL', 'PARTIAL', 'PROGRAM_ONLY', 'ODDS_ONLY'].filter((k) => compare.templates.some((t) => t.buckets.some((b) => b.completeness === k)));
+  const dPct = (x) => `${x >= 0 ? '+' : '−'}${(100 * Math.abs(x)).toFixed(0)} pts`;
+  const dMoney = (c) => `${c >= 0 ? '+' : '−'}${money(Math.abs(c))}`;
+  const vs = (b, render) => (b.baseline === 'self' ? null : b.baseline !== 'lean' || !b.vsLean ? <span className="dim">no baseline</span> : <span className="dim">({render(b.vsLean)} vs lean)</span>);
+  return (
+    <div className="race race--sheet">
+      <div className="race-sheet-head">
+        <strong>Simulated templates</strong>
+        <span className="dim">latest run per template and mode · {compare.selectedMeet === 'all' ? 'all meets' : compare.selectedMeet} · deltas against the lean row of the same bucket and mode</span>
+      </div>
+      {buckets.map((k) => (
+        <div key={k}>
+          <p><span className={`chip chip--${BUCKET_CHIP[k] ?? 'guess'}`}>{k}</span></p>
+          <table className="grid">
+            <thead>
+              <tr><th>Template</th><th>Mode</th><th>Days</th><th>Losing days</th><th>Max drawdown</th><th>P/L</th></tr>
+            </thead>
+            <tbody>
+              {compare.templates.map((t) => {
+                const b = t.buckets.find((x) => x.completeness === k);
+                if (!b) return null;
+                return (
+                  <tr key={t.runId}>
+                    <td><strong>{t.template}</strong>{t.simulationOnly && <span className="dim"> (simulation only)</span>}</td>
+                    <td className="dim">{t.applyChartScratchesBeforeGeneration ? 'scratches applied' : 'as generated'}</td>
+                    <td>{b.days}</td>
+                    <td>{pct(b.losingDayPct)} <span className="dim">({b.losingDays} of {b.days})</span> {vs(b, (v) => dPct(v.losingDayPctDelta))}</td>
+                    <td>{money(b.maxDrawdown?.cents ?? 0)} {vs(b, (v) => dMoney(v.maxDrawdownDeltaCents))}</td>
+                    <td>{signed(b.plCents)} {vs(b, (v) => dMoney(v.plDeltaCents))}</td>
+                  </tr>
+                );
+              })}
+            </tbody>
+          </table>
+        </div>
+      ))}
+    </div>
   );
 }

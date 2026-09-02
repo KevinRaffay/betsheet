@@ -24,15 +24,19 @@ export default function SimView({ onBack, onOpenDay }) {
   const [busy, setBusy] = useState(false);
   const [expanded, setExpanded] = useState(null); // runId
   const [run, setRun] = useState(null);
+  // D50: the at-the-window mode - chart scratches applied before generation.
+  const [applyScratches, setApplyScratches] = useState(false);
+  // D51: one meet or all meets - the same control as P/L and Distributions.
+  const [meet, setMeet] = useState('all');
 
-  const reload = () => getSimulationCompare().then(setCompare).catch((e) => setError(String(e.message)));
-  useEffect(() => { reload(); }, []);
+  const reload = () => getSimulationCompare(meet).then(setCompare).catch((e) => setError(String(e.message)));
+  useEffect(() => { reload(); }, [meet]);
 
   const handleRun = async () => {
     setBusy(true);
     setError(null);
     try {
-      await runSimulation({});
+      await runSimulation({ applyChartScratchesBeforeGeneration: applyScratches });
       setExpanded(null);
       setRun(null);
       await reload();
@@ -63,8 +67,20 @@ export default function SimView({ onBack, onOpenDay }) {
       <div className="pagehead">
         <h2>Simulator</h2>
         <div className="btnrow">
+          {compare?.meets?.length > 0 && (
+            <label className="dim">Meet{' '}
+              <select className="in in--sm" value={compare.selectedMeet ?? 'all'} onChange={(e) => setMeet(e.target.value)}>
+                <option value="all">all meets</option>
+                {compare.meets.map((m) => <option key={m} value={m}>{m}</option>)}
+              </select>
+            </label>
+          )}
+          <label className="dim" title="Build each simulated card with the day's chart scratches already applied - the at-the-window baseline. Grading is unchanged; the two modes are reported on separate rows, never pooled.">
+            <input type="checkbox" checked={applyScratches} onChange={(e) => setApplyScratches(e.target.checked)} disabled={busy} />
+            {' '}apply chart scratches before generation
+          </label>
           <button className="btn btn--primary" onClick={handleRun} disabled={busy}>
-            {busy ? 'Running…' : 'Run every template'}
+            {busy ? 'Running…' : applyScratches ? 'Run every template (scratches applied)' : 'Run every template'}
           </button>
           <button className="btn" onClick={onBack}>Back</button>
         </div>
@@ -83,13 +99,13 @@ export default function SimView({ onBack, onOpenDay }) {
         <div className="race race--sheet" key={k}>
           <div className="race-sheet-head">
             <span className={`chip chip--${BUCKET_CHIP[k]}`}>{k}</span>
-            <span className="dim">latest run per template · this bucket only</span>
+            <span className="dim">latest run per template and mode · this bucket only{compare.selectedMeet && compare.selectedMeet !== 'all' ? ` · ${compare.selectedMeet}` : ' · all meets'}</span>
           </div>
           <table className="grid grid--click">
             <thead>
               <tr>
-                <th>Template</th><th>Days</th><th>Losing days</th><th>Wagered</th>
-                <th>Returned</th><th>P/L</th><th>ROI</th><th>Hits</th><th>Run</th>
+                <th>Template</th><th>Mode</th><th>Days</th><th>Losing days</th><th>Drawdown</th><th>Wagered</th>
+                <th>Returned</th><th>P/L</th><th>ROI</th><th>vs lean</th><th>Hits</th><th>Run</th>
               </tr>
             </thead>
             <tbody>
@@ -99,12 +115,15 @@ export default function SimView({ onBack, onOpenDay }) {
                 return (
                   <tr key={t.runId} onClick={() => toggle(t.runId)}>
                     <td><strong>{t.template}</strong>{t.simulationOnly && <span className="dim"> (simulation only)</span>}</td>
+                    <td>{modeLabel(t)}</td>
                     <td>{b.days}</td>
                     <td>{b.losingDays}/{b.days}</td>
+                    <td>{money(b.maxDrawdown?.cents ?? 0)}{b.vsLean && <span className="dim"> ({delta(b.vsLean.maxDrawdownDeltaCents)})</span>}</td>
                     <td>{money(b.costCents)}</td>
                     <td>{money(b.returnedCents)}</td>
                     <td>{signed(b.plCents)}</td>
                     <td>{roi(b.plCents, b.costCents)}</td>
+                    <td>{vsLeanCell(b)}</td>
                     <td className="dim">{b.wins}/{b.tickets}</td>
                     <td className="dim">#{t.runId} · {t.finishedAt}</td>
                   </tr>
@@ -116,7 +135,7 @@ export default function SimView({ onBack, onOpenDay }) {
       ))}
       {bucketsPresent.length > 0 && (
         <p className="dim">
-          Buckets never pool: a program-only backfill day and a full-consensus day never share a total. Click a template for its bankroll over time.
+          Buckets never pool: a program-only backfill day and a full-consensus day never share a total. Modes never pool either: "as generated" builds each card on the stored entries, "scratches applied" builds it with the chart's scratches already out (the at-the-window baseline) - one row per (template, mode). "vs lean" is the P/L delta against the lean row of the same bucket, mode and meet, with the paired day count over the days both runs simulated; drawdown deltas in the same spirit (a positive delta is a deeper drawdown). Click a template for its bankroll over time.
         </p>
       )}
 
@@ -127,6 +146,29 @@ export default function SimView({ onBack, onOpenDay }) {
   );
 }
 
+// D51: the vs-lean cell - blank on the lean row itself, "no baseline" when
+// the mode has no lean run (or lean has no days in the bucket), else the
+// P/L delta and the paired day count.
+const delta = (cents) => `${cents >= 0 ? '+' : '−'}${money(Math.abs(cents))}`;
+export const vsLeanText = (b) => {
+  if (b.baseline === 'self') return '';
+  if (b.baseline !== 'lean' || !b.vsLean) return 'no baseline';
+  const p = b.vsLean.paired;
+  return `${delta(b.vsLean.plDeltaCents)} · better on ${p.better} / worse on ${p.worse} / tied on ${p.tied}`;
+};
+const vsLeanCell = (b) => {
+  if (b.baseline === 'self') return null;
+  if (b.baseline !== 'lean' || !b.vsLean) return <span className="dim">no baseline</span>;
+  const p = b.vsLean.paired;
+  return <>{signed(b.vsLean.plDeltaCents)} <span className="dim">better on {p.better} / worse on {p.worse} / tied on {p.tied}</span></>;
+};
+
+// D50: the run's scratch mode as a label. `as generated` = the card built on
+// the stored entries; `scratches applied` = chart scratches out first.
+const modeLabel = (run) => (run.applyChartScratchesBeforeGeneration
+  ? <span className="tag">scratches applied{run.scratchesApplied ? ` (${run.scratchesApplied})` : ''}</span>
+  : <span className="dim">as generated</span>);
+
 // Bankroll over time for one run: a day-by-day table per bucket with the
 // running P/L (and the running bankroll when the run was given one).
 function RunDetail({ run, onOpenDay }) {
@@ -135,7 +177,8 @@ function RunDetail({ run, onOpenDay }) {
       <div className="race-sheet-head">
         <strong>{run.template} · run #{run.runId}</strong>
         <span className="dim">
-          {run.params.bankrollCents ? `${money(run.params.bankrollCents)} per day` : "each day's own bankroll"}
+          {modeLabel(run)}
+          {' '}· {run.params.bankrollCents ? `${money(run.params.bankrollCents)} per day` : "each day's own bankroll"}
           {run.params.startingBankrollCents ? ` · starting bankroll ${money(run.params.startingBankrollCents)}` : ''}
           {' '}· {run.days.length} day{run.days.length === 1 ? '' : 's'}
         </span>

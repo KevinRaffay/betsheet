@@ -72,7 +72,7 @@ map in the same PR.
 | Every card records consensus_completeness (FULL / PARTIAL / PROGRAM_ONLY) from sources actually used | D25 (schema, migration 003), D10 (computed + written at generation) |
 | All P/L, simulation and distribution reporting buckets by completeness; program-only backfill never pools with full-consensus in one aggregate | D16, D19, D20 (rule: invariant 12) |
 | Wayback Machine fetcher (web.archive.org) retrieves archived versions of each consensus source for historical dates; outcomes audited like any source | D08d (on the D07 framework) |
-| Simulator evaluates structure-layer rules (place-money, hedge cuts, exotic construction, allocation curves) independently of race classification, so historical cards benchmark bet construction even without signal data | D18 (layer split), D19 (evaluation) |
+| Simulator evaluates structure-layer rules (place-money, hedge cuts, exotic construction, allocation curves) independently of race classification, so historical cards benchmark bet construction even without signal data | D18 (layer split), D19 (evaluation), D48 (the templates that fire on PROGRAM_ONLY days), D49 (exotic construction isolated: split box vs mid-price straight exacta) |
 
 ## Results, grading & simulation (workflow step 5)
 
@@ -84,7 +84,7 @@ map in the same PR.
 | Grade every ticket (all bet types, exotics, parlays, scratch/refund rules) | D15 |
 | P/L per-race, per-day, running; compare sheet variants | D16 |
 | Strategy templates as reusable rules | D18 |
-| Simulate templates across all stored cards with real payoffs | D19 |
+| Simulate templates across all stored cards with real payoffs | D19; D51 (compare per meet, vs-lean deltas, paired day counts) |
 | Distributions: % losing days, max drawdown, single-ticket dependence (>80%) | D20 |
 | Decision traces joined with graded results, exportable for LLM analysis | D17 |
 | Discipline tracker (planned vs. actual, house-money warnings) | D24 (schema in D03) |
@@ -100,8 +100,9 @@ map in the same PR.
 | Every race in every program fixture parses a well-formed distance; an unparsed distance is a preview warning, never `?` | D37, D32 (grammar) |
 | The card footer lists program-time AND chart scratches after grading, labeled by source | D38 |
 | Effective wagered (wagered − refunds) and effective ROI reported beside nominal at card, day and bucket level; refunds visible | D39 |
-| Historical simulation can apply chart scratches before generation (at-the-window baseline), both modes reported | D19 (option) |
+| Historical simulation can apply chart scratches before generation (at-the-window baseline), both modes reported | D50 (the D19 run option; compare groups by template AND mode, never pooled) |
 | Single-ticket dependence reported gross and net; the flag driven by net | D20 |
+| Structure-layer findings are recorded per engine version with run IDs before any engine change is proposed: one file per (engine version, bucket, corpus) under docs/findings/, both scratch modes, all meets and per meet, paired day counts, what is not concluded, the next corpus's question; never edited after the version is superseded | D52 (the first: lean-1.1 / PROGRAM_ONLY / DMR 2025-2026), CLAUDE.md "Findings" |
 
 ## Morning-line sheet (addendum 3, 2026-09-02)
 
@@ -119,7 +120,7 @@ map in the same PR.
 | Results from the track's results page as a second results source of record, cross-validated against Equibase charts: identical returned cents per ticket from either source | D42, D15 (grader) |
 | Batch ingestion policy A: a day saves automatically only with zero blocking warnings; anything blocking goes to a review queue in the UI - the documented batch exception to invariant 9 | D43 |
 | Per-meet fixtures and golden checkpoints: the runner halts at each meet's first race day until its golden is audited | D43 (the D32 pattern) |
-| `meet` on race_days (DMR-<year>-summer / -fall), with P/L and distribution grouping by meet | D43 (schema + runner), D16 / D20 (grouping) |
+| `meet` on race_days (DMR-<year>-summer / -fall), with P/L and distribution grouping by meet | D43 (schema + runner), D16 / D20 (grouping), D51 (simulation compare by meet) |
 | Every backfilled card carries the engine version it was generated under; D34 precedes any backfill run | D34, D43 |
 | The corpus itself is a deliverable: one row per meet, with preconditions, acceptance, a committed report (docs/backfill/<meet>.md), and the golden + queue decisions recorded | D44, D45, D46 |
 | No later meet starts until the earlier meet's report is reviewed (D44 -> D45 -> D46) | D44, D45, D46 |
