@@ -3,6 +3,24 @@ import { fetchConsensus, getConsensus, manualPicksPreview, manualPicksSave } fro
 
 const TYPE_LABEL = { top: 'top', second: '2nd', third: '3rd', watch_out: 'watch', contrarian: 'contra' };
 const OUTCOME_OK = new Set(['ok', 'manual_paste', 'manual_upload']);
+// D53: a discovery miss is not a failure - the source has not posted yet.
+const OUTCOME_NEUTRAL = new Set(['not_published']);
+const urlPath = (u) => { try { return new URL(u).pathname; } catch { return u; } };
+
+// D53: the discovery details on an audit row, so a miss is auditable from
+// the table alone - which sitemap answered how, the slug looked for, how
+// many entries were scanned and the nearest one (the near-miss).
+function Discovery({ a }) {
+  if (!a.candidate_slug && !a.sitemap_url) return null;
+  return (
+    <span className="dim">
+      {a.sitemap_url ? <>sitemap {a.sitemap_status ?? '?'} <a href={a.sitemap_url} target="_blank" rel="noreferrer">{urlPath(a.sitemap_url)}</a> · </> : null}
+      {a.entries_scanned != null ? `${a.entries_scanned} entries · ` : ''}
+      {a.candidate_slug ? <>looked for <code>{a.candidate_slug}</code></> : null}
+      {a.nearest_slug ? <> · nearest <code>{a.nearest_slug}</code></> : null}
+    </span>
+  );
+}
 
 // The consensus section of a stored race day: run/refresh the automated
 // fetchers, see every attempt (a failing source is always visible -
@@ -206,11 +224,12 @@ export default function ConsensusPanel({ dayId }) {
         <details className="race">
           <summary>
             Fetch audit — {data.attempts.length} attempt{data.attempts.length === 1 ? '' : 's'}
-            {data.attempts.some((a) => !OUTCOME_OK.has(a.outcome)) ? ' (failures present)' : ''}
+            {data.attempts.some((a) => !OUTCOME_OK.has(a.outcome) && !OUTCOME_NEUTRAL.has(a.outcome)) ? ' (failures present)' : ''}
+            {data.attempts.some((a) => OUTCOME_NEUTRAL.has(a.outcome)) ? ' (a source has not posted yet)' : ''}
           </summary>
           <table className="grid">
             <thead>
-              <tr><th>When</th><th>Source</th><th>Outcome</th><th>HTTP</th><th>Picks</th><th>Reason</th></tr>
+              <tr><th>When</th><th>Source</th><th>Outcome</th><th>HTTP</th><th>URL</th><th>Picks</th><th>Reason</th><th>Discovery</th></tr>
             </thead>
             <tbody>
               {data.attempts.map((a) => (
@@ -218,10 +237,13 @@ export default function ConsensusPanel({ dayId }) {
                   <td className="dim">{a.ts}</td>
                   <td>{a.source_name}</td>
                   <td>{OUTCOME_OK.has(a.outcome) ? a.outcome
-                    : <span className="tag tag--red">{a.outcome}</span>}</td>
+                    : OUTCOME_NEUTRAL.has(a.outcome) ? <span className="tag">{a.outcome}</span>
+                      : <span className="tag tag--red">{a.outcome}</span>}</td>
                   <td className="dim">{a.http_status ?? ''}</td>
+                  <td className="dim">{a.url ? <a href={a.url} target="_blank" rel="noreferrer">{urlPath(a.url)}</a> : ''}</td>
                   <td>{a.picks_extracted ?? ''}</td>
                   <td className="dim">{a.fallback_reason ?? ''}</td>
+                  <td><Discovery a={a} /></td>
                 </tr>
               ))}
             </tbody>
