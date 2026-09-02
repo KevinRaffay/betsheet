@@ -147,6 +147,9 @@ try {
     pdfRes.ok && pdfParsed.races.length === 10 &&
     pdfParsed.races.reduce((a, r) => a + r.entries.length, 0) === 98 &&
     pdfParsed.races[3].entries.some((e) => e.bestBet));
+  const raceFourAnalysis = pdfParsed.analysis?.find((a) => a.race === 4)?.text;
+  check('program-pdf endpoint: per-race Bottom Line analysis present',
+    typeof raceFourAnalysis === 'string' && raceFourAnalysis.length > 80);
 
   // Saving the PDF parse for its own (different) date must coexist with the
   // pasted day rather than conflict.
@@ -155,7 +158,7 @@ try {
     headers: { 'content-type': 'application/json' },
     body: JSON.stringify({
       track: 'Del Mar', date: pdfParsed.date, bankrollCents: 20000,
-      perRaceMinCents: 500, races: pdfParsed.races,
+      perRaceMinCents: 500, races: pdfParsed.races, analysis: pdfParsed.analysis,
     }),
   });
   const listBoth = await fetch(`${BASE}/api/race-days`).then((r) => r.json());
@@ -164,6 +167,8 @@ try {
   const bb = pdfDay.races.find((r) => r.number === 4).entries.find((e) => e.best_bet === 1);
   check('pdf day: best bet and program ranks persisted',
     bb?.horse_name === 'Run With Liberty' && bb?.program_rank === 1);
+  check('pdf day: Bottom Line text persists on the matching race',
+    pdfDay.races.find((r) => r.number === 4)?.bottom_line === raceFourAnalysis);
 
   // ---- results-chart parse endpoints (preview only; nothing persists) ----
 

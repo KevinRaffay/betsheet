@@ -133,6 +133,9 @@ const toInt = (v) => (v === null || v === undefined || v === '' ? null : Math.ro
 // from the track + date (DMR-<year>-summer / -fall), never typed.
 export function insertRaceDay(db, payload, correlationId) {
   const entriesSource = ['program', 'ml_sheet', 'both'].includes(payload.entriesSource) ? payload.entriesSource : 'program';
+  const bottomLineByRace = new Map((payload.analysis ?? [])
+    .filter((chunk) => chunk && Number.isInteger(chunk.race) && chunk.text)
+    .map((chunk) => [chunk.race, String(chunk.text)]));
   const dayInfo = db.prepare(`INSERT INTO race_days
       (track, date, bankroll_cents, per_race_min_cents, correlation_id, entries_source, meet)
       VALUES (?, ?, ?, ?, ?, ?, ?)`)
@@ -142,8 +145,8 @@ export function insertRaceDay(db, payload, correlationId) {
 
   const insertRace = db.prepare(`INSERT INTO races
       (race_day_id, number, post_time, distance, surface, race_type, conditions,
-       claiming_price_cents, wager_menu)
-      VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)`);
+       claiming_price_cents, wager_menu, bottom_line)
+      VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`);
   const insertEntry = db.prepare(`INSERT INTO entries
       (race_id, program_number, post_position, horse_name, morning_line,
        morning_line_decimal, jockey, trainer, weight, equipment, scratched,
@@ -155,6 +158,7 @@ export function insertRaceDay(db, payload, correlationId) {
       dayId, race.number, race.postTime ?? null, race.distance ?? null,
       race.surface ?? null, race.raceType ?? null, race.conditions ?? null,
       toInt(race.claimingPriceCents), race.wagerMenu ?? null,
+      bottomLineByRace.get(race.number) ?? null,
     );
     for (const e of race.entries) {
       // A scratched horse straight from the program can have no number;
