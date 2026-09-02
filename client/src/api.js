@@ -180,3 +180,16 @@ export const fetchMlSheet = (track, date, correlationId) =>
     headers: { 'content-type': 'application/json', ...(correlationId ? { 'x-correlation-id': correlationId } : {}) },
     body: JSON.stringify({ track, date }),
   }).then(asJson);
+
+// dmtc results page (D42).
+export const parseResultsHtml = (html, correlationId) =>
+  fetch('/api/parse/results-html', {
+    method: 'POST',
+    headers: { 'content-type': 'application/json', ...(correlationId ? { 'x-correlation-id': correlationId } : {}) },
+    body: JSON.stringify({ html }),
+  }).then(asJson);
+export const resultsFromArchive = (dayId, correlationId) =>
+  fetch(`/api/race-days/${dayId}/results/from-archive`, {
+    method: 'POST',
+    headers: { ...(correlationId ? { 'x-correlation-id': correlationId } : {}) },
+  }).then(asJson);

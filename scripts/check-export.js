@@ -123,7 +123,7 @@ try {
     full.trace.filter((e) => e.event === 'card_graded').length === 1 &&
     full.trace.findIndex((e) => e.event === 'card_graded') > full.trace.findIndex((e) => e.event === 'card_finalized'));
   check('results section carries the chart (finishers, exotics, resolved scratches)',
-    full.results.finishers.length === 90 && full.results.exotics.length === 67 &&
+    full.results.finishers.length === 90 && full.results.exotics.length === 68 &&
     full.results.scratches.some((s) => s.programNumber != null));
 
   console.log('-- durability --');

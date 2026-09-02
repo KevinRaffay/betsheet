@@ -13,6 +13,10 @@ import { parseChart } from '../shared/chart-parser.js';
 import { parseProgramPdf } from './program-parser.js';
 import { parseMlSheetPdf } from './ml-sheet-parser.js';
 import { mergeMlAndProgram } from '../shared/entries-merge.js';
+import { parseDmtcResults } from '../shared/dmtc-results-parser.js';
+import { DEFAULT_RAW_DIR, dayDir, readManifest } from './dmtc-crawler.js';
+import fs from 'node:fs';
+import path from 'node:path';
 import { listFetchers, loadExtraFetchers } from './fetchers/index.js';
 import { fetchWithTimeout, recordAttempt, robotsDisallows, upsertSource } from './consensus.js';
 import { extractPdfLines } from './pdf-text.js';
@@ -261,6 +265,46 @@ ingestRouter.post('/fetch/ml-sheet', async (req, res) => {
     audit('network_error', { url, fallbackReason: String(err?.message ?? err) });
     res.status(502).json({ error: `Could not reach the track: ${err?.message ?? err}`, url });
   }
+});
+
+// ---------- dmtc results page (D42): the second results source ----------
+
+// Parse an uploaded / pasted dmtc.com results page. Preview only.
+ingestRouter.post('/parse/results-html', (req, res) => {
+  const correlationId = req.get('x-correlation-id') || newCorrelationId();
+  const html = String(req.body?.html ?? '');
+  if (!html.trim()) return res.status(400).json({ error: 'html (the results page source) is required.' });
+  const parsed = parseDmtcResults(html);
+  log.info('parse_completed', {
+    correlationId, kind: 'results_html', bytes: html.length, races: parsed.races.length,
+    finishers: parsed.races.reduce((a, r) => a + r.results.length, 0),
+    exotics: parsed.races.reduce((a, r) => a + r.exotics.length, 0), warnings: parsed.warnings.length,
+  });
+  res.json({ correlationId, sourceKind: 'dmtc_html', ...parsed });
+});
+
+// Preview a race day's results from the D41 raw archive (never the network).
+// The calendar's race count must equal the parsed count - a mismatch is a
+// hard error for the day (422), per the D42 rule.
+ingestRouter.post('/race-days/:id/results/from-archive', (req, res) => {
+  const correlationId = req.get('x-correlation-id') || newCorrelationId();
+  const db = getDb();
+  const day = db.prepare('SELECT id, track, date, deleted_at FROM race_days WHERE id = ?').get(Number(req.params.id));
+  if (!day) return res.status(404).json({ error: 'No such race day.' });
+  if (day.deleted_at) return res.status(410).json({ error: 'This race day is deleted.' });
+  const rawDir = process.env.BETSHEET_RAW_DIR || DEFAULT_RAW_DIR;
+  const file = path.join(dayDir(rawDir, day.date), 'results.html');
+  if (!fs.existsSync(file)) return res.status(404).json({ error: `No archived results page for ${day.date}. Run: npm run dmtc-fetch -- --from ${day.date} --to ${day.date} --what results` });
+  const manifest = readManifest(rawDir, day.date);
+  const expected = { races: manifest?.calendar?.races ?? null };
+  const parsed = parseDmtcResults(fs.readFileSync(file, 'utf8'), expected);
+  const mismatch = parsed.warnings.find((w) => w.type === 'race_count_mismatch');
+  log.info('parse_completed', {
+    correlationId, kind: 'results_archive', raceDayId: day.id, races: parsed.races.length,
+    expectedRaces: expected.races, warnings: parsed.warnings.length, mismatch: Boolean(mismatch),
+  });
+  if (mismatch) return res.status(422).json({ error: `${mismatch.message} Nothing to preview - the archived page is incomplete or the calendar is wrong.`, warnings: parsed.warnings });
+  res.json({ correlationId, sourceKind: 'dmtc_html', archivedAt: manifest?.artifacts?.results?.fetched_at ?? null, ...parsed });
 });
 
 ingestRouter.post('/race-days', (req, res) => {

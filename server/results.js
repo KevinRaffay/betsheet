@@ -20,6 +20,10 @@ const traceLog = getLogger('decision-trace');
 
 export const resultsRouter = express.Router();
 
+// Results provenance (D42, migration 010): where the day's results came from.
+// Re-saving from ANY source replaces the day's results and regrades every card.
+const SOURCE_KINDS = { paste: 'equibase_paste', pdf: 'equibase_pdf', equibase_paste: 'equibase_paste', equibase_pdf: 'equibase_pdf', dmtc_html: 'dmtc_html' };
+
 const lettersOnly = (s) => String(s ?? '').replace(/[^A-Za-z]/g, '').toUpperCase();
 const nameKey = (s) => String(s ?? '').toUpperCase().replace(/[‘’]/g, "'")
   .replace(/\s+/g, ' ').trim();
@@ -52,7 +56,7 @@ resultsRouter.post('/race-days/:id/results', (req, res) => {
   const digest = crypto.createHash('sha256')
     .update(JSON.stringify(p.races)).digest('hex');
 
-  const counts = { results: 0, exotics: 0, scratches: 0 };
+  const counts = { results: 0, exotics: 0, scratches: 0, unresolvedFinishers: 0 };
   const save = db.transaction(() => {
     db.prepare('DELETE FROM race_results WHERE race_day_id = ?').run(day.id);
     db.prepare('DELETE FROM exotic_payoffs WHERE race_day_id = ?').run(day.id);
@@ -70,8 +74,19 @@ resultsRouter.post('/race-days/:id/results', (req, res) => {
         VALUES (?, ?, ?, ?)`);
 
     for (const race of p.races) {
+      // The dmtc page names also-rans without program numbers (D42); resolve
+      // them against the day's entries like scratches. Unresolved rows are
+      // counted, not invented - the column is NOT NULL and grading keys on it.
+      const entriesFor = db.prepare(`
+        SELECT e.program_number, e.horse_name FROM entries e
+        JOIN races r ON r.id = e.race_id
+        WHERE r.race_day_id = ? AND r.number = ?
+      `).all(day.id, race.number);
       for (const r of race.results ?? []) {
-        insResult.run(day.id, race.number, r.programNumber, r.horseName ?? null,
+        let pgm = r.programNumber ?? null;
+        if (pgm == null && r.horseName) pgm = entriesFor.find((e) => nameKey(e.horse_name) === nameKey(r.horseName))?.program_number ?? null;
+        if (pgm == null) { counts.unresolvedFinishers++; continue; }
+        insResult.run(day.id, race.number, pgm, r.horseName ?? null,
           r.finishPosition ?? null, r.winCents ?? null, r.placeCents ?? null, r.showCents ?? null);
         counts.results++;
       }
@@ -98,7 +113,7 @@ resultsRouter.post('/race-days/:id/results', (req, res) => {
     }
     db.prepare(`INSERT INTO result_charts (race_day_id, source_kind, raw_digest, correlation_id)
         VALUES (?, ?, ?, ?)`)
-      .run(day.id, p.sourceKind === 'pdf' ? 'pdf' : 'paste', digest, correlationId);
+      .run(day.id, SOURCE_KINDS[p.sourceKind] ?? 'equibase_paste', digest, correlationId);
   });
   save();
 
