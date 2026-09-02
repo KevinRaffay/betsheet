@@ -11,7 +11,7 @@ const signed = (cents) => (
 const roi = (plCents, costCents) =>
   (costCents > 0 ? `${plCents >= 0 ? '+' : ''}${(100 * plCents / costCents).toFixed(1)}%` : '—');
 
-const BUCKET_CHIP = { FULL: 'unanimous', PARTIAL: 'split', PROGRAM_ONLY: 'chaos', ODDS_ONLY: 'guess' };
+const BUCKET_CHIP = { FULL: 'unanimous', PARTIAL: 'split', PROGRAM_ONLY: 'chaos', ODDS_ONLY: 'guess', HUMAN: 'human' };
 
 // P/L across every stored card. Invariant 13 shapes this screen: every
 // number lives inside its consensus_completeness bucket and there is no
@@ -97,7 +97,8 @@ export default function PLView({ onBack, onOpenCard, onOpenDay }) {
                 <p className="dim">
                   {b.cards} card{b.cards === 1 ? '' : 's'} · {b.tickets} tickets
                   <br />
-                  {money(b.returnedCents)} back on {money(b.costCents)} · ROI {roi(b.plCents, b.costCents)}
+                  {money(b.returnedCents)} back on {money(b.costCents)} · ROI {roi(b.plCents, b.costCents)} wagered
+                  {' '}/ {roi(b.plCents, b.bankrollCents)} bankroll
                 </p>
               </div>
             ))}
@@ -123,7 +124,7 @@ export default function PLView({ onBack, onOpenCard, onOpenDay }) {
             <thead>
               <tr>
                 <th>Card</th><th>Template</th><th>Variant</th><th>Engine</th><th>Consensus</th><th>Bankroll</th>
-                <th>Wagered</th><th>Returned</th><th>P/L</th><th>ROI</th><th>Hits</th>
+                <th>Wagered</th><th>Returned</th><th>P/L</th><th>ROI (wagered)</th><th>ROI (bankroll)</th><th>Hits</th>
               </tr>
             </thead>
             <tbody>
@@ -139,6 +140,7 @@ export default function PLView({ onBack, onOpenCard, onOpenDay }) {
                   <td>{money(c.returnedCents)}</td>
                   <td>{signed(c.plCents)}</td>
                   <td>{roi(c.plCents, c.costCents)}</td>
+                  <td>{roi(c.plCents, c.bankrollCents)}</td>
                   <td className="dim">{c.wins}/{c.tickets}</td>
                 </tr>
               ))}

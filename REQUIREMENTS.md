@@ -88,6 +88,7 @@ map in the same PR.
 | Distributions: % losing days, max drawdown, single-ticket dependence (>80%) | D20 |
 | Decision traces joined with graded results, exportable for LLM analysis | D17 |
 | Discipline tracker (planned vs. actual, house-money warnings) | D24 (schema in D03) |
+| A human's pasted tickets become a first-class card (same tables, same grader), in a `HUMAN` completeness bucket that never pools with an engine bucket; no card generation or grading change | D54 |
 
 ## Backtest hygiene (addendum 2, 2026-09-02)
 
