@@ -141,3 +141,16 @@ export const manualPicksSave = (id, sourceName, races) =>
     headers: { 'content-type': 'application/json' },
     body: JSON.stringify({ sourceName, races }),
   }).then(asJson);
+
+// Simulation (D19).
+export const runSimulation = (body = {}) =>
+  fetch('/api/simulations', {
+    method: 'POST',
+    headers: { 'content-type': 'application/json' },
+    body: JSON.stringify(body),
+  }).then(asJson);
+export const listSimulations = () => fetch('/api/simulations').then(asJson);
+export const getSimulationCompare = () => fetch('/api/simulations/compare').then(asJson);
+export const getSimulation = (runId) => fetch(`/api/simulations/${runId}`).then(asJson);
+export const getSimulationDay = (runId, dayId) =>
+  fetch(`/api/simulations/${runId}/days/${dayId}`).then(asJson);

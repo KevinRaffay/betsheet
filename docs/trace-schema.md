@@ -54,6 +54,12 @@ engine event.
 | `ticket_graded` | `cardId`, `ticketId`, `betType`, `races`, `legs`, `outcome` (win/refund/partial/loss), `costCents`, `returnedCents`, `plCents`, `note` | one ticket scored against the day's chart |
 | `card_graded` | `cardId`, `gradedBy` (the triggering session's correlationId), `costCents`, `returnedCents`, `plCents`, `outcomes`, `topTicketShare` | the card summary. A regrade replaces DB rows but appends here — the log keeps every grading pass |
 
+### Simulation (emitted by `server/simulate.js`, one correlationId per POST /api/simulations)
+
+| event | fields | meaning |
+| --- | --- | --- |
+| `simulation_run` | `runId`, `template`, `params` (`bankrollCents`, `perRaceMinCents`, `startingBankrollCents`, `days`), `buckets[{completeness, days, tickets, wins, costCents, returnedCents, plCents, losingDays}]`, `days[{raceDayId, date, track, completeness, plCents}]` | one strategy template replayed over every non-deleted day with results (D19). The engine and grader are pure, so the per-ticket detail (persisted in `simulation_results.details`) is reproducible from the day + template; the event records the recipe and the outcome. Buckets never pool (invariant 13). Carries no `cardId`, so it never appears in a card export. |
+
 ### Day lifecycle (emitted by `server/ingest.js` / `server/results.js`, under the day's own correlationIds)
 
 | event | fields | meaning |

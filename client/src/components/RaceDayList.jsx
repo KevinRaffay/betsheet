@@ -1,7 +1,7 @@
 import React, { useEffect, useState } from 'react';
 import { listRaceDays, resetAppApi, restoreRaceDay } from '../api.js';
 
-export default function RaceDayList({ onOpen, onNew, onPL, refreshKey }) {
+export default function RaceDayList({ onOpen, onNew, onPL, onSim, refreshKey }) {
   const [days, setDays] = useState(null);
   const [error, setError] = useState(null);
   const [showDeleted, setShowDeleted] = useState(false);
@@ -47,6 +47,7 @@ export default function RaceDayList({ onOpen, onNew, onPL, refreshKey }) {
         <h2>{showDeleted ? 'Deleted race days' : 'Race days'}</h2>
         <div className="formrow formrow--tight">
           {!showDeleted && <button className="btn" onClick={onPL}>P/L</button>}
+          {!showDeleted && <button className="btn" onClick={onSim}>Simulate</button>}
           <button className="btn" onClick={() => setShowDeleted((v) => !v)}>
             {showDeleted ? 'Show active' : 'Show deleted'}
           </button>
