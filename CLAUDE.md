@@ -276,6 +276,7 @@ Before a branch is reported ready, verify — out loud, in the final message:
 | Batch backfill runner + Backfill queue (D43) | merged | PR #41, branch `backfill-runner` — migration 011 (`race_days.meet`, `backfill_queue`), server/backfill.js (policy A in code, commitDay through the routes' own writers, golden checkpoint per meet, cross-source in memory, per-meet report), queue API + view, P/L by meet, `npm run backfill`, `npm run check-backfill`; the routes now call the shared `insertRaceDay` / `saveResults` / `persistCard` |
 | Backfill run DMR-2026-summer (D44) | merged | PR #42, branch `backfill-dmr-2026-summer` — 27 days Jul 17 - Aug 30 saved under lean-1.1, zero queued, golden 2026-07-17 committed, cross-source identical on 08-28/29/30, report docs/backfill/DMR-2026-summer.md; every backfilled card is PROGRAM_ONLY (no consensus source runs on archived days) |
 | Index source order + meet-dates table (D47) | merged | PR #43, branch `backfill-dmr-2025-summer` — indexRaceDays / probeMeetWindow / dmtc-probe, three-way race-count rule in the runner, dark 2025-07 calendar fixture |
+| Backfill run DMR-2025-summer (D45) | in review | branch `backfill-dmr-2025-summer-run` — meet-dates table from the probe (31 race days), parser fixes for the 2025 print run (ad slug overprint, footer-anchored panel edge, 8pt numbers on 15-horse fields), golden 2025-07-18 committed, 31 saved / 0 queued, report docs/backfill/DMR-2025-summer.md |
 | dmtc.com crawler + raw archive (D41) | merged | PR #36, branch `dmtc-crawler` - calendar-indexed, polite, conditional, audited crawler; raw archive with manifests; `npm run dmtc-fetch`; the two real calendar pages are fixtures |
 | ML sheet as entries source of record (D40) | merged | PR #34, branch `ml-sheet-ingest` - ML/changes PDF parser + fetcher, program becomes analysis-only via the merge, ODDS_ONLY tier, engine `lean-1.0.1` (morning-line ranking fallback on rank-less races) |
 | Engine versioning (D34) | merged | PR #33, branch `engine-versioning` - `ENGINE_VERSION = lean-1.0`; migration 008; version on card rows, card header, P/L rows + version filter; trace events carry it; invariant 14 |
@@ -317,6 +318,11 @@ Before a branch is reported ready, verify — out loud, in the final message:
 - **BETSHEET_CONTACT** (in `.env`, gitignored) is the human named in the
   crawler's User-Agent - set it before any `dmtc-fetch` run; the UA says
   "set BETSHEET_CONTACT" otherwise.
+- **The 2025 programs carry an advertisement's print slug in the text layer**,
+  overprinted (every item twice at the same coordinates). program-parser.js
+  drops exact overprints before reading a panel and anchors the panel edge
+  on the footer x; a new print run that breaks either assumption halts at
+  the meet golden, never degrades silently (D45 found it exactly there).
 - **dmtc.com renders past seasons' calendars dark.** Every 2025 month parses to
   zero race days while the artifacts are still served. Index order (D47):
   calendar with race counts, else the committed meet-dates table from ONE
