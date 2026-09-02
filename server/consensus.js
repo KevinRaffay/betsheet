@@ -95,22 +95,40 @@ export function upsertSource(db, { name, kind }) {
   return db.prepare('INSERT INTO sources (name, kind) VALUES (?, ?)').run(name, kind).lastInsertRowid;
 }
 
+// The discovery fields an attempt row carries (D53): what was scanned, what
+// the fetcher looked for, and the nearest miss - the same in the DB row
+// and the fetch-audit line, so an attempt is auditable from the log alone.
+const DISCOVERY_FIELDS = ['sitemapUrl', 'sitemapStatus', 'candidateSlug', 'entriesScanned', 'nearestSlug'];
+
 export function recordAttempt(db, fields) {
+  const row = {
+    url: null, httpStatus: null, bytes: null, parseOk: null,
+    picksExtracted: null, fallbackReason: null,
+    sitemapUrl: null, sitemapStatus: null, candidateSlug: null, entriesScanned: null, nearestSlug: null,
+    ...fields,
+  };
   db.prepare(`INSERT INTO fetch_attempts
       (race_day_id, source_id, url, http_status, outcome, bytes, parse_ok,
-       picks_extracted, fallback_reason, correlation_id)
+       picks_extracted, fallback_reason, correlation_id,
+       sitemap_url, sitemap_status, candidate_slug, entries_scanned, nearest_slug)
       VALUES (@raceDayId, @sourceId, @url, @httpStatus, @outcome, @bytes,
-              @parseOk, @picksExtracted, @fallbackReason, @correlationId)`)
-    .run({
-      url: null, httpStatus: null, bytes: null, parseOk: null,
-      picksExtracted: null, fallbackReason: null, ...fields,
-    });
+              @parseOk, @picksExtracted, @fallbackReason, @correlationId,
+              @sitemapUrl, @sitemapStatus, @candidateSlug, @entriesScanned, @nearestSlug)`)
+    .run(row);
   log.info('fetch_attempt', fields);
 }
 
-function recentFailures(db, raceDayId, sourceId) {
+/**
+ * Backoff rule: the last BACKOFF_AFTER_FAILURES attempts in the window all
+ * failed. A 'not_published' attempt (D53) is neither a success nor a
+ * failure - a morning fetch before the source has posted is normal - so it
+ * is left out of the count entirely: three of them never disable a source,
+ * and one between two real failures neither resets nor extends the streak.
+ */
+export function recentFailures(db, raceDayId, sourceId) {
   const rows = db.prepare(`SELECT outcome FROM fetch_attempts
       WHERE race_day_id = ? AND source_id = ?
+        AND outcome != 'not_published'
         AND ts >= datetime('now', '-${BACKOFF_WINDOW_HOURS} hours')
       ORDER BY id DESC LIMIT ${BACKOFF_AFTER_FAILURES}`)
     .all(raceDayId, sourceId);
@@ -123,6 +141,11 @@ function recentFailures(db, raceDayId, sourceId) {
 const nameKey = (s) => String(s ?? '').toUpperCase().replace(/[‘’]/g, "'")
   .replace(/\s*\((?:GB|IRE|FR|ARG|CHI|AUS|JPN|GER|NZ|SAF|URU|BRZ|PER|MEX|KOR|CAN)\)\s*$/, '')
   .replace(/\s+/g, ' ').trim();
+// Track comparison is letters-only: "Delmar" (program panel letters), "Del
+// Mar" (Bottom Line header, SFTB titles) and "DEL MAR" (Equibase) are one
+// track. D35 canonicalizes the track at save; until then the runner must
+// not discard a page over the spelling (found live 2026-09-02, D53).
+export const trackKey = (s) => nameKey(s).replace(/[^A-Z0-9]/g, '');
 
 /**
  * Attach entry ids to raw picks for one race day. A pick that matches no
@@ -219,46 +242,70 @@ export async function runFetches(dayId, correlationId) {
     }
 
     let url = null;
+    // Discovery details ride EVERY row of this attempt (D53), so the
+    // audit says which sitemap was read and what slug was looked for even
+    // when the post was found and then failed to fetch or parse.
+    let audit = {};
     try {
       // A fetcher whose page URL is not constructible from track+date (blog
       // posts, dated slugs) resolves it first; its sub-fetches go through
-      // the same robots guard.
+      // the same robots guard. resolveUrl answers a URL string (legacy) or
+      // { url, discovery } - discovery = { sitemapUrl, sitemapStatus,
+      // candidateSlug, entriesScanned, nearestSlug, error? }.
       if (fetcher.resolveUrl) {
-        url = await fetcher.resolveUrl(
+        const resolved = await fetcher.resolveUrl(
           { track: day.track, date: day.date },
           { fetchText: guardedFetchText },
         );
+        const r = resolved && typeof resolved === 'object' ? resolved : { url: resolved ?? null, discovery: {} };
+        const d = r.discovery ?? {};
+        url = r.url ?? null;
+        audit = Object.fromEntries(DISCOVERY_FIELDS.map((k) => [k, d[k] ?? null]));
         if (!url) {
-          push('http_error', { fallbackReason: 'no published page found for this track/date' });
+          if (d.sitemapStatus != null && d.sitemapStatus !== 200) {
+            // The sitemap itself answered with an error: that IS an HTTP error.
+            push('http_error', { ...audit, httpStatus: d.sitemapStatus, fallbackReason: `sitemap HTTP ${d.sitemapStatus}: ${d.sitemapUrl ?? ''}` });
+          } else if (d.error && !d.entriesScanned) {
+            push('network_error', { ...audit, fallbackReason: d.error });
+          } else {
+            // Scanned and not there: the source has not posted (yet). Not
+            // a failure - see recentFailures.
+            push('not_published', {
+              ...audit,
+              fallbackReason: `no post for ${audit.candidateSlug ?? 'this track/date'} in ${audit.entriesScanned ?? 0} sitemap entries`
+                + (audit.nearestSlug ? `; nearest: ${audit.nearestSlug}` : ''),
+            });
+          }
           continue;
         }
       } else {
         url = fetcher.buildUrl({ track: day.track, date: day.date });
       }
       if (await robotsDisallows(url)) {
-        push('blocked', { url, fallbackReason: 'disallowed by robots.txt - paste this source manually' });
+        push('blocked', { ...audit, url, fallbackReason: 'disallowed by robots.txt - paste this source manually' });
         continue;
       }
       const res = await fetchWithTimeout(url);
       const body = await res.text();
       if (!res.ok) {
-        push('http_error', { url, httpStatus: res.status, bytes: body.length, fallbackReason: `HTTP ${res.status}` });
+        push('http_error', { ...audit, url, httpStatus: res.status, bytes: body.length, fallbackReason: `HTTP ${res.status}` });
         continue;
       }
       let parsed;
       try {
         parsed = fetcher.parse(body, { track: day.track, date: day.date });
       } catch (err) {
-        push('parse_error', { url, httpStatus: res.status, bytes: body.length, parseOk: 0, fallbackReason: String(err?.message ?? err) });
+        push('parse_error', { ...audit, url, httpStatus: res.status, bytes: body.length, parseOk: 0, fallbackReason: String(err?.message ?? err) });
         continue;
       }
       // The page must be for this card. A source that says otherwise is
       // discarded whole - a partially wrong consensus is worse than none.
-      const wrongTrack = parsed.track && nameKey(parsed.track) !== nameKey(day.track);
+      // Track compared letters-only (trackKey): a spelling is not a mismatch.
+      const wrongTrack = parsed.track && trackKey(parsed.track) !== trackKey(day.track);
       const wrongDate = parsed.date && parsed.date !== day.date;
       if (wrongTrack || wrongDate) {
         push('track_date_mismatch', {
-          url, httpStatus: res.status, bytes: body.length, parseOk: 1,
+          ...audit, url, httpStatus: res.status, bytes: body.length, parseOk: 1,
           fallbackReason: `page covers ${parsed.track ?? day.track} ${parsed.date ?? day.date}`,
         });
         continue;
@@ -266,10 +313,10 @@ export async function runFetches(dayId, correlationId) {
       const warnings = [...(parsed.warnings ?? [])];
       const resolved = resolvePicks(day.races, parsed.races ?? [], warnings, fetcher.name);
       const count = storePicks(db, sourceId, resolved);
-      push('ok', { url, httpStatus: res.status, bytes: body.length, parseOk: 1, picksExtracted: count });
+      push('ok', { ...audit, url, httpStatus: res.status, bytes: body.length, parseOk: 1, picksExtracted: count });
       if (warnings.length) log.warn('fetch_warnings', { ...base, source: fetcher.name, warnings });
     } catch (err) {
-      push('network_error', { url, fallbackReason: String(err?.message ?? err) });
+      push('network_error', { ...audit, url, fallbackReason: String(err?.message ?? err) });
     }
   }
   return { day, results };

@@ -88,7 +88,8 @@ await new Promise((r) => stub.listen(STUB_PORT, '127.0.0.1', r));
 const fetchersPath = path.join(tmp, 'stub-fetchers.mjs');
 fs.writeFileSync(fetchersPath, `
 const base = 'http://127.0.0.1:${STUB_PORT}';
-const common = { supports: ({ track }) => track === 'Del Mar' };
+// Letters-only like the runner's trackKey (D53): a day typed 'Delmar' is Del Mar.
+const common = { supports: ({ track }) => String(track).toUpperCase().replace(/[^A-Z]/g, '') === 'DELMAR' };
 const jsonParse = (body) => JSON.parse(body);
 export default [
   { id: 'stub-good', name: 'Stub Good Picks', kind: 'algorithmic', ...common,
@@ -113,7 +114,12 @@ export default [
     parse: jsonParse },
   { id: 'stub-resolver-none', name: 'Stub Resolver None', kind: 'algorithmic', ...common,
     buildUrl: () => base + '/unused',
-    resolveUrl: async () => null,
+    // D53: a discovery miss answers { url: null, discovery } - the audit fields.
+    resolveUrl: async () => ({ url: null, discovery: { sitemapUrl: base + '/sitemap-stub', sitemapStatus: 200, candidateSlug: 'del-mar-horse-racing-picks-for-thursday-september-3-2026', entriesScanned: 1, nearestSlug: 'picks-good' } }),
+    parse: jsonParse },
+  { id: 'stub-resolver-legacy', name: 'Stub Resolver Legacy', kind: 'algorithmic', ...common,
+    buildUrl: () => base + '/unused',
+    resolveUrl: async () => null, // pre-D53 shape: a bare null still means not published
     parse: jsonParse },
 ];
 `);
@@ -192,13 +198,24 @@ try {
   })(), JSON.stringify(c1.picks));
   check('unmatched pick kept and visible',
     c1.picks.some((p) => p.program_number === '99' && p.entry_id === null));
-  check('audit rows visible for every attempt', c1.attempts.length === 7,
+  check('audit rows visible for every attempt', c1.attempts.length === 8,
     `attempts=${c1.attempts.length}`);
   check('resolveUrl fetcher discovers its page and stores picks',
     outcome('Stub Resolver') === 'ok');
-  check('resolveUrl returning null -> visible no-page outcome',
-    outcome('Stub Resolver None') === 'http_error' &&
-    /no published page/.test(run1.results.find((r) => r.source === 'Stub Resolver None')?.fallbackReason ?? ''));
+  // D53: a discovery miss is not_published, never http_error, and the row
+  // carries the discovery fields (DB row = audit line = UI table).
+  const noneRes = run1.results.find((r) => r.source === 'Stub Resolver None');
+  const noneRow = c1.attempts.find((a) => a.source_name === 'Stub Resolver None');
+  check('discovery miss -> not_published with the audit fields on the response AND the DB row (sitemap url/status, candidate slug, entries scanned, nearest slug)',
+    noneRes?.outcome === 'not_published' && /no post for del-mar-horse-racing-picks-for-thursday-september-3-2026 in 1 sitemap entries; nearest: picks-good/.test(noneRes.fallbackReason) &&
+    noneRow?.outcome === 'not_published' && noneRow.sitemap_url === `http://127.0.0.1:${STUB_PORT}/sitemap-stub` && noneRow.sitemap_status === 200 &&
+    noneRow.candidate_slug === 'del-mar-horse-racing-picks-for-thursday-september-3-2026' && noneRow.entries_scanned === 1 && noneRow.nearest_slug === 'picks-good' && noneRow.url === null,
+    JSON.stringify({ noneRes, noneRow }));
+  check('a legacy resolveUrl returning a bare null is not_published too', outcome('Stub Resolver Legacy') === 'not_published');
+  check('a found page carries its discovery fields on the ok row as well (url + sitemap it came from)', (() => {
+    const row = c1.attempts.find((a) => a.source_name === 'Stub Resolver');
+    return row?.outcome === 'ok' && row.url === `http://127.0.0.1:${STUB_PORT}/picks-good`;
+  })());
 
   // ---- runs 2 and 3: refresh replaces, failures accumulate ----
   await jpost(`/api/race-days/${dayId}/fetch-consensus`, {});
@@ -219,6 +236,23 @@ try {
     (hits['/flaky'] ?? 0) === flakyHitsBefore);
   check('good source unaffected by others backing off',
     run4.results.find((r) => r.source === 'Stub Good Picks')?.outcome === 'ok');
+  check('D53: four not_published in a row never back a source off - the 4th run still tries it and records not_published, not blocked',
+    run4.results.find((r) => r.source === 'Stub Resolver None')?.outcome === 'not_published' &&
+    run4.results.find((r) => r.source === 'Stub Resolver Legacy')?.outcome === 'not_published',
+    JSON.stringify(run4.results.filter((r) => /Resolver/.test(r.source))));
+  const c4 = await (await fetch(`${BASE}/api/race-days/${dayId}/consensus`)).json();
+  check('...and the audit shows four not_published rows for it, zero blocked',
+    c4.attempts.filter((a) => a.source_name === 'Stub Resolver None').map((a) => a.outcome).join() === 'not_published,not_published,not_published,not_published');
+
+  // ---- D53: a day typed "Delmar" is the same track as a page saying "Del Mar" ----
+  const savedDelmar = await (await jpost('/api/race-days', {
+    track: 'Delmar', date: parsed.date, bankrollCents: 20000, perRaceMinCents: 500, races: parsed.races,
+  })).json();
+  const runDelmar = await (await jpost(`/api/race-days/${savedDelmar.id}/fetch-consensus`, {})).json();
+  check('a race day typed "Delmar": the good source\'s page (title "Del Mar") is accepted, not discarded as track_date_mismatch',
+    Number.isInteger(savedDelmar.id) && runDelmar.results.find((r) => r.source === 'Stub Good Picks')?.outcome === 'ok' &&
+    runDelmar.results.find((r) => r.source === 'Stub Wrong Day')?.outcome === 'track_date_mismatch',
+    JSON.stringify(runDelmar.results));
 
   // ---- manual fallback: preview writes nothing, confirm writes ----
   const preview = await (await jpost(`/api/race-days/${dayId}/consensus/manual-preview`, {
