@@ -197,10 +197,18 @@ try {
   const ticketKey = (det) => JSON.stringify(det.ticketDetails.map((t) => [t.betType, t.races, t.legs, t.stakeCents, t.costCents]));
   const leanBdet = await jget(`/api/simulations/${lean.runId}/days/${dayB.id}`);
   const d48 = {};
-  for (const n of ['exacta-primary', 'no-exotics', 'box-depth-3', 'best-bet-weighted']) d48[n] = await jget(`/api/simulations/${runBody.runs.find((r) => r.template === n).runId}/days/${dayB.id}`);
-  check('D48 templates all ran (simulation allows what the live endpoint refuses) and every one differs from lean on the PROGRAM_ONLY day',
+  for (const n of ['exacta-primary', 'no-exotics', 'box-depth-3', 'best-bet-weighted', 'box-only', 'straight-only']) d48[n] = await jget(`/api/simulations/${runBody.runs.find((r) => r.template === n).runId}/days/${dayB.id}`);
+  check('D48 + D49 templates all ran (simulation allows what the live endpoint refuses) and every one differs from lean on the PROGRAM_ONLY day',
     Object.values(d48).every((det) => det.ticketDetails.length > 0) && Object.entries(d48).every(([, det]) => ticketKey(det) !== ticketKey(leanBdet)),
     JSON.stringify(Object.fromEntries(Object.entries(d48).map(([n, det]) => [n, det.ticketDetails.map((t) => t.betType + ':' + t.stakeCents)]))));
+  // D49: the isolation pair - box-only has no straight exacta, straight-only
+  // no exacta box, and the two differ from each other and from no-exotics.
+  check('D49 on the PROGRAM_ONLY day: box-only = win/place + exacta_box only, straight-only = win/place + straight exacta only; four distinct ticket sets with lean and no-exotics; each still the whole bankroll',
+    d48['box-only'].ticketDetails.every((t) => ['win', 'place', 'exacta_box'].includes(t.betType)) && d48['box-only'].ticketDetails.some((t) => t.betType === 'exacta_box') &&
+    d48['straight-only'].ticketDetails.every((t) => ['win', 'place', 'exacta'].includes(t.betType)) && d48['straight-only'].ticketDetails.some((t) => t.betType === 'exacta') &&
+    new Set([leanBdet, d48['no-exotics'], d48['box-only'], d48['straight-only']].map(ticketKey)).size === 4 &&
+    d48['box-only'].costCents === 5000 && d48['straight-only'].costCents === 5000,
+    JSON.stringify({ box: d48['box-only'].ticketDetails.map((t) => t.betType), straight: d48['straight-only'].ticketDetails.map((t) => t.betType) }));
   check('D48 no-exotics on the PROGRAM_ONLY day: win / place only; exacta-primary: win tickets at the per-race minimum and no place ticket',
     d48['no-exotics'].ticketDetails.every((t) => ['win', 'place'].includes(t.betType)) && d48['exacta-primary'].ticketDetails.filter((t) => t.betType === 'win').every((t) => t.stakeCents === 500) && !d48['exacta-primary'].ticketDetails.some((t) => t.betType === 'place'));
   const soB = await jget(`/api/simulations/${runBody.runs.find((r) => r.template === 'structure-only').runId}/days/${dayB.id}`);

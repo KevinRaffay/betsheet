@@ -55,8 +55,8 @@ check('listTemplates carries name/description/rules/layers/simulationOnly for al
   listTemplates().length === Object.keys(TEMPLATES).length &&
   listTemplates().every((t) => t.name && t.description && t.rules && Array.isArray(t.layers) &&
     typeof t.simulationOnly === 'boolean'));
-check('the simulation-only set: the invariant-1 breaker plus the four D48 program-rank templates',
-  listTemplates().filter((t) => t.simulationOnly).map((t) => t.name).join(',') === 'no-place-money,exacta-primary,no-exotics,box-depth-3,best-bet-weighted');
+check('the simulation-only set: the invariant-1 breaker, the four D48 program-rank templates and the D49 exotic-isolation pair',
+  listTemplates().filter((t) => t.simulationOnly).map((t) => t.name).join(',') === 'no-place-money,exacta-primary,no-exotics,box-depth-3,best-bet-weighted,box-only,straight-only');
 
 // ---------- the real day under each template, pure ----------
 
@@ -261,6 +261,55 @@ check('rule_suppressed on the FULL day: fade fires on the odds-on unanimous favo
 check('no-exotics traces why each exotic is missing (no_exotic_tickets on the box, the mid-price exacta and the coverage adds)',
   sups(ne, 'split_exacta_box', 'no_exotic_tickets').length > 0 && sups(ne, 'mid_price_coverage', 'no_exotic_tickets').length === 8 && sups(ne, 'two_source_coverage', 'no_exotic_tickets').length > 0);
 
+// ---------- D49: the exotic-isolation pair on the PROGRAM_ONLY day ----------
+// no-exotics beat lean on the corpus; these two say WHICH exotic leaks.
+// box-only keeps the split exacta box and drops the mid-price straight
+// exacta; straight-only the reverse (hedgeBoxDepth 0). Each must differ from
+// lean, from no-exotics AND from the other, and land every race on its
+// allocation within the D36 tolerance (one balancer step + $1 per exotic).
+console.log('-- D49: exotic-isolation templates on the PROGRAM_ONLY day --');
+const ISO = ['box-only', 'straight-only'];
+for (const n of ISO) cards[n] = genPO(n);
+const withinD36 = (c) => c.allocations.every((a) => {
+  if (a.confidence === 'GUESS') return true;
+  const exoticCount = c.tickets.filter((t) => t.raceNumbers.length === 1 && t.raceNumbers[0] === a.race && !['win', 'place'].includes(t.betType)).length;
+  return Math.abs(spentIn(c, a.race) - a.amountCents) <= 200 + 100 * exoticCount;
+});
+const winMoney = (c, n) => c.tickets.filter((t) => t.raceNumbers.length === 1 && t.raceNumbers[0] === n && ['win', 'place'].includes(t.betType)).reduce((a, t) => a + t.costCents, 0);
+check('D49 no engine version bump: ENGINE_VERSION lean-1.1 and lean byte-identical on the PROGRAM_ONLY day after the hedgeBoxDepth-0 edit (frozen digest)',
+  ENGINE_VERSION === 'lean-1.1' && digestOf(genPO('lean')) === 'e1d7df85f7a0d0bd', `${ENGINE_VERSION} ${digestOf(genPO('lean'))}`);
+check('D49: both are simulation-only, structure-layer, and override only knobs lean already has (midPriceCoverage / hedgeBoxDepth)',
+  ISO.every((n) => TEMPLATES[n].simulationOnly && JSON.stringify(templateLayers(n)) === '["structure"]') &&
+  JSON.stringify(TEMPLATES['box-only'].rules) === '{"midPriceCoverage":false}' && JSON.stringify(TEMPLATES['straight-only'].rules) === '{"hedgeBoxDepth":0}');
+check('D49: box-only, straight-only, no-exotics and lean are FOUR different ticket sets on the PROGRAM_ONLY day, each exactly the bankroll',
+  new Set([leanPO, ne, cards['box-only'], cards['straight-only']].map(digestOf)).size === 4 && ISO.every((n) => total(cards[n]) === 20000),
+  JSON.stringify(ISO.map((n) => [n, digestOf(cards[n]), total(cards[n])])));
+const bo = cards['box-only'];
+check('box-only: zero straight exacta tickets; the same exacta boxes as lean (8, identical legs); mid_price_coverage declined disabled_by_template on every race it fires under lean',
+  !bo.tickets.some((t) => t.betType === 'exacta') &&
+  JSON.stringify(bo.tickets.filter((t) => t.betType === 'exacta_box').map((t) => [t.raceNumbers[0], t.legs])) === JSON.stringify(leanPO.tickets.filter((t) => t.betType === 'exacta_box').map((t) => [t.raceNumbers[0], t.legs])) &&
+  sups(bo, 'mid_price_coverage', 'disabled_by_template').length === 8 && sups(bo, 'split_exacta_box').length === 0,
+  JSON.stringify(bo.tickets.map((t) => t.betType)));
+const so = cards['straight-only'];
+check('straight-only: zero exacta_box tickets; straight exactas stay (at least every mid-price race lean had); split_exacta_box declined disabled_by_template on every SPLIT race',
+  !so.tickets.some((t) => t.betType === 'exacta_box') &&
+  so.tickets.filter((t) => t.betType === 'exacta' && t.ruleTags.includes('mid_price_coverage')).length >= leanPO.tickets.filter((t) => t.betType === 'exacta' && t.ruleTags.includes('mid_price_coverage')).length &&
+  sups(so, 'split_exacta_box', 'disabled_by_template').length === 8 && so.tickets.filter((t) => t.betType === 'exacta').every((t) => t.legs[1].length === 1),
+  JSON.stringify(so.tickets.map((t) => t.betType)));
+check('D49: the freed share lands on the win ticket - on every non-guess race the win (+ place) money under each template is >= lean\'s, and it is strictly more on every race that lost an exotic',
+  ISO.every((n) => leanPO.allocations.every((a) => a.confidence === 'GUESS' || winMoney(cards[n], a.race) >= winMoney(leanPO, a.race))) &&
+  leanPO.tickets.filter((t) => t.betType === 'exacta').every((t) => winMoney(bo, t.raceNumbers[0]) > winMoney(leanPO, t.raceNumbers[0])) &&
+  leanPO.tickets.filter((t) => t.betType === 'exacta_box').every((t) => winMoney(so, t.raceNumbers[0]) > winMoney(leanPO, t.raceNumbers[0])),
+  JSON.stringify(leanPO.allocations.map((a) => [a.race, winMoney(leanPO, a.race), winMoney(bo, a.race), winMoney(so, a.race)])));
+check('D49: every race lands on its allocation within the D36 tolerance under both templates (box-only exact; straight-only within one place-pair step)',
+  withinD36(bo) && withinD36(so) && bo.allocations.every((a) => spentIn(bo, a.race) === a.amountCents),
+  JSON.stringify(ISO.map((n) => cards[n].allocations.map((a) => [a.race, a.amountCents, spentIn(cards[n], a.race)]))));
+check('D49: the place-money invariant still holds under both (every 8-1+ win carries an equal place ticket)',
+  ISO.every((n) => cards[n].tickets.filter((t) => t.betType === 'win').every((w) => {
+    const e = racesPO.find((r) => r.number === w.raceNumbers[0]).entries.find((x) => x.program_number === w.legs[0][0]);
+    return e.morning_line_decimal < BET.placeMoneyThresholdMl || cards[n].tickets.some((p) => p.betType === 'place' && p.raceNumbers[0] === w.raceNumbers[0] && p.legs[0][0] === w.legs[0][0] && p.stakeCents === w.stakeCents);
+  })));
+
 
 // ---------- server round-trip ----------
 
@@ -330,7 +379,12 @@ try {
     /Templates:/.test((await unknown.json()).error));
   const simOnly = await jpost(`/api/race-days/${day.id}/cards`, { template: 'no-place-money' });
   const simOnly48 = await jpost(`/api/race-days/${day.id}/cards`, { template: 'exacta-primary' });
-  check('simulation-only templates on the LIVE endpoint -> 422 (invariant 1; the D48 four ride the same gate)', simOnly.status === 422 && simOnly48.status === 422);
+  const simOnly49a = await jpost(`/api/race-days/${day.id}/cards`, { template: 'box-only' });
+  const simOnly49b = await jpost(`/api/race-days/${day.id}/cards`, { template: 'straight-only' });
+  check('simulation-only templates on the LIVE endpoint -> 422 (invariant 1; the D48 four and the D49 pair ride the same gate)',
+    simOnly.status === 422 && simOnly48.status === 422 && simOnly49a.status === 422 && simOnly49b.status === 422);
+  check('D49: both templates are seeded into strategy_templates (served by the catalog, simulation-only)',
+    ['box-only', 'straight-only'].every((n) => apiTemplates.find((t) => t.name === n)?.simulationOnly === true));
   const rawOff = await jpost(`/api/race-days/${day.id}/cards`, { rules: { placeMoneyRule: false } });
   check('raw placeMoneyRule:false override -> 422 (invariant 1 holds at the API)', rawOff.status === 422);
 
