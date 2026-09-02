@@ -30,6 +30,10 @@ npm start        # build the client, serve app + API on http://127.0.0.1:8788
 npm run dev      # development: vite on :5175 (proxying /api), api on :8788
 ```
 
+Browser views are available at `/`, `/new`, `/pl`, `/simulate`, `/day/:id`,
+and `/card/:id`. Only data requests use the `/api` prefix, so these routes can
+be bookmarked and refreshed directly.
+
 The server binds `127.0.0.1` only — BetSheet is not hosted anywhere. Sharing
 a finished card without the local server running is the job of the here.now
 publish feature (Phase 4).

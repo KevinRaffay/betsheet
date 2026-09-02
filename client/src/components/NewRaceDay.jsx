@@ -129,7 +129,7 @@ export default function NewRaceDay({ onSaved, onCancel }) {
 
       <div className="formrow">
         <label>Track
-          <input value={track} onChange={(e) => setTrack(e.target.value)} placeholder="Del Mar" />
+          <input value={track} onChange={(e) => setTrack(e.target.value)} placeholder="Enter track name..." />
         </label>
         <label>Date
           <input type="date" value={date} onChange={(e) => setDate(e.target.value)} />

@@ -119,6 +119,8 @@ html, body {
 .pagehead h2, .pagehead h3 { margin: 0; }
 
 .dim { color: var(--color-text-muted); }
+input::placeholder,
+textarea::placeholder { color: var(--color-text-muted); opacity: 1; }
 
 .btn {
   display: inline-block;
@@ -151,6 +153,7 @@ label.btn,
   font-size: 14px;
   gap: 0;
 }
+label.btn.btn--primary { color: var(--color-accent-text); }
 .btn--primary {
   background: var(--color-accent);
   border-color: var(--color-accent);

@@ -95,6 +95,45 @@ export default function CardView({ cardId, onBack }) {
         </p>
       )}
 
+      <div className="race race--sheet card-footer">
+        <p>
+          <strong>Day total {money(total)}</strong> · {card.tickets.length} tickets
+          · bankroll {money(card.bankroll_cents)}
+          · {remaining >= 0 ? `${money(remaining)} unspent` : `${money(-remaining)} OVER`}
+        </p>
+        {summary && (
+          <p>
+            <strong>Graded:</strong> returned {money(summary.returnedCents)} on {money(summary.costCents)} wagered
+            {' '}· <strong className={summary.plCents >= 0 ? 'pl--pos' : 'pl--neg'}>
+              {summary.plCents >= 0 ? '+' : '−'}{money(Math.abs(summary.plCents))}
+            </strong>
+          </p>
+        )}
+        <p className="dim">
+          Sources used: {card.sources.used.length
+            ? card.sources.used.map((s) => `${s.name} (${s.ts?.slice(0, 10) ?? '—'})`).join(', ')
+            : 'program analysis and morning lines only'}
+          {card.sources.unavailable.length > 0 && (
+            <> · Unavailable: {card.sources.unavailable.map((s) => s.name).join(', ')}</>
+          )}
+        </p>
+        {card.scratches.length > 0 && (
+          <p className="dim">
+            Scratches: {card.scratches.map((s) => `R${s.race_number} #${s.program_number ?? '?'} ${s.horse_name}`).join(' · ')}
+          </p>
+        )}
+        {allTriggers.length > 0 && (
+          <>
+            <p><strong>Board watch</strong></p>
+            {allTriggers.map((t, i) => <p className="trigger" key={i}>▸ R{t.race}: {t.text}</p>)}
+          </>
+        )}
+        <div className="notice notice--warn">
+          <ul>{FAILURE_MODE_WARNINGS.map((w, i) => <li key={i}>{w}</li>)}</ul>
+        </div>
+        <p className="responsible">{RESPONSIBLE_LINE}</p>
+      </div>
+
       {card.allocations.map((a) => {
         const raceTickets = singles.filter((t) => {
           const races = t.selections.races ?? [];
@@ -174,44 +213,6 @@ export default function CardView({ cardId, onBack }) {
         </div>
       )}
 
-      <div className="race race--sheet card-footer">
-        <p>
-          <strong>Day total {money(total)}</strong> · {card.tickets.length} tickets
-          · bankroll {money(card.bankroll_cents)}
-          · {remaining >= 0 ? `${money(remaining)} unspent` : `${money(-remaining)} OVER`}
-        </p>
-        {summary && (
-          <p>
-            <strong>Graded:</strong> returned {money(summary.returnedCents)} on {money(summary.costCents)} wagered
-            {' '}· <strong className={summary.plCents >= 0 ? 'pl--pos' : 'pl--neg'}>
-              {summary.plCents >= 0 ? '+' : '−'}{money(Math.abs(summary.plCents))}
-            </strong>
-          </p>
-        )}
-        <p className="dim">
-          Sources used: {card.sources.used.length
-            ? card.sources.used.map((s) => `${s.name} (${s.ts?.slice(0, 10) ?? '—'})`).join(', ')
-            : 'program analysis and morning lines only'}
-          {card.sources.unavailable.length > 0 && (
-            <> · Unavailable: {card.sources.unavailable.map((s) => s.name).join(', ')}</>
-          )}
-        </p>
-        {card.scratches.length > 0 && (
-          <p className="dim">
-            Scratches: {card.scratches.map((s) => `R${s.race_number} #${s.program_number ?? '?'} ${s.horse_name}`).join(' · ')}
-          </p>
-        )}
-        {allTriggers.length > 0 && (
-          <>
-            <p><strong>Board watch</strong></p>
-            {allTriggers.map((t, i) => <p className="trigger" key={i}>▸ R{t.race}: {t.text}</p>)}
-          </>
-        )}
-        <div className="notice notice--warn">
-          <ul>{FAILURE_MODE_WARNINGS.map((w, i) => <li key={i}>{w}</li>)}</ul>
-        </div>
-        <p className="responsible">{RESPONSIBLE_LINE}</p>
-      </div>
     </section>
   );
 }
