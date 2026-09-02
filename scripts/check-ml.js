@@ -170,7 +170,8 @@ try {
   await new Promise((rr) => setTimeout(rr, 300));
   const audit = fs.readFileSync(path.join(logDir, 'fetch-audit.jsonl'), 'utf8').split('\n').filter(Boolean).map((l) => JSON.parse(l));
   check('fetch-audit stream: every ML fetch attempt landed (ok, http_error, blocked)',
-    ['ok', 'http_error', 'blocked'].every((o) => audit.some((e) => e.event === 'fetch_attempt' && /Stub/.test(e.source ?? '') && e.outcome === o)),
+    ['ok', 'http_error', 'blocked'].every((o) => audit.some((e) => e.event === 'fetch_attempt' && /Stub/.test(e.source ?? '') && e.outcome === o)) &&
+    audit.some((e) => e.event === 'fetch_attempt' && e.outcome === 'ok' && e.bytes > 200000 && e.picksExtracted === 94),
     JSON.stringify(audit.filter((e) => e.event === 'fetch_attempt').map((e) => [e.source, e.outcome])));
 } finally {
   server.kill(); stub.close();

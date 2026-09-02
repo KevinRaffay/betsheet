@@ -240,19 +240,22 @@ ingestRouter.post('/fetch/ml-sheet', async (req, res) => {
       return res.status(r.status === 404 ? 404 : 502).json({ error: `The track answered HTTP ${r.status} for ${url}.`, url });
     }
     const bytes = new Uint8Array(await r.arrayBuffer());
+    // pdfjs detaches the buffer while parsing: take the size first or the
+    // audit line says 0 bytes.
+    const byteLength = bytes.length;
     let parsed;
     try {
       parsed = await parseMlSheetPdf(bytes, { track, date });
     } catch (err) {
-      audit('parse_error', { url, httpStatus: r.status, bytes: bytes.length, parseOk: 0, fallbackReason: String(err?.message ?? err) });
+      audit('parse_error', { url, httpStatus: r.status, bytes: byteLength, parseOk: 0, fallbackReason: String(err?.message ?? err) });
       return res.status(422).json({ error: `Fetched the sheet but could not read it: ${err?.message ?? err}`, url });
     }
     const mismatch = parsed.warnings.find((w) => w.type === 'wrong_date' || w.type === 'wrong_track');
     if (mismatch) {
-      audit('track_date_mismatch', { url, httpStatus: r.status, bytes: bytes.length, parseOk: 1, fallbackReason: mismatch.message });
+      audit('track_date_mismatch', { url, httpStatus: r.status, bytes: byteLength, parseOk: 1, fallbackReason: mismatch.message });
       return res.status(422).json({ error: mismatch.message, url });
     }
-    audit('ok', { url, httpStatus: r.status, bytes: bytes.length, parseOk: 1, picksExtracted: parsed.races.reduce((a, x) => a + x.entries.length, 0) });
+    audit('ok', { url, httpStatus: r.status, bytes: byteLength, parseOk: 1, picksExtracted: parsed.races.reduce((a, x) => a + x.entries.length, 0) });
     res.json({ correlationId, entriesSource: 'ml_sheet', fetchedFrom: url, ...parsed });
   } catch (err) {
     audit('network_error', { url, fallbackReason: String(err?.message ?? err) });
