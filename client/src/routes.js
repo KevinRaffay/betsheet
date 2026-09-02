@@ -7,6 +7,7 @@ export function parseRoute(pathname) {
   if (parts.length === 1 && parts[0] === 'pl') return { name: 'pl' };
   if (parts.length === 1 && parts[0] === 'simulate') return { name: 'sim' };
   if (parts.length === 1 && parts[0] === 'backfill') return { name: 'backfill' };
+  if (parts.length === 1 && parts[0] === 'distribution') return { name: 'distribution' };
   if (parts.length === 2 && ['day', 'card'].includes(parts[0]) && POSITIVE_ID.test(parts[1])) {
     const id = Number(parts[1]);
     if (Number.isSafeInteger(id) && id > 0) {
@@ -23,6 +24,7 @@ export function pathForView(view) {
   if (view.name === 'pl') return '/pl';
   if (view.name === 'sim') return '/simulate';
   if (view.name === 'backfill') return '/backfill';
+  if (view.name === 'distribution') return '/distribution';
   if (view.name === 'day' && Number.isSafeInteger(view.id) && view.id > 0) return `/day/${view.id}`;
   if (view.name === 'card' && Number.isSafeInteger(view.id) && view.id > 0) return `/card/${view.id}`;
   return '/';
