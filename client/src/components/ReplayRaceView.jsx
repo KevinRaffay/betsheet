@@ -139,7 +139,7 @@ export default function ReplayRaceView({ dayId, onBack, onOpenStanding }) {
           </tbody>
         </table>
         {blind.bottomLineText && (
-          <details className="race-bottom-line">
+          <details className="race-bottom-line" open>
             <summary>Bottom Line</summary>
             <p>{blind.bottomLineText}</p>
           </details>
