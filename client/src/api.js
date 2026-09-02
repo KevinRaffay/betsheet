@@ -96,6 +96,7 @@ export const saveResults = (dayId, payload, correlationId) =>
 export const getResults = (dayId) =>
   fetch(`/api/race-days/${dayId}/results`).then(asJson);
 
+export const getTemplates = () => fetch('/api/templates').then(asJson);
 export const getPL = () => fetch('/api/pl').then(asJson);
 export const getDayPL = (dayId) => fetch(`/api/race-days/${dayId}/pl`).then(asJson);
 

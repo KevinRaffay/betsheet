@@ -7,8 +7,10 @@
 import express from 'express';
 import { classifyDay } from '../shared/classification.js';
 import { generateCard } from '../shared/card-engine.js';
+import { TEMPLATES, resolveTemplate } from '../shared/templates.js';
 import { getDb } from './db.js';
 import { gradeAndPersist } from './grading.js';
+import { templateIdFor } from './templates.js';
 import { getLogger, newCorrelationId } from './logging.js';
 
 const traceLog = getLogger('decision-trace');
@@ -67,6 +69,31 @@ cardsRouter.post('/race-days/:id/cards', (req, res) => {
   }
 
   const variant = String(req.body?.variant ?? 'default').trim() || 'default';
+
+  // Strategy template (D18): a named rule bundle; explicit `rules` override
+  // on top of it. The persisting endpoint enforces invariant 1 - a LIVE
+  // card can never disable the place-money rule, so simulation-only
+  // templates (and raw overrides to the same effect) are refused here;
+  // the simulator runs the engine directly.
+  const templateName = String(req.body?.template ?? 'lean');
+  const templateRules = resolveTemplate(templateName);
+  if (!templateRules) {
+    return res.status(400).json({
+      error: `Unknown template "${templateName}". Templates: ${Object.keys(TEMPLATES).join(', ')}.`,
+    });
+  }
+  if (TEMPLATES[templateName].simulationOnly) {
+    return res.status(422).json({
+      error: `Template "${templateName}" is simulation-only; a live card cannot use it (invariant 1).`,
+    });
+  }
+  const rules = { ...templateRules, ...(req.body?.rules ?? {}) };
+  if (rules.placeMoneyRule === false) {
+    return res.status(422).json({
+      error: 'Invariant 1: a live card cannot disable the place-money rule. The simulator runs the engine directly for that measurement.',
+    });
+  }
+
   const bankrollCents = Number(req.body?.bankrollCents ?? day.bankroll_cents);
   const perRaceMinCents = Number(req.body?.perRaceMinCents ?? day.per_race_min_cents);
   if (!Number.isInteger(bankrollCents) || bankrollCents <= 0) {
@@ -90,7 +117,8 @@ cardsRouter.post('/race-days/:id/cards', (req, res) => {
     races: day.races.map((r) => ({ ...r, classification: byNumber[r.number] })),
     sourcesUsed: used,
     sourcesUnavailable: unavailable,
-    rules: req.body?.rules ?? {},
+    rules,
+    template: templateName,
   });
 
   // Persist: APPEND-ONLY. Every generation is a new card row carrying its
@@ -103,11 +131,11 @@ cardsRouter.post('/race-days/:id/cards', (req, res) => {
       'SELECT COALESCE(MAX(card_number), 0) + 1 AS n FROM cards WHERE race_day_id = ?',
     ).get(day.id).n;
     const cardId = db.prepare(`INSERT INTO cards
-        (race_day_id, card_number, variant, bankroll_cents, per_race_min_cents,
-         status, correlation_id, consensus_completeness)
-        VALUES (?, ?, ?, ?, ?, 'final', ?, ?)`)
-      .run(day.id, cardNumber, variant, bankrollCents, perRaceMinCents,
-        correlationId, result.completeness).lastInsertRowid;
+        (race_day_id, card_number, variant, strategy_template_id, bankroll_cents,
+         per_race_min_cents, status, correlation_id, consensus_completeness)
+        VALUES (?, ?, ?, ?, ?, ?, 'final', ?, ?)`)
+      .run(day.id, cardNumber, variant, templateIdFor(db, templateName), bankrollCents,
+        perRaceMinCents, correlationId, result.completeness).lastInsertRowid;
 
     const insAlloc = db.prepare(`INSERT INTO allocations
         (card_id, race_id, amount_cents, confidence, rule, thesis)
@@ -142,7 +170,7 @@ cardsRouter.post('/race-days/:id/cards', (req, res) => {
     traceLog.info(ev.event, { correlationId, cardId, raceDayId: day.id, ...ev });
   }
   appLog.info('card_generated', {
-    correlationId, cardId, raceDayId: day.id, variant,
+    correlationId, cardId, raceDayId: day.id, variant, template: templateName,
     completeness: result.completeness,
     tickets: result.tickets.length,
     totalCents: result.tickets.reduce((a, t) => a + t.costCents, 0),
@@ -162,10 +190,12 @@ cardsRouter.post('/race-days/:id/cards', (req, res) => {
 cardsRouter.get('/race-days/:id/cards', (req, res) => {
   const db = getDb();
   const cards = db.prepare(`
-    SELECT c.id, c.card_number, c.variant, c.bankroll_cents, c.per_race_min_cents,
+    SELECT c.id, c.card_number, c.variant, st.name AS template,
+           c.bankroll_cents, c.per_race_min_cents,
            c.status, c.consensus_completeness, c.created_at,
            COUNT(t.id) AS tickets, COALESCE(SUM(t.cost_cents), 0) AS total_cents
     FROM cards c
+    LEFT JOIN strategy_templates st ON st.id = c.strategy_template_id
     LEFT JOIN tickets t ON t.card_id = c.id
     WHERE c.race_day_id = ?
     GROUP BY c.id
@@ -177,9 +207,10 @@ cardsRouter.get('/race-days/:id/cards', (req, res) => {
 cardsRouter.get('/cards/:id', (req, res) => {
   const db = getDb();
   const card = db.prepare(`
-    SELECT c.*, rd.track, rd.date,
+    SELECT c.*, rd.track, rd.date, st.name AS template,
            COALESCE(c.per_race_min_cents, rd.per_race_min_cents) AS per_race_min_cents
     FROM cards c JOIN race_days rd ON rd.id = c.race_day_id
+    LEFT JOIN strategy_templates st ON st.id = c.strategy_template_id
     WHERE c.id = ?
   `).get(Number(req.params.id));
   if (!card) return res.status(404).json({ error: 'No such card.' });

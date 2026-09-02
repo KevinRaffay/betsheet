@@ -125,6 +125,9 @@ Breaking any of these is a bug regardless of what the tests say.
 | `scripts/export-trace.js` | CLI twin of the export endpoint (`npm run export-trace -- --card N [--out file]`); same document, no server needed. |
 | `docs/trace-schema.md` | the trace event catalog (envelope, every engine/grading/lifecycle event with fields) and the export document shape. check-export asserts every event type appearing in a real export is documented here. |
 | `scripts/check-export.js` | export verification: the server runs with a tiny log-rotation threshold so one card's trace provably spans multiple rotated files; asserts seq contiguity across rotation and gzip, grade joining, regrade appending (log keeps every pass), doc honesty, named download, 404/410 guards, CLI ≡ endpoint, and honest partial/missing flagging when trace files are lost. |
+| `shared/templates.js` | strategy templates (D18): 6 named rule bundles (lean / spread / no-fade / no-chaos-box / structure-only / no-place-money) + the RULE_LAYERS signal/structure map the simulator keys on (structure rules read prices and ranks, benchmarkable on any completeness bucket; signal rules consume consensus votes). Pure — the code is the source of truth. |
+| `server/templates.js` | seeds the code-defined templates into the strategy_templates table (upsert by name, at boot and after factory reset) so cards reference them by FK, and serves GET /api/templates. |
+| `scripts/check-templates.js` | template verification: hygiene (overrides name real knobs, layer map covers the rule set exactly), each template's signature behavior on the real day + a synthetic chaos/coverage race, place-money invariant under every non-simulation template, and the server round-trip (FK persistence, trace/export carry the template, invariant-1 422 guards, reseed after reset). |
 | `client/src/components/ResultsPanel.jsx` | the results section of a stored day: chart paste + PDF upload, warnings-first read-only preview, save/replace, per-race finish/exotics/scratches view. |
 | `server/pdf-text.js` | line-reconstructed text extraction from text-based PDFs (y-grouped, x-sorted) — the chart PDF path feeds the SAME parser as a paste. |
 | `scripts/check-charts.js` | chart-parser verification: golden + hand-checked payoffs + the program↔chart closure (every program entry is a finisher or a scratch). |
@@ -172,6 +175,7 @@ npm run check-charts    # results-chart parser vs. the real Equibase chart
 npm run check-grading   # ticket grading vs. hand-computed + real-day payoffs
 npm run check-pl        # P/L views: bucket isolation, per-race sums, delete/restore
 npm run check-export    # trace export: rotation/gzip read-through, loss flagging
+npm run check-templates # strategy templates: layer map, per-template behavior, guards
 npm run export-trace -- --card N [--out f]  # the LLM feed for one card
 npm run reset -- --yes  # FACTORY RESET: wipe every record AND every log file
 ```
@@ -217,7 +221,8 @@ Before a branch is reported ready, verify — out loud, in the final message:
 | Entries parser — pasted text (D04) | merged | PR #4 — validated against a real Del Mar card (8 races, 81 entries, 0 warnings) |
 | Ingest UI + API (D06) | merged | PR #6 — paste/PDF → warnings-first read-only preview → transactional save; migration 002 adds `races.wager_menu` |
 | Consensus-fetch framework (D07) | merged | PR #7 — fetcher registry, robots/backoff/mismatch handling, audit trail, manual paste fallback w/ read-only preview |
-| Decision-trace export (D17) | in review | PR #25, branch `trace-export` — Phase 3 opens; per-card JSON feed (trace ⋈ grades ⋈ results), traceStatus honesty marker, CLI twin, docs/trace-schema.md |
+| Strategy templates (D18) | in review | branch `strategy-templates` — 6 named rule bundles + signal/structure layer map; allocationCurve made real (lean/spread); invariant-1 422 guard on the live endpoint; template on card rows, trace, P/L and export |
+| Decision-trace export (D17) | merged | PR #25, branch `trace-export` — Phase 3 opens; per-card JSON feed (trace ⋈ grades ⋈ results), traceStatus honesty marker, CLI twin, docs/trace-schema.md |
 | P/L views (D16) | merged | PR #24, branch `pl-views` — bucket panels + running card table + per-race variant-compare matrix; invariants 12/13 enforced by check-pl |
 | Ticket grading engine (D15) | merged | PR #23, branch `grading` — shared/grading.js (pure) + server/grading.js; results save auto-grades every card; Result/P&L columns on the card view; validated on the real Del Mar day's printed payoffs |
 | Results ingest UI (D14) | merged | PR #21, branch `results-ingest` — paste/PDF -> read-only preview -> persist; mismatched charts refused whole |
@@ -230,7 +235,7 @@ Before a branch is reported ready, verify — out loud, in the final message:
 | Card engine + decision trace (D10) | merged | PR #13 — lean allocation, all ticket rules, mandatory place-money sweep, exact bankroll, completeness, full trace to the decision-trace stream; conditions-text interleave fix in the program parser (goldens regenerated) |
 | Consensus table + classification (D09) | merged | PR #12 — chips + contrarian flags on the day view; classification re-runs after every fetch and manual confirm; migration 004 (`races.contrarian_flags`) |
 | SFTB fetcher (D08c) | merged | PR #9 — sitemap discovery + expected-order parsing; real fixture matches the program-PDF day. D08a CLOSED (dmtc picks page is a directory; covered by D05's Bottom Line extraction) and D08b CLOSED (ATR bot challenge; manual-paste only) — both by user decision 2026-09-01 |
-| Backtesting addendum encoding (D25) | in review | PR #8, branch `backtest-addendum` — `cards.consensus_completeness` (migration 003), invariant 12 (buckets never pool), Wayback fetcher planned as D08d, signal/structure layer split planned into D18/D19. Completeness boundary user-confirmed 2026-09-01: FULL = every race ≥2 external sources |
+| Backtesting addendum encoding (D25) | merged | PR #8, branch `backtest-addendum` — `cards.consensus_completeness` (migration 003), invariant 12 (buckets never pool), Wayback fetcher planned as D08d, signal/structure layer split planned into D18/D19. Completeness boundary user-confirmed 2026-09-01: FULL = every race ≥2 external sources |
 | Program-PDF parser (D05) | merged | PR #5 — real Del Mar program (10 races, 98 entries, Bottom Line, index validation); found the printed-scratch/renumbered-index pattern in the wild |
 
 ---

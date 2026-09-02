@@ -16,6 +16,8 @@ import { resultsRouter } from './results.js';
 import { gradingRouter } from './grading.js';
 import { plRouter } from './pl.js';
 import { exportRouter } from './trace-export.js';
+import { seedTemplates, templatesRouter } from './templates.js';
+import { getDb } from './db.js';
 
 const ROOT = fileURLToPath(new URL('../', import.meta.url));
 const log = getLogger('app');
@@ -26,6 +28,10 @@ const HOST = '127.0.0.1';
 
 const app = express();
 app.use(express.json({ limit: '10mb' }));
+
+// The code-defined strategy templates land in their table at boot so
+// cards can reference them by FK (shared/templates.js stays the truth).
+seedTemplates(getDb());
 
 // Request log for /api only (static assets would be noise). A request that
 // belongs to a card session carries its correlation id in this header.
@@ -55,6 +61,7 @@ app.use('/api', resultsRouter);
 app.use('/api', gradingRouter);
 app.use('/api', plRouter);
 app.use('/api', exportRouter);
+app.use('/api', templatesRouter);
 
 // JSON errors for the API, never Express's HTML error page. Registered
 // after the routers; `async` handlers above catch their own.

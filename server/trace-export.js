@@ -23,9 +23,10 @@ export const exportRouter = express.Router();
 /** Build the export document for one card, or {error, status} if it can't. */
 export function buildCardExport(db, cardId) {
   const card = db.prepare(`
-    SELECT c.*, rd.track, rd.date, rd.deleted_at AS day_deleted_at,
+    SELECT c.*, rd.track, rd.date, rd.deleted_at AS day_deleted_at, st.name AS template,
            COALESCE(c.per_race_min_cents, rd.per_race_min_cents) AS per_race_min_cents
     FROM cards c JOIN race_days rd ON rd.id = c.race_day_id
+    LEFT JOIN strategy_templates st ON st.id = c.strategy_template_id
     WHERE c.id = ?
   `).get(cardId);
   if (!card) return { error: 'No such card.', status: 404 };
@@ -177,6 +178,7 @@ export function buildCardExport(db, cardId) {
       id: card.id,
       cardNumber: card.card_number,
       variant: card.variant,
+      template: card.template,
       bankrollCents: card.bankroll_cents,
       perRaceMinCents: card.per_race_min_cents,
       consensusCompleteness: card.consensus_completeness,

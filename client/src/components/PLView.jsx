@@ -97,7 +97,7 @@ export default function PLView({ onBack, onOpenCard, onOpenDay }) {
           <table className="grid grid--click">
             <thead>
               <tr>
-                <th>Card</th><th>Variant</th><th>Consensus</th><th>Bankroll</th>
+                <th>Card</th><th>Template</th><th>Variant</th><th>Consensus</th><th>Bankroll</th>
                 <th>Wagered</th><th>Returned</th><th>P/L</th><th>ROI</th><th>Hits</th>
               </tr>
             </thead>
@@ -105,6 +105,7 @@ export default function PLView({ onBack, onOpenCard, onOpenDay }) {
               {d.cards.map((c) => (
                 <tr key={c.cardId} onClick={() => onOpenCard(c.cardId, c.raceDayId)}>
                   <td><strong>#{c.cardNumber}</strong></td>
+                  <td>{c.template ?? '—'}</td>
                   <td>{c.variant}</td>
                   <td><span className={`chip chip--${BUCKET_CHIP[c.completeness] ?? 'guess'}`}>{c.completeness}</span></td>
                   <td>{money(c.bankrollCents)}</td>

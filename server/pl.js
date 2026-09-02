@@ -20,7 +20,7 @@ plRouter.get('/pl', (_req, res) => {
 
   const cardRows = db.prepare(`
     SELECT c.id AS cardId, c.race_day_id AS raceDayId, rd.track, rd.date,
-           c.card_number AS cardNumber, c.variant,
+           c.card_number AS cardNumber, c.variant, st.name AS template,
            c.consensus_completeness AS completeness, c.bankroll_cents AS bankrollCents,
            SUM(t.cost_cents) AS costCents,
            SUM(gt.returned_cents) AS returnedCents,
@@ -30,6 +30,7 @@ plRouter.get('/pl', (_req, res) => {
     FROM graded_tickets gt
     JOIN tickets t ON t.id = gt.ticket_id
     JOIN cards c ON c.id = t.card_id
+    LEFT JOIN strategy_templates st ON st.id = c.strategy_template_id
     JOIN race_days rd ON rd.id = c.race_day_id
     WHERE rd.deleted_at IS NULL
     GROUP BY c.id
@@ -85,9 +86,11 @@ plRouter.get('/race-days/:id/pl', (req, res) => {
   }
 
   const cards = db.prepare(`
-    SELECT c.id, c.card_number, c.variant, c.bankroll_cents,
+    SELECT c.id, c.card_number, c.variant, st.name AS template, c.bankroll_cents,
            c.consensus_completeness, c.created_at
-    FROM cards c WHERE c.race_day_id = ? ORDER BY c.card_number
+    FROM cards c
+    LEFT JOIN strategy_templates st ON st.id = c.strategy_template_id
+    WHERE c.race_day_id = ? ORDER BY c.card_number
   `).all(day.id);
 
   const rows = db.prepare(`
@@ -123,7 +126,7 @@ plRouter.get('/race-days/:id/pl', (req, res) => {
       : [];
     const sum = (k) => perRace.reduce((a, x) => a + x[k], 0);
     return {
-      cardId: c.id, cardNumber: c.card_number, variant: c.variant,
+      cardId: c.id, cardNumber: c.card_number, variant: c.variant, template: c.template,
       bankrollCents: c.bankroll_cents, completeness: c.consensus_completeness,
       createdAt: c.created_at, graded: perRace.length > 0, perRace,
       costCents: sum('costCents'), returnedCents: sum('returnedCents'), plCents: sum('plCents'),

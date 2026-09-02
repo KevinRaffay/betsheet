@@ -16,8 +16,11 @@ export const BET = {
   longshotMl: 10,             // "longshot" for lottery-upside placement
   maxWinBetsPerRace: 2,       // cut hedges, keep stacks
 
-  // --- allocation curve ("lean") ---
-  allocationWeights: { UNANIMOUS: 2.5, SPLIT: 1.5, CHAOS: 1.8 },
+  // --- allocation curves (selected by rules.allocationCurve, D18) ---
+  allocationCurves: {
+    lean: { UNANIMOUS: 2.5, SPLIT: 1.5, CHAOS: 1.8 },   // the live methodology
+    spread: { UNANIMOUS: 1.7, SPLIT: 1.5, CHAOS: 1.7 }, // flatter: trust agreement less
+  },
   chaosExoticShare: 0.65,     // chaos money leans toward exotics
 
   // --- multi-race reserve ---
