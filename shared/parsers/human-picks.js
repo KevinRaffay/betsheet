@@ -10,10 +10,18 @@
 // TICKET gets constructed inside one parse call (a bad row is dropped,
 // the rest of the race still parses), not gate a whole day's save.
 //
-// Row grammar, one ticket per non-blank line, columns separated by a tab
-// or 2+ spaces:
+// Row grammar, one ticket per non-blank line:
 //
-//   <bet type>  <selections>  <stake>  [odds]  [rationale...]
+//   <bet type> | <selections> | <stake> | [odds] | [rationale...]
+//
+// Columns split on '|' when the line has one, else on a tab or 2+ spaces
+// (spreadsheet paste already carries tabs; a browser textarea's Tab key
+// moves focus rather than inserting a tab character, so typing a row by
+// hand needs an actually-typable delimiter - '|' is recommended for that,
+// never colliding with selections' own '/' and ',' the way a bare space
+// could). Detected per line, never mixed within one row, so an
+// incidental double space inside a pipe-delimited rationale is never
+// mistaken for a column break.
 //
 // Bet type: case-insensitive, vocabulary below; a trailing parenthetical
 // like "(part-wheel)" is stripped before matching. Daily Double / Pick N
@@ -120,7 +128,8 @@ export function parseHumanPicksText({ text, race, entries = [], wagerMenu = null
 
   const lines = String(text ?? '').split(/\r?\n/).map((l) => l.trim()).filter(Boolean);
   for (const line of lines) {
-    const cols = line.split(/\t+|[ ]{2,}/).map((c) => c.trim()).filter((c) => c !== '');
+    const cols = (line.includes('|') ? line.split('|') : line.split(/\t+|[ ]{2,}/))
+      .map((c) => c.trim()).filter((c) => c !== '');
     if (cols.length < 3) {
       warnings.push({ type: 'unrecognized_line', blocking: false, race, message: `Race ${race}: unrecognized line: "${line.slice(0, 80)}"` });
       continue;

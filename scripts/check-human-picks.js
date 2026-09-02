@@ -164,6 +164,28 @@ try {
     return p.warnings.length === 0 && p.tickets.length === 1 &&
       p.tickets[0].legs[0].sort().join(',') === '4,5';
   })());
+
+  console.log('-- pipe-delimited rows (a textarea Tab key does not insert a tab) --');
+  check('a pipe-delimited design-note table parses identically to the tab-delimited one', await (async () => {
+    const piped = [
+      'Win | #2 | $25',
+      'Win | #4 | $15',
+      'Exacta Box | 2,4 | $20',
+      'Trifecta | 2,4/2,4/3,5 | $20 | | ($5 x 4 combos)',
+      'Win | #5 | $20',
+    ].join('\n');
+    const p = await preview(dayId, 1, piped);
+    return p.tickets.length === 5 && p.warnings.length === 0 && p.raceCostCents === 10000;
+  })());
+  check('pipe-delimited rationale with an internal double space is never mistaken for a column break', await (async () => {
+    const p = await preview(dayId, 1, 'Win | #2 | $25 | 9/2 | a  big overlay here');
+    const t = p.tickets[0];
+    return t.odds_at_bet === '9/2' && t.rationale_text === 'a  big overlay here';
+  })());
+  check('a plain tab-delimited row (no pipe) still splits the old way', await (async () => {
+    const p = await preview(dayId, 1, 'Win\t#2\t$25');
+    return p.tickets.length === 1 && p.tickets[0].costCents === 2500;
+  })());
   check('name mismatch -> non-blocking, names the real entry', await (async () => {
     const ws = await w('Win\t#2 Not Tahini\t$25');
     return ws.length === 1 && ws[0].type === 'name_mismatch' && ws[0].blocking === false && ws[0].message.includes('Tahini');
