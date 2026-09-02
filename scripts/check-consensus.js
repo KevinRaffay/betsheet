@@ -244,15 +244,15 @@ try {
   check('...and the audit shows four not_published rows for it, zero blocked',
     c4.attempts.filter((a) => a.source_name === 'Stub Resolver None').map((a) => a.outcome).join() === 'not_published,not_published,not_published,not_published');
 
-  // ---- D53: a day typed "Delmar" is the same track as a page saying "Del Mar" ----
-  const savedDelmar = await (await jpost('/api/race-days', {
+  // ---- D35: track canonicalization at save closes the D53 gap at its root -
+  // a day can no longer be SAVED as "Delmar" (it stores as "Del Mar"), so
+  // typing "Delmar" for the same date now collides with the existing day
+  // instead of silently coexisting as a second, differently-spelled one ----
+  const conflictDelmar = await jpost('/api/race-days', {
     track: 'Delmar', date: parsed.date, bankrollCents: 20000, perRaceMinCents: 500, races: parsed.races,
-  })).json();
-  const runDelmar = await (await jpost(`/api/race-days/${savedDelmar.id}/fetch-consensus`, {})).json();
-  check('a race day typed "Delmar": the good source\'s page (title "Del Mar") is accepted, not discarded as track_date_mismatch',
-    Number.isInteger(savedDelmar.id) && runDelmar.results.find((r) => r.source === 'Stub Good Picks')?.outcome === 'ok' &&
-    runDelmar.results.find((r) => r.source === 'Stub Wrong Day')?.outcome === 'track_date_mismatch',
-    JSON.stringify(runDelmar.results));
+  });
+  check('D35: a day typed "Delmar" on the same date as the "Del Mar" day conflicts (409), not a silent duplicate',
+    conflictDelmar.status === 409);
 
   // ---- manual fallback: preview writes nothing, confirm writes ----
   const preview = await (await jpost(`/api/race-days/${dayId}/consensus/manual-preview`, {

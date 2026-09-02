@@ -14,6 +14,7 @@ import crypto from 'node:crypto';
 import { getDb } from './db.js';
 import { gradeAllCards } from './grading.js';
 import { getLogger, newCorrelationId } from './logging.js';
+import { canonicalizeTrack } from '../shared/track-codes.js';
 
 const log = getLogger('app');
 const traceLog = getLogger('decision-trace');
@@ -24,7 +25,6 @@ export const resultsRouter = express.Router();
 // Re-saving from ANY source replaces the day's results and regrades every card.
 const SOURCE_KINDS = { paste: 'equibase_paste', pdf: 'equibase_pdf', equibase_paste: 'equibase_paste', equibase_pdf: 'equibase_pdf', dmtc_html: 'dmtc_html' };
 
-const lettersOnly = (s) => String(s ?? '').replace(/[^A-Za-z]/g, '').toUpperCase();
 const nameKey = (s) => String(s ?? '').toUpperCase().replace(/[‘’]/g, "'")
   .replace(/\s+/g, ' ').trim();
 
@@ -130,7 +130,9 @@ resultsRouter.post('/race-days/:id/results', (req, res) => {
       error: `This chart is for ${p.date}; the race day is ${day.date}. Wrong chart - nothing saved.`,
     });
   }
-  if (p.track && lettersOnly(p.track) !== lettersOnly(day.track)) {
+  // Keyed on the canonical code (D35), not raw text - a chart naming "DEL
+  // MAR" must not be refused against a day saved as "Del Mar".
+  if (p.track && canonicalizeTrack(p.track).code !== day.track_code) {
     return res.status(422).json({
       error: `This chart is for ${p.track}; the race day is ${day.track}. Wrong chart - nothing saved.`,
     });

@@ -22,6 +22,7 @@ import fs from 'node:fs';
 import path from 'node:path';
 import crypto from 'node:crypto';
 import { fileURLToPath, URL } from 'node:url';
+import { canonicalizeTrack } from '../shared/track-codes.js';
 
 const ROOT = fileURLToPath(new URL('../', import.meta.url));
 export const DEFAULT_ORIGIN = 'https://www.dmtc.com';
@@ -42,10 +43,9 @@ export function meetFor(date) {
   return null;
 }
 
-/** meetFor() for a Del Mar day (any spelling of the track), null for other tracks - until D35 canonicalizes track codes. */
+/** meetFor() for a Del Mar day (any spelling of the track - D35 canonicalizes), null for other tracks. */
 export function meetForDay(track, date) {
-  const key = String(track ?? '').toUpperCase().replace(/[^A-Z]/g, '');
-  return key === 'DELMAR' || key === 'DMR' ? meetFor(date) : null;
+  return canonicalizeTrack(track).code === TRACK_CODE ? meetFor(date) : null;
 }
 
 export const calendarUrl = (origin, year, month) => `${origin}/racing/${year}/${String(month).padStart(2, '0')}`;
