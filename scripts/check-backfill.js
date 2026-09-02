@@ -249,6 +249,35 @@ check('--meet filters the range to one meet (none here) and the missing-calendar
 const rNoCal = await runBackfill({ from: '2026-11-01', to: '2026-11-30', rawDir: rawA, goldenDir: goldenA, docsDir: docsA, db: openDb(path.join(tmp, 'd.sqlite')), parsers: stubParsers });
 check('a month with no archived calendar is reported (never enumerated blindly)', rNoCal.lines.length === 0 && rNoCal.missingCalendars.join() === '2026-11');
 
+// ---------- index source 2 in the runner: a dark month indexed by the meet-dates table, the three-way race-count rule ----------
+console.log('-- runner: meet-table days (no calendar count) --');
+const rawT = path.join(tmp, 'rawT');
+fs.mkdirSync(path.join(rawT, 'DMR', 'calendar'), { recursive: true });
+fs.copyFileSync(path.join(FIX, 'dmtc', 'calendar-2026-08.html'), path.join(rawT, 'DMR', 'calendar', '2026-08.html'));
+fs.copyFileSync(path.join(FIX, 'dmtc', 'calendar-2025-07.html'), path.join(rawT, 'DMR', 'calendar', '2026-09.html'));   // a DARK September
+const meetsT = path.join(tmp, 'meetsT');
+fs.mkdirSync(meetsT, { recursive: true });
+const [tClean, tMismatch] = ['2026-09-04', '2026-09-05'];
+fs.writeFileSync(path.join(meetsT, 'DMR-2026-summer.json'), JSON.stringify({ meet: 'DMR-2026-summer', track: 'DMR', window: { from: '2026-09-04', to: '2026-09-06', source: 'check' }, probe: { requests: 3 },
+  days: [{ date: tClean, raceDay: true, races: 10, httpStatus: 200, url: 'x' }, { date: tMismatch, raceDay: true, races: 10, httpStatus: 200, url: 'x' }, { date: '2026-09-06', raceDay: false, httpStatus: 404, url: 'x' }] }));
+TWIST[tMismatch] = { mlRaces: 9 };
+for (const d of [dFirst, tClean, tMismatch]) {
+  fakeDay(rawT, d, { races: 10 });
+  if (d !== dFirst) { const mp = path.join(rawT, 'DMR', d.replace(/-/g, ''), 'manifest.json'); const m = JSON.parse(fs.readFileSync(mp, 'utf8')); m.calendar = null; m.index = { source: 'meet-table', races: 10 }; fs.writeFileSync(mp, JSON.stringify(m)); }
+}
+const dbT = openDb(path.join(tmp, 't.sqlite'));
+const rT = await runBackfill({ from: dFirst, to: tMismatch, rawDir: rawT, goldenDir: goldenA, docsDir: path.join(tmp, 'docsT'), meetsDir: meetsT, db: dbT, parsers: stubParsers });
+const LT = by(rT);
+check('index: the live August calendar (its un-archived days report missing) and the dark September (from the table) index together; the dark day 09-06 is never a line',
+  rT.lines.filter((l) => l.status !== 'missing').map((l) => l.date).join() === [dFirst, tClean, tMismatch].join() && !rT.lines.some((l) => l.date === '2026-09-06') && rT.lines.filter((l) => l.status === 'missing').every((l) => l.date.startsWith('2026-08') && l.indexSource === 'calendar') &&
+  rT.darkCalendars.join() === '2026-09' && rT.missingIndex.length === 0 && rT.tablesUsed.length === 1, JSON.stringify(rT.lines.map((l) => [l.date, l.status, l.indexSource])));
+check('a table day with no calendar count: ML / program / results agree -> saved, calendarRaces null, indexSource meet-table',
+  LT[tClean].status === 'saved' && LT[tClean].calendarRaces === null && LT[tClean].indexSource === 'meet-table' && LT[tClean].blocking.length === 0 && LT[dFirst].indexSource === 'calendar', JSON.stringify({ s: LT[tClean].status, n: LT[tClean].note }));
+check('a table day where the documents disagree on the race count (sheet 9 / program 10 / results 10) -> race_count_mismatch (source documents), queued',
+  LT[tMismatch].status === 'queued' && LT[tMismatch].blocking.some((w) => w.type === 'race_count_mismatch' && w.source === 'documents'), JSON.stringify(LT[tMismatch].blocking));
+dbT.close();
+
+
 // ---------- layer 3: the queue API on the real server ----------
 console.log('-- server: the Backfill queue API, P/L by meet --');
 dbA.close();

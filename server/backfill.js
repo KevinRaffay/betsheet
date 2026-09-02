@@ -23,7 +23,7 @@ import fs from 'node:fs';
 import path from 'node:path';
 import express from 'express';
 import { fileURLToPath, URL } from 'node:url';
-import { DEFAULT_RAW_DIR, TRACK_CODE, artifactFile, dayDir, meetFor, parseCalendar, readManifest } from './dmtc-crawler.js';
+import { DEFAULT_RAW_DIR, artifactFile, dayDir, indexRaceDays, readManifest } from './dmtc-crawler.js';
 import { parseMlSheetPdf } from './ml-sheet-parser.js';
 import { parseProgramPdf } from './program-parser.js';
 import { mergeMlAndProgram } from '../shared/entries-merge.js';
@@ -80,24 +80,16 @@ export const DEFAULT_PARSERS = {
 
 // ---------- the archived calendar: which dates are race days ----------
 
-/** Every race day in every ARCHIVED calendar month, date order, with its meet. */
-export function archivedRaceDays(rawDir) {
-  const dir = path.join(rawDir, TRACK_CODE, 'calendar');
-  const days = [];
-  const months = [];
-  if (fs.existsSync(dir)) {
-    for (const f of fs.readdirSync(dir).sort()) {
-      const m = f.match(/^(\d{4})-(\d{2})\.html$/);
-      if (!m) continue;
-      months.push(`${m[1]}-${m[2]}`);
-      const out = parseCalendar(fs.readFileSync(path.join(dir, f), 'utf8'), { year: Number(m[1]), month: Number(m[2]) });
-      days.push(...(Array.isArray(out) ? out : out.days ?? []));
-    }
-  }
-  days.sort((a, b) => a.date.localeCompare(b.date));
-  return { days, months };
+/**
+ * Every race day the archive can index, date order, with its meet and the
+ * source that named it: the archived calendar month when it carries race
+ * days, else the committed meet-dates table (user decision 2026-09-02;
+ * see indexRaceDays). Never a date neither source names.
+ */
+export function archivedRaceDays(rawDir, { meetsDir } = {}) {
+  const index = indexRaceDays({ rawDir, ...(meetsDir ? { meetsDir } : {}) });
+  return { days: index.days, months: index.months, darkCalendars: index.darkCalendars, missingIndex: index.missingIndex, tablesUsed: index.tablesUsed };
 }
-
 const monthsInRange = (from, to) => {
   const out = [];
   let [y, m] = from.slice(0, 7).split('-').map(Number);
@@ -145,7 +137,11 @@ export async function parseArchivedDay(day, { rawDir, parsers = DEFAULT_PARSERS,
   if (!manifest) missing.unshift('manifest');
   if (missing.length) return { missing };
   const expected = { track: TRACK_NAME, date: day.date };
-  const calendarRaces = manifest?.calendar?.races ?? day.races ?? null;
+  // Policy A race-count check (user decision 2026-09-02): the calendar count
+  // when the calendar carried one; otherwise the ML sheet, the program and
+  // the results page must AGREE with each other. The meet-table count came
+  // from the results page itself, so it never stands in for a calendar.
+  const calendarRaces = manifest?.calendar?.races ?? (day.indexSource === 'meet-table' ? null : day.races ?? null);
   const ml = await parsers.ml(new Uint8Array(fs.readFileSync(files.ml)), expected);
   const program = await parsers.program(new Uint8Array(fs.readFileSync(files.program)), expected);
   const merged = mergeMlAndProgram(ml, program);
@@ -163,7 +159,10 @@ export async function parseArchivedDay(day, { rawDir, parsers = DEFAULT_PARSERS,
     ...merged.warnings.map((w) => ({ ...w, source: w.source ?? 'entries' })),
     ...results.warnings.map((w) => ({ ...w, source: 'results' })),
   ];
-  if (calendarRaces != null) {
+  if (calendarRaces == null) {
+    const n = [ml.races.length, program.races.length, results.races.length];
+    if (new Set(n).size > 1) warnings.push({ type: 'race_count_mismatch', source: 'documents', message: `No calendar count for ${day.date}: the ML sheet has ${n[0]} races, the program ${n[1]}, the results page ${n[2]} - they must agree.` });
+  } else {
     if (ml.races.length !== calendarRaces) warnings.push({ type: 'race_count_mismatch', source: 'ml', message: `ML sheet has ${ml.races.length} races; the calendar says ${calendarRaces}.` });
     if (program.races.length !== calendarRaces) warnings.push({ type: 'race_count_mismatch', source: 'program', message: `Program has ${program.races.length} races; the calendar says ${calendarRaces}.` });
   }
@@ -288,25 +287,27 @@ const resultsSourceOf = (db, dayId) => db.prepare('SELECT source_kind FROM resul
  */
 export async function runBackfill({
   from, to = from, meet = null, dryRun = false, regenerate = false,
-  rawDir = DEFAULT_RAW_DIR, goldenDir = DEFAULT_GOLDEN_DIR, docsDir = DEFAULT_DOCS_DIR,
+  rawDir = DEFAULT_RAW_DIR, goldenDir = DEFAULT_GOLDEN_DIR, docsDir = DEFAULT_DOCS_DIR, meetsDir = null,
   db = getDb(), parsers = DEFAULT_PARSERS, template = 'lean',
   bankrollCents = 20000, perRaceMinCents = 500, correlationId = newCorrelationId(), onLine = () => {},
 } = {}) {
-  const { days: allDays, months } = archivedRaceDays(rawDir);
-  const missingCalendars = monthsInRange(from, to).filter((m) => !months.includes(m));
+  const index = archivedRaceDays(rawDir, { meetsDir });
+  const allDays = index.days;
+  const missingCalendars = monthsInRange(from, to).filter((m) => !index.months.includes(m));
+  const missingIndex = index.missingIndex.filter((m) => m >= from.slice(0, 7) && m <= to.slice(0, 7));
   const days = allDays.filter((d) => d.date >= from && d.date <= to && (!meet || d.meet === meet));
   const firstDayOfMeet = {};
   for (const d of allDays) if (d.meet && !firstDayOfMeet[d.meet]) firstDayOfMeet[d.meet] = d.date;
   const baseline = loadBaseline(docsDir);
   const report = {
     runId: correlationId, from, to, meet, dryRun, regenerate, engineVersion: ENGINE_VERSION, template,
-    bankrollCents, perRaceMinCents, missingCalendars, lines: [], halted: null, startedAt: new Date().toISOString(),
+    bankrollCents, perRaceMinCents, missingCalendars, missingIndex, darkCalendars: index.darkCalendars, tablesUsed: index.tablesUsed, lines: [], halted: null, startedAt: new Date().toISOString(),
   };
   const emit = (line) => { report.lines.push(line); onLine(line); return line; };
 
   for (const day of days) {
     const dayCid = newCorrelationId();
-    const base = { date: day.date, meet: day.meet, correlationId: dayCid, calendarRaces: day.races ?? null };
+    const base = { date: day.date, meet: day.meet, correlationId: dayCid, indexSource: day.indexSource ?? 'calendar', calendarRaces: day.indexSource === 'meet-table' ? null : (day.races ?? null) };
     let line;
     try {
       line = await processDay({ db, day, base, dryRun, regenerate, rawDir, goldenDir, parsers, template, bankrollCents, perRaceMinCents, firstDayOfMeet, runId: correlationId });
