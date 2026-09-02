@@ -221,7 +221,7 @@ Before a branch is reported ready, verify — out loud, in the final message:
 | Entries parser — pasted text (D04) | merged | PR #4 — validated against a real Del Mar card (8 races, 81 entries, 0 warnings) |
 | Ingest UI + API (D06) | merged | PR #6 — paste/PDF → warnings-first read-only preview → transactional save; migration 002 adds `races.wager_menu` |
 | Consensus-fetch framework (D07) | merged | PR #7 — fetcher registry, robots/backoff/mismatch handling, audit trail, manual paste fallback w/ read-only preview |
-| Strategy templates (D18) | in review | branch `strategy-templates` — 6 named rule bundles + signal/structure layer map; allocationCurve made real (lean/spread); invariant-1 422 guard on the live endpoint; template on card rows, trace, P/L and export |
+| Strategy templates (D18) | in review | PR #26, branch `strategy-templates` — 6 named rule bundles + signal/structure layer map; allocationCurve made real (lean/spread); invariant-1 422 guard on the live endpoint; template on card rows, trace, P/L and export |
 | Decision-trace export (D17) | merged | PR #25, branch `trace-export` — Phase 3 opens; per-card JSON feed (trace ⋈ grades ⋈ results), traceStatus honesty marker, CLI twin, docs/trace-schema.md |
 | P/L views (D16) | merged | PR #24, branch `pl-views` — bucket panels + running card table + per-race variant-compare matrix; invariants 12/13 enforced by check-pl |
 | Ticket grading engine (D15) | merged | PR #23, branch `grading` — shared/grading.js (pure) + server/grading.js; results save auto-grades every card; Result/P&L columns on the card view; validated on the real Del Mar day's printed payoffs |
