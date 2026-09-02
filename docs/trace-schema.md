@@ -68,6 +68,8 @@ engine event.
 | `race_day_deleted` | `raceDayId`, counts | soft delete; the trace files are never touched (invariant 12) |
 | `race_day_restored` | `raceDayId` | restore from the deleted list |
 | `race_day_superseded` | `raceDayId`, `supersededRaceDayId`, `supersededCorrelationId`, `supersededWasDeleted` | re-ingest replaced a prior day; old ids stay resolvable here |
+| `backfill_day` | `runId` (the run's correlationId), `date`, `meet`, `status` (saved / queued / skipped / resolved / regenerated / missing / failed / halted / would-*), `note`, `raceDayId`, `cardId`, `queueId`, `blocking[]`, `nonBlocking[]` (warning types), `completeness`, `engineVersion`, `crossSource {tickets, agree}` | one per race day the batch backfill (D43) decided, under the DAY's correlationId (the same id its race_days row carries) |
+| `backfill_queue_decided` | `queueId`, `date`, `meet`, `decision` (confirmed / rejected), `note`, `raceDayId`, `cardId`, `blocking[]` | the human decision on a queued day (invariant 9 batch policy A), under the day's correlationId; a confirm is followed by the ordinary `race_day_saved` / `results_saved` / card events under the same id |
 
 ## The export document (`GET /api/cards/:id/export`, `npm run export-trace`)
 

@@ -34,7 +34,7 @@ const tables = db.prepare(
 ).all().map((r) => r.name).sort();
 
 const expected = [
-  'actual_stakes', 'allocations', 'cards', 'consensus_picks', 'entries',
+  'actual_stakes', 'allocations', 'backfill_queue', 'cards', 'consensus_picks', 'entries',
   'exotic_payoffs', 'fetch_attempts', 'graded_tickets', 'publishes',
   'race_days', 'race_results', 'races', 'result_charts', 'result_scratches',
   'schema_migrations', 'simulation_results', 'simulation_runs', 'sources',
@@ -155,7 +155,7 @@ const ticket = d.prepare(`INSERT INTO tickets (card_id, race_id, sequence, bet_t
   VALUES (?, ?, 1, 'win', '[["1A"]]', 1500, 1500, 5250, 5250, 0, 'Race 1, $15 win, 1A', '["place_money_rule"]')`).run(card, race).lastInsertRowid;
 
 d.prepare(`INSERT INTO result_charts (race_day_id, source_kind, raw_digest, correlation_id)
-  VALUES (?, 'paste', 'abc123', 'cid-check')`).run(day);
+  VALUES (?, 'equibase_paste', 'abc123', 'cid-check')`).run(day);
 
 d.prepare(`INSERT INTO race_results (race_day_id, race_number, program_number, horse_name, finish_position, win_cents, place_cents, show_cents)
   VALUES (?, 1, '1A', 'Fast Idea', 1, 700, 340, 260)`).run(day);
