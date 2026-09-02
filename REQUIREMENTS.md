@@ -102,3 +102,11 @@ map in the same PR.
 | Effective wagered (wagered − refunds) and effective ROI reported beside nominal at card, day and bucket level; refunds visible | D39 |
 | Historical simulation can apply chart scratches before generation (at-the-window baseline), both modes reported | D19 (option) |
 | Single-ticket dependence reported gross and net; the flag driven by net | D20 |
+
+## Morning-line sheet (addendum 3, 2026-09-02)
+
+| Requirement | Deliverables |
+| --- | --- |
+| The track's ML/changes PDF parses into the entries structure and is the entries source of record; the program PDF is analysis-only and cross-validated against it, the sheet winning every disagreement with a warning | D40 |
+| Ingest accepts the ML sheet alone (ODDS_ONLY completeness, below PROGRAM_ONLY), the program alone, or both (preferred) | D40 |
+| The ML sheet is fetched from the track at its predictable URL when robots allow, audited like every fetch; past dates feed backfill | D40 (on the D07 framework) |

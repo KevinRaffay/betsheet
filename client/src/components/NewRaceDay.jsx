@@ -1,5 +1,5 @@
 import React, { useState } from 'react';
-import { parseEntriesText, parseProgramPdf, saveRaceDay } from '../api.js';
+import { fetchMlSheet, mergeParses, parseEntriesText, parseMlPdf, parseProgramPdf, saveRaceDay } from '../api.js';
 
 // The ingest screen: paste entries text or upload a program PDF, review the
 // parse, then save. The preview is READ-ONLY - it shows exactly what Save
@@ -16,6 +16,11 @@ export default function NewRaceDay({ onSaved, onCancel }) {
   const [conflict, setConflict] = useState(false);
   const [parsed, setParsed] = useState(null);
   const [correlationId, setCorrelationId] = useState(null);
+  // D40: the ML sheet is the entries source of record; the program is
+  // analysis-only. Both parses are kept so either upload can come first;
+  // the preview always shows the MERGED result when both are present.
+  const [mlParse, setMlParse] = useState(null);
+  const [programParse, setProgramParse] = useState(null);
 
   const applyParse = (result) => {
     setParsed(result);
@@ -37,11 +42,49 @@ export default function NewRaceDay({ onSaved, onCancel }) {
     }
   };
 
+  // Combine whatever is on hand: ML + program -> merged (server-side,
+  // logged); ML alone -> the sheet; program alone -> the program.
+  const combine = async (ml, program) => {
+    if (ml && program) return { ...(await mergeParses(ml, program, correlationId)), entriesSource: 'both' };
+    if (ml) return { ...ml, entriesSource: 'ml_sheet' };
+    return { ...program, entriesSource: 'program' };
+  };
+
   const handlePdf = async (file) => {
     if (!file) return;
     setBusy(true);
     try {
-      applyParse(await parseProgramPdf(file, { track, date, correlationId }));
+      const program = await parseProgramPdf(file, { track, date, correlationId });
+      setProgramParse(program);
+      applyParse(await combine(mlParse, program));
+    } catch (e) {
+      setError(String(e.message));
+    } finally {
+      setBusy(false);
+    }
+  };
+
+  const handleMlPdf = async (file) => {
+    if (!file) return;
+    setBusy(true);
+    try {
+      const ml = await parseMlPdf(file, { track, date, correlationId });
+      setMlParse(ml);
+      applyParse(await combine(ml, programParse));
+    } catch (e) {
+      setError(String(e.message));
+    } finally {
+      setBusy(false);
+    }
+  };
+
+  const handleFetchMl = async () => {
+    setBusy(true);
+    setError(null);
+    try {
+      const ml = await fetchMlSheet(track.trim(), date, correlationId);
+      setMlParse(ml);
+      applyParse(await combine(ml, programParse));
     } catch (e) {
       setError(String(e.message));
     } finally {
@@ -59,6 +102,7 @@ export default function NewRaceDay({ onSaved, onCancel }) {
         bankrollCents: Math.round(Number(bankroll || 0) * 100),
         perRaceMinCents: Math.round(Number(perRaceMin || 0) * 100),
         replace,
+        entriesSource: parsed.entriesSource ?? 'program',
         races: parsed.races,
       }, correlationId);
       onSaved(result.id);
@@ -111,8 +155,22 @@ export default function NewRaceDay({ onSaved, onCancel }) {
           <button className="btn btn--primary" disabled={busy || !text.trim()} onClick={handleParseText}>
             {busy ? 'Parsing…' : 'Parse pasted text'}
           </button>
+          <label className="btn btn--primary">
+            {busy ? 'Parsing…' : 'Upload ML sheet PDF'}
+            <input
+              type="file"
+              accept="application/pdf"
+              style={{ display: 'none' }}
+              disabled={busy}
+              onChange={(e) => handleMlPdf(e.target.files?.[0])}
+            />
+          </label>
+          <button className="btn" disabled={busy || !track.trim() || !date} onClick={handleFetchMl}
+            title="Fetch the track's morning-line sheet for this track and date">
+            {busy ? 'Fetching…' : 'Fetch ML sheet'}
+          </button>
           <label className="btn">
-            {busy ? 'Parsing…' : 'Upload program PDF'}
+            {busy ? 'Parsing…' : 'Upload program PDF (analysis)'}
             <input
               type="file"
               accept="application/pdf"
@@ -140,6 +198,12 @@ export default function NewRaceDay({ onSaved, onCancel }) {
           <div className="pagehead">
             <h3>
               Preview — {parsed.races.length} races, {entryCount} entries
+              {' '}<span className="dim">
+                · {parsed.entriesSource === 'both' ? 'ML sheet (record) + program (analysis)'
+                  : parsed.entriesSource === 'ml_sheet' ? 'ML sheet only - no program analysis (ODDS_ONLY)'
+                    : 'program only'}
+                {parsed.fetchedFrom ? ` · fetched from ${parsed.fetchedFrom}` : ''}
+              </span>
             </h3>
             <button
               className="btn btn--primary"

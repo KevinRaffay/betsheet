@@ -41,7 +41,7 @@ import {
 // produced under, so "the algorithm improved" and "I regraded under
 // different rules" are distinguishable and never overwrite each other.
 // 'lean-0' is reserved for cards that predate versioning.
-export const ENGINE_VERSION = 'lean-1.0';
+export const ENGINE_VERSION = 'lean-1.0.1';
 
 export const DEFAULT_RULES = {
   placeMoneyRule: true,
@@ -109,9 +109,12 @@ export function generateCard({ bankrollCents, perRaceMinCents, races, sourcesUse
 
   // ----- completeness (user-confirmed boundary, 2026-09-01) -----
   const extCounts = races.map((r) => r.classification.externalSourceCount);
+  // ODDS_ONLY (D40): no external sources AND no program analysis anywhere
+  // on the day - the morning line is the only signal.
+  const hasAnalysis = races.some((r) => r.entries.some((e) => e.program_rank != null));
   const completeness = extCounts.every((n) => n >= 2) ? 'FULL'
-    : extCounts.some((n) => n > 0) ? 'PARTIAL' : 'PROGRAM_ONLY';
-  emit('completeness_decided', { completeness, externalSourcesPerRace: extCounts });
+    : extCounts.some((n) => n > 0) ? 'PARTIAL' : hasAnalysis ? 'PROGRAM_ONLY' : 'ODDS_ONLY';
+  emit('completeness_decided', { completeness, externalSourcesPerRace: extCounts, programAnalysis: hasAnalysis });
 
   // ----- multi-race reserve -----
   const strongRaces = races.filter((r) => r.classification.classification === 'UNANIMOUS' && !isGuessRace(r));
@@ -295,19 +298,40 @@ function secondChoice(race) {
   }
   return programPick(race, 2);
 }
-const programPick = (race, rank) =>
-  race.entries.find((e) => e.program_rank === rank && !e.scratched) ?? null;
+// The program's ranked pick - or, on a race with NO program analysis (an
+// ML-sheet-only day, D40), the morning-line order: favorite first. The
+// fallback is traced once per race so the card says where its picks came
+// from.
+const programPick = (race, rank) => {
+  const ranked = race.entries.find((e) => e.program_rank === rank && !e.scratched);
+  if (ranked) return ranked;
+  if (race.entries.some((e) => e.program_rank != null)) return null;
+  const byMl = race.entries.filter((e) => !e.scratched && ml(e) != null).sort((a, b) => ml(a) - ml(b));
+  return byMl[rank - 1] ?? null;
+};
+
+// Position in morning-line order (1 = favorite) - only meaningful on a race
+// without program analysis; Infinity otherwise so it never competes.
+function mlRank(race, entry) {
+  if (race.entries.some((e) => e.program_rank != null)) return Infinity;
+  const byMl = race.entries.filter((e) => !e.scratched && ml(e) != null).sort((a, b) => ml(a) - ml(b));
+  const k = byMl.indexOf(entry);
+  return k < 0 ? Infinity : k + 1;
+}
 
 function liveLongshots(race) {
   const counts = race.classification.sourceCounts ?? {};
   return race.entries.filter((e) => !e.scratched && ml(e) >= BET.longshotMl &&
-    ((counts[e.program_number] ?? 0) >= 1 || (e.program_rank != null && e.program_rank <= 3)));
+    ((counts[e.program_number] ?? 0) >= 1 || (e.program_rank != null && e.program_rank <= 3) || mlRank(race, e) <= 3));
 }
 
 function buildRaceTickets({ race, alloc, rules, addTicket, emit, warnings }) {
   const A = alloc.amountCents;
   const menu = parseWagerMenu(race.wager_menu);
   const cls = alloc.confidence;
+  if (!race.entries.some((e) => e.program_rank != null) && !race.classification.topVotes?.length) {
+    emit('rule_fired', { rule: 'ml_order_fallback', race: race.number, reason: 'no program analysis and no external picks - morning-line order stands in for the ranking' });
+  }
   const top = topEntry(race);
   if (!top) {
     warnings.push(`Race ${race.number}: no usable top pick; allocation left to the balancing pass.`);

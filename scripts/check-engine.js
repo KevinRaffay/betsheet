@@ -316,6 +316,25 @@ check('overspend: trimmed to the exact bankroll in $2 pair steps, spread across 
       over.tickets.some((p) => p.betType === 'place' && p.raceNumbers[0] === w.raceNumbers[0] && p.stakeCents === w.stakeCents));
 })(), JSON.stringify(over.trace.find((e) => e.event === 'remainder_distributed')));
 
+// ODDS_ONLY (D40): an ML-sheet-only day has no program ranks and no
+// external picks - the tier below PROGRAM_ONLY, and the engine ranks by
+// morning line (favorite first) instead of skipping every race.
+const oddsEntries = synthEntries.map((e) => ({ ...e, program_rank: null }));
+const oddsCls = classifyDay([1], { 1: oddsEntries }, {})[0];
+const oddsCard = generateCard({ bankrollCents: 5000, perRaceMinCents: 500,
+  races: [{ ...synthRace, entries: oddsEntries, classification: oddsCls }] });
+check('ODDS_ONLY: no ranks + no sources -> the new tier, traced with programAnalysis:false',
+  oddsCard.completeness === 'ODDS_ONLY' &&
+  oddsCard.trace.some((e) => e.event === 'completeness_decided' && e.programAnalysis === false));
+check('ODDS_ONLY: the morning-line favorite anchors the race (ml_order_fallback traced), tickets exist',
+  oddsCard.tickets.length > 0 &&
+  oddsCard.trace.some((e) => e.event === 'rule_fired' && e.rule === 'ml_order_fallback' && e.race === 1) &&
+  oddsCard.tickets.find((t) => t.betType === 'win')?.legs[0][0] === '2', // Second Fiddle at 3/1 is the ML favorite
+  JSON.stringify(oddsCard.tickets.map((t) => [t.betType, t.legs])));
+check('ranked races unchanged: program ranks present -> the fallback never fires (synthetic day is FULL, two sources)',
+  synthCard.completeness === 'FULL' && !synthCard.trace.some((e) => e.rule === 'ml_order_fallback') &&
+  !card.trace.some((e) => e.rule === 'ml_order_fallback'));
+
 const noFade = gen(realDay(), { rules: { fadeThePrice: false } });
 check('toggle: fadeThePrice off -> R1 gets a win bet again',
   noFade.tickets.some((t) => t.betType === 'win' && t.raceNumbers[0] === 1));

@@ -9,7 +9,7 @@
 import { generateCard } from './card-engine.js';
 import { gradeCard } from './grading.js';
 
-export const BUCKET_ORDER = ['FULL', 'PARTIAL', 'PROGRAM_ONLY'];
+export const BUCKET_ORDER = ['FULL', 'PARTIAL', 'PROGRAM_ONLY', 'ODDS_ONLY'];
 
 /**
  * One day under one rule set: generate the card, grade it against the

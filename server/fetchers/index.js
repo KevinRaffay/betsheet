@@ -14,6 +14,9 @@
 //       races: [{ race, picks: [{ programNumber?, horseName?, pickType, note? }] }],
 //       warnings?: [...]
 //     }
+//     produces?: 'entries'         // an ENTRIES source (the ML sheet, D40):
+//                                  //   shares the registry, audit and robots
+//                                  //   guard, but the consensus runner skips it
 //   }
 //
 // pickType vocabulary is the consensus_picks CHECK constraint:
@@ -26,6 +29,7 @@
 // end without touching the network.
 
 import sftbFetcher from './sftb.js';
+import dmtcMlFetcher from './dmtc-ml.js';
 
 const fetchers = [];
 
@@ -45,6 +49,7 @@ export const listFetchers = () => [...fetchers];
 // their stub-only runs can never touch the network.
 if (!process.env.BETSHEET_DISABLE_BUILTIN_FETCHERS) {
   registerFetcher(sftbFetcher);
+  registerFetcher(dmtcMlFetcher);
 }
 
 let extrasLoaded = false;
