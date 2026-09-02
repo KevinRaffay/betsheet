@@ -1,5 +1,5 @@
 import React, { useEffect, useState } from 'react';
-import { getResults, parseResultsPdf, parseResultsText, saveResults } from '../api.js';
+import { getResults, parseResultsHtml, parseResultsPdf, parseResultsText, resultsFromArchive, saveResults } from '../api.js';
 
 const money = (cents) => (cents == null ? '' : `$${(cents / 100).toFixed(2)}`);
 
@@ -35,6 +35,21 @@ export default function ResultsPanel({ dayId }) {
     setBusy(true);
     try {
       applyParse({ ...(await parseResultsPdf(file, correlationId)), sourceKind: 'pdf' });
+    } catch (e) { setError(String(e.message)); } finally { setBusy(false); }
+  };
+  // dmtc.com results page (D42): the second results source of record.
+  const handleHtml = async (file) => {
+    if (!file) return;
+    setBusy(true);
+    try {
+      applyParse({ ...(await parseResultsHtml(await file.text(), correlationId)), sourceKind: 'dmtc_html' });
+    } catch (e) { setError(String(e.message)); } finally { setBusy(false); }
+  };
+  const handleArchive = async () => {
+    setBusy(true);
+    setError(null);
+    try {
+      applyParse({ ...(await resultsFromArchive(dayId, correlationId)), sourceKind: 'dmtc_html' });
     } catch (e) { setError(String(e.message)); } finally { setBusy(false); }
   };
   const handleSave = async () => {
@@ -113,7 +128,7 @@ export default function ResultsPanel({ dayId }) {
       )}
 
       <details className="race" open={!hasResults}>
-        <summary>{hasResults ? 'Replace results (paste or upload a corrected chart)' : 'Ingest results (Equibase chart paste or PDF)'}</summary>
+        <summary>{hasResults ? 'Replace results (Equibase chart or dmtc results page)' : 'Ingest results (Equibase chart paste / PDF, or the dmtc results page)'}</summary>
         <label className="pastebox">
           Paste the Equibase chart text
           <textarea rows={6} value={text} onChange={(e) => setText(e.target.value)}
@@ -127,6 +142,14 @@ export default function ResultsPanel({ dayId }) {
             {busy ? 'Parsing…' : 'Upload chart PDF'}
             <input type="file" accept="application/pdf" style={{ display: 'none' }}
               disabled={busy} onChange={(e) => handlePdf(e.target.files?.[0])} />
+          </label>
+          <button className="btn" disabled={busy} onClick={handleArchive} title="Preview the dmtc.com results page archived by dmtc-fetch for this day">
+            {busy ? 'Loading…' : 'Load dmtc results from archive'}
+          </button>
+          <label className="btn">
+            {busy ? 'Parsing…' : 'Upload dmtc results page (HTML)'}
+            <input type="file" accept=".html,.htm,text/html" style={{ display: 'none' }}
+              disabled={busy} onChange={(e) => handleHtml(e.target.files?.[0])} />
           </label>
         </div>
 

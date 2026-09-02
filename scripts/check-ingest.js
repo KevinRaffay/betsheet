@@ -206,9 +206,9 @@ try {
 
   const saveResultsRes = await jpost2(`/api/race-days/${pdfDay.id}/results`, resultsPayload);
   const savedResults = await saveResultsRes.json();
-  check('results save: 201 with counts (90 finishers, 67 payoffs, 8 scratches)',
+  check('results save: 201 with counts (90 finishers, 68 payoffs, 8 scratches)',
     saveResultsRes.status === 201 && savedResults.results === 90 &&
-    savedResults.exotics === 67 && savedResults.scratches === 8,
+    savedResults.exotics === 68 && savedResults.scratches === 8,
     JSON.stringify(savedResults));
 
   const readResults = await fetch(`${BASE}/api/race-days/${pdfDay.id}/results`).then((r) => r.json());
@@ -218,7 +218,7 @@ try {
     return winner?.horse_name === "Howie's Law" && winner?.win_cents === 280 &&
       exacta?.combination === '1-6' && exacta?.payout_cents === 1030 &&
       readResults.scratches.some((s) => s.horse_name === 'The Chosen Bride') &&
-      readResults.charts.length === 1 && readResults.charts[0].source_kind === 'paste';
+      readResults.charts.length === 1 && readResults.charts[0].source_kind === 'equibase_paste';
   })());
 
   await jpost2(`/api/race-days/${pdfDay.id}/results`, resultsPayload);

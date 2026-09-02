@@ -100,12 +100,27 @@ check('R10: pick6 pays both tiers, pick4/pick5 with a two-winner leg', (() => {
 check('R10: named pool (Turf Pick 3) and Place Pick All parse',
   r10.exotics.some((e) => e.betType === 'turfpick3' && e.combination === '11-4-2') &&
   r10.exotics.some((e) => e.betType === 'place_pick_all' && e.combination === '8 OF 10'));
-check('R10: Super High Five jackpot payout without printed cents',
-  r10.exotics.some((e) => e.betType === 'super_high_five' && e.payoutCents === 4103900));
+// Found by the D42 cross-check against the dmtc results page: nobody hit the
+// Super High Five (the page says "paid $0.00"), so the two numbers under the
+// Carryover column are the POOL ($41,039) and the CARRYOVER ($31,321) - the old
+// parse read the pool as a $41,039 payout on a $31,321 pool.
+check('R10: Super High Five - no payout, pool and carryover read from the Carryover column',
+  r10.exotics.some((e) => e.betType === 'super_high_five' && e.payoutCents === 0 && e.poolCents === 4103900 && e.carryoverCents === 3132100),
+  JSON.stringify(r10.exotics.find((e) => e.betType === 'super_high_five')));
+check('R10: the $1 3x3 row parses (payout, pool, carryover) instead of warning',
+  r10.exotics.some((e) => e.betType === '3x3' && e.combination === '3/4 OF 9' && e.payoutCents === 105 && e.poolCents === 3700 && e.carryoverCents === 187000));
+check('no warnings on the real chart', out.warnings.length === 0, JSON.stringify(out.warnings));
 
-check('exactly one honest warning: the unmodeled $1 3x3',
-  out.warnings.length === 1 && out.warnings[0].type === 'unrecognized_mutuel' &&
-  /3x3/.test(out.warnings[0].message), JSON.stringify(out.warnings));
+// A tiny field prints no show pool: the mutuel header omits Show and two
+// prices mean win/place (2026-08-28 R1 - found by the D42 cross-check).
+const small = parseChart(['DEL MAR - August 28, 2026 - Race 1', 'MAIDEN CLAIMING - Thoroughbred', 'Distance: Six Furlongs On The Dirt',
+  'Last Raced Pgm Horse Name (Jockey) Wgt M/E PP Start 1/4 1/2 Str Fin Odds Comments', 'Final Time: 1:11.01',
+  'Pgm Horse Win Place Wager Type Winning Numbers Payoff Pool', '2 Sensational Dream 6.40 3.60 $1.00 Exacta 2-1 11.30 40,813', '1 Icons Only 3.80 $2.00 Quinella 1-2 11.60 2,475'].join(String.fromCharCode(10)));
+check('no show pool: header without Show -> 2 prices = win/place, 1 = place', (() => {
+  const r = small.races[0]; if (!r) return false;
+  const w = r.results.find((x) => x.programNumber === '2'); const p = r.results.find((x) => x.programNumber === '1');
+  return r.exotics.length === 2 && (!w || (w.winCents === 640 && w.placeCents === 360 && w.showCents === null)) && (!p || (p.placeCents === 380 && p.winCents === null));
+})(), JSON.stringify(small.races[0]?.results));
 
 // ---- cross-fixture: chart vs. the program for the SAME day ----
 

@@ -29,7 +29,7 @@ const BET_TYPES = {
   exacta: 'exacta', quinella: 'quinella', trifecta: 'trifecta',
   superfecta: 'superfecta', 'daily double': 'daily_double',
   'pick 3': 'pick3', 'pick 4': 'pick4', 'pick 5': 'pick5', 'pick 6': 'pick6',
-  'super high five': 'super_high_five', consolation: 'consolation',
+  'super high five': 'super_high_five', consolation: 'consolation', '3x3': '3x3',
 };
 
 const money = (s) => Math.round(Number(String(s).replace(/,/g, '')) * 100);
@@ -81,12 +81,22 @@ const WPS_HALF = /^(\d+A?)\s+(.+?)((?:\s+\d+\.\d{2}){1,3})$/;
 // "8 OF 10" (Place Pick All), "TURFPICK3(11-4-2)" (a named pool wrapping
 // its combo in parens).
 const EXOTIC_SHELL = /^\$(\d+(?:\.\d{2})?)\s+(.+?)\s+([\d,]+(?:\.\d{2})?)\s+([\d,]+)\s*$/;
-const COMBO_TAIL = /^(.*?)\s+((?:[\dA]+(?:[-/][\dA]+)+)|(?:\d+\s+OF\s+\d+)|(?:[A-Z]+[A-Z0-9]*\([\dA/-]+\)))$/;
+const COMBO_TAIL = /^(.*?)\s+((?:[\dA]+(?:[-/][\dA]+)+)|(?:[\d/]+\s+OF\s+\d+)|(?:[A-Z]+[A-Z0-9]*\([\dA/-]+\)))$/;
 
-function parseExotic(exoticPart) {
-  const shell = exoticPart.match(EXOTIC_SHELL);
-  if (!shell) return null;
-  const middle = shell[2].replace(/\s*\(\d+\s+correct\)\s*$/, '').trim();
+const EXOTIC_SHELL3 = /^\$(\d+(?:\.\d{2})?)\s+(.+?)\s+([\d,]+(?:\.\d{2})?)\s+([\d,]+)\s+([\d,]+)\s*$/;
+
+function parseExotic(exoticPart, layout = { wps: 3, carryover: false }) {
+  let shell = null; let carryoverCents = null; let payoutCents = null; let poolCents = null;
+  const three = layout.carryover ? exoticPart.match(EXOTIC_SHELL3) : null;
+  if (three) {
+    shell = three; payoutCents = money(three[3]); poolCents = Number(three[4].replace(/,/g, '')) * 100; carryoverCents = Number(three[5].replace(/,/g, '')) * 100;
+  } else {
+    shell = exoticPart.match(EXOTIC_SHELL);
+    if (!shell) return null;
+    if (layout.carryover && !shell[3].includes('.')) { payoutCents = 0; poolCents = Number(shell[3].replace(/,/g, '')) * 100; carryoverCents = Number(shell[4].replace(/,/g, '')) * 100; }
+    else { payoutCents = money(shell[3]); poolCents = Number(shell[4].replace(/,/g, '')) * 100; }
+  }
+  const middle = shell[2].replace(/\s*\(\d+(?:\s+correct\))?\s*$/, '').trim();
   const split = middle.match(COMBO_TAIL);
   if (!split) return null;
   let type = split[1].trim();
@@ -104,12 +114,13 @@ function parseExotic(exoticPart) {
     betType: BET_TYPES[typeKey] ?? typeKey.replace(/[^a-z0-9]+/g, '_'),
     baseCents: money(shell[1]),
     combination,
-    payoutCents: money(shell[3]),
-    poolCents: Number(shell[4].replace(/,/g, '')) * 100, // pools print as whole dollars
+    payoutCents,
+    poolCents,
+    ...(carryoverCents != null ? { carryoverCents } : {}),
   };
 }
 
-function parseMutuelLine(line, race, warnings) {
+function parseMutuelLine(line, race, warnings, layout = { wps: 3, carryover: false }) {
   const dollar = line.indexOf('$');
   const wpsPart = (dollar >= 0 ? line.slice(0, dollar) : line).trim();
   const exoticPart = dollar >= 0 ? line.slice(dollar).trim() : '';
@@ -120,19 +131,24 @@ function parseMutuelLine(line, race, warnings) {
       const prices = w[3].trim().split(/\s+/).map(money);
       const result = race.results.find((r) => r.programNumber === w[1].toUpperCase());
       if (result) {
-        // 3 prices = win/place/show, 2 = place/show, 1 = show.
+        // With a show pool: 3 prices = win/place/show, 2 = place/show, 1 = show.
+        // Without one (tiny field): 2 = win/place, 1 = place.
         if (prices.length === 3) [result.winCents, result.placeCents, result.showCents] = prices;
+        else if (prices.length === 2 && layout.wps === 2) [result.winCents, result.placeCents] = prices;
         else if (prices.length === 2) [result.placeCents, result.showCents] = prices;
+        else if (layout.wps === 2) [result.placeCents] = prices;
         else [result.showCents] = prices;
       } else {
         warnings.push({ type: 'unmatched_payout', race: race.number, message: `Race ${race.number}: WPS payout for program ${w[1]} matched no finisher.` });
       }
+    } else if (layout.wps === 2 && /^\d+A?\s+\S/.test(wpsPart)) {
+      // no show pool: an unplaced finisher's row carries a name and nothing else
     } else {
       warnings.push({ type: 'unrecognized_mutuel', race: race.number, message: `Race ${race.number}: unrecognized mutuel text: "${wpsPart.slice(0, 60)}"` });
     }
   }
   if (exoticPart) {
-    const exotic = parseExotic(exoticPart);
+    const exotic = parseExotic(exoticPart, layout);
     if (exotic) race.exotics.push(exotic);
     else warnings.push({ type: 'unrecognized_mutuel', race: race.number, message: `Race ${race.number}: unrecognized wager text: "${exoticPart.slice(0, 60)}"` });
   }
@@ -166,6 +182,7 @@ export function parseChart(text) {
   const races = [];
   let race = null;
   let section = null; // 'results' | 'mutuel' | null
+  let layout = { wps: 3, carryover: false }; // set by each race's mutuel header
 
   for (const line of lines) {
     if (!line) continue;
@@ -215,7 +232,8 @@ export function parseChart(text) {
       continue;
     }
     if (/^Last Raced\s+Pgm\s+Horse/.test(line)) { section = 'results'; continue; }
-    if (/^Pgm\s+Horse\s+Win\s+Place\s+Show/.test(line)) { section = 'mutuel'; continue; }
+    const mutuelHeader = line.match(/^Pgm\s+Horse\s+Win\s+Place(\s+Show)?\s+Wager\s+Type\b.*?(Carryover)?\s*$/);
+    if (mutuelHeader) { section = 'mutuel'; layout = { wps: mutuelHeader[1] ? 3 : 2, carryover: Boolean(mutuelHeader[2]) }; continue; }
     if (/^Past Performance|^Trainers:|^Owners:|^Footnotes/.test(line)) { section = null; continue; }
 
     const scr = line.match(/^Scratched Horse\(s\):\s*(.+)$/);
@@ -231,7 +249,7 @@ export function parseChart(text) {
     }
     if (section === 'mutuel') {
       if (/^Total WPS Pool/.test(line)) continue;
-      parseMutuelLine(line, race, warnings);
+      parseMutuelLine(line, race, warnings, layout);
       continue;
     }
   }
