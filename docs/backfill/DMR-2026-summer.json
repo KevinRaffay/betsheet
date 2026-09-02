@@ -1,0 +1,1838 @@
+{
+  "meet": "DMR-2026-summer",
+  "lastRun": {
+    "runId": "789049de-964c-44c3-9ec2-f6ae888fee87",
+    "from": "2026-07-17",
+    "to": "2026-08-30",
+    "meet": null,
+    "dryRun": false,
+    "regenerate": false,
+    "engineVersion": "lean-1.1",
+    "template": "lean",
+    "bankrollCents": 20000,
+    "perRaceMinCents": 500,
+    "missingCalendars": [],
+    "halted": null,
+    "startedAt": "2026-09-02T12:00:24.656Z",
+    "finishedAt": "2026-09-02T12:00:47.718Z",
+    "summary": {
+      "days": 27,
+      "byStatus": {
+        "saved": 27
+      },
+      "warningsByType": {
+        "program_ml_disagreement": 14,
+        "index_renumbered": 30,
+        "unrecognized_mutuel": 32,
+        "incomplete_entry": 14,
+        "owner_trainer_fused": 5
+      },
+      "plByBucket": {
+        "PROGRAM_ONLY": {
+          "days": 27,
+          "wageredCents": 540000,
+          "effectiveWageredCents": 485800,
+          "returnedCents": 521490,
+          "plCents": -18510
+        }
+      },
+      "crossSource": {
+        "days": 3,
+        "disagreements": 0
+      },
+      "unexplainedRegressions": 0
+    }
+  },
+  "lines": [
+    {
+      "date": "2026-07-17",
+      "meet": "DMR-2026-summer",
+      "correlationId": "56f51b37-03e0-4235-992a-5b515dfad7cc",
+      "calendarRaces": 10,
+      "blocking": [],
+      "nonBlocking": [
+        {
+          "type": "program_ml_disagreement",
+          "race": 6,
+          "field": "jockey",
+          "programNumber": "1",
+          "message": "Race 6: #1 Sarwar (FR) - jockey is \"J Bravo\" on the ML sheet but \"Joe Bravo Waived\" in the program; the sheet wins.",
+          "source": "entries"
+        },
+        {
+          "type": "program_ml_disagreement",
+          "race": 7,
+          "field": "jockey",
+          "programNumber": "8",
+          "message": "Race 7: #8 Skyquist - jockey is \"R Gonzalez\" on the ML sheet but \"Ricardo Gonzalez Waived\" in the program; the sheet wins.",
+          "source": "entries"
+        }
+      ],
+      "parsedRaces": 10,
+      "resultsRaces": 10,
+      "hasChart": false,
+      "entriesSource": "both",
+      "status": "saved",
+      "raceDayId": 1,
+      "cardId": 30,
+      "completeness": "PROGRAM_ONLY",
+      "engineVersion": "lean-1.1",
+      "resultsSource": "dmtc_html",
+      "results": {
+        "results": 89,
+        "exotics": 67,
+        "scratches": 12,
+        "unresolvedFinishers": 0
+      },
+      "balancerMoved": true,
+      "carveOutFired": false,
+      "figures": {
+        "wageredCents": 20000,
+        "returnedCents": 13530,
+        "plCents": -6470,
+        "refundedCents": 0,
+        "gradedTickets": 29,
+        "tickets": 29,
+        "effectiveWageredCents": 20000,
+        "graded": true
+      },
+      "crossSource": null,
+      "note": "2 non-blocking warning(s)",
+      "regression": null
+    },
+    {
+      "date": "2026-07-18",
+      "meet": "DMR-2026-summer",
+      "correlationId": "e6289431-526b-476f-9a70-ebd240a9b7bd",
+      "calendarRaces": 11,
+      "blocking": [],
+      "nonBlocking": [
+        {
+          "type": "index_renumbered",
+          "race": 5,
+          "message": "Program: Race 5: the index numbers its field after the printed scratch (e.g. \"B Grayson\" is 7 in the index, 8 on the page). Page numbering kept; confirm at the window.",
+          "source": "entries"
+        },
+        {
+          "type": "index_renumbered",
+          "race": 6,
+          "message": "Program: Race 6: the index numbers its field after the printed scratch (e.g. \"Cupid Cowboy\" is 9 in the index, 10 on the page). Page numbering kept; confirm at the window.",
+          "source": "entries"
+        },
+        {
+          "type": "unrecognized_mutuel",
+          "race": 4,
+          "message": "Race 4: unrecognized wager \"Consolation Pick 3\" - stored as consolation_pick_3, never graded.",
+          "source": "results"
+        }
+      ],
+      "parsedRaces": 11,
+      "resultsRaces": 11,
+      "hasChart": false,
+      "entriesSource": "both",
+      "status": "saved",
+      "raceDayId": 2,
+      "cardId": 31,
+      "completeness": "PROGRAM_ONLY",
+      "engineVersion": "lean-1.1",
+      "resultsSource": "dmtc_html",
+      "results": {
+        "results": 98,
+        "exotics": 75,
+        "scratches": 17,
+        "unresolvedFinishers": 0
+      },
+      "balancerMoved": true,
+      "carveOutFired": false,
+      "figures": {
+        "wageredCents": 20000,
+        "returnedCents": 23370,
+        "plCents": 3370,
+        "refundedCents": 3500,
+        "gradedTickets": 31,
+        "tickets": 31,
+        "effectiveWageredCents": 16500,
+        "graded": true
+      },
+      "crossSource": null,
+      "note": "3 non-blocking warning(s)",
+      "regression": null
+    },
+    {
+      "date": "2026-07-19",
+      "meet": "DMR-2026-summer",
+      "correlationId": "70475a6f-c219-429c-bb14-75cedb6c27d1",
+      "calendarRaces": 11,
+      "blocking": [],
+      "nonBlocking": [
+        {
+          "type": "incomplete_entry",
+          "race": 7,
+          "message": "Program: Race 7, program 1: missing jockey.",
+          "source": "entries"
+        },
+        {
+          "type": "incomplete_entry",
+          "race": 7,
+          "message": "Program: Race 7, program 2: missing jockey.",
+          "source": "entries"
+        },
+        {
+          "type": "incomplete_entry",
+          "race": 7,
+          "message": "Program: Race 7, program 3: missing jockey, morningLine.",
+          "source": "entries"
+        },
+        {
+          "type": "incomplete_entry",
+          "race": 7,
+          "message": "Program: Race 7, program 4: missing jockey, morningLine.",
+          "source": "entries"
+        },
+        {
+          "type": "incomplete_entry",
+          "race": 7,
+          "message": "Program: Race 7, program 5: missing jockey, morningLine.",
+          "source": "entries"
+        },
+        {
+          "type": "incomplete_entry",
+          "race": 7,
+          "message": "Program: Race 7, program 6: missing jockey.",
+          "source": "entries"
+        },
+        {
+          "type": "incomplete_entry",
+          "race": 7,
+          "message": "Program: Race 7, program 7: missing jockey, morningLine.",
+          "source": "entries"
+        },
+        {
+          "type": "incomplete_entry",
+          "race": 7,
+          "message": "Program: Race 7, program 8: missing jockey, morningLine.",
+          "source": "entries"
+        },
+        {
+          "type": "incomplete_entry",
+          "race": 7,
+          "message": "Program: Race 7, program 9: missing jockey, morningLine.",
+          "source": "entries"
+        },
+        {
+          "type": "incomplete_entry",
+          "race": 7,
+          "message": "Program: Race 7, program 10: missing jockey.",
+          "source": "entries"
+        },
+        {
+          "type": "incomplete_entry",
+          "race": 7,
+          "message": "Program: Race 7, program 11: missing jockey, morningLine.",
+          "source": "entries"
+        },
+        {
+          "type": "incomplete_entry",
+          "race": 7,
+          "message": "Program: Race 7, program 12: missing jockey, morningLine.",
+          "source": "entries"
+        },
+        {
+          "type": "incomplete_entry",
+          "race": 7,
+          "message": "Program: Race 7, program 13: missing jockey, morningLine.",
+          "source": "entries"
+        },
+        {
+          "type": "incomplete_entry",
+          "race": 7,
+          "message": "Program: Race 7, program 14: missing jockey, morningLine.",
+          "source": "entries"
+        },
+        {
+          "type": "index_renumbered",
+          "race": 11,
+          "message": "Program: Race 11: the index numbers its field after the printed scratch (e.g. \"Ah Jeez\" is 6 in the index, 7 on the page). Page numbering kept; confirm at the window.",
+          "source": "entries"
+        },
+        {
+          "type": "program_ml_disagreement",
+          "race": 6,
+          "field": "jockey",
+          "programNumber": "10",
+          "message": "Race 6: #10 Beneficial - jockey is \"K Frey\" on the ML sheet but \"Kyle Frey Waived\" in the program; the sheet wins.",
+          "source": "entries"
+        },
+        {
+          "type": "program_ml_disagreement",
+          "race": 11,
+          "field": "jockey",
+          "programNumber": "11",
+          "message": "Race 11: #11 Calm Sea - jockey is \"J Hernandez\" on the ML sheet but \"Juan Hernandez Waived\" in the program; the sheet wins.",
+          "source": "entries"
+        }
+      ],
+      "parsedRaces": 11,
+      "resultsRaces": 11,
+      "hasChart": false,
+      "entriesSource": "both",
+      "status": "saved",
+      "raceDayId": 3,
+      "cardId": 32,
+      "completeness": "PROGRAM_ONLY",
+      "engineVersion": "lean-1.1",
+      "resultsSource": "dmtc_html",
+      "results": {
+        "results": 101,
+        "exotics": 73,
+        "scratches": 7,
+        "unresolvedFinishers": 0
+      },
+      "balancerMoved": true,
+      "carveOutFired": false,
+      "figures": {
+        "wageredCents": 20000,
+        "returnedCents": 30190,
+        "plCents": 10190,
+        "refundedCents": 0,
+        "gradedTickets": 31,
+        "tickets": 31,
+        "effectiveWageredCents": 20000,
+        "graded": true
+      },
+      "crossSource": null,
+      "note": "17 non-blocking warning(s)",
+      "regression": null
+    },
+    {
+      "date": "2026-07-23",
+      "meet": "DMR-2026-summer",
+      "correlationId": "fb13622a-2acc-47f0-a20c-f350cee690f6",
+      "calendarRaces": 8,
+      "blocking": [],
+      "nonBlocking": [],
+      "parsedRaces": 8,
+      "resultsRaces": 8,
+      "hasChart": false,
+      "entriesSource": "both",
+      "status": "saved",
+      "raceDayId": 4,
+      "cardId": 33,
+      "completeness": "PROGRAM_ONLY",
+      "engineVersion": "lean-1.1",
+      "resultsSource": "dmtc_html",
+      "results": {
+        "results": 68,
+        "exotics": 54,
+        "scratches": 8,
+        "unresolvedFinishers": 0
+      },
+      "balancerMoved": true,
+      "carveOutFired": false,
+      "figures": {
+        "wageredCents": 20000,
+        "returnedCents": 11300,
+        "plCents": -8700,
+        "refundedCents": 5000,
+        "gradedTickets": 20,
+        "tickets": 20,
+        "effectiveWageredCents": 15000,
+        "graded": true
+      },
+      "crossSource": null,
+      "note": "clean parse",
+      "regression": null
+    },
+    {
+      "date": "2026-07-24",
+      "meet": "DMR-2026-summer",
+      "correlationId": "d518971d-f5c8-4a8c-a5d0-cc03e6744e18",
+      "calendarRaces": 8,
+      "blocking": [],
+      "nonBlocking": [],
+      "parsedRaces": 8,
+      "resultsRaces": 8,
+      "hasChart": false,
+      "entriesSource": "both",
+      "status": "saved",
+      "raceDayId": 5,
+      "cardId": 34,
+      "completeness": "PROGRAM_ONLY",
+      "engineVersion": "lean-1.1",
+      "resultsSource": "dmtc_html",
+      "results": {
+        "results": 70,
+        "exotics": 55,
+        "scratches": 10,
+        "unresolvedFinishers": 0
+      },
+      "balancerMoved": true,
+      "carveOutFired": false,
+      "figures": {
+        "wageredCents": 20000,
+        "returnedCents": 13800,
+        "plCents": -6200,
+        "refundedCents": 1000,
+        "gradedTickets": 22,
+        "tickets": 22,
+        "effectiveWageredCents": 19000,
+        "graded": true
+      },
+      "crossSource": null,
+      "note": "clean parse",
+      "regression": null
+    },
+    {
+      "date": "2026-07-25",
+      "meet": "DMR-2026-summer",
+      "correlationId": "b8e6fa6d-00fc-46f1-9caa-9847ad2b1f81",
+      "calendarRaces": 11,
+      "blocking": [],
+      "nonBlocking": [
+        {
+          "type": "owner_trainer_fused",
+          "race": 11,
+          "message": "Program: Race 11: #1 Midnight Horizon (IRE) - the owner line runs into the trainer column (\"Blinkers On Racing Stable, Corbett or Wagner, et al Dan Blacker(Juan Landeros)\") and no other entry on the card names that trainer; trainer left blank.",
+          "source": "entries"
+        },
+        {
+          "type": "index_renumbered",
+          "race": 11,
+          "message": "Program: Race 11: the index numbers its field after the printed scratch (e.g. \"America's Mark\" is 6 in the index, 7 on the page). Page numbering kept; confirm at the window.",
+          "source": "entries"
+        },
+        {
+          "type": "index_renumbered",
+          "race": 9,
+          "message": "Program: Race 9: the index numbers its field after the printed scratch (e.g. \"Imaboutago (IRE)\" is 8 in the index, 9 on the page). Page numbering kept; confirm at the window.",
+          "source": "entries"
+        },
+        {
+          "type": "program_ml_disagreement",
+          "race": 1,
+          "field": "jockey",
+          "programNumber": "1",
+          "message": "Race 1: #1 My Girl Mia - jockey is \"E Jaramillo\" on the ML sheet but \"Emisael Jaramillo Waived\" in the program; the sheet wins.",
+          "source": "entries"
+        }
+      ],
+      "parsedRaces": 11,
+      "resultsRaces": 11,
+      "hasChart": false,
+      "entriesSource": "both",
+      "status": "saved",
+      "raceDayId": 6,
+      "cardId": 35,
+      "completeness": "PROGRAM_ONLY",
+      "engineVersion": "lean-1.1",
+      "resultsSource": "dmtc_html",
+      "results": {
+        "results": 97,
+        "exotics": 74,
+        "scratches": 17,
+        "unresolvedFinishers": 0
+      },
+      "balancerMoved": true,
+      "carveOutFired": false,
+      "figures": {
+        "wageredCents": 20000,
+        "returnedCents": 18570,
+        "plCents": -1430,
+        "refundedCents": 2600,
+        "gradedTickets": 27,
+        "tickets": 27,
+        "effectiveWageredCents": 17400,
+        "graded": true
+      },
+      "crossSource": null,
+      "note": "4 non-blocking warning(s)",
+      "regression": null
+    },
+    {
+      "date": "2026-07-26",
+      "meet": "DMR-2026-summer",
+      "correlationId": "f75a267a-206c-4967-b7c0-0c304b2a9ed8",
+      "calendarRaces": 11,
+      "blocking": [],
+      "nonBlocking": [
+        {
+          "type": "index_renumbered",
+          "race": 5,
+          "message": "Program: Race 5: the index numbers its field after the printed scratch (e.g. \"Let It Begin\" is 11 in the index, 12 on the page). Page numbering kept; confirm at the window.",
+          "source": "entries"
+        }
+      ],
+      "parsedRaces": 11,
+      "resultsRaces": 11,
+      "hasChart": false,
+      "entriesSource": "both",
+      "status": "saved",
+      "raceDayId": 7,
+      "cardId": 36,
+      "completeness": "PROGRAM_ONLY",
+      "engineVersion": "lean-1.1",
+      "resultsSource": "dmtc_html",
+      "results": {
+        "results": 96,
+        "exotics": 74,
+        "scratches": 12,
+        "unresolvedFinishers": 0
+      },
+      "balancerMoved": true,
+      "carveOutFired": false,
+      "figures": {
+        "wageredCents": 20000,
+        "returnedCents": 21300,
+        "plCents": 1300,
+        "refundedCents": 100,
+        "gradedTickets": 31,
+        "tickets": 31,
+        "effectiveWageredCents": 19900,
+        "graded": true
+      },
+      "crossSource": null,
+      "note": "1 non-blocking warning(s)",
+      "regression": null
+    },
+    {
+      "date": "2026-07-30",
+      "meet": "DMR-2026-summer",
+      "correlationId": "9982d492-1674-4bed-8ed2-3de4c6d30402",
+      "calendarRaces": 8,
+      "blocking": [],
+      "nonBlocking": [
+        {
+          "type": "index_renumbered",
+          "race": 1,
+          "message": "Program: Race 1: the index numbers its field after the printed scratch (e.g. \"Bell Bottom Blues\" is 6 in the index, 7 on the page). Page numbering kept; confirm at the window.",
+          "source": "entries"
+        },
+        {
+          "type": "program_ml_disagreement",
+          "race": 2,
+          "field": "jockey",
+          "programNumber": "3",
+          "message": "Race 2: #3 Knightwithlouis - jockey is \"K Frey\" on the ML sheet but \"Kyle Frey Waived\" in the program; the sheet wins.",
+          "source": "entries"
+        },
+        {
+          "type": "program_ml_disagreement",
+          "race": 8,
+          "field": "jockey",
+          "programNumber": "2",
+          "message": "Race 8: #2 Authentic Grace - jockey is \"A Ayuso\" on the ML sheet but \"Armando Ayuso Waived\" in the program; the sheet wins.",
+          "source": "entries"
+        }
+      ],
+      "parsedRaces": 8,
+      "resultsRaces": 8,
+      "hasChart": false,
+      "entriesSource": "both",
+      "status": "saved",
+      "raceDayId": 8,
+      "cardId": 37,
+      "completeness": "PROGRAM_ONLY",
+      "engineVersion": "lean-1.1",
+      "resultsSource": "dmtc_html",
+      "results": {
+        "results": 73,
+        "exotics": 54,
+        "scratches": 8,
+        "unresolvedFinishers": 0
+      },
+      "balancerMoved": true,
+      "carveOutFired": false,
+      "figures": {
+        "wageredCents": 20000,
+        "returnedCents": 26160,
+        "plCents": 6160,
+        "refundedCents": 1000,
+        "gradedTickets": 23,
+        "tickets": 23,
+        "effectiveWageredCents": 19000,
+        "graded": true
+      },
+      "crossSource": null,
+      "note": "3 non-blocking warning(s)",
+      "regression": null
+    },
+    {
+      "date": "2026-07-31",
+      "meet": "DMR-2026-summer",
+      "correlationId": "934854de-5b92-4fba-aeb7-f3beb5f22c01",
+      "calendarRaces": 8,
+      "blocking": [],
+      "nonBlocking": [
+        {
+          "type": "index_renumbered",
+          "race": 5,
+          "message": "Program: Race 5: the index numbers its field after the printed scratch (e.g. \"Blame It On Abby\" is 7 in the index, 8 on the page). Page numbering kept; confirm at the window.",
+          "source": "entries"
+        },
+        {
+          "type": "index_renumbered",
+          "race": 8,
+          "message": "Program: Race 8: the index numbers its field after the printed scratch (e.g. \"Clubhouse Deb\" is 9 in the index, 10 on the page). Page numbering kept; confirm at the window.",
+          "source": "entries"
+        },
+        {
+          "type": "unrecognized_mutuel",
+          "race": 8,
+          "message": "Race 8: unrecognized wager \"Consolation Turf Pick 3\" - stored as consolation_turf_pick_3, never graded.",
+          "source": "results"
+        },
+        {
+          "type": "unrecognized_mutuel",
+          "race": 8,
+          "message": "Race 8: unrecognized wager \"Consolation Pick 3\" - stored as consolation_pick_3, never graded.",
+          "source": "results"
+        },
+        {
+          "type": "unrecognized_mutuel",
+          "race": 8,
+          "message": "Race 8: unrecognized wager \"Consolation Double\" - stored as consolation_double, never graded.",
+          "source": "results"
+        }
+      ],
+      "parsedRaces": 8,
+      "resultsRaces": 8,
+      "hasChart": false,
+      "entriesSource": "both",
+      "status": "saved",
+      "raceDayId": 9,
+      "cardId": 38,
+      "completeness": "PROGRAM_ONLY",
+      "engineVersion": "lean-1.1",
+      "resultsSource": "dmtc_html",
+      "results": {
+        "results": 70,
+        "exotics": 57,
+        "scratches": 9,
+        "unresolvedFinishers": 0
+      },
+      "balancerMoved": true,
+      "carveOutFired": false,
+      "figures": {
+        "wageredCents": 20000,
+        "returnedCents": 29040,
+        "plCents": 9040,
+        "refundedCents": 100,
+        "gradedTickets": 24,
+        "tickets": 24,
+        "effectiveWageredCents": 19900,
+        "graded": true
+      },
+      "crossSource": null,
+      "note": "5 non-blocking warning(s)",
+      "regression": null
+    },
+    {
+      "date": "2026-08-01",
+      "meet": "DMR-2026-summer",
+      "correlationId": "f4fd2d77-9956-4095-a556-c7be9757d31d",
+      "calendarRaces": 11,
+      "blocking": [],
+      "nonBlocking": [
+        {
+          "type": "index_renumbered",
+          "race": 11,
+          "message": "Program: Race 11: the index numbers its field after the printed scratch (e.g. \"Born to Rock\" is 10 in the index, 11 on the page). Page numbering kept; confirm at the window.",
+          "source": "entries"
+        },
+        {
+          "type": "program_ml_disagreement",
+          "race": 2,
+          "field": "jockey",
+          "programNumber": "9",
+          "message": "Race 2: #9 La Scaloneta - jockey is \"R Gonzalez\" on the ML sheet but \"Ricardo Gonzalez Waived\" in the program; the sheet wins.",
+          "source": "entries"
+        },
+        {
+          "type": "program_ml_disagreement",
+          "race": 11,
+          "field": "jockey",
+          "programNumber": "7",
+          "message": "Race 11: #7 Like and Subscribe - jockey is \"K Kimura\" on the ML sheet but \"Kazushi Kimura Waived\" in the program; the sheet wins.",
+          "source": "entries"
+        }
+      ],
+      "parsedRaces": 11,
+      "resultsRaces": 11,
+      "hasChart": false,
+      "entriesSource": "both",
+      "status": "saved",
+      "raceDayId": 10,
+      "cardId": 39,
+      "completeness": "PROGRAM_ONLY",
+      "engineVersion": "lean-1.1",
+      "resultsSource": "dmtc_html",
+      "results": {
+        "results": 99,
+        "exotics": 74,
+        "scratches": 8,
+        "unresolvedFinishers": 0
+      },
+      "balancerMoved": true,
+      "carveOutFired": false,
+      "figures": {
+        "wageredCents": 20000,
+        "returnedCents": 8460,
+        "plCents": -11540,
+        "refundedCents": 100,
+        "gradedTickets": 27,
+        "tickets": 27,
+        "effectiveWageredCents": 19900,
+        "graded": true
+      },
+      "crossSource": null,
+      "note": "3 non-blocking warning(s)",
+      "regression": null
+    },
+    {
+      "date": "2026-08-02",
+      "meet": "DMR-2026-summer",
+      "correlationId": "231c930a-04f4-4539-9de2-d31d9687b4dc",
+      "calendarRaces": 10,
+      "blocking": [],
+      "nonBlocking": [
+        {
+          "type": "index_renumbered",
+          "race": 5,
+          "message": "Program: Race 5: the index numbers its field after the printed scratch (e.g. \"Clever Clover\" is 9 in the index, 10 on the page). Page numbering kept; confirm at the window.",
+          "source": "entries"
+        },
+        {
+          "type": "unrecognized_mutuel",
+          "race": 5,
+          "message": "Race 5: unrecognized wager \"Consolation Pick 3\" - stored as consolation_pick_3, never graded.",
+          "source": "results"
+        },
+        {
+          "type": "unrecognized_mutuel",
+          "race": 5,
+          "message": "Race 5: unrecognized wager \"Consolation Double\" - stored as consolation_double, never graded.",
+          "source": "results"
+        },
+        {
+          "type": "unrecognized_mutuel",
+          "race": 6,
+          "message": "Race 6: unrecognized wager \"Consolation Pick 3\" - stored as consolation_pick_3, never graded.",
+          "source": "results"
+        }
+      ],
+      "parsedRaces": 10,
+      "resultsRaces": 10,
+      "hasChart": false,
+      "entriesSource": "both",
+      "status": "saved",
+      "raceDayId": 11,
+      "cardId": 40,
+      "completeness": "PROGRAM_ONLY",
+      "engineVersion": "lean-1.1",
+      "resultsSource": "dmtc_html",
+      "results": {
+        "results": 79,
+        "exotics": 70,
+        "scratches": 10,
+        "unresolvedFinishers": 0
+      },
+      "balancerMoved": true,
+      "carveOutFired": false,
+      "figures": {
+        "wageredCents": 20000,
+        "returnedCents": 13730,
+        "plCents": -6270,
+        "refundedCents": 2000,
+        "gradedTickets": 29,
+        "tickets": 29,
+        "effectiveWageredCents": 18000,
+        "graded": true
+      },
+      "crossSource": null,
+      "note": "4 non-blocking warning(s)",
+      "regression": null
+    },
+    {
+      "date": "2026-08-06",
+      "meet": "DMR-2026-summer",
+      "correlationId": "6a6e5dc0-402d-4a41-bef3-b0a0c5b09f33",
+      "calendarRaces": 8,
+      "blocking": [],
+      "nonBlocking": [],
+      "parsedRaces": 8,
+      "resultsRaces": 8,
+      "hasChart": false,
+      "entriesSource": "both",
+      "status": "saved",
+      "raceDayId": 12,
+      "cardId": 41,
+      "completeness": "PROGRAM_ONLY",
+      "engineVersion": "lean-1.1",
+      "resultsSource": "dmtc_html",
+      "results": {
+        "results": 68,
+        "exotics": 54,
+        "scratches": 6,
+        "unresolvedFinishers": 0
+      },
+      "balancerMoved": true,
+      "carveOutFired": false,
+      "figures": {
+        "wageredCents": 20000,
+        "returnedCents": 12710,
+        "plCents": -7290,
+        "refundedCents": 2400,
+        "gradedTickets": 21,
+        "tickets": 21,
+        "effectiveWageredCents": 17600,
+        "graded": true
+      },
+      "crossSource": null,
+      "note": "clean parse",
+      "regression": null
+    },
+    {
+      "date": "2026-08-07",
+      "meet": "DMR-2026-summer",
+      "correlationId": "5aa6b4fa-1cf2-4b40-97e7-77fdfc23e306",
+      "calendarRaces": 8,
+      "blocking": [],
+      "nonBlocking": [
+        {
+          "type": "owner_trainer_fused",
+          "race": 1,
+          "message": "Program: Race 1: #2 Lady Rider - the owner line runs into the trainer column (\"Peerenboom Racing Stables LLC, Fritts or Pellman Vladimir Cerin(R. Gonzalez)\") and no other entry on the card names that trainer; trainer left blank.",
+          "source": "entries"
+        },
+        {
+          "type": "index_renumbered",
+          "race": 7,
+          "message": "Program: Race 7: the index numbers its field after the printed scratch (e.g. \"Early Encore\" is 3 in the index, 4 on the page). Page numbering kept; confirm at the window.",
+          "source": "entries"
+        },
+        {
+          "type": "program_ml_disagreement",
+          "race": 4,
+          "field": "jockey",
+          "programNumber": "3",
+          "message": "Race 4: #3 Bazooka Charlie - jockey is \"T Pereira\" on the ML sheet but \"Tiago Pereira Waived\" in the program; the sheet wins.",
+          "source": "entries"
+        }
+      ],
+      "parsedRaces": 8,
+      "resultsRaces": 8,
+      "hasChart": false,
+      "entriesSource": "both",
+      "status": "saved",
+      "raceDayId": 13,
+      "cardId": 42,
+      "completeness": "PROGRAM_ONLY",
+      "engineVersion": "lean-1.1",
+      "resultsSource": "dmtc_html",
+      "results": {
+        "results": 57,
+        "exotics": 53,
+        "scratches": 11,
+        "unresolvedFinishers": 0
+      },
+      "balancerMoved": true,
+      "carveOutFired": false,
+      "figures": {
+        "wageredCents": 20000,
+        "returnedCents": 13430,
+        "plCents": -6570,
+        "refundedCents": 5000,
+        "gradedTickets": 20,
+        "tickets": 20,
+        "effectiveWageredCents": 15000,
+        "graded": true
+      },
+      "crossSource": null,
+      "note": "3 non-blocking warning(s)",
+      "regression": null
+    },
+    {
+      "date": "2026-08-08",
+      "meet": "DMR-2026-summer",
+      "correlationId": "2c8114da-1cf7-43cb-8a41-f445ae810636",
+      "calendarRaces": 10,
+      "blocking": [],
+      "nonBlocking": [
+        {
+          "type": "owner_trainer_fused",
+          "race": 6,
+          "message": "Program: Race 6: #3 Khonsu - the owner line runs into the trainer column (\"Barnhart, Ahern or Firsthome Thoroughbreds, et al Adam Kitchingman(F Cano)\") and no other entry on the card names that trainer; trainer left blank.",
+          "source": "entries"
+        },
+        {
+          "type": "index_renumbered",
+          "race": 10,
+          "message": "Program: Race 10: the index numbers its field after the printed scratch (e.g. \"Big Vengeance\" is 13 in the index, 14 on the page). Page numbering kept; confirm at the window.",
+          "source": "entries"
+        },
+        {
+          "type": "index_renumbered",
+          "race": 9,
+          "message": "Program: Race 9: the index numbers its field after the printed scratch (e.g. \"Danzing Wild Cat\" is 6 in the index, 7 on the page). Page numbering kept; confirm at the window.",
+          "source": "entries"
+        },
+        {
+          "type": "index_renumbered",
+          "race": 8,
+          "message": "Program: Race 8: the index numbers its field after the printed scratch (e.g. \"Whiskey Decision\" is 7 in the index, 8 on the page). Page numbering kept; confirm at the window.",
+          "source": "entries"
+        },
+        {
+          "type": "unrecognized_mutuel",
+          "race": 7,
+          "message": "Race 7: unrecognized wager \"Consolation Pick 3\" - stored as consolation_pick_3, never graded.",
+          "source": "results"
+        },
+        {
+          "type": "unrecognized_mutuel",
+          "race": 7,
+          "message": "Race 7: unrecognized wager \"Consolation Double\" - stored as consolation_double, never graded.",
+          "source": "results"
+        },
+        {
+          "type": "unrecognized_mutuel",
+          "race": 8,
+          "message": "Race 8: unrecognized wager \"Consolation Pick 3\" - stored as consolation_pick_3, never graded.",
+          "source": "results"
+        }
+      ],
+      "parsedRaces": 10,
+      "resultsRaces": 10,
+      "hasChart": false,
+      "entriesSource": "both",
+      "status": "saved",
+      "raceDayId": 14,
+      "cardId": 43,
+      "completeness": "PROGRAM_ONLY",
+      "engineVersion": "lean-1.1",
+      "resultsSource": "dmtc_html",
+      "results": {
+        "results": 81,
+        "exotics": 71,
+        "scratches": 17,
+        "unresolvedFinishers": 0
+      },
+      "balancerMoved": true,
+      "carveOutFired": false,
+      "figures": {
+        "wageredCents": 20000,
+        "returnedCents": 12730,
+        "plCents": -7270,
+        "refundedCents": 2900,
+        "gradedTickets": 29,
+        "tickets": 29,
+        "effectiveWageredCents": 17100,
+        "graded": true
+      },
+      "crossSource": null,
+      "note": "7 non-blocking warning(s)",
+      "regression": null
+    },
+    {
+      "date": "2026-08-09",
+      "meet": "DMR-2026-summer",
+      "correlationId": "a57d269e-1481-4a91-bf5e-f53798216ec7",
+      "calendarRaces": 9,
+      "blocking": [],
+      "nonBlocking": [
+        {
+          "type": "index_renumbered",
+          "race": 4,
+          "message": "Program: Race 4: the index numbers its field after the printed scratch (e.g. \"Harkette\" is 12 in the index, 13 on the page). Page numbering kept; confirm at the window.",
+          "source": "entries"
+        }
+      ],
+      "parsedRaces": 9,
+      "resultsRaces": 9,
+      "hasChart": false,
+      "entriesSource": "both",
+      "status": "saved",
+      "raceDayId": 15,
+      "cardId": 44,
+      "completeness": "PROGRAM_ONLY",
+      "engineVersion": "lean-1.1",
+      "resultsSource": "dmtc_html",
+      "results": {
+        "results": 69,
+        "exotics": 61,
+        "scratches": 8,
+        "unresolvedFinishers": 0
+      },
+      "balancerMoved": true,
+      "carveOutFired": false,
+      "figures": {
+        "wageredCents": 20000,
+        "returnedCents": 11300,
+        "plCents": -8700,
+        "refundedCents": 2200,
+        "gradedTickets": 19,
+        "tickets": 19,
+        "effectiveWageredCents": 17800,
+        "graded": true
+      },
+      "crossSource": null,
+      "note": "1 non-blocking warning(s)",
+      "regression": null
+    },
+    {
+      "date": "2026-08-13",
+      "meet": "DMR-2026-summer",
+      "correlationId": "700977a5-c5be-4fe4-aae3-9956520dad39",
+      "calendarRaces": 8,
+      "blocking": [],
+      "nonBlocking": [
+        {
+          "type": "index_renumbered",
+          "race": 5,
+          "message": "Program: Race 5: the index numbers its field after the printed scratch (e.g. \"Angelica Bay (IRE)\" is 10 in the index, 12 on the page). Page numbering kept; confirm at the window.",
+          "source": "entries"
+        },
+        {
+          "type": "index_renumbered",
+          "race": 3,
+          "message": "Program: Race 3: the index numbers its field after the printed scratch (e.g. \"First Time Listing\" is 9 in the index, 10 on the page). Page numbering kept; confirm at the window.",
+          "source": "entries"
+        }
+      ],
+      "parsedRaces": 8,
+      "resultsRaces": 8,
+      "hasChart": false,
+      "entriesSource": "both",
+      "status": "saved",
+      "raceDayId": 16,
+      "cardId": 45,
+      "completeness": "PROGRAM_ONLY",
+      "engineVersion": "lean-1.1",
+      "resultsSource": "dmtc_html",
+      "results": {
+        "results": 65,
+        "exotics": 55,
+        "scratches": 9,
+        "unresolvedFinishers": 0
+      },
+      "balancerMoved": true,
+      "carveOutFired": false,
+      "figures": {
+        "wageredCents": 20000,
+        "returnedCents": 25300,
+        "plCents": 5300,
+        "refundedCents": 0,
+        "gradedTickets": 18,
+        "tickets": 18,
+        "effectiveWageredCents": 20000,
+        "graded": true
+      },
+      "crossSource": null,
+      "note": "2 non-blocking warning(s)",
+      "regression": null
+    },
+    {
+      "date": "2026-08-14",
+      "meet": "DMR-2026-summer",
+      "correlationId": "0039eafb-2dc2-488f-95c3-e50f86852254",
+      "calendarRaces": 8,
+      "blocking": [],
+      "nonBlocking": [],
+      "parsedRaces": 8,
+      "resultsRaces": 8,
+      "hasChart": false,
+      "entriesSource": "both",
+      "status": "saved",
+      "raceDayId": 17,
+      "cardId": 46,
+      "completeness": "PROGRAM_ONLY",
+      "engineVersion": "lean-1.1",
+      "resultsSource": "dmtc_html",
+      "results": {
+        "results": 59,
+        "exotics": 55,
+        "scratches": 8,
+        "unresolvedFinishers": 0
+      },
+      "balancerMoved": true,
+      "carveOutFired": false,
+      "figures": {
+        "wageredCents": 20000,
+        "returnedCents": 22380,
+        "plCents": 2380,
+        "refundedCents": 2600,
+        "gradedTickets": 23,
+        "tickets": 23,
+        "effectiveWageredCents": 17400,
+        "graded": true
+      },
+      "crossSource": null,
+      "note": "clean parse",
+      "regression": null
+    },
+    {
+      "date": "2026-08-15",
+      "meet": "DMR-2026-summer",
+      "correlationId": "491e2dde-87fd-4b42-ba13-8b5d36e96168",
+      "calendarRaces": 10,
+      "blocking": [],
+      "nonBlocking": [
+        {
+          "type": "index_renumbered",
+          "race": 9,
+          "message": "Program: Race 9: the index numbers its field after the printed scratch (e.g. \"Four Amigos\" is 10 in the index, 11 on the page). Page numbering kept; confirm at the window.",
+          "source": "entries"
+        },
+        {
+          "type": "index_renumbered",
+          "race": 8,
+          "message": "Program: Race 8: the index numbers its field after the printed scratch (e.g. \"Candy Bar\" is 9 in the index, 10 on the page). Page numbering kept; confirm at the window.",
+          "source": "entries"
+        },
+        {
+          "type": "program_ml_disagreement",
+          "race": 3,
+          "field": "jockey",
+          "programNumber": "5",
+          "message": "Race 3: #5 Will Be - jockey is \"R Gonzalez\" on the ML sheet but \"Ricardo Gonzalez Waived\" in the program; the sheet wins.",
+          "source": "entries"
+        },
+        {
+          "type": "unrecognized_mutuel",
+          "race": 4,
+          "message": "Race 4: unrecognized wager \"Consolation Pick 3\" - stored as consolation_pick_3, never graded.",
+          "source": "results"
+        },
+        {
+          "type": "unrecognized_mutuel",
+          "race": 4,
+          "message": "Race 4: unrecognized wager \"Consolation Double\" - stored as consolation_double, never graded.",
+          "source": "results"
+        },
+        {
+          "type": "unrecognized_mutuel",
+          "race": 5,
+          "message": "Race 5: unrecognized wager \"Consolation Pick 3\" - stored as consolation_pick_3, never graded.",
+          "source": "results"
+        },
+        {
+          "type": "unrecognized_mutuel",
+          "race": 5,
+          "message": "Race 5: unrecognized wager \"Consolation Double\" - stored as consolation_double, never graded.",
+          "source": "results"
+        },
+        {
+          "type": "unrecognized_mutuel",
+          "race": 6,
+          "message": "Race 6: unrecognized wager \"Consolation Pick 3\" - stored as consolation_pick_3, never graded.",
+          "source": "results"
+        }
+      ],
+      "parsedRaces": 10,
+      "resultsRaces": 10,
+      "hasChart": false,
+      "entriesSource": "both",
+      "status": "saved",
+      "raceDayId": 18,
+      "cardId": 47,
+      "completeness": "PROGRAM_ONLY",
+      "engineVersion": "lean-1.1",
+      "resultsSource": "dmtc_html",
+      "results": {
+        "results": 79,
+        "exotics": 73,
+        "scratches": 13,
+        "unresolvedFinishers": 0
+      },
+      "balancerMoved": true,
+      "carveOutFired": false,
+      "figures": {
+        "wageredCents": 20000,
+        "returnedCents": 9740,
+        "plCents": -10260,
+        "refundedCents": 4900,
+        "gradedTickets": 26,
+        "tickets": 26,
+        "effectiveWageredCents": 15100,
+        "graded": true
+      },
+      "crossSource": null,
+      "note": "8 non-blocking warning(s)",
+      "regression": null
+    },
+    {
+      "date": "2026-08-16",
+      "meet": "DMR-2026-summer",
+      "correlationId": "c3f78cc1-022c-4b54-9a71-5516f2e307bb",
+      "calendarRaces": 10,
+      "blocking": [],
+      "nonBlocking": [
+        {
+          "type": "index_renumbered",
+          "race": 6,
+          "message": "Program: Race 6: the index numbers its field after the printed scratch (e.g. \"Cano for the Win\" is 9 in the index, 10 on the page). Page numbering kept; confirm at the window.",
+          "source": "entries"
+        },
+        {
+          "type": "program_ml_disagreement",
+          "race": 4,
+          "field": "jockey",
+          "programNumber": "6",
+          "message": "Race 4: #6 Piper's Causeway - jockey is \"E Jaramillo\" on the ML sheet but \"Emisael Jaramillo Waived\" in the program; the sheet wins.",
+          "source": "entries"
+        },
+        {
+          "type": "unrecognized_mutuel",
+          "race": 8,
+          "message": "Race 8: unrecognized wager \"Consolation Pick 3\" - stored as consolation_pick_3, never graded.",
+          "source": "results"
+        },
+        {
+          "type": "unrecognized_mutuel",
+          "race": 8,
+          "message": "Race 8: unrecognized wager \"Consolation Double\" - stored as consolation_double, never graded.",
+          "source": "results"
+        },
+        {
+          "type": "unrecognized_mutuel",
+          "race": 9,
+          "message": "Race 9: unrecognized wager \"Consolation Pick 3\" - stored as consolation_pick_3, never graded.",
+          "source": "results"
+        }
+      ],
+      "parsedRaces": 10,
+      "resultsRaces": 10,
+      "hasChart": false,
+      "entriesSource": "both",
+      "status": "saved",
+      "raceDayId": 19,
+      "cardId": 48,
+      "completeness": "PROGRAM_ONLY",
+      "engineVersion": "lean-1.1",
+      "resultsSource": "dmtc_html",
+      "results": {
+        "results": 86,
+        "exotics": 71,
+        "scratches": 8,
+        "unresolvedFinishers": 0
+      },
+      "balancerMoved": true,
+      "carveOutFired": false,
+      "figures": {
+        "wageredCents": 20000,
+        "returnedCents": 6000,
+        "plCents": -14000,
+        "refundedCents": 2000,
+        "gradedTickets": 28,
+        "tickets": 28,
+        "effectiveWageredCents": 18000,
+        "graded": true
+      },
+      "crossSource": null,
+      "note": "5 non-blocking warning(s)",
+      "regression": null
+    },
+    {
+      "date": "2026-08-20",
+      "meet": "DMR-2026-summer",
+      "correlationId": "9d5f7f59-1171-4c7e-be39-2de60cf30875",
+      "calendarRaces": 8,
+      "blocking": [],
+      "nonBlocking": [
+        {
+          "type": "owner_trainer_fused",
+          "race": 1,
+          "message": "Program: Race 1: #3 Wiki Kane - the owner line runs into the trainer column (\"Barnhart, Ahern or Firsthome Thoroughbreds, et al Adam Kitchingman(F Cano)\") and no other entry on the card names that trainer; trainer left blank.",
+          "source": "entries"
+        },
+        {
+          "type": "index_renumbered",
+          "race": 8,
+          "message": "Program: Race 8: the index numbers its field after the printed scratch (e.g. \"Birkin Girl\" is 9 in the index, 11 on the page). Page numbering kept; confirm at the window.",
+          "source": "entries"
+        },
+        {
+          "type": "index_renumbered",
+          "race": 1,
+          "message": "Program: Race 1: the index numbers its field after the printed scratch (e.g. \"Killourney Reigns (IRE)\" is 5 in the index, 6 on the page). Page numbering kept; confirm at the window.",
+          "source": "entries"
+        },
+        {
+          "type": "unrecognized_mutuel",
+          "race": 2,
+          "message": "Race 2: unrecognized wager \"Consolation Double\" - stored as consolation_double, never graded.",
+          "source": "results"
+        },
+        {
+          "type": "unrecognized_mutuel",
+          "race": 3,
+          "message": "Race 3: unrecognized wager \"Consolation Pick 3\" - stored as consolation_pick_3, never graded.",
+          "source": "results"
+        },
+        {
+          "type": "unrecognized_mutuel",
+          "race": 8,
+          "message": "Race 8: unrecognized wager \"Consolation Turf Pick 3\" - stored as consolation_turf_pick_3, never graded.",
+          "source": "results"
+        }
+      ],
+      "parsedRaces": 8,
+      "resultsRaces": 8,
+      "hasChart": false,
+      "entriesSource": "both",
+      "status": "saved",
+      "raceDayId": 20,
+      "cardId": 49,
+      "completeness": "PROGRAM_ONLY",
+      "engineVersion": "lean-1.1",
+      "resultsSource": "dmtc_html",
+      "results": {
+        "results": 72,
+        "exotics": 57,
+        "scratches": 18,
+        "unresolvedFinishers": 0
+      },
+      "balancerMoved": true,
+      "carveOutFired": false,
+      "figures": {
+        "wageredCents": 20000,
+        "returnedCents": 38150,
+        "plCents": 18150,
+        "refundedCents": 2000,
+        "gradedTickets": 23,
+        "tickets": 23,
+        "effectiveWageredCents": 18000,
+        "graded": true
+      },
+      "crossSource": null,
+      "note": "6 non-blocking warning(s)",
+      "regression": {
+        "baseline": null,
+        "runner": {
+          "wageredCents": 20000,
+          "returnedCents": 38150,
+          "plCents": 18150,
+          "refundedCents": 2000,
+          "gradedTickets": 23,
+          "tickets": 23,
+          "effectiveWageredCents": 18000,
+          "graded": true
+        },
+        "label": "no baseline"
+      }
+    },
+    {
+      "date": "2026-08-21",
+      "meet": "DMR-2026-summer",
+      "correlationId": "0ed6d57b-2301-47a6-b4db-b3ac0aa4635a",
+      "calendarRaces": 8,
+      "blocking": [],
+      "nonBlocking": [
+        {
+          "type": "unrecognized_mutuel",
+          "race": 4,
+          "message": "Race 4: unrecognized wager \"Consolation Pick 3\" - stored as consolation_pick_3, never graded.",
+          "source": "results"
+        },
+        {
+          "type": "unrecognized_mutuel",
+          "race": 4,
+          "message": "Race 4: unrecognized wager \"Consolation Double\" - stored as consolation_double, never graded.",
+          "source": "results"
+        },
+        {
+          "type": "unrecognized_mutuel",
+          "race": 5,
+          "message": "Race 5: unrecognized wager \"Consolation Pick 3\" - stored as consolation_pick_3, never graded.",
+          "source": "results"
+        },
+        {
+          "type": "unrecognized_mutuel",
+          "race": 7,
+          "message": "Race 7: unrecognized wager \"Consolation Turf Pick 3\" - stored as consolation_turf_pick_3, never graded.",
+          "source": "results"
+        },
+        {
+          "type": "unrecognized_mutuel",
+          "race": 7,
+          "message": "Race 7: unrecognized wager \"Consolation Pick 3\" - stored as consolation_pick_3, never graded.",
+          "source": "results"
+        },
+        {
+          "type": "unrecognized_mutuel",
+          "race": 7,
+          "message": "Race 7: unrecognized wager \"Consolation Double\" - stored as consolation_double, never graded.",
+          "source": "results"
+        },
+        {
+          "type": "unrecognized_mutuel",
+          "race": 8,
+          "message": "Race 8: unrecognized wager \"Consolation Pick 3\" - stored as consolation_pick_3, never graded.",
+          "source": "results"
+        }
+      ],
+      "parsedRaces": 8,
+      "resultsRaces": 8,
+      "hasChart": false,
+      "entriesSource": "both",
+      "status": "saved",
+      "raceDayId": 21,
+      "cardId": 50,
+      "completeness": "PROGRAM_ONLY",
+      "engineVersion": "lean-1.1",
+      "resultsSource": "dmtc_html",
+      "results": {
+        "results": 56,
+        "exotics": 62,
+        "scratches": 7,
+        "unresolvedFinishers": 0
+      },
+      "balancerMoved": true,
+      "carveOutFired": false,
+      "figures": {
+        "wageredCents": 20000,
+        "returnedCents": 18860,
+        "plCents": -1140,
+        "refundedCents": 5000,
+        "gradedTickets": 21,
+        "tickets": 21,
+        "effectiveWageredCents": 15000,
+        "graded": true
+      },
+      "crossSource": null,
+      "note": "7 non-blocking warning(s)",
+      "regression": {
+        "baseline": null,
+        "runner": {
+          "wageredCents": 20000,
+          "returnedCents": 18860,
+          "plCents": -1140,
+          "refundedCents": 5000,
+          "gradedTickets": 21,
+          "tickets": 21,
+          "effectiveWageredCents": 15000,
+          "graded": true
+        },
+        "label": "no baseline"
+      }
+    },
+    {
+      "date": "2026-08-22",
+      "meet": "DMR-2026-summer",
+      "correlationId": "ad5cc7b4-dddd-4153-a37a-50bcc541c8c7",
+      "calendarRaces": 11,
+      "blocking": [],
+      "nonBlocking": [
+        {
+          "type": "index_renumbered",
+          "race": 2,
+          "message": "Program: Race 2: the index numbers its field after the printed scratch (e.g. \"Celestial Skies\" is 6 in the index, 8 on the page). Page numbering kept; confirm at the window.",
+          "source": "entries"
+        },
+        {
+          "type": "index_renumbered",
+          "race": 6,
+          "message": "Program: Race 6: the index numbers its field after the printed scratch (e.g. \"Thebeachisback\" is 10 in the index, 11 on the page). Page numbering kept; confirm at the window.",
+          "source": "entries"
+        },
+        {
+          "type": "unrecognized_mutuel",
+          "race": 10,
+          "message": "Race 10: unrecognized wager \"Cross Country Pick 5\" - stored as cross_country_pick_5, never graded.",
+          "source": "results"
+        }
+      ],
+      "parsedRaces": 11,
+      "resultsRaces": 11,
+      "hasChart": false,
+      "entriesSource": "both",
+      "status": "saved",
+      "raceDayId": 22,
+      "cardId": 51,
+      "completeness": "PROGRAM_ONLY",
+      "engineVersion": "lean-1.1",
+      "resultsSource": "dmtc_html",
+      "results": {
+        "results": 108,
+        "exotics": 75,
+        "scratches": 14,
+        "unresolvedFinishers": 0
+      },
+      "balancerMoved": true,
+      "carveOutFired": false,
+      "figures": {
+        "wageredCents": 20000,
+        "returnedCents": 39660,
+        "plCents": 19660,
+        "refundedCents": 4300,
+        "gradedTickets": 31,
+        "tickets": 31,
+        "effectiveWageredCents": 15700,
+        "graded": true
+      },
+      "crossSource": null,
+      "note": "3 non-blocking warning(s)",
+      "regression": {
+        "baseline": null,
+        "runner": {
+          "wageredCents": 20000,
+          "returnedCents": 39660,
+          "plCents": 19660,
+          "refundedCents": 4300,
+          "gradedTickets": 31,
+          "tickets": 31,
+          "effectiveWageredCents": 15700,
+          "graded": true
+        },
+        "label": "no baseline"
+      }
+    },
+    {
+      "date": "2026-08-23",
+      "meet": "DMR-2026-summer",
+      "correlationId": "eae0a86c-5037-4b31-bb69-daffe1b05790",
+      "calendarRaces": 9,
+      "blocking": [],
+      "nonBlocking": [
+        {
+          "type": "owner_trainer_fused",
+          "race": 1,
+          "message": "Program: Race 1: #7 Mischievous Bev - the owner line runs into the trainer column (\"Barnhart, Ahern or Firsthome Thoroughbreds, et al Adam Kitchingman(F Cano)\") and no other entry on the card names that trainer; trainer left blank.",
+          "source": "entries"
+        },
+        {
+          "type": "unrecognized_mutuel",
+          "race": 8,
+          "message": "Race 8: unrecognized wager \"Consolation Pick 3\" - stored as consolation_pick_3, never graded.",
+          "source": "results"
+        },
+        {
+          "type": "unrecognized_mutuel",
+          "race": 8,
+          "message": "Race 8: unrecognized wager \"Consolation Double\" - stored as consolation_double, never graded.",
+          "source": "results"
+        },
+        {
+          "type": "unrecognized_mutuel",
+          "race": 9,
+          "message": "Race 9: unrecognized wager \"Consolation Pick 3\" - stored as consolation_pick_3, never graded.",
+          "source": "results"
+        }
+      ],
+      "parsedRaces": 9,
+      "resultsRaces": 9,
+      "hasChart": false,
+      "entriesSource": "both",
+      "status": "saved",
+      "raceDayId": 23,
+      "cardId": 52,
+      "completeness": "PROGRAM_ONLY",
+      "engineVersion": "lean-1.1",
+      "resultsSource": "dmtc_html",
+      "results": {
+        "results": 83,
+        "exotics": 65,
+        "scratches": 10,
+        "unresolvedFinishers": 0
+      },
+      "balancerMoved": true,
+      "carveOutFired": false,
+      "figures": {
+        "wageredCents": 20000,
+        "returnedCents": 23500,
+        "plCents": 3500,
+        "refundedCents": 100,
+        "gradedTickets": 27,
+        "tickets": 27,
+        "effectiveWageredCents": 19900,
+        "graded": true
+      },
+      "crossSource": null,
+      "note": "4 non-blocking warning(s)",
+      "regression": {
+        "baseline": null,
+        "runner": {
+          "wageredCents": 20000,
+          "returnedCents": 23500,
+          "plCents": 3500,
+          "refundedCents": 100,
+          "gradedTickets": 27,
+          "tickets": 27,
+          "effectiveWageredCents": 19900,
+          "graded": true
+        },
+        "label": "no baseline"
+      }
+    },
+    {
+      "date": "2026-08-27",
+      "meet": "DMR-2026-summer",
+      "correlationId": "fd5a176d-d5c0-48f6-9af5-2298ba737349",
+      "calendarRaces": 8,
+      "blocking": [],
+      "nonBlocking": [
+        {
+          "type": "program_ml_disagreement",
+          "race": 1,
+          "field": "jockey",
+          "programNumber": "8",
+          "message": "Race 1: #8 Authentic Grace - jockey is \"J Rosario\" on the ML sheet but \"Joel Rosario Waived\" in the program; the sheet wins.",
+          "source": "entries"
+        }
+      ],
+      "parsedRaces": 8,
+      "resultsRaces": 8,
+      "hasChart": false,
+      "entriesSource": "both",
+      "status": "saved",
+      "raceDayId": 24,
+      "cardId": 53,
+      "completeness": "PROGRAM_ONLY",
+      "engineVersion": "lean-1.1",
+      "resultsSource": "dmtc_html",
+      "results": {
+        "results": 62,
+        "exotics": 54,
+        "scratches": 8,
+        "unresolvedFinishers": 0
+      },
+      "balancerMoved": true,
+      "carveOutFired": false,
+      "figures": {
+        "wageredCents": 20000,
+        "returnedCents": 35850,
+        "plCents": 15850,
+        "refundedCents": 1000,
+        "gradedTickets": 23,
+        "tickets": 23,
+        "effectiveWageredCents": 19000,
+        "graded": true
+      },
+      "crossSource": null,
+      "note": "1 non-blocking warning(s)",
+      "regression": {
+        "baseline": null,
+        "runner": {
+          "wageredCents": 20000,
+          "returnedCents": 35850,
+          "plCents": 15850,
+          "refundedCents": 1000,
+          "gradedTickets": 23,
+          "tickets": 23,
+          "effectiveWageredCents": 19000,
+          "graded": true
+        },
+        "label": "no baseline"
+      }
+    },
+    {
+      "date": "2026-08-28",
+      "meet": "DMR-2026-summer",
+      "correlationId": "2f15a8c9-a6ed-4081-b647-c4e1606fa856",
+      "calendarRaces": 8,
+      "blocking": [],
+      "nonBlocking": [
+        {
+          "type": "index_renumbered",
+          "race": 1,
+          "message": "Program: Race 1: the index numbers its field after the printed scratch (e.g. \"Debby's Gal\" is 4 in the index, 5 on the page). Page numbering kept; confirm at the window.",
+          "source": "entries"
+        }
+      ],
+      "parsedRaces": 8,
+      "resultsRaces": 8,
+      "hasChart": true,
+      "entriesSource": "both",
+      "status": "saved",
+      "raceDayId": 25,
+      "cardId": 54,
+      "completeness": "PROGRAM_ONLY",
+      "engineVersion": "lean-1.1",
+      "resultsSource": "dmtc_html",
+      "results": {
+        "results": 59,
+        "exotics": 53,
+        "scratches": 10,
+        "unresolvedFinishers": 0
+      },
+      "balancerMoved": true,
+      "carveOutFired": false,
+      "figures": {
+        "wageredCents": 20000,
+        "returnedCents": 30760,
+        "plCents": 10760,
+        "refundedCents": 3500,
+        "gradedTickets": 21,
+        "tickets": 21,
+        "effectiveWageredCents": 16500,
+        "graded": true
+      },
+      "crossSource": {
+        "tickets": 21,
+        "agree": 21,
+        "disagreements": []
+      },
+      "note": "1 non-blocking warning(s)",
+      "regression": {
+        "baseline": null,
+        "runner": {
+          "wageredCents": 20000,
+          "returnedCents": 30760,
+          "plCents": 10760,
+          "refundedCents": 3500,
+          "gradedTickets": 21,
+          "tickets": 21,
+          "effectiveWageredCents": 16500,
+          "graded": true
+        },
+        "label": "no baseline"
+      }
+    },
+    {
+      "date": "2026-08-29",
+      "meet": "DMR-2026-summer",
+      "correlationId": "bb5d8437-c68b-40a2-8394-b6aa0a9ae35e",
+      "calendarRaces": 10,
+      "blocking": [],
+      "nonBlocking": [
+        {
+          "type": "index_renumbered",
+          "race": 8,
+          "message": "Program: Race 8: the index numbers its field after the printed scratch (e.g. \"Amador\" is 9 in the index, 10 on the page). Page numbering kept; confirm at the window.",
+          "source": "entries"
+        },
+        {
+          "type": "index_renumbered",
+          "race": 7,
+          "message": "Program: Race 7: the index numbers its field after the printed scratch (e.g. \"He's a Knockout\" is 9 in the index, 10 on the page). Page numbering kept; confirm at the window.",
+          "source": "entries"
+        }
+      ],
+      "parsedRaces": 10,
+      "resultsRaces": 10,
+      "hasChart": true,
+      "entriesSource": "both",
+      "status": "saved",
+      "raceDayId": 26,
+      "cardId": 55,
+      "completeness": "PROGRAM_ONLY",
+      "engineVersion": "lean-1.1",
+      "resultsSource": "dmtc_html",
+      "results": {
+        "results": 90,
+        "exotics": 66,
+        "scratches": 12,
+        "unresolvedFinishers": 0
+      },
+      "balancerMoved": true,
+      "carveOutFired": false,
+      "figures": {
+        "wageredCents": 20000,
+        "returnedCents": 800,
+        "plCents": -19200,
+        "refundedCents": 800,
+        "gradedTickets": 29,
+        "tickets": 29,
+        "effectiveWageredCents": 19200,
+        "graded": true
+      },
+      "crossSource": {
+        "tickets": 29,
+        "agree": 29,
+        "disagreements": []
+      },
+      "note": "2 non-blocking warning(s)",
+      "regression": {
+        "baseline": null,
+        "runner": {
+          "wageredCents": 20000,
+          "returnedCents": 800,
+          "plCents": -19200,
+          "refundedCents": 800,
+          "gradedTickets": 29,
+          "tickets": 29,
+          "effectiveWageredCents": 19200,
+          "graded": true
+        },
+        "label": "no baseline"
+      }
+    },
+    {
+      "date": "2026-08-30",
+      "meet": "DMR-2026-summer",
+      "correlationId": "7e4b1621-e9b9-40ca-8938-f3af8ac84ffc",
+      "calendarRaces": 10,
+      "blocking": [],
+      "nonBlocking": [
+        {
+          "type": "index_renumbered",
+          "race": 5,
+          "message": "Program: Race 5: the index numbers its field after the printed scratch (e.g. \"Beautiful Dawn\" is 4 in the index, 5 on the page). Page numbering kept; confirm at the window.",
+          "source": "entries"
+        },
+        {
+          "type": "index_renumbered",
+          "race": 10,
+          "message": "Program: Race 10: the index numbers its field after the printed scratch (e.g. \"Beyond Stoked\" is 4 in the index, 5 on the page). Page numbering kept; confirm at the window.",
+          "source": "entries"
+        },
+        {
+          "type": "program_ml_disagreement",
+          "race": 3,
+          "field": "jockey",
+          "programNumber": "7",
+          "message": "Race 3: #7 Fun to Run - jockey is \"T Baze\" on the ML sheet but \"Tyler Baze Waived\" in the program; the sheet wins.",
+          "source": "entries"
+        }
+      ],
+      "parsedRaces": 10,
+      "resultsRaces": 10,
+      "hasChart": true,
+      "entriesSource": "both",
+      "status": "saved",
+      "raceDayId": 27,
+      "cardId": 56,
+      "completeness": "PROGRAM_ONLY",
+      "engineVersion": "lean-1.1",
+      "resultsSource": "dmtc_html",
+      "results": {
+        "results": 90,
+        "exotics": 68,
+        "scratches": 8,
+        "unresolvedFinishers": 0
+      },
+      "balancerMoved": true,
+      "carveOutFired": false,
+      "figures": {
+        "wageredCents": 20000,
+        "returnedCents": 10870,
+        "plCents": -9130,
+        "refundedCents": 100,
+        "gradedTickets": 28,
+        "tickets": 28,
+        "effectiveWageredCents": 19900,
+        "graded": true
+      },
+      "crossSource": {
+        "tickets": 28,
+        "agree": 28,
+        "disagreements": []
+      },
+      "note": "3 non-blocking warning(s)",
+      "regression": {
+        "baseline": null,
+        "runner": {
+          "wageredCents": 20000,
+          "returnedCents": 10870,
+          "plCents": -9130,
+          "refundedCents": 100,
+          "gradedTickets": 28,
+          "tickets": 28,
+          "effectiveWageredCents": 19900,
+          "graded": true
+        },
+        "label": "no baseline"
+      }
+    }
+  ]
+}

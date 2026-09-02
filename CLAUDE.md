@@ -268,7 +268,8 @@ Before a branch is reported ready, verify — out loud, in the final message:
 | Bankroll balancer remainder fix (D30) | merged | PR #27, branch `balancer-remainder` - the balancer parked the whole per-card rounding remainder on the single biggest win ticket (card 16 R1: $37 allocated, $65 spent, a quarter of the bankroll on one horse). Now round-robin $1 steps per race per pass, largest allocations first, guesswork races last; `remainder_distributed` trace event; card view shows allocated AND spent per race |
 | Place-money carve-out (D36) | merged | PR #38, branch `place-money-carve-out` - engine `lean-1.1`: the pair is sized inside the allocation, the balancer tops deficits up toward each allocation before spreading, `remainder_distributed` names skipped races; check-engine allocation-integrity assertions |
 | dmtc results HTML parser (D42) | merged | PR #37, branch `dmtc-results-parser` - second results source of record, cross-validated against Equibase; from-archive preview with the calendar race-count hard error; provenance vocabulary (migration 010) |
-| Batch backfill runner + Backfill queue (D43) | in review | PR #41, branch `backfill-runner` — migration 011 (`race_days.meet`, `backfill_queue`), server/backfill.js (policy A in code, commitDay through the routes' own writers, golden checkpoint per meet, cross-source in memory, per-meet report), queue API + view, P/L by meet, `npm run backfill`, `npm run check-backfill`; the routes now call the shared `insertRaceDay` / `saveResults` / `persistCard` |
+| Batch backfill runner + Backfill queue (D43) | merged | PR #41, branch `backfill-runner` — migration 011 (`race_days.meet`, `backfill_queue`), server/backfill.js (policy A in code, commitDay through the routes' own writers, golden checkpoint per meet, cross-source in memory, per-meet report), queue API + view, P/L by meet, `npm run backfill`, `npm run check-backfill`; the routes now call the shared `insertRaceDay` / `saveResults` / `persistCard` |
+| Backfill run DMR-2026-summer (D44) | in review | PR #42, branch `backfill-dmr-2026-summer` — 27 days Jul 17 - Aug 30 saved under lean-1.1, zero queued, golden 2026-07-17 committed, cross-source identical on 08-28/29/30, report docs/backfill/DMR-2026-summer.md; every backfilled card is PROGRAM_ONLY (no consensus source runs on archived days) |
 | dmtc.com crawler + raw archive (D41) | merged | PR #36, branch `dmtc-crawler` - calendar-indexed, polite, conditional, audited crawler; raw archive with manifests; `npm run dmtc-fetch`; the two real calendar pages are fixtures |
 | ML sheet as entries source of record (D40) | merged | PR #34, branch `ml-sheet-ingest` - ML/changes PDF parser + fetcher, program becomes analysis-only via the merge, ODDS_ONLY tier, engine `lean-1.0.1` (morning-line ranking fallback on rank-less races) |
 | Engine versioning (D34) | merged | PR #33, branch `engine-versioning` - `ENGINE_VERSION = lean-1.0`; migration 008; version on card rows, card header, P/L rows + version filter; trace events carry it; invariant 14 |
@@ -310,6 +311,11 @@ Before a branch is reported ready, verify — out loud, in the final message:
 - **BETSHEET_CONTACT** (in `.env`, gitignored) is the human named in the
   crawler's User-Agent - set it before any `dmtc-fetch` run; the UA says
   "set BETSHEET_CONTACT" otherwise.
+- **Backfilled days are PROGRAM_ONLY by construction.** No consensus fetcher
+  runs on an archived day (D07/D08 sources are live-day only), so a backfill
+  corpus measures Bottom Line + morning line; FULL/PARTIAL buckets stay empty
+  until a historical picks source exists (D08b Wayback). Never read a
+  PROGRAM_ONLY corpus figure as the live methodology's.
 - **Backfill resume = rerun.** The runner keeps no state of its own: it halts
   (golden checkpoint, golden drift, un-audited meet) and the fix is to audit,
   commit and run the same command again; a live day is always skipped and a
