@@ -102,6 +102,7 @@ map in the same PR.
 | Effective wagered (wagered − refunds) and effective ROI reported beside nominal at card, day and bucket level; refunds visible | D39 |
 | Historical simulation can apply chart scratches before generation (at-the-window baseline), both modes reported | D50 (the D19 run option; compare groups by template AND mode, never pooled) |
 | Single-ticket dependence reported gross and net; the flag driven by net | D20 |
+| Structure-layer findings are recorded per engine version with run IDs before any engine change is proposed: one file per (engine version, bucket, corpus) under docs/findings/, both scratch modes, all meets and per meet, paired day counts, what is not concluded, the next corpus's question; never edited after the version is superseded | D52 (the first: lean-1.1 / PROGRAM_ONLY / DMR 2025-2026), CLAUDE.md "Findings" |
 
 ## Morning-line sheet (addendum 3, 2026-09-02)
 
