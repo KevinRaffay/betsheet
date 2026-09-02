@@ -110,3 +110,14 @@ map in the same PR.
 | The track's ML/changes PDF parses into the entries structure and is the entries source of record; the program PDF is analysis-only and cross-validated against it, the sheet winning every disagreement with a warning | D40 |
 | Ingest accepts the ML sheet alone (ODDS_ONLY completeness, below PROGRAM_ONLY), the program alone, or both (preferred) | D40 |
 | The ML sheet is fetched from the track at its predictable URL when robots allow, audited like every fetch; past dates feed backfill | D40 (on the D07 framework) |
+
+## Historical backfill (addendum 4, 2026-09-01)
+
+| Requirement | Deliverables |
+| --- | --- |
+| Backfill from the track's own archive: calendar-indexed, robots-respecting, polite, conditional requests, raw artifacts archived with a manifest; parsers run from the archive, never the network | D41 (on the D07 framework) |
+| Results from the track's results page as a second results source of record, cross-validated against Equibase charts: identical returned cents per ticket from either source | D42, D15 (grader) |
+| Batch ingestion policy A: a day saves automatically only with zero blocking warnings; anything blocking goes to a review queue in the UI - the documented batch exception to invariant 9 | D43 |
+| Per-meet fixtures and golden checkpoints: the runner halts at each meet's first race day until its golden is audited | D43 (the D32 pattern) |
+| `meet` on race_days (DMR-<year>-summer / -fall), with P/L and distribution grouping by meet | D43 (schema + runner), D16 / D20 (grouping) |
+| Every backfilled card carries the engine version it was generated under; D34 precedes any backfill run | D34, D43 |
