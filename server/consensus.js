@@ -25,7 +25,11 @@ import { getLogger, newCorrelationId } from './logging.js';
 const log = getLogger('fetch-audit');
 
 const FETCH_TIMEOUT_MS = 15000;
-const USER_AGENT = 'BetSheet/0.1 (local handicapping tool)';
+// One identifying User-Agent for every automated request (D07 sources and
+// the D41 crawler alike); BETSHEET_CONTACT names the human behind it.
+export function userAgent(contact = process.env.BETSHEET_CONTACT) {
+  return `BetSheet/0.1 (local handicapping tool; ${contact ? `contact: ${contact}` : 'set BETSHEET_CONTACT'})`;
+}
 const BACKOFF_AFTER_FAILURES = 3;
 const BACKOFF_WINDOW_HOURS = 6;
 
@@ -78,7 +82,7 @@ export function fetchWithTimeout(url) {
   const timer = setTimeout(() => ctl.abort(), FETCH_TIMEOUT_MS);
   return fetch(url, {
     signal: ctl.signal,
-    headers: { 'user-agent': USER_AGENT },
+    headers: { 'user-agent': userAgent() },
     redirect: 'follow',
   }).finally(() => clearTimeout(timer));
 }
