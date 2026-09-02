@@ -12,7 +12,7 @@
 import fs from 'node:fs';
 import path from 'node:path';
 import { fileURLToPath, URL } from 'node:url';
-import { parseProgramPdf, distanceFromHeader, stakesTitleFromHeader, trackFromBottomLine } from '../server/program-parser.js';
+import { parseProgramPdf, distanceFromHeader, stakesTitleFromHeader, trackFromBottomLine, splitFusedOwnerTrainer } from '../server/program-parser.js';
 
 const ROOT = fileURLToPath(new URL('../', import.meta.url));
 const PDF = path.join(ROOT, 'tests', 'fixtures', 'programs', 'delmar-2026-08-30.pdf');
@@ -246,13 +246,16 @@ check('08-22: best bet Kensington Lane (IRE) - race 9, program 9, rank 1, 3/1 - 
   return bets.length === 1 && bets[0].race === 9 && bets[0].programNumber === '9' &&
     bets[0].horseName === 'Kensington Lane (IRE)' && bets[0].programRank === 1 && bets[0].morningLine === '3/1';
 })());
-check('08-22: core fields on every live entry, ONE known gap - R9 #9 trainer glued into the owner line', (() => {
+check('08-22: every non-scratched entry has all core fields', (() => {
   const gaps = out2.races.flatMap((r) => r.entries.filter((e) => !e.scratched &&
     !(e.horseName && e.jockey && e.trainer && e.owner && e.weight && e.morningLine && e.morningLineDecimal > 0 && e.breeding))
     .map((e) => `${r.number}:${e.programNumber}`));
-  const kl = out2.races[8].entries.find((e) => e.programNumber === '9');
-  return gaps.join(',') === '9:9' && kl.trainer === null && /D' Amato/.test(kl.owner);
+  return gaps.length === 0;
 })());
+check('08-22: R9 #9 Kensington Lane - owner/trainer split where pdfjs fused them into one item', (() => {
+  const kl = out2.races[8].entries.find((e) => e.programNumber === '9');
+  return kl.owner === 'Agave Racing Stable, Medallion Racing or Trommer' && kl.trainer === "Philip D' Amato(M. Donald)";
+})(), JSON.stringify(out2.races[8].entries.find((e) => e.programNumber === '9')?.owner));
 check('08-22: also-eligibles - one in R3, two in R7',
   out2.races.map((r) => r.entries.filter((e) => e.alsoEligible).length).join(',') === '0,0,1,0,0,0,2,0,0,0,0');
 check('08-22: index 122 rows, 3 scratches',
@@ -273,6 +276,38 @@ check('track fallback: multi-word track', trackFromBottomLine('Santa Anita Botto
 check('track fallback: no header -> null', trackFromBottomLine('BEST BET: RACE 2, SOME HORSE') === null);
 check('track fallback: the panel letters still win on the fixture (golden unchanged)',
   out.track === 'DELMAR' && !out.warnings.some((w) => w.type === 'no_track'));
+
+// --- fused owner/trainer (08-22 R9 #9) - the card is the dictionary ---
+const fusedDay = () => [
+  { number: 1, entries: [{ programNumber: '1', horseName: 'A', owner: 'Some Stable', trainer: "Philip D' Amato(M. Donald)" },
+    { programNumber: '2', horseName: 'B', owner: 'Other LLC', trainer: 'Bob Baffert(J. Barnes)' }] },
+  { number: 9, entries: [{ programNumber: '9', horseName: 'Kensington Lane (IRE)', trainer: null,
+    owner: "Agave Racing Stable, Medallion Racing or Trommer Philip D' Amato(M. Donald)" }] },
+];
+check('fused owner/trainer: a trainer seen elsewhere on the card is peeled off the owner text', (() => {
+  const races = fusedDay(); const w = [];
+  splitFusedOwnerTrainer(races, w);
+  const e = races[1].entries[0];
+  return e.trainer === "Philip D' Amato(M. Donald)" && e.owner === 'Agave Racing Stable, Medallion Racing or Trommer' && w.length === 0;
+})());
+check('fused owner/trainer: longest known trainer wins, entries with a trainer are untouched', (() => {
+  const races = fusedDay();
+  races[0].entries.push({ programNumber: '3', horseName: 'C', owner: 'X', trainer: "D' Amato(M. Donald)" });
+  splitFusedOwnerTrainer(races, []);
+  return races[1].entries[0].trainer === "Philip D' Amato(M. Donald)" &&
+    races[0].entries.every((e) => e.owner.length <= 11);
+})());
+check('fused owner/trainer: no dictionary hit -> owner_trainer_fused warning, never a guess', (() => {
+  const races = fusedDay(); races[0].entries = []; const w = [];
+  splitFusedOwnerTrainer(races, w);
+  const e = races[1].entries[0];
+  return e.trainer === null && /Trommer Philip/.test(e.owner) && w.length === 1 && w[0].type === 'owner_trainer_fused' && w[0].race === 9;
+})());
+check('fused owner/trainer: a plain owner with no trainer and no parens is left alone, no warning', (() => {
+  const races = [{ number: 2, entries: [{ programNumber: '4', horseName: 'D', owner: 'Reddam Racing, LLC', trainer: null }] }]; const w = [];
+  splitFusedOwnerTrainer(races, w);
+  return races[0].entries[0].owner === 'Reddam Racing, LLC' && w.length === 0;
+})());
 
 check('wrong expected date -> wrong_date warning',
   wrong.warnings.some((w) => w.type === 'wrong_date'));
