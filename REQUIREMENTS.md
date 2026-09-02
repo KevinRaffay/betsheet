@@ -84,7 +84,7 @@ map in the same PR.
 | Grade every ticket (all bet types, exotics, parlays, scratch/refund rules) | D15 |
 | P/L per-race, per-day, running; compare sheet variants | D16 |
 | Strategy templates as reusable rules | D18 |
-| Simulate templates across all stored cards with real payoffs | D19 |
+| Simulate templates across all stored cards with real payoffs | D19; D51 (compare per meet, vs-lean deltas, paired day counts) |
 | Distributions: % losing days, max drawdown, single-ticket dependence (>80%) | D20 |
 | Decision traces joined with graded results, exportable for LLM analysis | D17 |
 | Discipline tracker (planned vs. actual, house-money warnings) | D24 (schema in D03) |
@@ -119,7 +119,7 @@ map in the same PR.
 | Results from the track's results page as a second results source of record, cross-validated against Equibase charts: identical returned cents per ticket from either source | D42, D15 (grader) |
 | Batch ingestion policy A: a day saves automatically only with zero blocking warnings; anything blocking goes to a review queue in the UI - the documented batch exception to invariant 9 | D43 |
 | Per-meet fixtures and golden checkpoints: the runner halts at each meet's first race day until its golden is audited | D43 (the D32 pattern) |
-| `meet` on race_days (DMR-<year>-summer / -fall), with P/L and distribution grouping by meet | D43 (schema + runner), D16 / D20 (grouping) |
+| `meet` on race_days (DMR-<year>-summer / -fall), with P/L and distribution grouping by meet | D43 (schema + runner), D16 / D20 (grouping), D51 (simulation compare by meet) |
 | Every backfilled card carries the engine version it was generated under; D34 precedes any backfill run | D34, D43 |
 | The corpus itself is a deliverable: one row per meet, with preconditions, acceptance, a committed report (docs/backfill/<meet>.md), and the golden + queue decisions recorded | D44, D45, D46 |
 | No later meet starts until the earlier meet's report is reviewed (D44 -> D45 -> D46) | D44, D45, D46 |
