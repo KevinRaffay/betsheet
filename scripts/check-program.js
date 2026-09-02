@@ -10,7 +10,7 @@
 import fs from 'node:fs';
 import path from 'node:path';
 import { fileURLToPath, URL } from 'node:url';
-import { parseProgramPdf } from '../server/program-parser.js';
+import { parseProgramPdf, distanceFromHeader, stakesTitleFromHeader } from '../server/program-parser.js';
 
 const ROOT = fileURLToPath(new URL('../', import.meta.url));
 const PDF = path.join(ROOT, 'tests', 'fixtures', 'programs', 'delmar-2026-08-30.pdf');
@@ -151,6 +151,71 @@ check('index: spot row (Agency, program 1, race 6)', (() => {
 
 // Expected-track/date verification fires on a mismatch.
 const wrong = await parseProgramPdf(PDF, { track: 'Santa Anita', date: '2026-09-01' });
+// --- header fields from the 2026-08-22 program (hand-copied text items) ---
+// That program is not a committed fixture (12MB); its header lines are
+// reproduced here exactly as pdfjs emitted them (text, x, y), so the rules
+// that went wrong on it stay pinned. Set BETSHEET_PROGRAM_PDF_0822 to the
+// PDF's path to run the whole-file assertions below as well.
+const it = (s, x, y) => ({ s, x, y, h: 6 });
+const h3 = [
+  it('Other Than Maiden, Claiming, Or Starter At A Mile Or Over Allowed 2 Lbs. Claiming Price $20,000', 334, 475),
+  it('One', 572, 465),
+  it('Mile And One Sixteenth. (Turf) Chute Start. (Rail at 0 Feet)', 334, 461),
+];
+check('distance: split across a line wrap ("One" / "Mile And One Sixteenth. (Turf)...")', (() => {
+  const d = distanceFromHeader(h3);
+  return d && d.distance === 'One Mile And One Sixteenth' && d.consumed.length === 1 && d.consumed[0].s === 'One';
+})(), JSON.stringify(distanceFromHeader(h3)));
+const h7 = [
+  it('Non-winners Of Two Races At A Mile Or Over Since May 22 Allowed 2 Lbs. Such A Race Since', 341, 462),
+  it('One Mile. (Turf) Stretch Start. (Rail at 0 Feet)', 429, 450),
+];
+check('distance: conditions text "...At A Mile Or Over" is never the distance',
+  distanceFromHeader(h7)?.distance === 'One Mile', JSON.stringify(distanceFromHeader(h7)));
+const h11 = [
+  it('40th Running of', 428, 503), it('Del Mar Mile (Grade II)', 417, 496), it('$300,000 Guaranteed', 419, 490),
+  it('STAKES. FOR THREE-YEAR-OLDS AND UPWARD. By subscription of $300 each, which shall', 331, 484),
+  it('One Mile. (Turf) Stretch Start. (Rail at 0', 464, 446),
+];
+check('distance: a stakes title ("Del Mar Mile") is never the distance',
+  distanceFromHeader(h11)?.distance === 'One Mile', JSON.stringify(distanceFromHeader(h11)));
+check('distance: fractions, no trailing period, purely-distance items consumed',
+  distanceFromHeader([it('One Mile And One Quarter.', 503, 388)])?.distance === 'One Mile And One Quarter' &&
+  distanceFromHeader([it('Five And One Half Furlongs.', 395, 448)])?.distance === 'Five And One Half Furlongs' &&
+  distanceFromHeader([it('One Mile', 557, 431)])?.distance === 'One Mile' &&
+  distanceFromHeader([it('Six Furlongs.', 394, 476)])?.consumed.length === 1 &&
+  distanceFromHeader([it('One Mile. (Turf)', 537, 466)])?.consumed.length === 0);
+check('distance: nothing distance-like -> null',
+  distanceFromHeader([it('STAKES. FOR FILLIES, THREE-YEAR-OLDS.', 331, 468), it('One Mile Or Over Since May 22', 331, 460)]) === null);
+check('stakes title: the line under "Nth Running of", sponsor dropped, grade kept',
+  stakesTitleFromHeader([it('24th Running of', 431, 499), it('Green Flash Handicap Presented by Longines (Grade II)', 362, 493),
+    it('$200,000 Guaranteed', 422, 487), it('STAKES. A HANDICAP FOR THREE-YEAR-OLDS AND UPWARD.', 336, 475)]) === 'Green Flash Handicap (Grade II)' &&
+  stakesTitleFromHeader([it('70th Running of', 428, 489), it('Del Mar Oaks Presented by Keeneland Sales (Grade I)', 362, 482),
+    it('$300,000 Guaranteed', 419, 475)]) === 'Del Mar Oaks (Grade I)' &&
+  stakesTitleFromHeader(h11) === 'Del Mar Mile (Grade II)' &&
+  stakesTitleFromHeader([it('36th Running of', 430, 508), it('Pacific Classic (Grade I)', 417, 502),
+    it('$1,000,000 Guaranteed', 419, 496)]) === 'Pacific Classic (Grade I)');
+check('stakes title: the /Stakes/ word match stays as the fallback without an anchor',
+  stakesTitleFromHeader([it('$2 WPS Parlay', 400, 540), it('Torrey Pines Stakes (Grade III)', 403, 459)]) === 'Torrey Pines Stakes (Grade III)' &&
+  stakesTitleFromHeader([it('$2 WPS Parlay', 400, 540)]) === null);
+check('R7 (fixture): the title is read via the "49th Running of" anchor, unchanged',
+  r7.raceType === 'STAKES - Torrey Pines Stakes (Grade III)');
+
+const extraPdf = process.env.BETSHEET_PROGRAM_PDF_0822;
+if (extraPdf && fs.existsSync(extraPdf)) {
+  const p = await parseProgramPdf(extraPdf, { track: 'Del Mar', date: '2026-08-22' });
+  const dists = p.races.map((r) => r.distance).join('|');
+  check('08-22 program: 11 distances (R3 split, R10 fraction) read off the printed pages',
+    dists === 'One Mile|Six Furlongs|One Mile And One Sixteenth|One Mile|Five Furlongs|Five And One Half Furlongs|One Mile|One Mile|One Mile|One Mile And One Quarter|One Mile', dists);
+  const titles = [5, 9, 10, 11].map((n) => p.races[n - 1].raceType).join('|');
+  check('08-22 program: stakes titles without the word Stakes',
+    titles === 'STAKES - Green Flash Handicap (Grade II)|STAKES - Del Mar Oaks (Grade I)|STAKES - Pacific Classic (Grade I)|STAKES - Del Mar Mile (Grade II)', titles);
+  check('08-22 program: no other race type carries conditions text',
+    p.races.every((r) => r.raceType && r.raceType.length <= 60), JSON.stringify(p.races.map((r) => r.raceType)));
+} else {
+  console.log('  skip  08-22 program whole-file assertions (set BETSHEET_PROGRAM_PDF_0822)');
+}
+
 check('wrong expected date -> wrong_date warning',
   wrong.warnings.some((w) => w.type === 'wrong_date'));
 check('wrong expected track -> wrong_track warning',
