@@ -379,6 +379,9 @@ const realEntries = dbR.prepare('SELECT COUNT(*) n FROM entries e JOIN races r O
 const rankedEntries = dbR.prepare('SELECT COUNT(*) n FROM entries e JOIN races r ON r.id = e.race_id WHERE r.race_day_id = ? AND e.program_rank IS NOT NULL').get(realDay.id).n;
 check('real 08-30: the stored day is the merged document (98 entries, sheet as record, program analysis ranks present), meet stamped',
   realEntries === 98 && realDay.entries_source === 'both' && realDay.meet === 'DMR-2026-summer' && rankedEntries >= 10 && rankedEntries < 98, JSON.stringify({ realEntries, rankedEntries, src: realDay.entries_source, meet: realDay.meet }));
+const bottomLineRaces = dbR.prepare('SELECT COUNT(*) n FROM races WHERE race_day_id = ? AND bottom_line IS NOT NULL').get(realDay.id).n;
+check('real 08-30: races.bottom_line populated from the program analysis (D59 - dayPayload dropped parsed.merged.analysis before this fix)',
+  bottomLineRaces > 0, JSON.stringify({ bottomLineRaces }));
 dbR.close();
 
 // ---------- layer 5: every COMMITTED meet golden still matches a fresh parse ----------
