@@ -122,6 +122,14 @@ const src = d.prepare(
 
 d.prepare(`INSERT INTO fetch_attempts (race_day_id, source_id, url, http_status, outcome, bytes, parse_ok, picks_extracted, correlation_id)
   VALUES (?, ?, 'https://example/2026-08-30', 200, 'ok', 5120, 1, 16, 'cid-check')`).run(day, src);
+// D53 (migration 013): a discovery miss is its own outcome and carries the discovery fields.
+d.prepare(`INSERT INTO fetch_attempts (race_day_id, source_id, outcome, fallback_reason, sitemap_url, sitemap_status, candidate_slug, entries_scanned, nearest_slug, correlation_id)
+  VALUES (?, ?, 'not_published', 'no post yet', 'https://example/sitemap-index-1.xml', 200, 'del-mar-horse-racing-picks-for-thursday-september-3-2026', 22, 'del-mar-horse-racing-picks-for-friday-september-4-2026', 'cid-check')`).run(day, src);
+check('fetch_attempts accepts not_published with the discovery columns (013)',
+  d.prepare("SELECT COUNT(*) AS n FROM fetch_attempts WHERE outcome = 'not_published' AND entries_scanned = 22 AND nearest_slug LIKE 'del-mar-%'").get().n === 1);
+check('fetch_attempts still rejects an unknown outcome', (() => {
+  try { d.prepare("INSERT INTO fetch_attempts (race_day_id, source_id, outcome) VALUES (?, ?, 'maybe')").run(day, src); return false; } catch { return true; }
+})());
 
 d.prepare(`INSERT INTO consensus_picks (race_id, source_id, entry_id, program_number, horse_name, pick_type)
   VALUES (?, ?, ?, '1A', 'Fast Idea', 'top')`).run(race, src, e1);
