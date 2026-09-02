@@ -347,6 +347,46 @@ try {
   }).then((r) => r.json());
   check('after reset: race-day ids restart at 1 (safe - the old logs went too)',
     freshSave.id === 1);
+
+  // ---- track canonicalization (D35): every spelling collides on the code ----
+  const spellingDate = '2026-01-01';
+  const spellingPayload = (track) => ({
+    track, date: spellingDate, bankrollCents: 20000, perRaceMinCents: 500, races: parsed.races,
+  });
+  const spellA = await fetch(`${BASE}/api/race-days`, {
+    method: 'POST', headers: { 'content-type': 'application/json' },
+    body: JSON.stringify(spellingPayload('Delmar')),
+  });
+  check('track spelling "Delmar" saves', spellA.status === 201);
+  const spellB = await fetch(`${BASE}/api/race-days`, {
+    method: 'POST', headers: { 'content-type': 'application/json' },
+    body: JSON.stringify(spellingPayload('DEL MAR')),
+  });
+  check('"DEL MAR" collides with "Delmar" on the same date (same code) -> 409', spellB.status === 409);
+  const spellC = await fetch(`${BASE}/api/race-days`, {
+    method: 'POST', headers: { 'content-type': 'application/json' },
+    body: JSON.stringify({ ...spellingPayload('Del Mar'), replace: true }),
+  });
+  const spellCBody = await spellC.json();
+  check('"Del Mar" replaces the same row under the shared code', spellC.status === 201);
+  const spellRow = await fetch(`${BASE}/api/race-days/${spellCBody.id}`).then((r) => r.json());
+  check('the saved day carries the canonical display name and code regardless of input spelling',
+    spellRow.track === 'Del Mar' && spellRow.track_code === 'DMR', JSON.stringify(spellRow));
+
+  const unknownTrack = await fetch(`${BASE}/api/parse/entries-text`, {
+    method: 'POST', headers: { 'content-type': 'application/json' },
+    body: JSON.stringify({ text: 'Santa Anita Daily Entries\nRace 1\n' }),
+  }).then((r) => r.json());
+  check('an unrecognized track never blocks the preview, just warns',
+    unknownTrack.track === 'Santa Anita' &&
+    unknownTrack.warnings.some((w) => w.type === 'unrecognized_track'), JSON.stringify(unknownTrack.warnings));
+
+  const knownTrack = await fetch(`${BASE}/api/parse/entries-text`, {
+    method: 'POST', headers: { 'content-type': 'application/json' },
+    body: JSON.stringify({ text: 'Del Mar Daily Entries\nRace 1\n' }),
+  }).then((r) => r.json());
+  check('a recognized track never warns',
+    !knownTrack.warnings.some((w) => w.type === 'unrecognized_track'));
 } finally {
   server.kill();
   await new Promise((r) => setTimeout(r, 300));
