@@ -24,6 +24,8 @@ export default function SimView({ onBack, onOpenDay }) {
   const [busy, setBusy] = useState(false);
   const [expanded, setExpanded] = useState(null); // runId
   const [run, setRun] = useState(null);
+  // D50: the at-the-window mode - chart scratches applied before generation.
+  const [applyScratches, setApplyScratches] = useState(false);
 
   const reload = () => getSimulationCompare().then(setCompare).catch((e) => setError(String(e.message)));
   useEffect(() => { reload(); }, []);
@@ -32,7 +34,7 @@ export default function SimView({ onBack, onOpenDay }) {
     setBusy(true);
     setError(null);
     try {
-      await runSimulation({});
+      await runSimulation({ applyChartScratchesBeforeGeneration: applyScratches });
       setExpanded(null);
       setRun(null);
       await reload();
@@ -63,8 +65,12 @@ export default function SimView({ onBack, onOpenDay }) {
       <div className="pagehead">
         <h2>Simulator</h2>
         <div className="btnrow">
+          <label className="dim" title="Build each simulated card with the day's chart scratches already applied - the at-the-window baseline. Grading is unchanged; the two modes are reported on separate rows, never pooled.">
+            <input type="checkbox" checked={applyScratches} onChange={(e) => setApplyScratches(e.target.checked)} disabled={busy} />
+            {' '}apply chart scratches before generation
+          </label>
           <button className="btn btn--primary" onClick={handleRun} disabled={busy}>
-            {busy ? 'Running…' : 'Run every template'}
+            {busy ? 'Running…' : applyScratches ? 'Run every template (scratches applied)' : 'Run every template'}
           </button>
           <button className="btn" onClick={onBack}>Back</button>
         </div>
@@ -88,7 +94,7 @@ export default function SimView({ onBack, onOpenDay }) {
           <table className="grid grid--click">
             <thead>
               <tr>
-                <th>Template</th><th>Days</th><th>Losing days</th><th>Wagered</th>
+                <th>Template</th><th>Mode</th><th>Days</th><th>Losing days</th><th>Wagered</th>
                 <th>Returned</th><th>P/L</th><th>ROI</th><th>Hits</th><th>Run</th>
               </tr>
             </thead>
@@ -99,6 +105,7 @@ export default function SimView({ onBack, onOpenDay }) {
                 return (
                   <tr key={t.runId} onClick={() => toggle(t.runId)}>
                     <td><strong>{t.template}</strong>{t.simulationOnly && <span className="dim"> (simulation only)</span>}</td>
+                    <td>{modeLabel(t)}</td>
                     <td>{b.days}</td>
                     <td>{b.losingDays}/{b.days}</td>
                     <td>{money(b.costCents)}</td>
@@ -116,7 +123,7 @@ export default function SimView({ onBack, onOpenDay }) {
       ))}
       {bucketsPresent.length > 0 && (
         <p className="dim">
-          Buckets never pool: a program-only backfill day and a full-consensus day never share a total. Click a template for its bankroll over time.
+          Buckets never pool: a program-only backfill day and a full-consensus day never share a total. Modes never pool either: "as generated" builds each card on the stored entries, "scratches applied" builds it with the chart's scratches already out (the at-the-window baseline) - one row per (template, mode). Click a template for its bankroll over time.
         </p>
       )}
 
@@ -127,6 +134,12 @@ export default function SimView({ onBack, onOpenDay }) {
   );
 }
 
+// D50: the run's scratch mode as a label. `as generated` = the card built on
+// the stored entries; `scratches applied` = chart scratches out first.
+const modeLabel = (run) => (run.applyChartScratchesBeforeGeneration
+  ? <span className="tag">scratches applied{run.scratchesApplied ? ` (${run.scratchesApplied})` : ''}</span>
+  : <span className="dim">as generated</span>);
+
 // Bankroll over time for one run: a day-by-day table per bucket with the
 // running P/L (and the running bankroll when the run was given one).
 function RunDetail({ run, onOpenDay }) {
@@ -135,7 +148,8 @@ function RunDetail({ run, onOpenDay }) {
       <div className="race-sheet-head">
         <strong>{run.template} · run #{run.runId}</strong>
         <span className="dim">
-          {run.params.bankrollCents ? `${money(run.params.bankrollCents)} per day` : "each day's own bankroll"}
+          {modeLabel(run)}
+          {' '}· {run.params.bankrollCents ? `${money(run.params.bankrollCents)} per day` : "each day's own bankroll"}
           {run.params.startingBankrollCents ? ` · starting bankroll ${money(run.params.startingBankrollCents)}` : ''}
           {' '}· {run.days.length} day{run.days.length === 1 ? '' : 's'}
         </span>

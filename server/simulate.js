@@ -34,21 +34,54 @@ function eligibleDayIds(db) {
 }
 
 /**
+ * D50: the day's chart scratches (result_scratches, already resolved to
+ * program numbers by name at save - the same rows grading refunds key on)
+ * applied to the stored entries BEFORE generation, so the card is built as
+ * it would have been at the window. Rows that never resolved to a program
+ * number are skipped here exactly as grading skips them. The stored day is
+ * never touched - this is a copy for one simulated card.
+ */
+export function applyChartScratches(db, day) {
+  const rows = db.prepare('SELECT race_number, program_number FROM result_scratches WHERE race_day_id = ? AND program_number IS NOT NULL').all(day.id);
+  const scratched = new Set(rows.map((r) => `${r.race_number}|${r.program_number}`));
+  let applied = 0;
+  const races = day.races.map((r) => ({
+    ...r,
+    entries: r.entries.map((e) => {
+      if (e.scratched || !scratched.has(`${r.number}|${e.program_number}`)) return e;
+      applied++;
+      return { ...e, scratched: 1 };
+    }),
+  }));
+  return { day: { ...day, races }, applied };
+}
+
+/**
  * Run one template over every eligible day and persist the run.
  * `bankrollCents` / `perRaceMinCents` override the day's own recipe when
  * given (one bankroll across the whole history); `startingBankrollCents`
- * only shapes the bankroll-over-time series. Returns the run id.
+ * only shapes the bankroll-over-time series. `applyChartScratchesBeforeGeneration`
+ * (D50, default false) builds each card with the chart's scratches already
+ * applied - the at-the-window baseline; grading is unchanged either way.
+ * Returns the run id.
  */
 export function runTemplate(db, templateName, {
   bankrollCents = null, perRaceMinCents = null, startingBankrollCents = null, correlationId,
+  applyChartScratchesBeforeGeneration = false,
 } = {}) {
   const rules = resolveTemplate(templateName);
   if (!rules) throw new Error(`Unknown template "${templateName}".`);
   const rows = [];
+  let scratchesApplied = 0;
   for (const id of eligibleDayIds(db)) {
-    const day = loadDayFull(db, id);
+    let day = loadDayFull(db, id);
     const dayResults = loadDayResultsFor(db, id);
     if (!dayResults) continue;
+    if (applyChartScratchesBeforeGeneration) {
+      const r = applyChartScratches(db, day);
+      day = r.day;
+      scratchesApplied += r.applied;
+    }
     const sim = simulateDay({
       bankrollCents: bankrollCents ?? day.bankroll_cents,
       perRaceMinCents: perRaceMinCents ?? day.per_race_min_cents,
@@ -60,6 +93,8 @@ export function runTemplate(db, templateName, {
   }
   const params = {
     template: templateName, engineVersion: ENGINE_VERSION, bankrollCents, perRaceMinCents, startingBankrollCents,
+    applyChartScratchesBeforeGeneration: Boolean(applyChartScratchesBeforeGeneration),
+    scratchesApplied: applyChartScratchesBeforeGeneration ? scratchesApplied : 0,
     correlationId, days: rows.length,
   };
   const { buckets } = summarizeRun(rows, { startingBankrollCents });
@@ -84,12 +119,17 @@ export function runTemplate(db, templateName, {
   // day's P/L. The per-ticket detail lives in simulation_results and is
   // reproducible - the engine and grader are pure.
   traceLog.info('simulation_run', {
-    correlationId, runId, template: templateName, params, buckets: summary.buckets,
+    correlationId, runId, template: templateName, params,
+    applyChartScratchesBeforeGeneration: params.applyChartScratchesBeforeGeneration,
+    buckets: summary.buckets,
     days: rows.map((r) => ({ raceDayId: r.raceDayId, date: r.date, track: r.track, completeness: r.completeness, plCents: r.plCents })),
   });
-  log.info('simulation_run', { correlationId, runId, template: templateName, days: rows.length });
+  log.info('simulation_run', { correlationId, runId, template: templateName, days: rows.length, applyChartScratchesBeforeGeneration: params.applyChartScratchesBeforeGeneration });
   return runId;
 }
+
+/** The mode label the UI and the compare grouping use (D50). */
+export const scratchMode = (applied) => (applied ? 'chart_scratches_applied' : 'as_generated');
 
 /**
  * One run read back. Soft-deleted days drop out (invariant 12) and the
@@ -118,9 +158,12 @@ function readRun(db, runId, { withDays = true } = {}) {
     };
   }).sort((a, b) => a.date.localeCompare(b.date) || a.track.localeCompare(b.track) || a.raceDayId - b.raceDayId);
   const { buckets } = summarizeRun(days, { startingBankrollCents: params.startingBankrollCents ?? null });
+  const applied = Boolean(params.applyChartScratchesBeforeGeneration);
   const out = {
     runId: run.id, template: run.template,
     simulationOnly: Boolean(TEMPLATES[run.template]?.simulationOnly),
+    applyChartScratchesBeforeGeneration: applied, mode: scratchMode(applied),
+    scratchesApplied: params.scratchesApplied ?? 0,
     params, startedAt: run.started_at, finishedAt: run.finished_at,
     daysInRun: params.days ?? rows.length, buckets,
   };
@@ -150,6 +193,13 @@ simulateRouter.post('/simulations', (req, res) => {
     if (error) return res.status(400).json({ error });
     opts[k] = value;
   }
+  // D50: the at-the-window mode. A boolean or absent; anything else is a
+  // caller error - the two modes must never be confused.
+  const apply = req.body?.applyChartScratchesBeforeGeneration;
+  if (apply != null && typeof apply !== 'boolean') {
+    return res.status(400).json({ error: 'applyChartScratchesBeforeGeneration must be true or false.' });
+  }
+  opts.applyChartScratchesBeforeGeneration = apply === true;
   const runs = names.map((n) => readRun(db, runTemplate(db, n, opts)));
   res.status(201).json({ correlationId, runs });
 });
@@ -161,17 +211,22 @@ simulateRouter.get('/simulations', (_req, res) => {
   res.json({ runs: ids.map((id) => readRun(db, id, { withDays: false })) });
 });
 
-// The compare surface: the latest run per template, side by side.
+// The compare surface: the latest run per (template, scratch mode), side by
+// side. D50: the two modes are different experiments (a card built on the
+// program's entries vs one built at the window) and are never pooled - a
+// template that ran in both modes gets two rows.
 simulateRouter.get('/simulations/compare', (_req, res) => {
   const db = getDb();
   const latest = db.prepare(`
-    SELECT MAX(sr.id) AS id, st.name AS template FROM simulation_runs sr
+    SELECT MAX(sr.id) AS id, st.name AS template,
+           COALESCE(json_extract(sr.params, '$.applyChartScratchesBeforeGeneration'), 0) AS applied
+    FROM simulation_runs sr
     JOIN strategy_templates st ON st.id = sr.strategy_template_id
-    GROUP BY sr.strategy_template_id
+    GROUP BY sr.strategy_template_id, applied
   `).all();
   const order = Object.keys(TEMPLATES);
   const templates = latest
-    .sort((a, b) => order.indexOf(a.template) - order.indexOf(b.template))
+    .sort((a, b) => (order.indexOf(a.template) - order.indexOf(b.template)) || (a.applied - b.applied))
     .map((r) => readRun(db, r.id, { withDays: false }));
   res.json({ templates });
 });

@@ -53,13 +53,15 @@ const synthDay = {
 const synthChart = {
   track: 'SANTA ANITA', date: '2026-08-30',
   races: [
+    // D50: Beta Cruiser is a CHART scratch (name only, resolved to #2 at
+    // save exactly as grading does). Lean as generated boxes 1-2 and gets a
+    // partial refund; built at the window it never names #2.
     { number: 1, results: [
       { programNumber: '1', horseName: 'Alpha Marker', finishPosition: 1, winCents: 600, placeCents: 340, showCents: 280 },
       { programNumber: '3', horseName: 'Gamma Ray Burst', finishPosition: 2, winCents: null, placeCents: 700, showCents: 420 },
-      { programNumber: '2', horseName: 'Beta Cruiser', finishPosition: 3, winCents: null, placeCents: null, showCents: 300 },
     ], exotics: [
       { betType: 'exacta', baseCents: 100, combination: '1-3', payoutCents: 1980, poolCents: 100000 },
-    ], scratches: [] },
+    ], scratches: [{ horseName: 'Beta Cruiser', reason: 'Veterinarian' }] },
     { number: 2, results: [
       { programNumber: '2', horseName: 'Epsilon Star', finishPosition: 1, winCents: 1200, placeCents: 600, showCents: 440 },
       { programNumber: '1', horseName: 'Delta Blues', finishPosition: 2, winCents: null, placeCents: 320, showCents: 280 },
@@ -215,6 +217,46 @@ try {
   check('structure-only on the PROGRAM_ONLY day: single-race tickets only, still a whole day',
     soB.ticketDetails.length > 0 && soB.ticketDetails.every((t) => t.races.length === 1) && soB.costCents === 5000);
 
+  console.log('-- D50: chart scratches applied before generation (the at-the-window baseline) --');
+  // The default mode is what every check above measured: identical to the
+  // live card, refunds included. Day B's chart scratches #2 (a name-only
+  // chart scratch resolved at save), so lean as generated boxes 1-2 and
+  // gets a partial refund there.
+  check('default mode: runs record applyChartScratchesBeforeGeneration=false, mode as_generated, and lean as generated carries the refund on day B (the box named the chart-scratched #2)',
+    runBody.runs.every((r) => r.applyChartScratchesBeforeGeneration === false && r.mode === 'as_generated') &&
+    (leanBdet.outcomes.refund ?? 0) + (leanBdet.outcomes.partial ?? 0) > 0 && leanBdet.ticketDetails.some((t) => t.races[0] === 1 && t.legs.flat().includes('2')),
+    JSON.stringify(leanBdet.outcomes));
+  const scratchRun = await (await jpost('/api/simulations', { templates: ['lean'], applyChartScratchesBeforeGeneration: true })).json();
+  const sLean = scratchRun.runs[0];
+  check('scratch mode: the run records the flag, mode chart_scratches_applied, a scratch count, and still covers exactly the two days with results (day C skipped either way)',
+    sLean.applyChartScratchesBeforeGeneration === true && sLean.mode === 'chart_scratches_applied' && sLean.scratchesApplied > 0 && sLean.daysInRun === 2 && sLean.days.length === 2,
+    JSON.stringify({ flag: sLean.applyChartScratchesBeforeGeneration, mode: sLean.mode, n: sLean.scratchesApplied, days: sLean.daysInRun }));
+  const sB = await jget(`/api/simulations/${sLean.runId}/days/${dayB.id}`);
+  check('scratch mode on day B: no ticket names the chart-scratched #2, zero refunds / partials at grading, the day is still the whole bankroll, and the ticket set differs from the as-generated one',
+    !sB.ticketDetails.some((t) => t.races.includes(1) && t.legs.flat().includes('2')) && !sB.outcomes.refund && !sB.outcomes.partial &&
+    sB.costCents === 5000 && ticketKey(sB) !== ticketKey(leanBdet),
+    JSON.stringify({ outcomes: sB.outcomes, tickets: sB.ticketDetails.map((t) => t.betType + ':' + t.legs.flat().join('/')) }));
+  // Day A: the REAL chart's scratches (R2 x4, R5, R8, R10 x2), resolved by name against the real program's entries.
+  const chartScratched = new Map();
+  for (const r of chart.races) for (const s of r.scratches ?? []) {
+    const e = prog.races.find((x) => x.number === r.number)?.entries.find((x) => x.horseName.toUpperCase() === s.horseName.toUpperCase());
+    if (e) chartScratched.set(`${r.number}|${e.programNumber}`, s.horseName);
+  }
+  const sA = await jget(`/api/simulations/${sLean.runId}/days/${dayA.id}`);
+  const namesScratched = (det) => det.ticketDetails.flatMap((t) => t.races.flatMap((race, i) => (t.legs[i] ?? []).filter((p) => chartScratched.has(`${race}|${p}`)).map((p) => `R${race} #${p}`)));
+  check(`scratch mode on the real day: the chart's ${chartScratched.size} scratches resolve to program numbers, no ticket names any of them, zero refunds / partials at grading`,
+    chartScratched.size >= 6 && namesScratched(sA).length === 0 && !sA.outcomes.refund && !sA.outcomes.partial && sA.ticketDetails.length > 0,
+    JSON.stringify({ named: namesScratched(sA), outcomes: sA.outcomes }));
+  check('the stored day is untouched: the default-mode identity with the live card still holds on a fresh as-generated run after the scratch run',
+    (await (await jpost('/api/simulations', { templates: ['lean'] })).json()).runs[0].days.find((d) => d.raceDayId === dayA.id).plCents === liveA1.summary.plCents);
+  check('a non-boolean applyChartScratchesBeforeGeneration -> 400', (await jpost('/api/simulations', { applyChartScratchesBeforeGeneration: 'yes' })).status === 400);
+  const cmpModes = await jget('/api/simulations/compare');
+  check('compare groups by (template, mode): lean has TWO rows - as_generated and chart_scratches_applied - never pooled; every other template one row',
+    cmpModes.templates.filter((t) => t.template === 'lean').map((t) => t.mode).sort().join() === 'as_generated,chart_scratches_applied' &&
+    cmpModes.templates.filter((t) => t.template === 'lean' && t.mode === 'chart_scratches_applied')[0].runId === sLean.runId &&
+    cmpModes.templates.length === names.length + 1 && names.filter((n) => n !== 'lean').every((n) => cmpModes.templates.filter((t) => t.template === n).length === 1),
+    JSON.stringify(cmpModes.templates.map((t) => [t.template, t.mode, t.runId])));
+
   console.log('-- overrides, listing, compare, append-only --');
   const over = await (await jpost('/api/simulations', { templates: ['lean'], bankrollCents: 10000, startingBankrollCents: 50000 })).json();
   check('bankroll override applies to every day; starting bankroll shapes the series',
@@ -224,11 +266,12 @@ try {
   check('unknown template -> 400', (await jpost('/api/simulations', { templates: ['nope'] })).status === 400);
   check('bad bankroll -> 400', (await jpost('/api/simulations', { bankrollCents: -5 })).status === 400);
   const list = await jget('/api/simulations');
-  check('GET /simulations: every run, newest first', list.runs.length === names.length + 1 && list.runs[0].runId === over.runs[0].runId);
+  check('GET /simulations: every run, newest first', list.runs.length === names.length + 3 && list.runs[0].runId === over.runs[0].runId);
   const cmp = await jget('/api/simulations/compare');
-  check('compare: the latest run per template - lean is the override run, the rest the first pass',
-    cmp.templates.length === names.length && cmp.templates.map((t) => t.template).join(',') === names.join(',') &&
-    cmp.templates.find((t) => t.template === 'lean').runId === over.runs[0].runId &&
+  const cmpAsGen = cmp.templates.filter((t) => t.mode === 'as_generated');
+  check('compare: the latest run per (template, mode) - as-generated lean is the override run, the rest the first pass, the scratch-mode lean row stays beside it',
+    cmpAsGen.length === names.length && cmpAsGen.map((t) => t.template).join(',') === names.join(',') &&
+    cmpAsGen.find((t) => t.template === 'lean').runId === over.runs[0].runId && cmp.templates.length === names.length + 1 &&
     cmp.templates.every((t) => Array.isArray(t.buckets) && !('days' in t)));
   check('runs are append-only: the earlier lean run still reads back unchanged',
     (await jget(`/api/simulations/${lean.runId}`)).buckets[0].plCents === lean.buckets[0].plCents && over.runs[0].runId > lean.runId);
@@ -255,6 +298,10 @@ try {
   check('decision-trace: one simulation_run event per run under the POST correlation id, naming template, buckets and days',
     simEvents.length === names.length && simEvents.every((e) => runBody.runs.some((r) => r.runId === e.runId && r.template === e.template) &&
       Array.isArray(e.buckets) && e.days.length === 2), `events=${simEvents.length}`);
+  const scratchEvent = traceLines.find((l) => l.event === 'simulation_run' && l.runId === sLean.runId);
+  check('decision-trace: the scratch-mode run carries applyChartScratchesBeforeGeneration=true (top level + params) and the default runs false',
+    scratchEvent?.applyChartScratchesBeforeGeneration === true && scratchEvent.params.applyChartScratchesBeforeGeneration === true && scratchEvent.params.scratchesApplied > 0 &&
+    simEvents.every((e) => e.applyChartScratchesBeforeGeneration === false), JSON.stringify(scratchEvent?.params));
 } finally {
   server.kill();
   await new Promise((rr) => setTimeout(rr, 300));
