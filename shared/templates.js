@@ -24,6 +24,9 @@ export const RULE_LAYERS = {
   midPriceCoverage: 'structure',
   longshotOnTop: 'structure',
   allocationCurve: 'structure',
+  exoticTickets: 'structure',   // D48: exacta / box / trifecta construction on or off
+  winStake: 'structure',        // D48: 'share' (the branch's share of the allocation) or 'minimum'
+  hedgeBoxDepth: 'structure',   // D48: horses in the split exacta box (2 = lean)
   coverageAdds: 'signal',   // fires off 2+-source counts
   parlays: 'signal',        // legs are picked BY the consensus
 };
@@ -52,6 +55,31 @@ export const TEMPLATES = {
   'no-place-money': {
     description: 'SIMULATION ONLY - disables invariant 1 to measure what the mandatory place-money rule earns. Live cards refuse this template.',
     rules: { placeMoneyRule: false },
+    simulationOnly: true,
+  },
+  // ---- D48: templates that vary the rules which actually fire on a
+  // PROGRAM_ONLY day (hedge_cut boxes, mid-price exactas, allocation).
+  // Trace analysis of the 70-day corpus (2026-09-02) showed the six above
+  // tie lean to the penny there: fade needs an algorithm order, chaos
+  // boxes need a CHAOS race, and neither exists on a backfilled day.
+  'exacta-primary': {
+    description: 'SIMULATION ONLY - the exacta strategy without its portfolio costume: hedge_cut boxes and mid-price exactas stay, every win ticket shrinks to the per-race minimum, place-money rule off (it keys off win stake).',
+    rules: { winStake: 'minimum', placeMoneyRule: false },
+    simulationOnly: true,
+  },
+  'no-exotics': {
+    description: 'SIMULATION ONLY - the inverse: WPS only. No exacta boxes, no mid-price exactas, no trifecta boxes; the freed allocation goes to the win ticket (place money still rides at 8-1+).',
+    rules: { exoticTickets: false, midPriceCoverage: false },
+    simulationOnly: true,
+  },
+  'box-depth-3': {
+    description: 'SIMULATION ONLY - coverage vs concentration: the split exacta box takes the top THREE program ranks instead of two, sized inside the same per-race allocation.',
+    rules: { hedgeBoxDepth: 3 },
+    simulationOnly: true,
+  },
+  'best-bet-weighted': {
+    description: 'SIMULATION ONLY - allocation keyed to the Bottom Line Best Bet flag: the Best Bet race takes the heavy weight, every other race flat; a day with no Best Bet is flat throughout.',
+    rules: { allocationCurve: 'best-bet' },
     simulationOnly: true,
   },
 };

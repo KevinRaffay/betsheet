@@ -44,7 +44,8 @@ const synthDay = {
       synthEntry('3', 'Gamma Ray Burst', '8/1', 8, 3),
     ] },
     { number: 2, raceType: 'ALLOWANCE', conditions: 'FOR FOUR YEAR OLDS AND UPWARD', entries: [
-      synthEntry('1', 'Delta Blues', '3/1', 3, 1), synthEntry('2', 'Epsilon Star', '5/1', 5, 2),
+      // Delta Blues is the program's Best Bet: the D48 best-bet curve keys on it (a day with no Best Bet is flat = lean here).
+      { ...synthEntry('1', 'Delta Blues', '3/1', 3, 1), bestBet: true }, synthEntry('2', 'Epsilon Star', '5/1', 5, 2),
       synthEntry('3', 'Zeta Function', '10/1', 10, 3),
     ] },
   ],
@@ -192,6 +193,16 @@ try {
     leanDet.ticketDetails.every((t) => Array.isArray(t.ruleTags) && ['win', 'refund', 'partial', 'loss'].includes(t.outcome)) &&
     leanDet.ticketDetails.some((t) => t.betType === 'place') &&
     noPlace.simulationOnly === true && !noPlaceDet.ticketDetails.some((t) => t.betType === 'place'));
+  // D48: the four program-rank templates run in simulation (they are refused live) and DIVERGE from lean on the PROGRAM_ONLY day.
+  const ticketKey = (det) => JSON.stringify(det.ticketDetails.map((t) => [t.betType, t.races, t.legs, t.stakeCents, t.costCents]));
+  const leanBdet = await jget(`/api/simulations/${lean.runId}/days/${dayB.id}`);
+  const d48 = {};
+  for (const n of ['exacta-primary', 'no-exotics', 'box-depth-3', 'best-bet-weighted']) d48[n] = await jget(`/api/simulations/${runBody.runs.find((r) => r.template === n).runId}/days/${dayB.id}`);
+  check('D48 templates all ran (simulation allows what the live endpoint refuses) and every one differs from lean on the PROGRAM_ONLY day',
+    Object.values(d48).every((det) => det.ticketDetails.length > 0) && Object.entries(d48).every(([, det]) => ticketKey(det) !== ticketKey(leanBdet)),
+    JSON.stringify(Object.fromEntries(Object.entries(d48).map(([n, det]) => [n, det.ticketDetails.map((t) => t.betType + ':' + t.stakeCents)]))));
+  check('D48 no-exotics on the PROGRAM_ONLY day: win / place only; exacta-primary: win tickets at the per-race minimum and no place ticket',
+    d48['no-exotics'].ticketDetails.every((t) => ['win', 'place'].includes(t.betType)) && d48['exacta-primary'].ticketDetails.filter((t) => t.betType === 'win').every((t) => t.stakeCents === 500) && !d48['exacta-primary'].ticketDetails.some((t) => t.betType === 'place'));
   const soB = await jget(`/api/simulations/${runBody.runs.find((r) => r.template === 'structure-only').runId}/days/${dayB.id}`);
   check('structure-only on the PROGRAM_ONLY day: single-race tickets only, still a whole day',
     soB.ticketDetails.length > 0 && soB.ticketDetails.every((t) => t.races.length === 1) && soB.costCents === 5000);

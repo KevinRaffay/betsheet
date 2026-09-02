@@ -15,12 +15,13 @@ import fs from 'node:fs';
 import os from 'node:os';
 import path from 'node:path';
 import { fileURLToPath, URL } from 'node:url';
+import crypto from 'node:crypto';
 
 const ROOT = fileURLToPath(new URL('../', import.meta.url));
 const tmp = fs.mkdtempSync(path.join(os.tmpdir(), 'betsheet-templcheck-'));
 process.env.BETSHEET_LOG_DIR = path.join(tmp, 'unit-logs');
 
-const { DEFAULT_RULES, generateCard } = await import('../shared/card-engine.js');
+const { DEFAULT_RULES, generateCard, ENGINE_VERSION } = await import('../shared/card-engine.js');
 const { TEMPLATES, RULE_LAYERS, resolveTemplate, templateLayers, listTemplates } = await import('../shared/templates.js');
 const { classifyDay } = await import('../shared/classification.js');
 const { BET } = await import('../shared/betmath.js');
@@ -54,8 +55,8 @@ check('listTemplates carries name/description/rules/layers/simulationOnly for al
   listTemplates().length === Object.keys(TEMPLATES).length &&
   listTemplates().every((t) => t.name && t.description && t.rules && Array.isArray(t.layers) &&
     typeof t.simulationOnly === 'boolean'));
-check('exactly one template is simulation-only (the invariant-1 breaker)',
-  listTemplates().filter((t) => t.simulationOnly).map((t) => t.name).join(',') === 'no-place-money');
+check('the simulation-only set: the invariant-1 breaker plus the four D48 program-rank templates',
+  listTemplates().filter((t) => t.simulationOnly).map((t) => t.name).join(',') === 'no-place-money,exacta-primary,no-exotics,box-depth-3,best-bet-weighted');
 
 // ---------- the real day under each template, pure ----------
 
@@ -187,6 +188,80 @@ check('no-chaos-box: the box is gone, anchor + longshot exacta stay',
       c.tickets.some((t) => t.betType === 'win') && total(c) === 10000;
   })());
 
+// ---------- D48: the program-rank templates on a PROGRAM_ONLY day ----------
+// The same real program with NO external picks: every race classifies SPLIT
+// (capped), completeness PROGRAM_ONLY - the bucket the whole backfill
+// corpus lives in. The six D18 templates tie lean to the penny here (that
+// tie is documented-correct); each D48 template MUST differ.
+console.log('-- D48: program-rank templates on the PROGRAM_ONLY day --');
+const digestOf = (c) => crypto.createHash('sha256').update(JSON.stringify(c.tickets.map((t) => [t.raceNumbers, t.betType, t.legs, t.stakeCents, t.costCents]))).digest('hex').slice(0, 16);
+const clsPO = classifyDay(prog.races.map((r) => r.number), entriesByRace, {});
+const byNPO = Object.fromEntries(clsPO.map((c) => [c.number, c]));
+const racesPO = prog.races.map((r) => ({ number: r.number, race_type: r.raceType, conditions: r.conditions, wager_menu: r.wagerMenu, entries: entriesByRace[r.number], classification: byNPO[r.number] }));
+const genPO = (name, extra = {}) => generateCard({ bankrollCents: 20000, perRaceMinCents: 500, races: racesPO, sourcesUsed: [], rules: { ...TEMPLATES[name].rules, ...extra }, template: name });
+const spentIn = (c, n) => c.tickets.filter((t) => t.raceNumbers.length === 1 && t.raceNumbers[0] === n).reduce((a, t) => a + t.costCents, 0);
+const leanPO = genPO('lean');
+check('no engine version bump: ENGINE_VERSION is still lean-1.1 and lean is byte-identical to the pre-D48 engine on the FULL day (30 tickets) and the PROGRAM_ONLY day (25 tickets) - frozen digests',
+  ENGINE_VERSION === 'lean-1.1' && digestOf(lean) === '0f6269f62f8349c3' && digestOf(leanPO) === 'e1d7df85f7a0d0bd' && leanPO.completeness === 'PROGRAM_ONLY',
+  `${ENGINE_VERSION} ${digestOf(lean)} ${digestOf(leanPO)}`);
+const NEW = ['exacta-primary', 'no-exotics', 'box-depth-3', 'best-bet-weighted'];
+const cards = Object.fromEntries(NEW.map((n) => [n, genPO(n)]));
+check('the six D18 templates tie lean on the PROGRAM_ONLY day (documented-correct: nothing they toggle fires there)',
+  ['spread', 'no-fade', 'no-chaos-box', 'structure-only'].every((n) => digestOf(genPO(n)) === digestOf(leanPO)));
+for (const n of NEW) {
+  check(`${n}: a DIFFERENT ticket set from lean on the PROGRAM_ONLY day, still exactly the bankroll`, digestOf(cards[n]) !== digestOf(leanPO) && total(cards[n]) === 20000, `${digestOf(cards[n])} total ${total(cards[n])}`);
+}
+check('RULE_LAYERS: all four are structure-layer', NEW.every((n) => JSON.stringify(templateLayers(n)) === '["structure"]'));
+const ep = cards['exacta-primary'];
+check('exacta-primary: no place tickets; every win ticket at the per-race minimum ($5); boxes and mid-price exactas stay',
+  !ep.tickets.some((t) => t.betType === 'place') && ep.tickets.filter((t) => t.betType === 'win').every((t) => t.stakeCents === 500) &&
+  ep.tickets.filter((t) => t.betType === 'exacta_box').length === leanPO.tickets.filter((t) => t.betType === 'exacta_box').length && ep.tickets.some((t) => t.ruleTags.includes('mid_price_coverage')),
+  JSON.stringify(ep.tickets.filter((t) => t.betType === 'win').map((t) => t.stakeCents)));
+check('exacta-primary: the balancer steps the box, never the held win (remainder_distributed names the box ticket; held races without a box are skipped as stake_held_by_template)', (() => {
+  const rem = ep.trace.find((e) => e.event === 'remainder_distributed');
+  return rem && rem.races.every((r) => ep.tickets.find((t) => t.sequence === r.ticket)?.betType === 'exacta_box') && rem.skipped.some((s) => s.reason === 'stake_held_by_template');
+})());
+const ne = cards['no-exotics'];
+check('no-exotics: zero exacta / exacta_box / trifecta_box tickets; win tickets carry the allocation; place-money pairs still ride at 8-1+',
+  !ne.tickets.some((t) => ['exacta', 'exacta_box', 'trifecta_box'].includes(t.betType)) && ne.tickets.some((t) => t.betType === 'place' && t.ruleTags.includes('place_money_rule')) &&
+  ne.allocations.every((a) => spentIn(ne, a.race) === a.amountCents), JSON.stringify(ne.tickets.map((t) => t.betType)));
+const b3 = cards['box-depth-3'];
+check('box-depth-3: every split exacta box takes three program ranks (6 combos) and every hedge_cut race lands on its allocation (D36 tolerance: exact after balancing)',
+  b3.tickets.filter((t) => t.betType === 'exacta_box').every((t) => t.legs[0].length === 3 && t.costCents === t.stakeCents * 6) && b3.tickets.some((t) => t.betType === 'exacta_box') &&
+  b3.allocations.filter((a) => b3.trace.some((e) => e.event === 'rule_fired' && e.rule === 'hedge_cut' && e.race === a.race)).every((a) => spentIn(b3, a.race) === a.amountCents),
+  JSON.stringify(b3.allocations.map((a) => [a.race, a.amountCents, spentIn(b3, a.race)])));
+const bb = cards['best-bet-weighted'];
+const bbRace = prog.races.find((r) => r.entries.some((e) => e.bestBet)).number;
+check(`best-bet-weighted: the Best Bet race (R${bbRace}) takes the heavy weight (double any other race), allocations sum to the bankroll, best_bet_weight traced`, (() => {
+  const a = Object.fromEntries(bb.allocations.map((x) => [x.race, x.amountCents]));
+  const others = bb.allocations.filter((x) => x.race !== bbRace && x.confidence !== 'GUESS').map((x) => x.amountCents);
+  return a[bbRace] >= 2 * Math.max(...others) && bb.allocations.reduce((s, x) => s + x.amountCents, 0) === 20000 && bb.trace.some((e) => e.event === 'rule_fired' && e.rule === 'best_bet_weight' && e.race === bbRace);
+})(), JSON.stringify(bb.allocations.map((x) => [x.race, x.amountCents])));
+const noBB = generateCard({ bankrollCents: 20000, perRaceMinCents: 500, races: racesPO.map((r) => ({ ...r, entries: r.entries.map((e) => ({ ...e, best_bet: 0 })) })), sourcesUsed: [], rules: TEMPLATES['best-bet-weighted'].rules, template: 'best-bet-weighted' });
+check('best-bet-weighted with no Best Bet on the day: flat (every non-guess race equal, one race carrying the rounding drift), best_bet_weight suppressed with no_best_bet', (() => {
+  const amts = noBB.allocations.filter((x) => x.confidence !== 'GUESS').map((x) => x.amountCents).sort((a, b) => a - b);
+  const common = amts[Math.floor(amts.length / 2)];
+  return amts.filter((a) => a !== common).length <= 1 && Math.max(...amts) - Math.min(...amts) < 100 * amts.length && noBB.trace.some((e) => e.event === 'rule_suppressed' && e.rule === 'best_bet_weight' && e.reason === 'no_best_bet');
+})());
+// rule_suppressed: "never fired" and "never evaluated" are now different things.
+const sups = (c, rule, reason) => c.trace.filter((e) => e.event === 'rule_suppressed' && e.rule === rule && (reason == null || e.reason === reason));
+check('rule_suppressed on the PROGRAM_ONLY day: fade declines with no_algo_order on EVERY race (10), chaos box declines per race (10) and once for the day (no_chaos_race)',
+  sups(leanPO, 'fade_favorite_price', 'no_algo_order').length === 10 && sups(leanPO, 'chaos_trifecta_box', 'not_chaos_classification').length === 10 && sups(leanPO, 'chaos_trifecta_box', 'no_chaos_race').length === 1,
+  JSON.stringify({ fade: sups(leanPO, 'fade_favorite_price').map((e) => e.reason), chaos: sups(leanPO, 'chaos_trifecta_box').length }));
+check('rule_suppressed: place money declines per win ticket below 8-1 (below_odds_threshold with the ml); mid-price declines where no mid-priced horse remains; hedge_cut answers on every race (fired or declined)',
+  sups(leanPO, 'place_money_rule', 'below_odds_threshold').length > 0 && sups(leanPO, 'place_money_rule', 'below_odds_threshold').every((e) => typeof e.ml === 'number' && e.ml < 8) &&
+  sups(leanPO, 'mid_price_coverage', 'no_mid_priced_horse').length > 0 &&
+  racesPO.every((r) => leanPO.trace.some((e) => e.rule === 'hedge_cut' && e.race === r.number)));
+check('rule_suppressed: a disabled rule says disabled_by_template (no-fade on this day; place money under exacta-primary; the D18 no-place-money reason is now machine-readable)',
+  sups(genPO('no-fade'), 'fade_favorite_price', 'disabled_by_template').length === 10 && sups(ep, 'place_money_rule', 'disabled_by_template').length === 1 && sups(genPO('no-place-money'), 'place_money_rule', 'disabled_by_template').length === 1);
+check('rule_suppressed on the FULL day: fade fires on the odds-on unanimous favorite and declines above_odds_on / not_unanimous elsewhere; every reason is a machine token',
+  lean.trace.some((e) => e.event === 'rule_fired' && e.rule === 'fade_favorite_price') && sups(lean, 'fade_favorite_price').every((e) => ['above_odds_on', 'not_unanimous', 'no_algo_order', 'no_morning_line'].includes(e.reason)) &&
+  lean.trace.filter((e) => e.event === 'rule_suppressed' && e.rule !== 'win_bet').every((e) => /^[a-z_]+$/.test(e.reason)),
+  JSON.stringify([...new Set(lean.trace.filter((e) => e.event === 'rule_suppressed').map((e) => e.rule + ':' + e.reason))]));
+check('no-exotics traces why each exotic is missing (no_exotic_tickets on the box, the mid-price exacta and the coverage adds)',
+  sups(ne, 'split_exacta_box', 'no_exotic_tickets').length > 0 && sups(ne, 'mid_price_coverage', 'no_exotic_tickets').length === 8 && sups(ne, 'two_source_coverage', 'no_exotic_tickets').length > 0);
+
+
 // ---------- server round-trip ----------
 
 console.log('-- server round-trip --');
@@ -254,7 +329,8 @@ try {
   check('unknown template -> 400 with the valid list', unknown.status === 400 &&
     /Templates:/.test((await unknown.json()).error));
   const simOnly = await jpost(`/api/race-days/${day.id}/cards`, { template: 'no-place-money' });
-  check('simulation-only template on the LIVE endpoint -> 422 (invariant 1)', simOnly.status === 422);
+  const simOnly48 = await jpost(`/api/race-days/${day.id}/cards`, { template: 'exacta-primary' });
+  check('simulation-only templates on the LIVE endpoint -> 422 (invariant 1; the D48 four ride the same gate)', simOnly.status === 422 && simOnly48.status === 422);
   const rawOff = await jpost(`/api/race-days/${day.id}/cards`, { rules: { placeMoneyRule: false } });
   check('raw placeMoneyRule:false override -> 422 (invariant 1 holds at the API)', rawOff.status === 422);
 
