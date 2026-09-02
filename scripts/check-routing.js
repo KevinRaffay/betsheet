@@ -36,6 +36,12 @@ try {
   check('card route parses positive id', parseRoute('/card/23').id === 23);
   check('malformed route falls back to list', parseRoute('/day/nope').name === 'list');
   check('unknown route falls back to list', parseRoute('/not-a-route').name === 'list');
+  check('replay route parses (D55)', parseRoute('/replay').name === 'replay');
+  check('replay standing route parses', parseRoute('/replay/standing').name === 'replayStanding');
+  check('replay day route parses positive id', parseRoute('/replay/day/9').name === 'replayDay' && parseRoute('/replay/day/9').id === 9);
+  check('replay path formats round-trip', pathForView({ name: 'replay' }) === '/replay' &&
+    pathForView({ name: 'replayStanding' }) === '/replay/standing' &&
+    pathForView({ name: 'replayDay', id: 9 }) === '/replay/day/9');
 
   let ready = false;
   for (let attempt = 0; attempt < 50 && !ready; attempt++) {
@@ -44,7 +50,7 @@ try {
   }
   check('server boots on isolated port', ready);
 
-  for (const route of ['/', '/new', '/pl', '/simulate', '/day/1', '/card/1']) {
+  for (const route of ['/', '/new', '/pl', '/simulate', '/day/1', '/card/1', '/replay', '/replay/standing', '/replay/day/1']) {
     const response = await fetch(base + route);
     const text = await response.text();
     check(`${route} serves the client shell`, response.ok && text.includes('<div id="root">'));

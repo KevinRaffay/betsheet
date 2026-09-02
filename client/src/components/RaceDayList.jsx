@@ -1,7 +1,7 @@
 import React, { useEffect, useState } from 'react';
 import { listRaceDays, resetAppApi, restoreRaceDay } from '../api.js';
 
-export default function RaceDayList({ onOpen, onNew, onPL, onSim, onBackfill, onDistribution, refreshKey }) {
+export default function RaceDayList({ onOpen, onNew, onPL, onSim, onBackfill, onDistribution, onReplay, refreshKey }) {
   const [days, setDays] = useState(null);
   const [error, setError] = useState(null);
   const [showDeleted, setShowDeleted] = useState(false);
@@ -50,6 +50,7 @@ export default function RaceDayList({ onOpen, onNew, onPL, onSim, onBackfill, on
           {!showDeleted && <button className="btn" onClick={onSim}>Simulate</button>}
           {!showDeleted && <button className="btn" onClick={onDistribution}>Distributions</button>}
           {!showDeleted && <button className="btn" onClick={onBackfill}>Backfill queue</button>}
+          {!showDeleted && <button className="btn" onClick={onReplay}>Replay</button>}
           <button className="btn" onClick={() => setShowDeleted((v) => !v)}>
             {showDeleted ? 'Show active' : 'Show deleted'}
           </button>
