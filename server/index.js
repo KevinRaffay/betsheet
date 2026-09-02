@@ -11,6 +11,7 @@ import { getLogger } from './logging.js';
 import { ingestRouter } from './ingest.js';
 import { consensusRouter } from './consensus.js';
 import { cardsRouter } from './cards.js';
+import { humanCardsRouter } from './human-cards.js';
 import { resetRouter } from './reset.js';
 import { resultsRouter } from './results.js';
 import { gradingRouter } from './grading.js';
@@ -59,6 +60,7 @@ app.get('/api/health', (_req, res) => {
 app.use('/api', ingestRouter);
 app.use('/api', consensusRouter);
 app.use('/api', cardsRouter);
+app.use('/api', humanCardsRouter);
 app.use('/api', resetRouter);
 app.use('/api', resultsRouter);
 app.use('/api', gradingRouter);

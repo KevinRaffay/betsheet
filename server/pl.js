@@ -11,7 +11,7 @@ import { getDb } from './db.js';
 
 export const plRouter = express.Router();
 
-const BUCKET_ORDER = ['FULL', 'PARTIAL', 'PROGRAM_ONLY', 'ODDS_ONLY'];
+const BUCKET_ORDER = ['FULL', 'PARTIAL', 'PROGRAM_ONLY', 'ODDS_ONLY', 'HUMAN'];
 
 // The running view: per-bucket totals + every graded card as a row, plus
 // the cards still waiting on results. Deliberately NO overall total.
@@ -64,7 +64,7 @@ plRouter.get('/pl', (req, res) => {
     if (!byBucket.has(row.completeness)) {
       byBucket.set(row.completeness, {
         completeness: row.completeness, cards: 0, tickets: 0,
-        costCents: 0, returnedCents: 0, plCents: 0,
+        costCents: 0, returnedCents: 0, plCents: 0, bankrollCents: 0,
       });
     }
     const b = byBucket.get(row.completeness);
@@ -73,6 +73,7 @@ plRouter.get('/pl', (req, res) => {
     b.costCents += row.costCents;
     b.returnedCents += row.returnedCents;
     b.plCents += row.plCents;
+    b.bankrollCents += row.bankrollCents ?? 0;
   }
   const buckets = BUCKET_ORDER.filter((k) => byBucket.has(k)).map((k) => byBucket.get(k));
 

@@ -20,6 +20,12 @@ export function seedTemplates(db) {
     for (const t of listTemplates()) {
       upsert.run(t.name, t.description, JSON.stringify(t.rules));
     }
+    // D54: 'human' is a real strategy_templates row purely for FK integrity
+    // (every LEFT JOIN strategy_templates then resolves template:'human'
+    // with zero query changes) - deliberately NOT in shared/templates.js's
+    // TEMPLATES map, so it never appears in the live-generate dropdown,
+    // resolveTemplate(), or POST /api/simulations' "run every template."
+    upsert.run('human', 'Human-entered picks, replayed blind race by race (D54/D55). Not engine-generated or simulated.', '{}');
   });
   seed();
 }
