@@ -156,7 +156,8 @@ export const runSimulation = (body = {}) =>
     body: JSON.stringify(body),
   }).then(asJson);
 export const listSimulations = () => fetch('/api/simulations').then(asJson);
-export const getSimulationCompare = () => fetch('/api/simulations/compare').then(asJson);
+export const getSimulationCompare = (meet) =>
+  fetch(`/api/simulations/compare${meet && meet !== 'all' ? `?meet=${encodeURIComponent(meet)}` : ''}`).then(asJson);
 export const getSimulation = (runId) => fetch(`/api/simulations/${runId}`).then(asJson);
 export const getSimulationDay = (runId, dayId) =>
   fetch(`/api/simulations/${runId}/days/${dayId}`).then(asJson);
