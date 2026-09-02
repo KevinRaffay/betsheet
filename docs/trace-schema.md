@@ -35,7 +35,7 @@ engine event.
 
 | event | fields | meaning |
 | --- | --- | --- |
-| `inputs_snapshot` | `bankrollCents`, `perRaceMinCents`, `raceCount`, `entries[{race, entries}]`, `sourcesUsed`, `sourcesUnavailable`, `rules` | everything the run saw, first event (`seq` 0). `rules` is the full structure-layer toggle set after template overrides. |
+| `inputs_snapshot` | `bankrollCents`, `perRaceMinCents`, `raceCount`, `entries[{race, entries}]`, `sourcesUsed`, `sourcesUnavailable`, `template`, `rules` | everything the run saw, first event (`seq` 0). `template` is the strategy-template name (D18, null for direct engine calls); `rules` is the full resolved rule set after template + explicit overrides. |
 | `consensus_table` | `race`, `table` | the per-horse vote table the classification was computed from |
 | `race_classified` | `race`, `classification` (UNANIMOUS/SPLIT/CHAOS/GUESS), `externalSourceCount`, `cappedFromUnanimous`, `topVotes`, `contrarianFlags` | the signal-layer call and the votes behind it |
 | `completeness_decided` | `completeness` (FULL/PARTIAL/PROGRAM_ONLY), `externalSourcesPerRace` | the card's consensus-completeness bucket (invariant 13) |
@@ -69,7 +69,7 @@ One self-contained JSON object per card:
 | section | contents |
 | --- | --- |
 | `export` | `schema` (`betsheet.card-trace-export`), `schemaVersion`, `exportedAt`, `docs` |
-| `card` | id, cardNumber, variant, bankrollCents, perRaceMinCents, consensusCompleteness, correlationId, createdAt |
+| `card` | id, cardNumber, variant, template (strategy-template name, D18), bankrollCents, perRaceMinCents, consensusCompleteness, correlationId, createdAt |
 | `raceDay` | id, track, date |
 | `sources` | `used` / `unavailable`, each `{name, ts, outcome, reason}` — latest attempt per source (invariant 11) |
 | `races` | per race: number, raceType, surface, distance, postTime, conditions, classification, contrarianFlags, wagerMenu, and full `entries` (programNumber, horseName, morningLine + decimal, programRank, bestBet, scratched) |

@@ -12,6 +12,7 @@
 import express from 'express';
 import { getDb } from './db.js';
 import { getLogger, newCorrelationId, resetLogs } from './logging.js';
+import { seedTemplates } from './templates.js';
 
 const log = getLogger('app');
 
@@ -35,6 +36,10 @@ export function resetApp(db) {
   });
   wipe();
   db.exec('VACUUM');
+
+  // The built-in strategy templates are code, not user data - a fresh era
+  // still has them (cards reference them by FK from the first generate).
+  seedTemplates(db);
 
   const logFilesRemoved = resetLogs();
 

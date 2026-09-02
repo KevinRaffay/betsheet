@@ -66,7 +66,7 @@ const isGuessRace = (race) => {
  *   classification: classifyDay() result for the race }]
  * Returns { completeness, allocations, tickets, warnings, trace }.
  */
-export function generateCard({ bankrollCents, perRaceMinCents, races, sourcesUsed = [], sourcesUnavailable = [], rules: ruleOverrides = {} }) {
+export function generateCard({ bankrollCents, perRaceMinCents, races, sourcesUsed = [], sourcesUnavailable = [], rules: ruleOverrides = {}, template = null }) {
   const rules = { ...DEFAULT_RULES, ...ruleOverrides };
   const trace = [];
   const warnings = [];
@@ -80,6 +80,7 @@ export function generateCard({ bankrollCents, perRaceMinCents, races, sourcesUse
     entries: races.map((r) => ({ race: r.number, entries: r.entries.filter((e) => !e.scratched).length })),
     sourcesUsed,
     sourcesUnavailable,
+    template,
     rules,
   });
 
@@ -115,7 +116,8 @@ export function generateCard({ bankrollCents, perRaceMinCents, races, sourcesUse
   // ----- allocation -----
   const guessRaces = races.filter(isGuessRace);
   const weighted = races.filter((r) => !isGuessRace(r));
-  const weightFor = (r) => BET.allocationWeights[r.classification.classification] ?? 1.5;
+  const curve = BET.allocationCurves[rules.allocationCurve] ?? BET.allocationCurves.lean;
+  const weightFor = (r) => curve[r.classification.classification] ?? 1.5;
   const guessTotal = guessRaces.length * perRaceMinCents;
   const pool = bankrollCents - guessTotal - reserve;
   const totalWeight = weighted.reduce((a, r) => a + weightFor(r), 0) || 1;
@@ -125,7 +127,7 @@ export function generateCard({ bankrollCents, perRaceMinCents, races, sourcesUse
   for (const race of weighted) {
     const raw = (pool * weightFor(race)) / totalWeight;
     const amount = Math.max(perRaceMinCents, Math.round(raw / 100) * 100);
-    allocations.push(makeAllocation(race, amount, race.classification.classification, `lean_weight_${weightFor(race)}`));
+    allocations.push(makeAllocation(race, amount, race.classification.classification, `${rules.allocationCurve}_weight_${weightFor(race)}`));
     allocated += amount;
   }
   for (const race of guessRaces) {
