@@ -344,6 +344,28 @@ check('real 08-30: the stored day is the merged document (98 entries, sheet as r
   realEntries === 98 && realDay.entries_source === 'both' && realDay.meet === 'DMR-2026-summer' && rankedEntries >= 10 && rankedEntries < 98, JSON.stringify({ realEntries, rankedEntries, src: realDay.entries_source, meet: realDay.meet }));
 dbR.close();
 
+// ---------- layer 5: every COMMITTED meet golden still matches a fresh parse ----------
+// The runner re-verifies a golden only when it reaches the meet's first day;
+// this runs the same comparison on every audited golden in the repo so a
+// parser change that would halt the next backfill fails here first.
+console.log('-- committed meet goldens (tests/fixtures/backfill) --');
+const goldenRoot = path.join(FIX, 'backfill');
+const { goldenDocument, parseArchivedDay } = await import('../server/backfill.js');
+const meets = fs.existsSync(goldenRoot) ? fs.readdirSync(goldenRoot).filter((m) => fs.existsSync(path.join(goldenRoot, m, 'day.expected.json'))) : [];
+check('at least one audited meet golden is committed', meets.length > 0, 'none found');
+for (const m of meets) {
+  const dir = path.join(goldenRoot, m);
+  const expected = readJson(path.join(dir, 'day.expected.json'));
+  const manifest = readJson(path.join(dir, 'manifest.json'));
+  const rawG = path.join(tmp, 'rawG-' + m);
+  const dayDirG = path.join(rawG, 'DMR', expected.date.replace(/-/g, ''));
+  fs.mkdirSync(dayDirG, { recursive: true });
+  for (const a of ['ml.pdf', 'program.pdf', 'results.html', 'manifest.json']) fs.copyFileSync(path.join(dir, a), path.join(dayDirG, a));
+  const parsed = await parseArchivedDay({ date: expected.date, meet: m, races: manifest.calendar?.races ?? null }, { rawDir: rawG });
+  const d = parsed.missing ? 'missing ' + parsed.missing.join() : firstDiff(goldenDocument({ date: expected.date, meet: m }, parsed), expected);
+  check(`golden ${m} (${expected.date}) matches a fresh parse of the artifacts beside it`, !d, d ?? '');
+}
+
 try { fs.rmSync(tmp, { recursive: true, force: true }); } catch { /* win locks */ }
 console.log('');
 if (failures) { console.error(`check-backfill: ${failures} failure(s)`); process.exit(1); }
