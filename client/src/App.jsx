@@ -112,6 +112,7 @@ export default function App() {
           <CardView
             cardId={view.id}
             onBack={() => navigate(view.dayId ? { name: 'day', id: view.dayId } : { name: 'list' })}
+            onDeleted={() => navigate(view.dayId ? { name: 'day', id: view.dayId } : { name: 'list' })}
           />
         )}
       </main>
