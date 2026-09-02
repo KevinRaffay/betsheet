@@ -173,7 +173,8 @@ Breaking any of these is a bug regardless of what the tests say.
 | `client/src/components/CardsPanel.jsx` | the cards section of a stored day: recipe columns (# / variant / bankroll / per-race min / consensus / tickets / day total), variant field, Generate action (append-only — every run is a new numbered card). |
 | `client/src/components/CardView.jsx` | the sheet: per-race tables (Bet type / Selections-rationale / Say to the teller / If it hits / Cost), thesis + board-watch triggers, multi-race section, subtotals, footer (totals, sources used with dates + unavailable, scratches, failure-mode warnings, responsible-gambling line). |
 | `client/src/api.js` | client half of the ingest API; carries the session's correlation id on every call. |
-| `client/src/App.jsx` | root component, theme application, view routing (list / new / day). |
+| `client/src/App.jsx` | root component, theme application, browser view routing (list / new / pl / simulate / day / card) via the History API. |
+| `client/src/routes.js` | pure browser route parsing and formatting; UI paths stay separate from `/api` paths. |
 | `client/src/components/NewRaceDay.jsx` | the ingest screen: track/date/bankroll form, paste box + PDF upload, warnings-first READ-ONLY preview (corrections = fix the source, re-parse), save with replace-on-conflict. Save needs Track + Date; when the parse could not supply them the preview says which field is missing instead of a silently disabled button. |
 | `client/src/components/RaceDayList.jsx` | home: stored race days table, Show deleted toggle + restore, and the Danger zone (factory reset behind an explicit confirm). |
 | `server/reset.js` | factory reset shared by `POST /api/reset` (requires `{confirm:"RESET"}`) and the CLI: wipes every table in FK order, VACUUMs, restarts the race-day id sequence, removes every log file (`resetLogs` in logging.js), then logs `app_reset` as the new era's first event. |
@@ -209,6 +210,7 @@ npm run check-pl        # P/L views: bucket isolation, per-race sums, delete/res
 npm run check-export    # trace export: rotation/gzip read-through, loss flagging
 npm run check-templates # strategy templates: layer map, per-template behavior, guards
 npm run check-sim       # simulator: sim == live grade, buckets, series, delete/restore, trace
+npm run check-routing   # browser routes, SPA deep links, and API JSON boundary
 npm run check-ml        # ML sheet: real 08-16 sheet golden + hand checks, merge, endpoints, ODDS_ONLY tier
 npm run check-dmtc-fetch # crawler vs. a stub site: calendar, politeness, conditional requests, robots, backoff, audit
 npm run check-dmtc-results # dmtc results page vs. Equibase chart: identical cents per ticket on 08-28/29/30
@@ -266,6 +268,7 @@ Before a branch is reported ready, verify — out loud, in the final message:
 | ML sheet as entries source of record (D40) | merged | PR #34, branch `ml-sheet-ingest` - ML/changes PDF parser + fetcher, program becomes analysis-only via the merge, ODDS_ONLY tier, engine `lean-1.0.1` (morning-line ranking fallback on rank-less races) |
 | Engine versioning (D34) | merged | PR #33, branch `engine-versioning` - `ENGINE_VERSION = lean-1.0`; migration 008; version on card rows, card header, P/L rows + version filter; trace events carry it; invariant 14 |
 | Simulator (D19) | merged | PR #31, branch `simulator` - every template replayed over every stored day with a chart; per-bucket compare + bankroll over time; runs append-only; `npm run check-sim` |
+| Browser routes | in progress | History API routes for `/`, `/new`, `/pl`, `/simulate`, `/day/:id`, and `/card/:id`; production server serves the client shell for direct navigation; `npm run check-routing` |
 | Fused owner/trainer split (D33) | merged | PR #30, branch `owner-trainer-split` - 08-22 R9 #9 Kensington Lane arrived with "Philip D' Amato(M. Donald)" fused into the owner item and trainer null (pinned as a known gap by D32). Card-wide dictionary pass; the 08-22 golden changes in exactly that entry's owner/trainer, 08-30 byte-identical |
 | Program header fields (D32) | merged | PR #29, branch `program-header-fields` - on the 2026-08-22 program, stakes titles without the word "Stakes" (Green Flash Handicap, Del Mar Oaks, Pacific Classic, Del Mar Mile) fell back to conditions text as the race type, and three distances were wrong (R3 null on a line wrap, R7 read from conditions text, R11 from the title) plus R10 truncated to "One Mile" (Pacific Classic is a mile and a quarter). Rules rewritten as pure helpers pinned by the exact pdfjs text items; the 08-22 program is now the SECOND committed fixture with its own golden + 19 hand-checked assertions (branch carries D31 merged in, since the golden needs the track fallback) |
 | Strategy templates (D18) | merged | PR #26, branch `strategy-templates` — 6 named rule bundles + signal/structure layer map; allocationCurve made real (lean/spread); invariant-1 422 guard on the live endpoint; template on card rows, trace, P/L and export |

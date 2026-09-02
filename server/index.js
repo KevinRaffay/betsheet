@@ -75,6 +75,11 @@ app.use('/api', (err, _req, res, _next) => {
 
 app.use(express.static(path.join(ROOT, 'dist')));
 
+// Client-side routes need the app shell on direct navigation and refresh.
+// API misses remain JSON 404s and never fall through to this handler.
+app.use('/api', (_req, res) => res.status(404).json({ error: 'API route not found.' }));
+app.get('*', (_req, res) => res.sendFile(path.join(ROOT, 'dist', 'index.html')));
+
 const server = app.listen(PORT, HOST, () => {
   log.info('server_started', { host: HOST, port: PORT });
   console.log(`BetSheet listening on http://${HOST}:${PORT}`);

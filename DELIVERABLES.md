@@ -6,6 +6,7 @@ tracked externally — it must always reflect actual state.
 
 | ID | Deliverable | Phase | PR # / branch | Status | Notes |
 | --- | --- | --- | --- | --- | --- |
+| D44 | Browser routes and deep-link refresh | 1 | — | in progress | History API routes for `/`, `/new`, `/pl`, `/simulate`, `/day/:id`, and `/card/:id`; Express serves the built client shell for non-API routes while unknown API paths remain JSON 404s; `npm run check-routing` and `npm run build` |
 | D01 | Repo scaffold: structure from life-swipe, CLAUDE.md, README, REQUIREMENTS.md, DELIVERABLES.md seeded with full PR list | 1 | [#1](https://github.com/KevinRaffay/betsheet/pull/1) / `scaffold` | merged | stack, styling tokens, loopback server, theme toggle |
 | D02 | Logging foundation: structured JSON streams, rolling files w/ compression + retention, correlation IDs, config | 1 | [#2](https://github.com/KevinRaffay/betsheet/pull/2) / `logging` | merged | app / fetch-audit / decision-trace streams; size+day rotation, gzip past hot days, prune past retention; `npm run check-logging` |
 | D03 | SQLite schema + migrations (full schema incl. Phase 2–4 tables) | 1 | [#3](https://github.com/KevinRaffay/betsheet/pull/3) / `schema` | merged | better-sqlite3; append-only migrations w/ tamper guard; money in integer cents; `npm run check-schema`. Hotfix: guard hashes canonical (LF) text + self-heals ending-variant records — Windows autocrlf produced false tamper alarms on branch switches; `.gitattributes` pins migration endings |

@@ -6,6 +6,7 @@
   "description": "Horse race betting card generator & strategy tracker: generate, grade, simulate.",
   "scripts": {
     "start": "npm run build && node server/index.js",
+    "start-qa": "npm run build && node -e \"process.env.BETSHEET_PORT ||= '8902'; import('./server/index.js')\"",
     "build": "vite build",
     "dev": "concurrently -k -n vite,api -c cyan,magenta \"vite\" \"node --watch server/index.js\"",
     "serve": "node server/index.js",
@@ -25,6 +26,7 @@
     "check-export": "node scripts/check-export.js",
     "check-templates": "node scripts/check-templates.js",
     "check-sim": "node scripts/check-sim.js",
+    "check-routing": "node scripts/check-routing.js",
     "check-ml": "node scripts/check-ml.js",
     "check-dmtc-fetch": "node scripts/check-dmtc-fetch.js",
     "check-dmtc-results": "node scripts/check-dmtc-results.js",
