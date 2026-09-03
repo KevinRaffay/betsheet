@@ -16,7 +16,11 @@ a new deliverable.
 
 **D66 follow-up (QA, 2026-09-02):** the LLM modal now uses stacked race cards
 with collapsible entries, fixed header/footer controls, a generation spinner,
-and next-race navigation that advances from the race most recently saved.
+and next-race navigation that advances from the race most recently saved. It
+also shows payout estimates in preview, displays generation/save errors in the
+affected race card, preserves model reasoning in saved allocations and keeps
+that reasoning visible at the preview's compact size. The LLM prompt receives
+stored external consensus, including Sports from the Basement.
 
 | ID | Deliverable | Phase | PR # / branch | Status | Notes |
 | --- | --- | --- | --- | --- | --- |

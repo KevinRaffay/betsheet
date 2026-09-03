@@ -315,7 +315,12 @@ Before a branch is reported ready, verify — out loud, in the final message:
 
 The D66 modal follow-up keeps races in one-column cards with collapsible
 entries, fixed header/footer controls, a generation spinner, and next-race
-navigation that advances from the race most recently saved.
+navigation that advances from the race most recently saved. It displays
+preview payout estimates before save, shows generation/save errors inside the
+affected race card, preserves model reasoning in the saved allocation and
+keeps that reasoning visible at the same compact size. The LLM prompt also
+receives the day's stored external consensus, including Sports from the
+Basement.
 
 | feature | state | notes |
 | --- | --- | --- |

@@ -204,6 +204,7 @@ export async function previewLlmRace(db, day, raceNumber, cardId, { stubResponse
     text: extracted.ticketBlockText, race: raceNumber, entries, wagerMenu: race.wager_menu,
     scratchedProgramNumbers: scratched, ruleTag: 'llm',
   });
+  parsed.tickets = estimatePayouts(parsed.tickets, entries);
 
   const cardCostCents = spentCents + parsed.raceCostCents;
   return {
@@ -291,10 +292,11 @@ export function persistLlmRace(db, day, { race: raceNumber, requestId, bankrollC
           t.tellerCall, t.rationale, JSON.stringify(t.ruleTags), t.rationale_text, t.odds_at_bet,
         );
       });
-      db.prepare(`INSERT INTO allocations (card_id, race_id, amount_cents, confidence, rule, thesis)
-          VALUES (?, ?, ?, 'LLM', 'llm_pick', ?)`)
-        .run(card.id, race.id, parsed.raceCostCents, extracted.reasoningText || null);
     }
+
+    db.prepare(`INSERT INTO allocations (card_id, race_id, amount_cents, confidence, rule, thesis)
+        VALUES (?, ?, ?, 'LLM', 'llm_pick', ?)`)
+      .run(card.id, race.id, parsed.raceCostCents, extracted.reasoningText || null);
 
     return card;
   })();

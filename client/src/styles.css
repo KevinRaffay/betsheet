@@ -331,6 +331,11 @@ label.btn.btn--primary { color: var(--color-accent-text); }
   font-size: 13px;
   line-height: 1.45;
 }
+.llm-reasoning {
+  margin: 6px 0 10px;
+  font-size: 13px;
+  line-height: 1.45;
+}
 .race-entries { margin: 8px 0 10px; }
 .race-entries > summary {
   cursor: pointer;
@@ -486,6 +491,8 @@ label.btn.btn--primary { color: var(--color-accent-text); }
   padding: 12px;
   background: var(--color-bg-raised);
 }
+.llm-race-card .grid { font-size: 10.5px; }
+.llm-race-card .grid th { font-size: 9px; }
 .llm-race-card__header {
   display: flex;
   align-items: center;

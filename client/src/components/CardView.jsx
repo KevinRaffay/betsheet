@@ -141,7 +141,7 @@ export default function CardView({ cardId, onBack, onDeleted }) {
         {allTriggers.length > 0 && (
           <>
             <p><strong>Board watch</strong></p>
-            {allTriggers.map((t, i) => <p className="trigger" key={i}>▸ R{t.race}: {t.text}</p>)}
+            {allTriggers.map((t, i) => <p className="trigger" key={i}>• R{t.race}: {t.text}</p>)}
           </>
         )}
       </div>
@@ -169,10 +169,10 @@ export default function CardView({ cardId, onBack, onDeleted }) {
               </span>
             </div>
             {thesis && <p className="thesis">{thesis}</p>}
-            {triggers.map((t, i) => <p className="trigger" key={i}>▸ {t}</p>)}
+            {triggers.map((t, i) => <p className="trigger" key={i}>• {t}</p>)}
             {flags.map((f, i) => (
               <p className="trigger" key={`f${i}`}>
-                ▸ {f.type === 'algo_fades_favorite' ? 'FADE' : 'LONGSHOT×2'}: #{f.programNumber} {f.horseName} — {f.detail}
+                • {f.type === 'algo_fades_favorite' ? 'FADE' : 'LONGSHOT×2'}: #{f.programNumber} {f.horseName} — {f.detail}
               </p>
             ))}
             {race?.bottom_line && (

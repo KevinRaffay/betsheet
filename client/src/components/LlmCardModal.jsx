@@ -11,25 +11,35 @@ const normalizeTicket = (t) => ({
   betType: t.betType ?? t.bet_type,
   legsText: (t.legs ?? t.selections?.legs ?? []).map((l) => l.join(',')).join(' / '),
   tellerCall: t.tellerCall ?? t.teller_call,
+  estMinCents: t.estMinCents ?? t.est_payout_min_cents,
+  estMaxCents: t.estMaxCents ?? t.est_payout_max_cents,
+  estIsRange: t.estIsRange ?? Boolean(t.est_is_range),
   costCents: t.costCents ?? t.cost_cents,
   rationaleText: t.rationale_text ?? t.rationaleText,
 });
+
+const estDisplay = (ticket) => {
+  if (ticket.estMinCents == null) return '—';
+  if (!ticket.estIsRange) return money(ticket.estMinCents);
+  return `${money(ticket.estMinCents)}–${money(ticket.estMaxCents)} (est.)`;
+};
 
 function TicketsTable({ tickets, totalCents }) {
   if (!tickets.length) return <p className="dim">No tickets on this race.</p>;
   return (
     <table className="grid">
-      <thead><tr><th>Bet type</th><th>Selections / rationale</th><th>Say to the teller</th><th>Cost</th></tr></thead>
+      <thead><tr><th>Bet type</th><th>Selections / rationale</th><th>Say to the teller</th><th>If it hits</th><th>Cost</th></tr></thead>
       <tbody>
         {tickets.map(normalizeTicket).map((t, i) => (
           <tr key={i}>
             <td className="bt">{t.betType.replace(/_/g, ' ')}</td>
             <td>{t.legsText}{t.rationaleText ? <span className="dim"> — {t.rationaleText}</span> : null}</td>
             <td className="teller">{t.tellerCall}</td>
+            <td>{estDisplay(t)}</td>
             <td>{money(t.costCents)}</td>
           </tr>
         ))}
-        <tr className="row--subtotal"><td colSpan={3}>Race total</td><td>{money(totalCents)}</td></tr>
+        <tr className="row--subtotal"><td colSpan={4}>Race total</td><td>{money(totalCents)}</td></tr>
       </tbody>
     </table>
   );
@@ -71,7 +81,7 @@ function EntriesTable({ entries }) {
 export default function LlmCardModal({ dayId, onCardChanged, onClose }) {
   const [dayInfo, setDayInfo] = useState(null);
   const [cardId, setCardId] = useState(null);
-  const [ticketsByRace, setTicketsByRace] = useState(new Map()); // raceNumber -> { tickets, raceCostCents }
+  const [ticketsByRace, setTicketsByRace] = useState(new Map()); // raceNumber -> { tickets, raceCostCents, reasoningText }
   const [expandedRaces, setExpandedRaces] = useState(new Set());
   const [openRace, setOpenRace] = useState(null); // race actively being generated/previewed (unsaved)
   const [lastSavedRace, setLastSavedRace] = useState(null);
@@ -79,6 +89,7 @@ export default function LlmCardModal({ dayId, onCardChanged, onClose }) {
   const [correlationId, setCorrelationId] = useState(null);
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState(null);
+  const [errorRace, setErrorRace] = useState(null);
 
   const reload = () => {
     getRaceDay(dayId).then(setDayInfo).catch((e) => setError(String(e.message)));
@@ -89,15 +100,24 @@ export default function LlmCardModal({ dayId, onCardChanged, onClose }) {
   };
   useEffect(reload, [dayId]);
 
-  const refreshTickets = () => {
-    if (!cardId) { setTicketsByRace(new Map()); return; }
-    fetch(`/api/cards/${cardId}`).then((r) => r.json()).then((c) => {
+  const refreshTickets = (requestedCardId = cardId) => {
+    if (!requestedCardId) { setTicketsByRace(new Map()); return; }
+    fetch(`/api/cards/${requestedCardId}`).then((r) => r.json()).then((c) => {
       const numberByRaceId = new Map((c.races ?? []).map((r) => [r.id, r.number]));
       const byRace = new Map();
+      for (const allocation of c.allocations ?? []) {
+        const num = allocation.race_number;
+        if (num == null) continue;
+        byRace.set(num, {
+          tickets: [],
+          raceCostCents: allocation.amount_cents ?? 0,
+          reasoningText: allocation.thesis ?? '',
+        });
+      }
       for (const t of c.tickets ?? []) {
         const num = numberByRaceId.get(t.race_id);
         if (num == null) continue;
-        if (!byRace.has(num)) byRace.set(num, { tickets: [], raceCostCents: 0 });
+        if (!byRace.has(num)) byRace.set(num, { tickets: [], raceCostCents: 0, reasoningText: '' });
         const entry = byRace.get(num);
         entry.tickets.push(t);
         entry.raceCostCents += t.cost_cents;
@@ -134,6 +154,7 @@ export default function LlmCardModal({ dayId, onCardChanged, onClose }) {
   const handleGenerate = async (raceNumber) => {
     setOpenRace(raceNumber);
     setPreview(null);
+    setErrorRace(null);
     setBusy(true);
     setError(null);
     try {
@@ -141,6 +162,7 @@ export default function LlmCardModal({ dayId, onCardChanged, onClose }) {
       if (p.correlationId) setCorrelationId(p.correlationId);
       setPreview(p);
     } catch (e) {
+      setErrorRace(raceNumber);
       setError(String(e.message));
     } finally {
       setBusy(false);
@@ -157,17 +179,23 @@ export default function LlmCardModal({ dayId, onCardChanged, onClose }) {
       setLastSavedRace(savedRace);
       setOpenRace(null);
       setPreview(null);
-      refreshTickets();
+      refreshTickets(r.cardId);
       toggleExpanded(savedRace, true); // "the card will display" - open its panel right away
       onCardChanged?.();
     } catch (e) {
+      setErrorRace(openRace);
       setError(String(e.message));
     } finally {
       setBusy(false);
     }
   };
 
-  const handleCancelPreview = () => { setOpenRace(null); setPreview(null); };
+  const handleCancelPreview = () => {
+    setOpenRace(null);
+    setPreview(null);
+    setErrorRace(null);
+    setError(null);
+  };
 
   if (error && !dayInfo) {
     return (
@@ -195,7 +223,7 @@ export default function LlmCardModal({ dayId, onCardChanged, onClose }) {
                 Generate one race at a time - reasoning and the raw model response are logged per race regardless of
                 whether you save it.
               </p>
-              {error && <p className="notice notice--error">{error}</p>}
+              {error && openRace == null && <p className="notice notice--error">{error}</p>}
 
               <div className="llm-race-grid">
                 {races.map((r) => {
@@ -214,6 +242,9 @@ export default function LlmCardModal({ dayId, onCardChanged, onClose }) {
                       <EntriesTable entries={r.entries ?? []} />
                       {openRace === r.number && (
                         <div>
+                          {errorRace === r.number && error && (
+                            <p className="notice notice--error" role="alert">{error}</p>
+                          )}
                           {busy && !preview && (
                             <p className="llm-loading" role="status">
                               <span className="spinner" aria-hidden="true" />
@@ -256,14 +287,19 @@ export default function LlmCardModal({ dayId, onCardChanged, onClose }) {
                         </div>
                       )}
                       {openRace !== r.number && saved && (
-                        <details
-                          className="race-bottom-line"
-                          open={expandedRaces.has(r.number)}
-                          onToggle={(e) => toggleExpanded(r.number, e.target.open)}
-                        >
-                          <summary>Race {r.number} card ({money(saved.raceCostCents)})</summary>
+                        <>
+                          {saved.reasoningText && (
+                            <p className="llm-reasoning"><strong>Model reasoning:</strong> {saved.reasoningText}</p>
+                          )}
+                          <details
+                            className="race-bottom-line"
+                            open={expandedRaces.has(r.number)}
+                            onToggle={(e) => toggleExpanded(r.number, e.target.open)}
+                          >
+                            <summary>Race {r.number} card ({money(saved.raceCostCents)})</summary>
                           <TicketsTable tickets={saved.tickets} totalCents={saved.raceCostCents} />
-                        </details>
+                          </details>
+                        </>
                       )}
                     </article>
                   );
