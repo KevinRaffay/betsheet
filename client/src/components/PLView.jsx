@@ -11,7 +11,7 @@ const signed = (cents) => (
 const roi = (plCents, costCents) =>
   (costCents > 0 ? `${plCents >= 0 ? '+' : ''}${(100 * plCents / costCents).toFixed(1)}%` : '—');
 
-const BUCKET_CHIP = { FULL: 'unanimous', PARTIAL: 'split', PROGRAM_ONLY: 'chaos', ODDS_ONLY: 'guess', HUMAN: 'human' };
+const BUCKET_CHIP = { FULL: 'unanimous', PARTIAL: 'split', PROGRAM_ONLY: 'chaos', ODDS_ONLY: 'guess', HUMAN: 'human', LLM_GENERATED: 'llm' };
 
 // P/L across every stored card. Invariant 13 shapes this screen: every
 // number lives inside its consensus_completeness bucket and there is no

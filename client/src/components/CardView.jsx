@@ -98,7 +98,7 @@ export default function CardView({ cardId, onBack, onDeleted }) {
       </div>
       {error && <p className="notice notice--error">{error}</p>}
       <p className="dim">
-        <span className={`chip chip--${card.consensus_completeness === 'FULL' ? 'unanimous' : card.consensus_completeness === 'PARTIAL' ? 'split' : card.consensus_completeness === 'HUMAN' ? 'human' : 'chaos'}`}>
+        <span className={`chip chip--${card.consensus_completeness === 'FULL' ? 'unanimous' : card.consensus_completeness === 'PARTIAL' ? 'split' : card.consensus_completeness === 'HUMAN' ? 'human' : card.consensus_completeness === 'LLM_GENERATED' ? 'llm' : 'chaos'}`}>
           {card.consensus_completeness}
         </span>
         {' '}consensus · template {card.template ?? '—'} · engine <code>{card.engine_version ?? 'lean-0'}</code> · bankroll {money(card.bankroll_cents)}

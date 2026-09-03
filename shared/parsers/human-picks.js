@@ -118,9 +118,13 @@ function resolveToken(token, entries, race, warnings) {
  * `scratchedProgramNumbers`: Set/array of program numbers that did not
  * run (program-time scratches union chart scratches when known) - a
  * human should never be allowed to bet a horse that in fact didn't run.
+ * `ruleTag`: stamped onto each ticket's ruleTags (D63: 'llm' for an LLM
+ * card's picks, reusing this exact parser/validation for a model's ticket
+ * block same as a human's pasted text - defaults to 'human' so every
+ * existing caller is unaffected).
  * Returns { tickets, warnings, raceCostCents }. Never throws.
  */
-export function parseHumanPicksText({ text, race, entries = [], wagerMenu = null, scratchedProgramNumbers = [] }) {
+export function parseHumanPicksText({ text, race, entries = [], wagerMenu = null, scratchedProgramNumbers = [], ruleTag = 'human' }) {
   const warnings = [];
   const tickets = [];
   const scratched = new Set(scratchedProgramNumbers);
@@ -239,7 +243,7 @@ export function parseHumanPicksText({ text, race, entries = [], wagerMenu = null
       estMinCents: null, estMaxCents: null, estIsRange: false,
       tellerCall: tellerCall(betType, raceNumbers, stakeCents, resolvedLegs),
       rationale: rationaleText, rationale_text: rationaleText, odds_at_bet: oddsAtBet,
-      ruleTags: ['human'],
+      ruleTags: [ruleTag],
     });
   }
 

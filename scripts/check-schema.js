@@ -35,7 +35,7 @@ const tables = db.prepare(
 
 const expected = [
   'actual_stakes', 'allocations', 'backfill_queue', 'cards', 'consensus_picks', 'entries',
-  'exotic_payoffs', 'fetch_attempts', 'graded_tickets', 'human_race_state', 'publishes',
+  'exotic_payoffs', 'fetch_attempts', 'graded_tickets', 'human_race_state', 'llm_card_requests', 'publishes',
   'race_days', 'race_results', 'races', 'result_charts', 'result_scratches',
   'schema_migrations', 'simulation_results', 'simulation_runs', 'sources',
   'strategy_templates', 'tickets',
@@ -190,6 +190,9 @@ check('completeness: valid level accepted',
 d.prepare("UPDATE cards SET consensus_completeness = 'HUMAN' WHERE id = ?").run(card);
 check('completeness: HUMAN accepted (D54, migration 016 rebuild)',
   d.prepare('SELECT consensus_completeness c FROM cards WHERE id = ?').get(card).c === 'HUMAN');
+d.prepare("UPDATE cards SET consensus_completeness = 'LLM_GENERATED' WHERE id = ?").run(card);
+check('completeness: LLM_GENERATED accepted (D63, migration 018 rebuild)',
+  d.prepare('SELECT consensus_completeness c FROM cards WHERE id = ?').get(card).c === 'LLM_GENERATED');
 d.prepare("UPDATE cards SET consensus_completeness = 'FULL' WHERE id = ?").run(card);
 
 d.prepare(`INSERT INTO allocations (card_id, race_id, amount_cents, confidence, rule)
