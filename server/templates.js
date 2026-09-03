@@ -32,6 +32,11 @@ export function seedTemplates(db) {
     // simulation run (an LLM card is manually generated race by race, not
     // something the simulator could ever replay).
     upsert.run('llm', 'LLM-generated picks, one race at a time from entries and already-fetched consensus (D63). Not engine-generated or simulated.', '{}');
+    // D71: same reasoning as 'human'/'llm' above - real row for FK integrity,
+    // deliberately outside shared/templates.js's TEMPLATES map so it never
+    // appears in the live-generate dropdown, resolveTemplate(), or a
+    // simulation run (Equibase's printed sheet is uploaded, not generated).
+    upsert.run('equibase-otr', "Equibase's Off to the Races sheet, tickets taken verbatim (D71). Not engine-generated or simulated.", '{}');
   });
   seed();
 }

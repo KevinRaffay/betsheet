@@ -64,6 +64,16 @@ A human's pasted tickets, not the engine, produced these - no `inputs_snapshot`/
 | `ticket_added` | `cardId`, `raceDayId`, `race`, `betType`, `selections` (legs), `stakeCents`, `costCents`, `rationaleText` | one human ticket landed on the card, carrying the pasted rationale verbatim |
 | `human_race_locked` | `cardId`, `raceDayId`, `race`, `pass` | one race's picks were locked (or explicitly passed) on a human card - the timestamp this event's `ts` field carries is the same one written to `human_race_state.picks_locked_at`, the fact a later blindness computation (D55) is derived from |
 
+### Equibase Off to the Races (D71, emitted by `server/equibase-otr.js`, one correlationId per confirm call spanning all three cards)
+
+Equibase's printed sheet, not the engine, produced these - no `inputs_snapshot`/`rule_fired`/`allocation_decided` events exist, since `shared/card-engine.js` is never called. One confirm call always produces exactly three `card_generated` events (some-reward / higher-reward / both, D71's three variants) plus one `equibase_otr_ingested` summary event.
+
+| event | fields | meaning |
+| --- | --- | --- |
+| `card_generated` | `cardId`, `raceDayId`, `engineVersion` (`'equibase-otr'`), `variant` (`'some-reward'` / `'higher-reward'` / `'both'`) | one of the three cards created by this confirm call (append-only - a re-upload creates three MORE cards, never replaces) |
+| `ticket_added` | `cardId`, `raceDayId`, `race`, `betType`, `selections` (legs), `stakeCents`, `costCents`, `rationaleText` (the tier label, "Some Reward Opportunity" / "Higher Reward Opportunity") | one printed ticket landed on a card, taken verbatim - no interpretation, no re-sizing |
+| `equibase_otr_ingested` | `raceDayId`, `archivePath`, `sha256`, `races` (count parsed), `warnings` (count) | one summary event per confirm call, naming the archived file this ingest was re-parsed from |
+
 ### Replay (D55, emitted by `server/replay.js`, under the card's correlationId)
 
 | event | fields | meaning |
