@@ -35,6 +35,31 @@ function TicketsTable({ tickets, totalCents }) {
   );
 }
 
+function EntriesTable({ entries }) {
+  return (
+    <details className="race-entries">
+      <summary>Entries ({entries.length})</summary>
+      <table className="grid grid--entries">
+        <thead>
+          <tr><th>#</th><th>Horse</th><th>Jockey</th><th>Trainer</th><th>M/L</th><th>Rank</th></tr>
+        </thead>
+        <tbody>
+          {entries.map((entry) => (
+            <tr key={entry.id} className={entry.scratched ? 'row--scratched' : ''}>
+              <td>{entry.program_number ?? '—'}</td>
+              <td>{entry.horse_name}</td>
+              <td>{entry.jockey ?? '—'}</td>
+              <td>{entry.trainer ?? '—'}</td>
+              <td>{entry.morning_line ?? '—'}</td>
+              <td>{entry.program_rank ?? '—'}</td>
+            </tr>
+          ))}
+        </tbody>
+      </table>
+    </details>
+  );
+}
+
 // LLM cards (D63/D65/D66): a modal walkthrough, one race at a time -
 // Generate (the actual model call) shows a preview, Save confirms it.
 // Every already-generated race carries a collapsible panel in its own row
@@ -49,6 +74,7 @@ export default function LlmCardModal({ dayId, onCardChanged, onClose }) {
   const [ticketsByRace, setTicketsByRace] = useState(new Map()); // raceNumber -> { tickets, raceCostCents }
   const [expandedRaces, setExpandedRaces] = useState(new Set());
   const [openRace, setOpenRace] = useState(null); // race actively being generated/previewed (unsaved)
+  const [lastSavedRace, setLastSavedRace] = useState(null);
   const [preview, setPreview] = useState(null);
   const [correlationId, setCorrelationId] = useState(null);
   const [busy, setBusy] = useState(false);
@@ -89,7 +115,12 @@ export default function LlmCardModal({ dayId, onCardChanged, onClose }) {
   }, [onClose]);
 
   const races = dayInfo?.races ?? [];
-  const nextUngenerated = races.find((r) => !ticketsByRace.has(r.number));
+  const firstUngenerated = races.find((r) => r.number !== lastSavedRace && !ticketsByRace.has(r.number));
+  const lastSavedIndex = lastSavedRace == null
+    ? -1
+    : races.findIndex((r) => r.number === lastSavedRace);
+  const nextUngenerated = races.slice(lastSavedIndex + 1).find((r) => !ticketsByRace.has(r.number))
+    ?? firstUngenerated;
   const allGenerated = races.length > 0 && races.every((r) => ticketsByRace.has(r.number));
 
   const toggleExpanded = (raceNumber, open) => {
@@ -123,6 +154,7 @@ export default function LlmCardModal({ dayId, onCardChanged, onClose }) {
       const r = await lockLlmCard(dayId, { race: openRace, requestId: preview.requestId, bankrollCents: dayInfo.bankroll_cents, cardId }, correlationId);
       if (!cardId) setCardId(r.cardId);
       const savedRace = openRace;
+      setLastSavedRace(savedRace);
       setOpenRace(null);
       setPreview(null);
       refreshTickets();
@@ -155,92 +187,91 @@ export default function LlmCardModal({ dayId, onCardChanged, onClose }) {
           <h3>Generate Card from LLM</h3>
           <button className="modal__close" onClick={onClose} aria-label="Close">×</button>
         </div>
-        {!dayInfo && <p className="placeholder">Loading…</p>}
+        {!dayInfo && <div className="modal__body"><p className="placeholder">Loading…</p></div>}
         {dayInfo && (
           <>
-            <p className="dim">
-              Generate one race at a time - reasoning and the raw model response are logged per race regardless of
-              whether you save it.
-            </p>
-            {error && <p className="notice notice--error">{error}</p>}
+            <div className="modal__body">
+              <p className="dim">
+                Generate one race at a time - reasoning and the raw model response are logged per race regardless of
+                whether you save it.
+              </p>
+              {error && <p className="notice notice--error">{error}</p>}
 
-            <table className="grid">
-              <thead><tr><th>Race</th><th>Status</th><th></th></tr></thead>
-              <tbody>
+              <div className="llm-race-grid">
                 {races.map((r) => {
                   const saved = ticketsByRace.get(r.number);
                   return (
-                    <React.Fragment key={r.id}>
-                      <tr>
-                        <td>{r.number}</td>
-                        <td className="dim">{saved ? 'Generated' : 'Not generated'}</td>
-                        <td>
-                          <button className="btn btn--sm" disabled={busy} onClick={() => handleGenerate(r.number)}>
-                            {saved ? 'Regenerate' : 'Generate'}
-                          </button>
-                        </td>
-                      </tr>
+                    <article className="llm-race-card" key={r.id}>
+                      <div className="llm-race-card__header">
+                        <div>
+                          <strong>Race {r.number}</strong>
+                          <span className="dim"> · {saved ? 'Generated' : 'Not generated'}</span>
+                        </div>
+                        <button className="btn btn--sm" disabled={busy} onClick={() => handleGenerate(r.number)}>
+                          {saved ? 'Regenerate' : 'Generate'}
+                        </button>
+                      </div>
+                      <EntriesTable entries={r.entries ?? []} />
                       {openRace === r.number && (
-                        <tr>
-                          <td colSpan={3}>
-                            {busy && !preview && <p className="placeholder">Calling the model…</p>}
-                            {preview && (
-                              <div className="formrow">
-                                <p className="dim">
-                                  Race bankroll {money(preview.perRaceBankrollCents)} · card total {money(preview.cardCostCents)}
-                                  {' '}of {money(preview.bankrollCents)}
-                                  {preview.overBankroll && <span className="notice notice--warn"> over bankroll</span>}
-                                </p>
-                                {preview.reasoningText && (
-                                  <details className="race-bottom-line" open>
-                                    <summary>Model reasoning</summary>
-                                    <p>{preview.reasoningText}</p>
-                                  </details>
-                                )}
-                                {preview.warnings.length > 0 && (
-                                  <div className={`notice ${preview.warnings.some((w) => w.blocking) ? 'notice--error' : 'notice--warn'}`}>
-                                    <ul>{preview.warnings.map((w, i) => <li key={i}>{w.blocking ? <strong>BLOCKING: </strong> : null}{w.message}</li>)}</ul>
-                                  </div>
-                                )}
-                                {preview.tickets.length === 0 && preview.warnings.length === 0 && (
-                                  <p className="dim">The model proposed no bet on this race.</p>
-                                )}
-                                {preview.tickets.length > 0 && <TicketsTable tickets={preview.tickets} totalCents={preview.raceCostCents} />}
-                                <div className="formrow formrow--tight">
-                                  <button
-                                    className="btn btn--primary" disabled={busy || preview.warnings.some((w) => w.blocking)}
-                                    onClick={handleSave}
-                                  >
-                                    Save this race
-                                  </button>
-                                  <button className="btn" disabled={busy} onClick={handleCancelPreview}>Cancel</button>
+                        <div>
+                          {busy && !preview && (
+                            <p className="llm-loading" role="status">
+                              <span className="spinner" aria-hidden="true" />
+                              Calling the model…
+                            </p>
+                          )}
+                          {preview && (
+                            <div className="formrow">
+                              <p className="dim">
+                                Race bankroll {money(preview.perRaceBankrollCents)} · card total {money(preview.cardCostCents)}
+                                {' '}of {money(preview.bankrollCents)}
+                                {preview.overBankroll && <span className="notice notice--warn"> over bankroll</span>}
+                              </p>
+                              {preview.reasoningText && (
+                                <details className="race-bottom-line" open>
+                                  <summary>Model reasoning</summary>
+                                  <p>{preview.reasoningText}</p>
+                                </details>
+                              )}
+                              {preview.warnings.length > 0 && (
+                                <div className={`notice ${preview.warnings.some((w) => w.blocking) ? 'notice--error' : 'notice--warn'}`}>
+                                  <ul>{preview.warnings.map((w, i) => <li key={i}>{w.blocking ? <strong>BLOCKING: </strong> : null}{w.message}</li>)}</ul>
                                 </div>
+                              )}
+                              {preview.tickets.length === 0 && preview.warnings.length === 0 && (
+                                <p className="dim">The model proposed no bet on this race.</p>
+                              )}
+                              {preview.tickets.length > 0 && <TicketsTable tickets={preview.tickets} totalCents={preview.raceCostCents} />}
+                              <div className="formrow formrow--tight">
+                                <button
+                                  className="btn btn--primary" disabled={busy || preview.warnings.some((w) => w.blocking)}
+                                  onClick={handleSave}
+                                >
+                                  Save this race
+                                </button>
+                                <button className="btn" disabled={busy} onClick={handleCancelPreview}>Cancel</button>
                               </div>
-                            )}
-                          </td>
-                        </tr>
+                            </div>
+                          )}
+                        </div>
                       )}
                       {openRace !== r.number && saved && (
-                        <tr>
-                          <td colSpan={3}>
-                            <details
-                              className="race-bottom-line"
-                              open={expandedRaces.has(r.number)}
-                              onToggle={(e) => toggleExpanded(r.number, e.target.open)}
-                            >
-                              <summary>Race {r.number} card ({money(saved.raceCostCents)})</summary>
-                              <TicketsTable tickets={saved.tickets} totalCents={saved.raceCostCents} />
-                            </details>
-                          </td>
-                        </tr>
+                        <details
+                          className="race-bottom-line"
+                          open={expandedRaces.has(r.number)}
+                          onToggle={(e) => toggleExpanded(r.number, e.target.open)}
+                        >
+                          <summary>Race {r.number} card ({money(saved.raceCostCents)})</summary>
+                          <TicketsTable tickets={saved.tickets} totalCents={saved.raceCostCents} />
+                        </details>
                       )}
-                    </React.Fragment>
+                    </article>
                   );
                 })}
-              </tbody>
-            </table>
+              </div>
+            </div>
 
-            <div className="formrow formrow--tight" style={{ marginTop: 16 }}>
+            <div className="modal__footer formrow formrow--tight">
               {nextUngenerated && (
                 <button className="btn btn--primary" disabled={busy} onClick={() => handleGenerate(nextUngenerated.number)}>
                   Generate next race (Race {nextUngenerated.number}) →
