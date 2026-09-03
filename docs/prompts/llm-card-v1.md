@@ -91,7 +91,20 @@ grammar, then a line reading exactly "<<<END TICKETS>>>":
   with "/", e.g. "#4 / #2" (4 to win, 2 to place). Box types list
   every horse in the box separated by ",", e.g. "#4,#2,#7".
 - <stake>: the TOTAL dollar amount for that ticket (not per-combo),
-  e.g. "$20".
+  e.g. "$20". For a BOX bet, the total must divide EXACTLY and EVENLY
+  across every combination the box produces, with each combination's
+  share a whole multiple of that wager type's base unit shown in the
+  wager menu above. The number of combinations is:
+    exacta box:     n x (n-1)
+    trifecta box:   n x (n-1) x (n-2)
+    superfecta box: n x (n-1) x (n-2) x (n-3)
+  where n = how many horses you put in the box. Example: a $1 exacta
+  box on 3 horses has 3 x 2 = 6 combinations, so a valid total is any
+  multiple of 6 x $1 = $6 (e.g. $6, $12, $18) - NOT $16.50, which
+  splits to $2.75 per combination, not a whole dollar. Compute
+  combinations x base-unit FIRST, then pick your total as a multiple
+  of that - never pick a total that merely "sounds right" and divide
+  afterward. Prefer smaller boxes (3-4 horses) to keep this simple.
 - <rationale>: one short sentence, required.
 
 If you have no bet worth making on this race, output the block with
@@ -121,6 +134,28 @@ CONSENSUS
 No external consensus on file for this race - program analysis and
 morning line only.
 ```
+
+## Fixes
+
+- **2026-09-03: box-bet total didn't divide evenly per combo.** Live bug
+  report on a real 2026-09-03 Del Mar race: generating raced `Exacta Box |
+  #2,#4,#3 | $16.50` - a $1-exacta race, 3 horses boxed = 6 combinations,
+  $16.50 / 6 = $2.75/combo, not a whole dollar - correctly BLOCKED by
+  `shared/parsers/human-picks.js` (`non_multiple_stake`, same rule a
+  human's bad paste hits), but the model had no way to know the total
+  needed to line up: the v1 prompt said only "the TOTAL dollar amount
+  (not per-combo)" with no combo-count formula or divisibility rule at
+  all. Root cause confirmed against the actual logged `response_text` in
+  `llm_card_requests` (retrievable via `GET /api/cards/:id/llm-requests`)
+  - the model picked a plausible-looking total with no combo arithmetic
+  behind it. Fix is prompt-only: the `<stake>` rule now gives the exact
+  combination-count formula per box type and a worked example matching
+  this exact failure, and instructs computing combinations × base-unit
+  FIRST rather than picking a total and dividing after. No parser,
+  server, or schema change - the validation was already correct and
+  stays exactly as strict; this only gives the model what it needs to
+  satisfy it. Not provably foolproof (a model can still miscalculate),
+  so the existing blocking-warning behavior remains the real backstop.
 
 ## Response parsing
 

@@ -57,6 +57,8 @@ console.log('-- pure: buildLlmRaceUserPrompt --');
   check('no consensus on file -> the honest fallback line, not an empty section', empty.includes('No external consensus on file'));
 
   check('system prompt names the ticket-block markers', SYSTEM_PROMPT.includes('<<<TICKETS>>>') && SYSTEM_PROMPT.includes('<<<END TICKETS>>>'));
+  check('system prompt gives the box combination-count formulas and the divisibility rule (2026-09-03 fix)',
+    SYSTEM_PROMPT.includes('exacta box:') && SYSTEM_PROMPT.includes('n x (n-1)') && SYSTEM_PROMPT.includes('$16.50') && SYSTEM_PROMPT.includes('$2.75'));
 }
 
 console.log('-- pure: extractTicketBlock --');
@@ -177,6 +179,27 @@ try {
   check('save refuses blocking warnings (422), nothing changed', unknownSave.status === 422);
   const cardStillUnchanged = await jget(`/api/cards/${cardId}`);
   check('card still exactly two tickets after the refused save', cardStillUnchanged.tickets.length === 2);
+
+  console.log('-- regression (2026-09-03 live bug report): box total that does not split into whole-dollar combos --');
+  {
+    // The exact real-world case: a $1-exacta race, exacta box #2,#4,#3
+    // (3 horses -> 6 combinations) at $16.50 total -> $2.75/combo, not a
+    // whole dollar. Fixed by improving the PROMPT (asserted above); this
+    // proves the parser's blocking behavior was always correct and stays
+    // that way as the real backstop even if a model still gets it wrong.
+    const boxDay = {
+      track: 'Box Fixture Downs', date: '2026-09-03', bankrollCents: 20000, perRaceMinCents: 500,
+      races: [{ number: 1, wagerMenu: '$1 Exacta', entries: [entry('2', 'Two', '5/2', 2.5), entry('3', 'Three', '4/1', 4), entry('4', 'Four', '8/5', 1.6)] }],
+    };
+    const boxCreated = await (await jpost('/api/race-days', boxDay)).json();
+    const boxResponse = 'Reasoning about the box.\n\n<<<TICKETS>>>\nexacta box | #2,#4,#3 | $16.50 | Covers the top three underneath.\n<<<END TICKETS>>>\n';
+    const boxPreview = await (await jpost(`/api/race-days/${boxCreated.id}/llm-cards/preview`, { race: 1, __stubResponse: boxResponse })).json();
+    check('the exact reported response still previews (not a hard error) with the SAME blocking warning the user saw',
+      boxPreview.tickets.length === 0 && boxPreview.warnings.some((w) => w.blocking && w.type === 'non_multiple_stake' && /\$2\.75 per combo is not a multiple of the \$1\.00 increment/.test(w.message)),
+      JSON.stringify(boxPreview));
+    const boxSave = await jpost(`/api/race-days/${boxCreated.id}/llm-cards`, { race: 1, requestId: boxPreview.requestId });
+    check('save refuses (422), no card/tickets created for the bad box', boxSave.status === 422);
+  }
 
   console.log('-- reasoning + raw response retrievable per race --');
   const requests = await jget(`/api/cards/${cardId}/llm-requests`);

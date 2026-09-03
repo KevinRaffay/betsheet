@@ -40,7 +40,20 @@ grammar, then a line reading exactly "${TICKET_BLOCK_END}":
   with "/", e.g. "#4 / #2" (4 to win, 2 to place). Box types list
   every horse in the box separated by ",", e.g. "#4,#2,#7".
 - <stake>: the TOTAL dollar amount for that ticket (not per-combo),
-  e.g. "$20".
+  e.g. "$20". For a BOX bet, the total must divide EXACTLY and EVENLY
+  across every combination the box produces, with each combination's
+  share a whole multiple of that wager type's base unit shown in the
+  wager menu above. The number of combinations is:
+    exacta box:     n x (n-1)
+    trifecta box:   n x (n-1) x (n-2)
+    superfecta box: n x (n-1) x (n-2) x (n-3)
+  where n = how many horses you put in the box. Example: a $1 exacta
+  box on 3 horses has 3 x 2 = 6 combinations, so a valid total is any
+  multiple of 6 x $1 = $6 (e.g. $6, $12, $18) - NOT $16.50, which
+  splits to $2.75 per combination, not a whole dollar. Compute
+  combinations x base-unit FIRST, then pick your total as a multiple
+  of that - never pick a total that merely "sounds right" and divide
+  afterward. Prefer smaller boxes (3-4 horses) to keep this simple.
 - <rationale>: one short sentence, required.
 
 If you have no bet worth making on this race, output the block with
