@@ -36,6 +36,13 @@ const canonical = (text) => text.replace(/\r\n/g, '\n');
 const digest = (text) => crypto.createHash('sha256').update(canonical(text)).digest('hex');
 const rawDigest = (text) => crypto.createHash('sha256').update(text).digest('hex');
 
+// Migration 014 briefly shipped with the tombstone repair inline. Databases
+// that applied that released version must be allowed to reach migration 019,
+// where the repair now lives; unknown changes still fail the tamper guard.
+const knownMigrationRevisions = new Map([
+  ['014-track-canonicalization.sql', ['8e9eac40ddf0eba8362a69ea47bbb87374d015892fed838942b068ca9541cef8']],
+]);
+
 // A record written by the raw-byte era matches one of the same content's
 // line-ending variants; anything else is a real edit.
 function isLegacyEndingVariant(prior, sql) {
@@ -74,7 +81,11 @@ export function openDb(dbPath = DEFAULT_PATH) {
     const prior = applied.get(file);
     if (prior) {
       if (prior !== hash) {
-        if (isLegacyEndingVariant(prior, sql)) {
+        const knownRevision = knownMigrationRevisions.get(file)?.includes(prior);
+        if (knownRevision) {
+          db.prepare('UPDATE schema_migrations SET sha256 = ? WHERE name = ?').run(hash, file);
+          log.info('migration_hash_migrated', { migration: file, db: path.basename(dbPath) });
+        } else if (isLegacyEndingVariant(prior, sql)) {
           // Same content, different line endings (or a raw-era record):
           // self-heal the record to the canonical hash and move on.
           db.prepare('UPDATE schema_migrations SET sha256 = ? WHERE name = ?').run(hash, file);
