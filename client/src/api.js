@@ -230,6 +230,8 @@ export const lockHumanCard = (dayId, { race, text, pass, bankrollCents, cardId }
 // Replay (D55): the blind race-by-race view, reveal, close, standing.
 export const getReplayDays = () => fetch('/api/replay/days').then(asJson);
 export const getRandomReplayDay = () => fetch('/api/replay/random').then(asJson);
+export const getReplayDayRaces = (dayId, cardId) =>
+  fetch(`/api/replay/days/${dayId}/races${cardId ? `?cardId=${cardId}` : ''}`).then(asJson);
 export const getReplayRace = (dayId, race, cardId) =>
   fetch(`/api/replay/days/${dayId}/races/${race}${cardId ? `?cardId=${cardId}` : ''}`).then(asJson);
 export const revealClassification = (cardId) =>

@@ -188,6 +188,15 @@ try {
   check('a later human card on the same day is NON_BLIND even though it was ALSO played cleanly',
     secondClosed.blindness === 'NON_BLIND', JSON.stringify(secondClosed));
 
+  console.log('-- day landing (D62): per-race status + PL without opening a race --');
+  const daySummaryNoCard = await jget(`/api/replay/days/${dayId}/races`);
+  check('no cardId -> every race unlocked, no PL', daySummaryNoCard.races.every((r) => r.locked === false && r.revealed === false && r.humanRacePl === null));
+  const daySummary = await jget(`/api/replay/days/${dayId}/races?cardId=${humanCardId}`);
+  check('one row per race, in order', daySummary.races.length === 2 && daySummary.races[0].raceNumber === 1 && daySummary.races[1].raceNumber === 2);
+  check('race 1 revealed with the same human P/L the reveal payload showed',
+    daySummary.races[0].revealed === true && daySummary.races[0].humanRacePl === 6250, JSON.stringify(daySummary.races[0]));
+  check('race 2 was auto-passed by close(), never locked with tickets', daySummary.races[1].pass === true, JSON.stringify(daySummary.races[1]));
+
   console.log('-- standing: only closed cards count, meets pool by default --');
   const standing = await jget('/api/replay/standing');
   check('meets pooled by default (no ?meet= narrowing needed to see every group)', standing.selectedMeet === 'all');

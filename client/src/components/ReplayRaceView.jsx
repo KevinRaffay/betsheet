@@ -17,8 +17,8 @@ const BLINDNESS_LABEL = { PRE_COMMIT: 'Pre-commit', SEQUENTIAL: 'Sequential', NO
 // shown is raw per-source picks only (shared/classification.js's
 // buildConsensusTable) - the engine's own UNANIMOUS/SPLIT/CHAOS read and
 // contrarian flags stay hidden unless this card opts in.
-export default function ReplayRaceView({ dayId, onBack, onOpenStanding }) {
-  const [raceNumber, setRaceNumber] = useState(1);
+export default function ReplayRaceView({ dayId, initialRace = 1, onBack, onOpenStanding }) {
+  const [raceNumber, setRaceNumber] = useState(initialRace);
   const [totalRaces, setTotalRaces] = useState(null);
   const [dayInfo, setDayInfo] = useState(null);
   const [cardId, setCardId] = useState(null);
