@@ -234,6 +234,34 @@ try {
     check('save refuses (422), no card/tickets created for the bad box', boxSave.status === 422);
   }
 
+  console.log('-- regression: consensus picks actually reach the LLM prompt --');
+  {
+    // shared/classification.js's buildConsensusTable returns the table
+    // ARRAY directly, not {table: [...]}. server/llm-cards.js used to call
+    // it as `buildConsensusTable(entries, picks).table`, so consensusTable
+    // was silently always undefined and every prompt said "No external
+    // consensus on file for this race" even when real picks existed on
+    // the day. Seeds a REAL pick through the same manual-paste path a
+    // live day would use (not a hand-built table object) and inspects
+    // the actual prompt_text that was sent, not just the parsed reply.
+    const consensusDay = {
+      track: 'Consensus Fixture Downs', date: '2026-09-03', bankrollCents: 20000, perRaceMinCents: 500,
+      races: [{ number: 1, wagerMenu: '$1 Exacta', entries: [entry('1', 'One Runner', '5/2', 2.5), entry('2', 'Two Runner', '4/1', 4)] }],
+    };
+    const consensusCreated = await (await jpost('/api/race-days', consensusDay)).json();
+    const picksPreview = await (await jpost(`/api/race-days/${consensusCreated.id}/consensus/manual-preview`, { sourceName: 'Test Source', text: 'Race 1: 1, 2' })).json();
+    check('manual picks preview parses cleanly (top #1, second #2)', picksPreview.races.length === 1 && picksPreview.warnings.length === 0, JSON.stringify(picksPreview));
+    const picksStored = await (await jpost(`/api/race-days/${consensusCreated.id}/consensus/manual`, { sourceName: 'Test Source', races: picksPreview.races })).json();
+    check('manual picks stored (2: top #1 + second #2)', picksStored.picksStored === 2, JSON.stringify(picksStored));
+
+    const consensusResponse = 'Reasoning that references the consensus.\n\n<<<TICKETS>>>\nWin | #1 | $20 | Consensus favorite.\n<<<END TICKETS>>>\n';
+    await jpost(`/api/race-days/${consensusCreated.id}/llm-cards/preview`, { race: 1, __stubResponse: consensusResponse });
+    const loggedConsensus = dbCheck.prepare('SELECT prompt_text FROM llm_card_requests WHERE race_day_id = ? ORDER BY id DESC').get(consensusCreated.id);
+    check('the actual prompt sent to the model names the real consensus source and its pick, not the "no consensus" fallback',
+      loggedConsensus?.prompt_text.includes('Test Source: top #1 One Runner') && !loggedConsensus?.prompt_text.includes('No external consensus on file'),
+      loggedConsensus?.prompt_text);
+  }
+
   console.log('-- reasoning + raw response retrievable per race --');
   const requests = await jget(`/api/cards/${cardId}/llm-requests`);
   check('every logged call for this card is retrievable, race 1 and race 2 both present', requests.some((r) => r.raceNumber === 1) && requests.some((r) => r.raceNumber === 2));
