@@ -33,7 +33,8 @@ class HumanCardError extends Error {
 
 const nameKey = (s) => String(s ?? '').toUpperCase().replace(/[‘’]/g, "'").replace(/\s+/g, ' ').trim();
 
-function loadRace(db, dayId, raceNumber) {
+/** Shared with server/llm-cards.js (D63) - same race/scratch resolution for either picker. */
+export function loadRace(db, dayId, raceNumber) {
   const race = db.prepare('SELECT * FROM races WHERE race_day_id = ? AND number = ?').get(dayId, raceNumber);
   if (!race) throw new HumanCardError(404, `No race ${raceNumber} on this race day.`);
   const entries = db.prepare('SELECT * FROM entries WHERE race_id = ?').all(race.id);
@@ -41,7 +42,7 @@ function loadRace(db, dayId, raceNumber) {
 }
 
 /** Program-time scratches union chart scratches (resolved to program numbers), for this one race. */
-function scratchedProgramNumbersFor(db, dayId, race, entries) {
+export function scratchedProgramNumbersFor(db, dayId, race, entries) {
   const scratched = new Set(entries.filter((e) => e.scratched).map((e) => e.program_number));
   const chartScratches = db.prepare(
     'SELECT program_number, horse_name FROM result_scratches WHERE race_day_id = ? AND race_number = ?',

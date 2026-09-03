@@ -53,6 +53,7 @@ map in the same PR.
 | Full decision trace for every card, shipped with the engine | D10 (schema: D02; export: D17) |
 | Known-failure-mode warnings encoded on the sheet | D10, D11 |
 | 2+-source flagged horses get small coverage even in lean mode | D10 |
+| An LLM can generate a card manually, race by race, from entries and already-fetched consensus (no search); stored in its own LLM_GENERATED bucket, compared against lean and human via the existing standing/P&L machinery, never pooled | D63 |
 
 ## Card presentation (workflow step 4)
 

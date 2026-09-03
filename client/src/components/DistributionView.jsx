@@ -6,7 +6,7 @@ const signed = (cents) => (
   <span className={cents >= 0 ? 'pl--pos' : 'pl--neg'}>{cents >= 0 ? '+' : '−'}{money(Math.abs(cents))}</span>
 );
 const pct = (x) => (x == null ? '—' : `${(100 * x).toFixed(0)}%`);
-const BUCKET_CHIP = { FULL: 'unanimous', PARTIAL: 'split', PROGRAM_ONLY: 'chaos', ODDS_ONLY: 'guess', HUMAN: 'human' };
+const BUCKET_CHIP = { FULL: 'unanimous', PARTIAL: 'split', PROGRAM_ONLY: 'chaos', ODDS_ONLY: 'guess', HUMAN: 'human', LLM_GENERATED: 'llm' };
 
 // Distributions (D20): the SHAPE of the P/L per completeness bucket - share
 // of losing days, the deepest drawdown of the running P/L, and single-ticket

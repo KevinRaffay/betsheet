@@ -14,7 +14,7 @@
 // The flag (> 0.8) is driven by NET: on 2026-08-28 gross was 40% while net
 // was 77% - the gross figure hides refunds and small winners.
 
-export const BUCKET_ORDER = ['FULL', 'PARTIAL', 'PROGRAM_ONLY', 'ODDS_ONLY', 'HUMAN'];
+export const BUCKET_ORDER = ['FULL', 'PARTIAL', 'PROGRAM_ONLY', 'ODDS_ONLY', 'HUMAN', 'LLM_GENERATED'];
 export const DEPENDENCE_THRESHOLD = 0.8;
 
 /**
