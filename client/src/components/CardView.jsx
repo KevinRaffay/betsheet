@@ -147,7 +147,6 @@ export default function CardView({ cardId, onBack, onDeleted }) {
         <div className="notice notice--warn">
           <ul>{FAILURE_MODE_WARNINGS.map((w, i) => <li key={i}>{w}</li>)}</ul>
         </div>
-        <p className="responsible">{RESPONSIBLE_LINE}</p>
       </div>
 
       {card.allocations.map((a) => {
@@ -257,6 +256,7 @@ export default function CardView({ cardId, onBack, onDeleted }) {
         </div>
       )}
 
+      <p className="responsible">{RESPONSIBLE_LINE}</p>
     </section>
   );
 }
