@@ -355,23 +355,22 @@ ingestRouter.post('/race-days', (req, res) => {
   // The one-day-per-track+date rule keys on the canonical code (D35), not
   // the raw text a parser happened to spell the track with - "Del Mar" and
   // "Delmar" collide on the same date instead of silently coexisting.
-  const existing = db.prepare('SELECT id, deleted_at FROM race_days WHERE track_code = ? AND date = ?')
-    .get(canonicalizeTrack(p.track).code, p.date);
+  const existingRows = db.prepare('SELECT id, correlation_id, deleted_at FROM race_days WHERE track_code = ? AND date = ? ORDER BY deleted_at IS NULL DESC, id')
+    .all(canonicalizeTrack(p.track).code, p.date);
+  const existing = existingRows[0] ?? null;
   // A LIVE duplicate needs an explicit replace; a soft-deleted tombstone
   // for the same track/date is superseded by re-ingesting - the user
   // already deleted it, and the code+date pair leaves no other slot.
-  if (existing && !existing.deleted_at && !p.replace) {
+  if (existingRows.some((row) => !row.deleted_at) && !p.replace) {
     return res.status(409).json({
       error: `A race day for ${p.track} ${p.date} already exists.`,
       existingId: existing.id,
     });
   }
 
-  const oldRow = existing
-    ? db.prepare('SELECT id, correlation_id, deleted_at FROM race_days WHERE id = ?').get(existing.id)
-    : null;
+  const oldRows = existingRows;
   const save = db.transaction(() => {
-    if (existing) db.prepare('DELETE FROM race_days WHERE id = ?').run(existing.id);
+    for (const row of oldRows) db.prepare('DELETE FROM race_days WHERE id = ?').run(row.id);
     return insertRaceDay(db, p, correlationId);
   });
   const dayId = save();
@@ -379,7 +378,7 @@ ingestRouter.post('/race-days', (req, res) => {
   // A replaced/superseded day documents itself in the trace: the old id and
   // correlation id stay resolvable even though the row is gone, so log
   // events referencing them read as "that day was superseded by this one".
-  if (oldRow) {
+  for (const oldRow of oldRows) {
     traceLog.info('race_day_superseded', {
       correlationId,
       raceDayId: dayId,
