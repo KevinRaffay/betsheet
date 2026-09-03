@@ -1,6 +1,6 @@
 import React, { useEffect, useState } from 'react';
 import { generateCardApi, getTemplates, listCards } from '../api.js';
-import LlmCardPanel from './LlmCardPanel.jsx';
+import LlmCardModal from './LlmCardModal.jsx';
 
 // The cards section of a stored race day: existing cards and the generate
 // action - append-only, every run is a new numbered card carrying its
@@ -12,7 +12,7 @@ export default function CardsPanel({ dayId, onOpenCard }) {
   const [variant, setVariant] = useState('default');
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState(null);
-  const [showLlm, setShowLlm] = useState(false);
+  const [showLlmModal, setShowLlmModal] = useState(false);
 
   const reload = () => listCards(dayId).then(setCards).catch((e) => setError(String(e.message)));
   useEffect(() => { reload(); }, [dayId]);
@@ -54,8 +54,8 @@ export default function CardsPanel({ dayId, onOpenCard }) {
           <button className="btn btn--primary" disabled={busy} onClick={handleGenerate}>
             {busy ? 'Generating…' : 'Generate card'}
           </button>
-          <button className="btn" onClick={() => setShowLlm((v) => !v)}>
-            {showLlm ? 'Hide LLM card' : 'Generate Card from LLM'}
+          <button className="btn" onClick={() => setShowLlmModal(true)}>
+            Generate Card from LLM
           </button>
         </div>
       </div>
@@ -87,7 +87,14 @@ export default function CardsPanel({ dayId, onOpenCard }) {
           </tbody>
         </table>
       )}
-      {showLlm && <LlmCardPanel dayId={dayId} onOpenCard={onOpenCard} />}
+      {showLlmModal && (
+        <LlmCardModal
+          dayId={dayId}
+          onOpenCard={onOpenCard}
+          onCardChanged={reload}
+          onClose={() => { setShowLlmModal(false); reload(); }}
+        />
+      )}
     </section>
   );
 }
