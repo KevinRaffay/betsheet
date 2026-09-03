@@ -9,6 +9,11 @@ tracked externally — it must always reflect actual state.
 table and wherever the ID is cited; the plain D-sequence is reserved for the
 planned deliverables and a QA row never reuses or blocks a number.
 
+**Maintenance note (QA, 2026-09-02):** migration 014 was restored to its
+recorded immutable contents after a digest mismatch. The tombstone-collision
+repair lives in append-only migration 019; this correction does not introduce
+a new deliverable.
+
 | ID | Deliverable | Phase | PR # / branch | Status | Notes |
 | --- | --- | --- | --- | --- | --- |
 | D44-QA | Browser routes and deep-link refresh | 1 | [#45](https://github.com/KevinRaffay/betsheet/pull/45), [#48](https://github.com/KevinRaffay/betsheet/pull/48) / `qa` | merged | History API routes for `/`, `/new`, `/pl`, `/simulate`, `/day/:id`, and `/card/:id`; Express serves the built client shell for non-API routes while unknown API paths remain JSON 404s; `npm run check-routing` and `npm run build` |

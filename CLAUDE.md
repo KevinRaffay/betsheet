@@ -413,6 +413,7 @@ is the first (D52: engine `lean-1.1`, bucket PROGRAM_ONLY, the 70-day DMR
 - **Ports**: BetSheet uses api :8788 / vite :5175. life-swipe owns :8787 and
   :5173/:5174 on this machine — don't squat on them.
 - **Two instances, two log dirs.** The betsheet-alt test instance (port 8902, its own DB) sets BETSHEET_LOG_DIR=server/logs-alt in C:/repos/.claude/launch.json. It used to share server/logs with the main instance - either side's factory reset silently wiped the other's decision traces (found live: exports came back traceStatus=missing). Never point two instances at one log dir.
+- **Shipped migrations are immutable.** If an applied migration needs a repair, restore its original contents and add the fix as the next numbered migration. Migration 019 carries the D35 tombstone-collision repair that must not be added to 014 after release.
 - **Equibase blocks scripted fetching.** Confirmed. Don't retry cleverly;
   the paste/PDF path is the design, not a fallback.
 - **BETSHEET_CONTACT** (in `.env`, gitignored) is the human named in the
