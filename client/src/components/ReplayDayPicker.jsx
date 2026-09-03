@@ -1,26 +1,22 @@
 import React, { useEffect, useState } from 'react';
 import { getRandomReplayDay, getReplayDays } from '../api.js';
 
-// Replay (D55) day picker: stored days with results, replayed_at blank =
-// unplayed. Default pool is DMR-2025-* meets (more likely forgotten, so
-// genuinely blind) - the checkbox widens to every meet.
+// Replay (D55) day picker: every stored day with results, replayed_at
+// blank = unplayed.
 export default function ReplayDayPicker({ onBack, onOpenDay, onOpenStanding }) {
-  const [widen, setWiden] = useState(false);
   const [data, setData] = useState(null);
   const [error, setError] = useState(null);
   const [busy, setBusy] = useState(false);
 
-  const pool = widen ? 'all' : 'recent';
-
   useEffect(() => {
-    getReplayDays(pool).then(setData).catch((e) => setError(String(e.message)));
-  }, [pool]);
+    getReplayDays().then(setData).catch((e) => setError(String(e.message)));
+  }, []);
 
   const handleRandom = async () => {
     setBusy(true);
     setError(null);
     try {
-      const day = await getRandomReplayDay(pool);
+      const day = await getRandomReplayDay();
       onOpenDay(day.id);
     } catch (e) {
       setError(String(e.message));
@@ -44,12 +40,9 @@ export default function ReplayDayPicker({ onBack, onOpenDay, onOpenStanding }) {
       {error && <p className="notice notice--error">{error}</p>}
       <div className="formrow formrow--tight">
         <button className="btn btn--primary" disabled={busy} onClick={handleRandom}>Random unplayed day</button>
-        <label className="dim">
-          <input type="checkbox" checked={widen} onChange={(e) => setWiden(e.target.checked)} /> widen to every meet (2026 days are more likely remembered)
-        </label>
       </div>
       {!data && <p className="placeholder">Loading…</p>}
-      {data && data.days.length === 0 && <p className="placeholder">No stored days with results in this pool.</p>}
+      {data && data.days.length === 0 && <p className="placeholder">No stored days with results yet.</p>}
       {data && data.days.length > 0 && (
         <table className="grid grid--click">
           <thead>

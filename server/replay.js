@@ -99,30 +99,26 @@ function buildSummary(db, card) {
 
 replayRouter.get('/replay/days', (req, res) => {
   const db = getDb();
-  const pool = req.query.pool === 'all' ? 'all' : 'recent';
-  const rows = db.prepare(`
+  const days = db.prepare(`
     SELECT rd.id, rd.track, rd.date, rd.meet, rd.replayed_at AS replayedAt,
            (SELECT COUNT(*) FROM races r WHERE r.race_day_id = rd.id) AS raceCount
     FROM race_days rd
     WHERE rd.deleted_at IS NULL AND EXISTS (SELECT 1 FROM race_results rr WHERE rr.race_day_id = rd.id)
     ORDER BY rd.date DESC, rd.track
   `).all();
-  const days = pool === 'all' ? rows : rows.filter((r) => r.meet?.startsWith('DMR-2025'));
-  res.json({ pool, days });
+  res.json({ days });
 });
 
 replayRouter.get('/replay/random', (req, res) => {
   const db = getDb();
-  const pool = req.query.pool === 'all' ? 'all' : 'recent';
-  const rows = db.prepare(`
+  const candidates = db.prepare(`
     SELECT rd.id, rd.track, rd.date, rd.meet,
            (SELECT COUNT(*) FROM races r WHERE r.race_day_id = rd.id) AS raceCount
     FROM race_days rd
     WHERE rd.deleted_at IS NULL AND rd.replayed_at IS NULL
       AND EXISTS (SELECT 1 FROM race_results rr WHERE rr.race_day_id = rd.id)
   `).all();
-  const candidates = pool === 'all' ? rows : rows.filter((r) => r.meet?.startsWith('DMR-2025'));
-  if (!candidates.length) return res.status(404).json({ error: 'No unplayed days in this pool.' });
+  if (!candidates.length) return res.status(404).json({ error: 'No unplayed days.' });
   res.json(candidates[Math.floor(Math.random() * candidates.length)]);
 });
 
