@@ -313,6 +313,15 @@ Before a branch is reported ready, verify — out loud, in the final message:
 
 ## Feature status
 
+The D66 modal follow-up keeps races in one-column cards with collapsible
+entries, fixed header/footer controls, a generation spinner, and next-race
+navigation that advances from the race most recently saved. It displays
+preview payout estimates before save, shows generation/save errors inside the
+affected race card, preserves model reasoning in the saved allocation and
+keeps that reasoning visible at the same compact size. The LLM prompt also
+receives the day's stored external consensus, including Sports from the
+Basement.
+
 | feature | state | notes |
 | --- | --- | --- |
 | LLM cards: fix "If it hits" column empty on the card sheet (D67) | in review | PR [#84](https://github.com/KevinRaffay/betsheet/pull/84), branch `fix-llm-card-est-payout` — live bug report 2026-09-03. Root cause: `shared/parsers/human-picks.js` (reused for LLM tickets since D63) always sets `estMinCents`/`estMaxCents` null - correct for a HUMAN's own pasted picks (D54, no estimate needed), wrong for an LLM's, which should be reviewable like the engine's own cards. Fix scoped to LLM cards only: new `estimatePayouts` in `server/llm-cards.js`, called at save time, reuses `shared/betmath.js`'s SAME validated formulas the engine uses (`winPayout` exact for win, `placeEstimate`/`exactaEstimate`/`trifectaBoxEstimate` banded for place/exacta/exacta box/trifecta box - exacta box using the two shortest-priced horses in the box). Show/straight trifecta/superfecta/superfecta box deliberately left without an estimate - no validated formula exists anywhere in this codebase for them (the engine never produces those types), and inventing new unvalidated multipliers alongside `betmath.js`'s carefully-tuned constants would be guessing with money math. `npm run check-llm-cards` grew two regressions (a win ticket's exact estimate; an exacta box estimate using the two shortest-priced horses, independently computed and compared); `check-human-picks` (confirms human cards unaffected), `check-schema`, `npm run build` all pass. Browser-verified end to end with a real `ANTHROPIC_API_KEY`: generated/saved a 3-ticket race, opened the real card view, confirmed "If it hits" reads $280 exact (win), $60.00–$90.00 est. (place), $62.56–$129.94 est. (exacta box) - all matching hand-computed expected values |

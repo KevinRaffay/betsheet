@@ -14,6 +14,14 @@ recorded immutable contents after a digest mismatch. The tombstone-collision
 repair lives in append-only migration 019; this correction does not introduce
 a new deliverable.
 
+**D66 follow-up (QA, 2026-09-02):** the LLM modal now uses stacked race cards
+with collapsible entries, fixed header/footer controls, a generation spinner,
+and next-race navigation that advances from the race most recently saved. It
+also shows payout estimates in preview, displays generation/save errors in the
+affected race card, preserves model reasoning in saved allocations and keeps
+that reasoning visible at the preview's compact size. The LLM prompt receives
+stored external consensus, including Sports from the Basement.
+
 | ID | Deliverable | Phase | PR # / branch | Status | Notes |
 | --- | --- | --- | --- | --- | --- |
 | D44-QA | Browser routes and deep-link refresh | 1 | [#45](https://github.com/KevinRaffay/betsheet/pull/45), [#48](https://github.com/KevinRaffay/betsheet/pull/48) / `qa` | merged | History API routes for `/`, `/new`, `/pl`, `/simulate`, `/day/:id`, and `/card/:id`; Express serves the built client shell for non-API routes while unknown API paths remain JSON 404s; `npm run check-routing` and `npm run build` |

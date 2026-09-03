@@ -109,7 +109,7 @@ export default function ReplayRaceView({ dayId, initialRace = 1, onBack, onOpenS
         <h2>{dayInfo.track} — {dayInfo.date} · Replay, race {raceNumber} of {totalRaces}</h2>
         <div className="btnrow">
           <button className="btn" disabled={!canGoPrev} onClick={() => setRaceNumber((n) => n - 1)}>◂ Prev race</button>
-          <button className="btn" disabled={!canGoNext} onClick={() => setRaceNumber((n) => n + 1)}>Next race ▸</button>
+          <button className="btn" disabled={!canGoNext} onClick={() => setRaceNumber((n) => n + 1)}>Next race →</button>
           {cardId && <button className="btn" disabled={busy} onClick={handleClose}>Close day</button>}
           <button className="btn" onClick={onOpenStanding}>Standing</button>
           <button className="btn" onClick={onBack}>Back</button>

@@ -130,6 +130,7 @@ try {
   console.log('-- preview race 1: well-formed stub response --');
   const p1 = await (await jpost(`/api/race-days/${dayId}/llm-cards/preview`, { race: 1, __stubResponse: wellFormedResponse(1, 25, 'Strong on the morning line.') })).json();
   check('preview parses one ticket, no blocking warnings, ruleTags carry llm', p1.tickets.length === 1 && p1.warnings.every((w) => !w.blocking) && p1.tickets[0].ruleTags?.[0] === 'llm', JSON.stringify(p1));
+  check('preview win ticket carries its If it hits estimate', p1.tickets[0].estMinCents === 8750 && p1.tickets[0].estMaxCents === 8750 && p1.tickets[0].estIsRange === false, JSON.stringify(p1.tickets[0]));
   check('reasoning text extracted separately from the ticket block', p1.reasoningText === 'Reasoning: Strong on the morning line.', p1.reasoningText);
   check('per-race bankroll on the first (cardless) preview = bankroll / totalRaces', p1.perRaceBankrollCents === 10000, JSON.stringify(p1));
   check('requestId present (the audit log row)', Number.isInteger(p1.requestId));
@@ -141,6 +142,7 @@ try {
   const cardId = s1Body.cardId;
   const cardRow = await jget(`/api/cards/${cardId}`);
   check('card is template llm, bucket LLM_GENERATED, engine_version llm', cardRow.template === 'llm' && cardRow.consensus_completeness === 'LLM_GENERATED' && cardRow.engine_version === 'llm', JSON.stringify({ t: cardRow.template, c: cardRow.consensus_completeness, e: cardRow.engine_version }));
+  check('saved race preserves model reasoning in its allocation thesis', cardRow.allocations.some((a) => a.race_number === 1 && a.thesis === 'Reasoning: Strong on the morning line.'), JSON.stringify(cardRow.allocations));
   check('the day already had results - the card graded immediately', s1Body.graded != null);
 
   console.log('-- regression (bug report): saved LLM tickets carry an "If it hits" estimate, same formulas the engine uses --');
