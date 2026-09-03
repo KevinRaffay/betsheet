@@ -90,6 +90,8 @@ export default function LlmCardModal({ dayId, onCardChanged, onClose }) {
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState(null);
   const [errorRace, setErrorRace] = useState(null);
+  const [regenerateAllProgress, setRegenerateAllProgress] = useState(null); // { index, total, raceNumber }
+  const [regenerateAllResults, setRegenerateAllResults] = useState(null); // [{ race, status: 'saved'|'blocked'|'error', message }]
 
   const reload = () => {
     getRaceDay(dayId).then(setDayInfo).catch((e) => setError(String(e.message)));
@@ -197,6 +199,53 @@ export default function LlmCardModal({ dayId, onCardChanged, onClose }) {
     setError(null);
   };
 
+  // Regenerate every race, one call at a time, auto-saving each in place -
+  // same generate-then-save operation "Regenerate" already does per race,
+  // just run for the whole card in race order. A race whose preview comes
+  // back with a BLOCKING warning is left as-is (its previous ticket, if
+  // any, is untouched) rather than saved half-broken; the run continues to
+  // the next race regardless (invariant-style: one bad race never blocks
+  // the rest, same as a missing consensus source never blocks generation).
+  const handleRegenerateAll = async () => {
+    if (busy || races.length === 0) return;
+    setOpenRace(null);
+    setPreview(null);
+    setErrorRace(null);
+    setError(null);
+    setRegenerateAllResults(null);
+    setBusy(true);
+    let localCardId = cardId;
+    let localCorrelationId = correlationId;
+    const results = [];
+    for (let i = 0; i < races.length; i++) {
+      const raceNumber = races[i].number;
+      setRegenerateAllProgress({ index: i + 1, total: races.length, raceNumber });
+      try {
+        const p = await previewLlmCard(dayId, raceNumber, localCardId, localCorrelationId);
+        if (p.correlationId) localCorrelationId = p.correlationId;
+        const blocking = p.warnings.find((w) => w.blocking);
+        if (blocking) {
+          results.push({ race: raceNumber, status: 'blocked', message: blocking.message });
+          continue;
+        }
+        const r = await lockLlmCard(dayId, {
+          race: raceNumber, requestId: p.requestId, bankrollCents: dayInfo.bankroll_cents, cardId: localCardId,
+        }, localCorrelationId);
+        if (!localCardId) localCardId = r.cardId;
+        results.push({ race: raceNumber, status: 'saved' });
+      } catch (e) {
+        results.push({ race: raceNumber, status: 'error', message: String(e.message) });
+      }
+      if (localCardId !== cardId) setCardId(localCardId);
+      refreshTickets(localCardId); // live feedback race by race, not one batch update at the end
+    }
+    setCorrelationId(localCorrelationId);
+    setRegenerateAllProgress(null);
+    setRegenerateAllResults(results);
+    onCardChanged?.();
+    setBusy(false);
+  };
+
   if (error && !dayInfo) {
     return (
       <div className="modal-backdrop" onClick={onClose}>
@@ -224,6 +273,32 @@ export default function LlmCardModal({ dayId, onCardChanged, onClose }) {
                 whether you save it.
               </p>
               {error && openRace == null && <p className="notice notice--error">{error}</p>}
+
+              <div className="formrow formrow--tight">
+                <button className="btn" disabled={busy || races.length === 0} onClick={handleRegenerateAll}>
+                  Regenerate All Races
+                </button>
+                {regenerateAllProgress && (
+                  <p className="llm-loading" role="status">
+                    <span className="spinner" aria-hidden="true" />
+                    Regenerating race {regenerateAllProgress.raceNumber} ({regenerateAllProgress.index} of {regenerateAllProgress.total})…
+                  </p>
+                )}
+              </div>
+              {regenerateAllResults && (
+                <div className={`notice ${regenerateAllResults.every((r) => r.status === 'saved') ? '' : 'notice--warn'}`}>
+                  <p>
+                    Regenerate all: {regenerateAllResults.filter((r) => r.status === 'saved').length} of {regenerateAllResults.length} races saved.
+                  </p>
+                  {regenerateAllResults.some((r) => r.status !== 'saved') && (
+                    <ul>
+                      {regenerateAllResults.filter((r) => r.status !== 'saved').map((r) => (
+                        <li key={r.race}>Race {r.race}: {r.status === 'blocked' ? 'blocked' : 'failed'} — {r.message}</li>
+                      ))}
+                    </ul>
+                  )}
+                </div>
+              )}
 
               <div className="llm-race-grid">
                 {races.map((r) => {
