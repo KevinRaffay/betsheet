@@ -1,0 +1,258 @@
+import React, { useEffect, useState } from 'react';
+import { getRaceDay, listCards, lockLlmCard, previewLlmCard } from '../api.js';
+
+const money = (cents) => (cents == null ? '—' : cents % 100 === 0 ? `$${cents / 100}` : `$${(cents / 100).toFixed(2)}`);
+
+// A ticket may come from a live preview (parseHumanPicksText's camelCase
+// shape: betType/costCents/tellerCall/legs) or a saved DB row (snake_case:
+// bet_type/cost_cents/teller_call/selections.legs) - normalize once so the
+// same table renders either.
+const normalizeTicket = (t) => ({
+  betType: t.betType ?? t.bet_type,
+  legsText: (t.legs ?? t.selections?.legs ?? []).map((l) => l.join(',')).join(' / '),
+  tellerCall: t.tellerCall ?? t.teller_call,
+  costCents: t.costCents ?? t.cost_cents,
+  rationaleText: t.rationale_text ?? t.rationaleText,
+});
+
+function TicketsTable({ tickets, totalCents }) {
+  if (!tickets.length) return <p className="dim">No tickets on this race.</p>;
+  return (
+    <table className="grid">
+      <thead><tr><th>Bet type</th><th>Selections / rationale</th><th>Say to the teller</th><th>Cost</th></tr></thead>
+      <tbody>
+        {tickets.map(normalizeTicket).map((t, i) => (
+          <tr key={i}>
+            <td className="bt">{t.betType.replace(/_/g, ' ')}</td>
+            <td>{t.legsText}{t.rationaleText ? <span className="dim"> — {t.rationaleText}</span> : null}</td>
+            <td className="teller">{t.tellerCall}</td>
+            <td>{money(t.costCents)}</td>
+          </tr>
+        ))}
+        <tr className="row--subtotal"><td colSpan={3}>Race total</td><td>{money(totalCents)}</td></tr>
+      </tbody>
+    </table>
+  );
+}
+
+// LLM cards (D63/D65/D66): a modal walkthrough, one race at a time -
+// Generate (the actual model call) shows a preview, Save confirms it.
+// Every already-generated race carries a collapsible panel in its own row
+// showing the saved card (D66 - replaces the "Open card #N" button, which
+// is gone: there's nothing left to jump elsewhere for). Calls
+// `onCardChanged` after every save so the day's Betting cards table
+// (CardsPanel.jsx) refreshes live instead of going stale until the page
+// is revisited (D65).
+export default function LlmCardModal({ dayId, onCardChanged, onClose }) {
+  const [dayInfo, setDayInfo] = useState(null);
+  const [cardId, setCardId] = useState(null);
+  const [ticketsByRace, setTicketsByRace] = useState(new Map()); // raceNumber -> { tickets, raceCostCents }
+  const [expandedRaces, setExpandedRaces] = useState(new Set());
+  const [openRace, setOpenRace] = useState(null); // race actively being generated/previewed (unsaved)
+  const [preview, setPreview] = useState(null);
+  const [correlationId, setCorrelationId] = useState(null);
+  const [busy, setBusy] = useState(false);
+  const [error, setError] = useState(null);
+
+  const reload = () => {
+    getRaceDay(dayId).then(setDayInfo).catch((e) => setError(String(e.message)));
+    listCards(dayId).then((cards) => {
+      const llm = cards.filter((c) => c.template === 'llm').sort((a, b) => b.card_number - a.card_number)[0];
+      setCardId(llm ? llm.id : null);
+    }).catch(() => {});
+  };
+  useEffect(reload, [dayId]);
+
+  const refreshTickets = () => {
+    if (!cardId) { setTicketsByRace(new Map()); return; }
+    fetch(`/api/cards/${cardId}`).then((r) => r.json()).then((c) => {
+      const numberByRaceId = new Map((c.races ?? []).map((r) => [r.id, r.number]));
+      const byRace = new Map();
+      for (const t of c.tickets ?? []) {
+        const num = numberByRaceId.get(t.race_id);
+        if (num == null) continue;
+        if (!byRace.has(num)) byRace.set(num, { tickets: [], raceCostCents: 0 });
+        const entry = byRace.get(num);
+        entry.tickets.push(t);
+        entry.raceCostCents += t.cost_cents;
+      }
+      setTicketsByRace(byRace);
+    }).catch(() => {});
+  };
+  useEffect(refreshTickets, [cardId]); // eslint-disable-line react-hooks/exhaustive-deps
+
+  // Close on Escape, from anywhere in the dialog.
+  useEffect(() => {
+    const onKey = (e) => { if (e.key === 'Escape') onClose(); };
+    window.addEventListener('keydown', onKey);
+    return () => window.removeEventListener('keydown', onKey);
+  }, [onClose]);
+
+  const races = dayInfo?.races ?? [];
+  const nextUngenerated = races.find((r) => !ticketsByRace.has(r.number));
+  const allGenerated = races.length > 0 && races.every((r) => ticketsByRace.has(r.number));
+
+  const toggleExpanded = (raceNumber, open) => {
+    setExpandedRaces((prev) => {
+      const next = new Set(prev);
+      if (open) next.add(raceNumber); else next.delete(raceNumber);
+      return next;
+    });
+  };
+
+  const handleGenerate = async (raceNumber) => {
+    setOpenRace(raceNumber);
+    setPreview(null);
+    setBusy(true);
+    setError(null);
+    try {
+      const p = await previewLlmCard(dayId, raceNumber, cardId, correlationId);
+      if (p.correlationId) setCorrelationId(p.correlationId);
+      setPreview(p);
+    } catch (e) {
+      setError(String(e.message));
+    } finally {
+      setBusy(false);
+    }
+  };
+
+  const handleSave = async () => {
+    setBusy(true);
+    setError(null);
+    try {
+      const r = await lockLlmCard(dayId, { race: openRace, requestId: preview.requestId, bankrollCents: dayInfo.bankroll_cents, cardId }, correlationId);
+      if (!cardId) setCardId(r.cardId);
+      const savedRace = openRace;
+      setOpenRace(null);
+      setPreview(null);
+      refreshTickets();
+      toggleExpanded(savedRace, true); // "the card will display" - open its panel right away
+      onCardChanged?.();
+    } catch (e) {
+      setError(String(e.message));
+    } finally {
+      setBusy(false);
+    }
+  };
+
+  const handleCancelPreview = () => { setOpenRace(null); setPreview(null); };
+
+  if (error && !dayInfo) {
+    return (
+      <div className="modal-backdrop" onClick={onClose}>
+        <div className="modal" role="dialog" aria-modal="true" onClick={(e) => e.stopPropagation()}>
+          <p className="notice notice--error">{error}</p>
+          <button className="btn" onClick={onClose}>Close</button>
+        </div>
+      </div>
+    );
+  }
+
+  return (
+    <div className="modal-backdrop" onClick={onClose}>
+      <div className="modal" role="dialog" aria-modal="true" aria-label="Generate Card from LLM" onClick={(e) => e.stopPropagation()}>
+        <div className="modal__header">
+          <h3>Generate Card from LLM</h3>
+          <button className="modal__close" onClick={onClose} aria-label="Close">×</button>
+        </div>
+        {!dayInfo && <p className="placeholder">Loading…</p>}
+        {dayInfo && (
+          <>
+            <p className="dim">
+              Generate one race at a time - reasoning and the raw model response are logged per race regardless of
+              whether you save it.
+            </p>
+            {error && <p className="notice notice--error">{error}</p>}
+
+            <table className="grid">
+              <thead><tr><th>Race</th><th>Status</th><th></th></tr></thead>
+              <tbody>
+                {races.map((r) => {
+                  const saved = ticketsByRace.get(r.number);
+                  return (
+                    <React.Fragment key={r.id}>
+                      <tr>
+                        <td>{r.number}</td>
+                        <td className="dim">{saved ? 'Generated' : 'Not generated'}</td>
+                        <td>
+                          <button className="btn btn--sm" disabled={busy} onClick={() => handleGenerate(r.number)}>
+                            {saved ? 'Regenerate' : 'Generate'}
+                          </button>
+                        </td>
+                      </tr>
+                      {openRace === r.number && (
+                        <tr>
+                          <td colSpan={3}>
+                            {busy && !preview && <p className="placeholder">Calling the model…</p>}
+                            {preview && (
+                              <div className="formrow">
+                                <p className="dim">
+                                  Race bankroll {money(preview.perRaceBankrollCents)} · card total {money(preview.cardCostCents)}
+                                  {' '}of {money(preview.bankrollCents)}
+                                  {preview.overBankroll && <span className="notice notice--warn"> over bankroll</span>}
+                                </p>
+                                {preview.reasoningText && (
+                                  <details className="race-bottom-line" open>
+                                    <summary>Model reasoning</summary>
+                                    <p>{preview.reasoningText}</p>
+                                  </details>
+                                )}
+                                {preview.warnings.length > 0 && (
+                                  <div className={`notice ${preview.warnings.some((w) => w.blocking) ? 'notice--error' : 'notice--warn'}`}>
+                                    <ul>{preview.warnings.map((w, i) => <li key={i}>{w.blocking ? <strong>BLOCKING: </strong> : null}{w.message}</li>)}</ul>
+                                  </div>
+                                )}
+                                {preview.tickets.length === 0 && preview.warnings.length === 0 && (
+                                  <p className="dim">The model proposed no bet on this race.</p>
+                                )}
+                                {preview.tickets.length > 0 && <TicketsTable tickets={preview.tickets} totalCents={preview.raceCostCents} />}
+                                <div className="formrow formrow--tight">
+                                  <button
+                                    className="btn btn--primary" disabled={busy || preview.warnings.some((w) => w.blocking)}
+                                    onClick={handleSave}
+                                  >
+                                    Save this race
+                                  </button>
+                                  <button className="btn" disabled={busy} onClick={handleCancelPreview}>Cancel</button>
+                                </div>
+                              </div>
+                            )}
+                          </td>
+                        </tr>
+                      )}
+                      {openRace !== r.number && saved && (
+                        <tr>
+                          <td colSpan={3}>
+                            <details
+                              className="race-bottom-line"
+                              open={expandedRaces.has(r.number)}
+                              onToggle={(e) => toggleExpanded(r.number, e.target.open)}
+                            >
+                              <summary>Race {r.number} card ({money(saved.raceCostCents)})</summary>
+                              <TicketsTable tickets={saved.tickets} totalCents={saved.raceCostCents} />
+                            </details>
+                          </td>
+                        </tr>
+                      )}
+                    </React.Fragment>
+                  );
+                })}
+              </tbody>
+            </table>
+
+            <div className="formrow formrow--tight" style={{ marginTop: 16 }}>
+              {nextUngenerated && (
+                <button className="btn btn--primary" disabled={busy} onClick={() => handleGenerate(nextUngenerated.number)}>
+                  Generate next race (Race {nextUngenerated.number}) →
+                </button>
+              )}
+              {allGenerated
+                ? <button className="btn btn--primary" onClick={onClose}>All races generated - Close</button>
+                : <button className="btn" onClick={onClose}>Close</button>}
+            </div>
+          </>
+        )}
+      </div>
+    </div>
+  );
+}

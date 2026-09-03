@@ -54,6 +54,23 @@ engine event.
 | `ticket_graded` | `cardId`, `ticketId`, `engineVersion` (the grader's version), `betType`, `races`, `legs`, `outcome` (win/refund/partial/loss), `costCents`, `returnedCents`, `plCents`, `note` | one ticket scored against the day's chart |
 | `card_graded` | `cardId`, `gradedBy` (the triggering session's correlationId), `engineVersion`, `costCents`, `returnedCents`, `plCents`, `outcomes`, `topTicketShare` | the card summary. A regrade replaces DB rows but appends here — the log keeps every grading pass |
 
+### Human cards (D54, emitted by `server/human-cards.js`, streamed under the card's correlationId)
+
+A human's pasted tickets, not the engine, produced these - no `inputs_snapshot`/`rule_fired`/`allocation_decided` events exist for a human card, since `shared/card-engine.js` is never called.
+
+| event | fields | meaning |
+| --- | --- | --- |
+| `card_generated` | `cardId`, `raceDayId`, `engineVersion` (`'human'`), `template` (`'human'`) | the human card's first race lock, on card creation only (append-only, D28) |
+| `ticket_added` | `cardId`, `raceDayId`, `race`, `betType`, `selections` (legs), `stakeCents`, `costCents`, `rationaleText` | one human ticket landed on the card, carrying the pasted rationale verbatim |
+| `human_race_locked` | `cardId`, `raceDayId`, `race`, `pass` | one race's picks were locked (or explicitly passed) on a human card - the timestamp this event's `ts` field carries is the same one written to `human_race_state.picks_locked_at`, the fact a later blindness computation (D55) is derived from |
+
+### Replay (D55, emitted by `server/replay.js`, under the card's correlationId)
+
+| event | fields | meaning |
+| --- | --- | --- |
+| `human_race_revealed` | `cardId`, `raceDayId`, `race` | one race's results were revealed on a human card - the `ts` this event carries is the same one written to `human_race_state.results_revealed_at`, the other half of the blindness computation |
+| `human_card_closed` | `cardId`, `raceDayId` | `POST /api/replay/cards/:id/close` ran: every still-unlocked race became an explicit PASS, every locked-unrevealed race was revealed, all under ONE timestamp so a genuinely pre-committed day still computes PRE_COMMIT afterward. Makes the card eligible for the standing table (`shared/replay.js`'s `isCardClosed`) |
+
 ### Simulation (emitted by `server/simulate.js`, one correlationId per POST /api/simulations)
 
 | event | fields | meaning |

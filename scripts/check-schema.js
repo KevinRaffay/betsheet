@@ -35,7 +35,7 @@ const tables = db.prepare(
 
 const expected = [
   'actual_stakes', 'allocations', 'backfill_queue', 'cards', 'consensus_picks', 'entries',
-  'exotic_payoffs', 'fetch_attempts', 'graded_tickets', 'publishes',
+  'exotic_payoffs', 'fetch_attempts', 'graded_tickets', 'human_race_state', 'llm_card_requests', 'publishes',
   'race_days', 'race_results', 'races', 'result_charts', 'result_scratches',
   'schema_migrations', 'simulation_results', 'simulation_runs', 'sources',
   'strategy_templates', 'tickets',
@@ -49,6 +49,9 @@ check('WAL mode', db.pragma('journal_mode', { simple: true }) === 'wal');
 
 check('race_days has a track_code column (D35, migration 014)',
   db.prepare("SELECT COUNT(*) c FROM pragma_table_info('race_days') WHERE name = 'track_code'").get().c === 1);
+
+check('cards has a saw_classification column, default 0 (D55, migration 017)',
+  db.prepare("SELECT COUNT(*) c FROM pragma_table_info('cards') WHERE name = 'saw_classification' AND \"dflt_value\" = '0'").get().c === 1);
 
 // --- track canonicalization backfill (D35): the migration's own SQL,
 // exercised directly against rows shaped like the ones it was written to
@@ -184,6 +187,13 @@ check('completeness: CHECK rejects an unknown level',
 d.prepare("UPDATE cards SET consensus_completeness = 'FULL' WHERE id = ?").run(card);
 check('completeness: valid level accepted',
   d.prepare('SELECT consensus_completeness c FROM cards WHERE id = ?').get(card).c === 'FULL');
+d.prepare("UPDATE cards SET consensus_completeness = 'HUMAN' WHERE id = ?").run(card);
+check('completeness: HUMAN accepted (D54, migration 016 rebuild)',
+  d.prepare('SELECT consensus_completeness c FROM cards WHERE id = ?').get(card).c === 'HUMAN');
+d.prepare("UPDATE cards SET consensus_completeness = 'LLM_GENERATED' WHERE id = ?").run(card);
+check('completeness: LLM_GENERATED accepted (D63, migration 018 rebuild)',
+  d.prepare('SELECT consensus_completeness c FROM cards WHERE id = ?').get(card).c === 'LLM_GENERATED');
+d.prepare("UPDATE cards SET consensus_completeness = 'FULL' WHERE id = ?").run(card);
 
 d.prepare(`INSERT INTO allocations (card_id, race_id, amount_cents, confidence, rule)
   VALUES (?, ?, 4000, 'SPLIT', 'mid_confidence_split')`).run(card, race);
@@ -206,6 +216,12 @@ d.prepare(`INSERT INTO result_scratches (race_day_id, race_number, program_numbe
 
 d.prepare(`INSERT INTO graded_tickets (ticket_id, outcome, returned_cents, pl_cents, correlation_id)
   VALUES (?, 'win', 5250, 3750, 'cid-check')`).run(ticket);
+
+d.prepare(`INSERT INTO human_race_state (card_id, race_number, picks_locked_at, passed)
+  VALUES (?, 1, '2026-08-30T20:00:00Z', 0)`).run(card);
+check('human_race_state: UNIQUE(card_id, race_number)',
+  !!throws(() => d.prepare(`INSERT INTO human_race_state (card_id, race_number, picks_locked_at)
+    VALUES (?, 1, '2026-08-30T20:05:00Z')`).run(card)));
 
 const run = d.prepare(`INSERT INTO simulation_runs (strategy_template_id, params, summary)
   VALUES (?, '{"bankroll":20000}', '{"net":3750}')`).run(tpl).lastInsertRowid;
@@ -249,7 +265,7 @@ check('join across the graph returns the graded ticket',
 // --- cascade delete: removing the day removes its dependents ---
 d.prepare('DELETE FROM race_days WHERE id = ?').run(day);
 const leftovers = ['races', 'entries', 'fetch_attempts', 'consensus_picks', 'cards',
-  'allocations', 'tickets', 'graded_tickets', 'race_results', 'exotic_payoffs',
+  'allocations', 'tickets', 'graded_tickets', 'human_race_state', 'race_results', 'exotic_payoffs',
   'result_scratches', 'result_charts', 'simulation_results', 'publishes', 'actual_stakes']
   .map((t) => [t, d.prepare(`SELECT COUNT(*) c FROM ${t}`).get().c])
   .filter(([, c]) => c > 0);

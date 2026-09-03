@@ -53,6 +53,7 @@ map in the same PR.
 | Full decision trace for every card, shipped with the engine | D10 (schema: D02; export: D17) |
 | Known-failure-mode warnings encoded on the sheet | D10, D11 |
 | 2+-source flagged horses get small coverage even in lean mode | D10 |
+| An LLM can generate a card manually, race by race, from entries and already-fetched consensus (no search); stored in its own LLM_GENERATED bucket, compared against lean and human via the existing standing/P&L machinery, never pooled | D63 |
 
 ## Card presentation (workflow step 4)
 
@@ -88,6 +89,8 @@ map in the same PR.
 | Distributions: % losing days, max drawdown, single-ticket dependence (>80%) | D20 |
 | Decision traces joined with graded results, exportable for LLM analysis | D17 |
 | Discipline tracker (planned vs. actual, house-money warnings) | D24 (schema in D03) |
+| A human's pasted tickets become a first-class card (same tables, same grader), in a `HUMAN` completeness bucket that never pools with an engine bucket; no card generation or grading change | D54 |
+| A human can play any stored day blind, race by race, and is compared against lean on the same day; blindness (pre-commit / sequential / non-blind) is recorded from timestamps and never pooled | D54, D55 |
 
 ## Backtest hygiene (addendum 2, 2026-09-02)
 

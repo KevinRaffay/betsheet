@@ -98,7 +98,7 @@ export default function CardView({ cardId, onBack, onDeleted }) {
       </div>
       {error && <p className="notice notice--error">{error}</p>}
       <p className="dim">
-        <span className={`chip chip--${card.consensus_completeness === 'FULL' ? 'unanimous' : card.consensus_completeness === 'PARTIAL' ? 'split' : 'chaos'}`}>
+        <span className={`chip chip--${card.consensus_completeness === 'FULL' ? 'unanimous' : card.consensus_completeness === 'PARTIAL' ? 'split' : card.consensus_completeness === 'HUMAN' ? 'human' : card.consensus_completeness === 'LLM_GENERATED' ? 'llm' : 'chaos'}`}>
           {card.consensus_completeness}
         </span>
         {' '}consensus · template {card.template ?? '—'} · engine <code>{card.engine_version ?? 'lean-0'}</code> · bankroll {money(card.bankroll_cents)}
@@ -147,7 +147,6 @@ export default function CardView({ cardId, onBack, onDeleted }) {
         <div className="notice notice--warn">
           <ul>{FAILURE_MODE_WARNINGS.map((w, i) => <li key={i}>{w}</li>)}</ul>
         </div>
-        <p className="responsible">{RESPONSIBLE_LINE}</p>
       </div>
 
       {card.allocations.map((a) => {
@@ -257,6 +256,7 @@ export default function CardView({ cardId, onBack, onDeleted }) {
         </div>
       )}
 
+      <p className="responsible">{RESPONSIBLE_LINE}</p>
     </section>
   );
 }

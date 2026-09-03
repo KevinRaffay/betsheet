@@ -22,6 +22,9 @@
     "reset": "node scripts/reset.js",
     "check-charts": "node scripts/check-charts.js",
     "check-grading": "node scripts/check-grading.js",
+    "check-human-picks": "node scripts/check-human-picks.js",
+    "check-llm-cards": "node scripts/check-llm-cards.js",
+    "check-replay": "node scripts/check-replay.js",
     "check-pl": "node scripts/check-pl.js",
     "check-export": "node scripts/check-export.js",
     "check-templates": "node scripts/check-templates.js",
@@ -35,6 +38,7 @@
     "dmtc-probe": "node scripts/dmtc-probe.js",
     "check-backfill": "node scripts/check-backfill.js",
     "check-distribution": "node scripts/check-distribution.js",
+    "backfill-bottom-line": "node scripts/backfill-bottom-line.js",
     "export-trace": "node scripts/export-trace.js"
   },
   "dependencies": {
