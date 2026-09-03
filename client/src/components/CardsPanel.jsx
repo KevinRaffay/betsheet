@@ -90,7 +90,6 @@ export default function CardsPanel({ dayId, onOpenCard }) {
       {showLlmModal && (
         <LlmCardModal
           dayId={dayId}
-          onOpenCard={onOpenCard}
           onCardChanged={reload}
           onClose={() => { setShowLlmModal(false); reload(); }}
         />
