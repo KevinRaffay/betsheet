@@ -154,7 +154,7 @@ export async function previewLlmRace(db, day, raceNumber, cardId, { stubResponse
     FROM consensus_picks cp JOIN sources s ON s.id = cp.source_id
     WHERE cp.race_id = ?
   `).all(race.id);
-  const consensusTable = buildConsensusTable(entries, picks).table;
+  const consensusTable = buildConsensusTable(entries, picks);
 
   const totalRaces = raceNumbersFor(db, day.id).length;
   const userPrompt = buildLlmRaceUserPrompt({
