@@ -144,9 +144,6 @@ export default function CardView({ cardId, onBack, onDeleted }) {
             {allTriggers.map((t, i) => <p className="trigger" key={i}>▸ R{t.race}: {t.text}</p>)}
           </>
         )}
-        <div className="notice notice--warn">
-          <ul>{FAILURE_MODE_WARNINGS.map((w, i) => <li key={i}>{w}</li>)}</ul>
-        </div>
       </div>
 
       {card.allocations.map((a) => {
@@ -256,6 +253,9 @@ export default function CardView({ cardId, onBack, onDeleted }) {
         </div>
       )}
 
+      <div className="notice notice--warn">
+        <ul>{FAILURE_MODE_WARNINGS.map((w, i) => <li key={i}>{w}</li>)}</ul>
+      </div>
       <p className="responsible">{RESPONSIBLE_LINE}</p>
     </section>
   );
