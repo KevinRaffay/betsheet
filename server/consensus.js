@@ -18,7 +18,9 @@
 import express from 'express';
 import { listFetchers, loadExtraFetchers } from './fetchers/index.js';
 import { parsePicksText } from '../shared/picks-parser.js';
+import { parseAtrPdfText } from '../shared/parsers/atr-pdf.js';
 import { classifyDay } from '../shared/classification.js';
+import { extractPdfLines } from './pdf-text.js';
 import { getDb } from './db.js';
 import { getLogger, newCorrelationId } from './logging.js';
 
@@ -200,6 +202,20 @@ function storePicks(db, sourceId, resolved) {
   });
   tx();
   return count;
+}
+
+// Adapts the ATR PDF parser's {race, topPick, watchFor} shape into the
+// same {race, picks: [{programNumber, horseName, pickType}]} shape
+// shared/picks-parser.js produces, so it feeds the SAME resolvePicks -
+// no new consensus schema, just a new input path into the existing one.
+function atrPicksToRaces(picks) {
+  return picks.map((p) => ({
+    race: p.race,
+    picks: [
+      { programNumber: p.topPick.programNumber, horseName: p.topPick.name, pickType: 'top' },
+      { programNumber: p.watchFor.programNumber, horseName: p.watchFor.name, pickType: 'watch_out' },
+    ],
+  }));
 }
 
 function loadDay(db, id) {
@@ -465,6 +481,59 @@ consensusRouter.post('/race-days/:id/consensus/manual', (req, res) => {
   recordAttempt(db, {
     raceDayId: day.id, sourceId, correlationId,
     outcome: 'manual_paste', parseOk: 1, picksExtracted: count,
+  });
+  classifyAndPersist(db, day, correlationId);
+  res.status(201).json({ correlationId, picksStored: count });
+});
+
+// At The Races PDF upload (D69): a same-day "print to PDF" of ATR's
+// racecard page, covering every race on one file - a faster input path
+// into the SAME consensus_picks structure the manual-paste textarea above
+// writes to (top pick + watch pick), not a new source type or schema. Same
+// trust tier as manual paste (not the D07 automated fetch cycle), so it
+// gets its own outcome value on the SAME preview-then-confirm contract
+// (invariant 9): preview parses and resolves but writes nothing, confirm
+// stores exactly what the preview showed.
+consensusRouter.post(
+  '/race-days/:id/consensus/atr-pdf-preview',
+  express.raw({ type: 'application/pdf', limit: '30mb' }),
+  async (req, res) => {
+    const db = getDb();
+    const day = loadDay(db, Number(req.params.id));
+    if (!day) return res.status(404).json({ error: 'No such race day.' });
+    if (!Buffer.isBuffer(req.body) || req.body.length === 0) {
+      return res.status(400).json({ error: 'Send the racecard PDF as a raw application/pdf body.' });
+    }
+    const sourceName = String(req.query.sourceName ?? '').trim() || 'At The Races';
+    try {
+      const text = await extractPdfLines(new Uint8Array(req.body));
+      const parsed = parseAtrPdfText(text);
+      const warnings = [...parsed.warnings];
+      const resolved = resolvePicks(day.races, atrPicksToRaces(parsed.picks), warnings, sourceName);
+      res.json({ sourceName, races: resolved, warnings });
+    } catch (err) {
+      res.status(422).json({ error: `Could not read that PDF: ${err?.message ?? err}` });
+    }
+  },
+);
+
+consensusRouter.post('/race-days/:id/consensus/atr-pdf', (req, res) => {
+  if (deletedGuard(req, res)) return;
+  const correlationId = req.get('x-correlation-id') || newCorrelationId();
+  const db = getDb();
+  const day = loadDay(db, Number(req.params.id));
+  if (!day) return res.status(404).json({ error: 'No such race day.' });
+  const sourceName = String(req.body?.sourceName ?? '').trim();
+  const races = req.body?.races;
+  if (!sourceName) return res.status(400).json({ error: 'sourceName is required.' });
+  if (!Array.isArray(races) || races.length === 0) {
+    return res.status(400).json({ error: 'races (from the preview) are required.' });
+  }
+  const sourceId = upsertSource(db, { name: sourceName, kind: 'manual' });
+  const count = storePicks(db, sourceId, races);
+  recordAttempt(db, {
+    raceDayId: day.id, sourceId, correlationId,
+    outcome: 'manual_upload', parseOk: 1, picksExtracted: count,
   });
   classifyAndPersist(db, day, correlationId);
   res.status(201).json({ correlationId, picksStored: count });
