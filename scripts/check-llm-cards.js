@@ -18,6 +18,7 @@ import fs from 'node:fs';
 import os from 'node:os';
 import path from 'node:path';
 import { fileURLToPath, URL } from 'node:url';
+import { exactaEstimate, winPayout } from '../shared/betmath.js';
 
 const ROOT = fileURLToPath(new URL('../', import.meta.url));
 const tmp = fs.mkdtempSync(path.join(os.tmpdir(), 'betsheet-llmcheck-'));
@@ -141,6 +142,36 @@ try {
   const cardRow = await jget(`/api/cards/${cardId}`);
   check('card is template llm, bucket LLM_GENERATED, engine_version llm', cardRow.template === 'llm' && cardRow.consensus_completeness === 'LLM_GENERATED' && cardRow.engine_version === 'llm', JSON.stringify({ t: cardRow.template, c: cardRow.consensus_completeness, e: cardRow.engine_version }));
   check('the day already had results - the card graded immediately', s1Body.graded != null);
+
+  console.log('-- regression (bug report): saved LLM tickets carry an "If it hits" estimate, same formulas the engine uses --');
+  {
+    // race 1's win ticket: #1 at ML 5/2 (mld 2.5), $25 stake -> winPayout is exact.
+    const winTicket = cardRow.tickets.find((t) => t.bet_type === 'win');
+    const expectedWin = winPayout(2500, 2.5);
+    check('win ticket: est_payout_min/max_cents populated and exact (not a range)',
+      winTicket && winTicket.est_payout_min_cents === expectedWin && winTicket.est_payout_max_cents === expectedWin && winTicket.est_is_range === 0,
+      JSON.stringify(winTicket));
+  }
+
+  console.log('-- regression (bug report): exacta box estimate uses the two shortest-priced horses in the box --');
+  {
+    const boxDay = {
+      track: 'Est Fixture Downs', date: '2026-09-03', bankrollCents: 20000, perRaceMinCents: 500,
+      races: [{ number: 1, wagerMenu: '$1 Exacta', entries: [entry('2', 'Two', '5/2', 2.5), entry('3', 'Three', '4/1', 4), entry('4', 'Four', '8/5', 1.6)] }],
+    };
+    const boxCreated = await (await jpost('/api/race-days', boxDay)).json();
+    const boxResponse = 'Reasoning about the box.\n\n<<<TICKETS>>>\nexacta box | #2,#4,#3 | $18 | Covers the top three underneath.\n<<<END TICKETS>>>\n';
+    const boxPreview = await (await jpost(`/api/race-days/${boxCreated.id}/llm-cards/preview`, { race: 1, __stubResponse: boxResponse })).json();
+    check('preview parses cleanly (3 horses boxed, $18 / 6 combos = $3/combo, a $1 multiple)', boxPreview.tickets.length === 1 && boxPreview.warnings.every((w) => !w.blocking), JSON.stringify(boxPreview));
+    const boxSave = await (await jpost(`/api/race-days/${boxCreated.id}/llm-cards`, { race: 1, requestId: boxPreview.requestId })).json();
+    const boxCard = await jget(`/api/cards/${boxSave.cardId}`);
+    const boxTicket = boxCard.tickets.find((t) => t.bet_type === 'exacta_box');
+    // Box holds mlds 2.5/4/1.6 - the two SHORTEST (most favored) are 1.6 (#4) and 2.5 (#2).
+    const [expLo, expHi] = exactaEstimate(300, 1.6, 2.5); // $18 / 6 combos = $3/combo = 300 cents
+    check('exacta box estimate uses the two shortest-priced horses (#4 at 1.6, #2 at 2.5), not the order pasted',
+      boxTicket && boxTicket.est_payout_min_cents === expLo && boxTicket.est_payout_max_cents === expHi && boxTicket.est_is_range === 1,
+      JSON.stringify({ boxTicket, expLo, expHi }));
+  }
 
   console.log('-- preview race 2 on the SAME card: bankroll recomputed from what race 1 actually spent --');
   const p2 = await (await jpost(`/api/race-days/${dayId}/llm-cards/preview`, { race: 2, cardId, __stubResponse: wellFormedResponse(2, 40, 'Value price given the consensus.') })).json();
