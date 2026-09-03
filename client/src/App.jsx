@@ -10,7 +10,7 @@ import { parseRoute, pathForView } from './routes.js';
 import BackfillQueue from './components/BackfillQueue.jsx';
 import DistributionView from './components/DistributionView.jsx';
 import ReplayDayPicker from './components/ReplayDayPicker.jsx';
-import ReplayRaceView from './components/ReplayRaceView.jsx';
+import ReplayDayLanding from './components/ReplayDayLanding.jsx';
 import ReplayStanding from './components/ReplayStanding.jsx';
 
 export default function App() {
@@ -82,7 +82,7 @@ export default function App() {
           />
         )}
         {view.name === 'replayDay' && (
-          <ReplayRaceView
+          <ReplayDayLanding
             dayId={view.id}
             onBack={() => navigate({ name: 'replay' })}
             onOpenStanding={() => navigate({ name: 'replayStanding' })}

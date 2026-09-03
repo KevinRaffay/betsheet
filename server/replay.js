@@ -160,6 +160,38 @@ function revealedPayload(db, card, race, raceNumber) {
   };
 }
 
+// ---------- day landing (D62): every race at a glance, PL once revealed ----------
+
+replayRouter.get('/replay/days/:id/races', (req, res) => {
+  const db = getDb();
+  const day = db.prepare('SELECT * FROM race_days WHERE id = ?').get(Number(req.params.id));
+  if (!day) return res.status(404).json({ error: 'No such race day.' });
+
+  const races = db.prepare('SELECT * FROM races WHERE race_day_id = ? ORDER BY number').all(day.id);
+  const cardId = req.query.cardId ? Number(req.query.cardId) : null;
+  const card = cardId ? db.prepare('SELECT * FROM cards WHERE id = ? AND race_day_id = ?').get(cardId, day.id) : null;
+  const states = card ? stateRows(db, card.id) : [];
+
+  const out = races.map((race) => {
+    const state = states.find((s) => s.race_number === race.number);
+    const row = {
+      raceNumber: race.number, distance: race.distance, surface: race.surface, raceType: race.race_type,
+      locked: Boolean(state), pass: Boolean(state?.passed), revealed: Boolean(state?.results_revealed_at),
+      humanRacePl: null, humanAllocatedCents: null, leanRacePl: null, leanAllocatedCents: null,
+    };
+    if (state?.results_revealed_at) {
+      const revealed = revealedPayload(db, card, race, race.number);
+      row.humanRacePl = revealed.humanRacePl;
+      row.humanAllocatedCents = revealed.humanAllocatedCents;
+      row.leanRacePl = revealed.leanRacePl;
+      row.leanAllocatedCents = revealed.leanAllocatedCents;
+    }
+    return row;
+  });
+
+  res.json({ bankrollCents: day.bankroll_cents, perRaceMinCents: day.per_race_min_cents, races: out });
+});
+
 // ---------- the blind race view ----------
 
 replayRouter.get('/replay/days/:id/races/:number', (req, res) => {
