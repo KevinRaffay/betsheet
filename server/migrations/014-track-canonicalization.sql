@@ -18,34 +18,8 @@
 -- an unknown track is never blocked, per invariant 3's spirit.
 ALTER TABLE race_days ADD COLUMN track_code TEXT;
 
-UPDATE race_days SET track_code = 'DMR'
+UPDATE race_days SET track_code = 'DMR', track = 'Del Mar'
 WHERE upper(replace(replace(track, ' ', ''), '.', '')) IN ('DELMAR', 'DMR', 'DELMARRACINGCOM');
-
--- A pre-D35 database can contain a deleted tombstone and a live day for the
--- same canonical track/date under different spellings. SQLite checks the
--- old UNIQUE(track, date) during each UPDATE, so move colliding tombstones
--- aside first, then canonicalize the live rows.
-UPDATE race_days
-SET track = '__legacy_delmar__'
-WHERE track_code = 'DMR'
-	AND deleted_at IS NOT NULL
-	AND EXISTS (
-		SELECT 1 FROM race_days live
-		WHERE live.id <> race_days.id
-			AND live.date = race_days.date
-			AND live.deleted_at IS NULL
-			AND live.track_code = 'DMR'
-	);
-
-UPDATE race_days SET track = 'Del Mar'
-WHERE track_code = 'DMR' AND deleted_at IS NULL;
-
-UPDATE race_days SET track = 'Del Mar'
-WHERE track_code = 'DMR' AND deleted_at IS NOT NULL
-	AND track <> '__legacy_delmar__';
-
-UPDATE race_days SET track = 'Delmar'
-WHERE track = '__legacy_delmar__';
 
 UPDATE race_days SET track_code = upper(substr(replace(track, ' ', ''), 1, 3))
 WHERE track_code IS NULL;
