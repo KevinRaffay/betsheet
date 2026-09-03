@@ -227,6 +227,22 @@ export const lockHumanCard = (dayId, { race, text, pass, bankrollCents, cardId }
     body: JSON.stringify({ race, text, pass, bankrollCents, cardId }),
   }).then(asJson);
 
+// LLM cards (D63): per-race preview (calls the model) + confirm/save, and
+// the per-race request log (reasoning + raw response).
+export const previewLlmCard = (dayId, race, cardId, correlationId) =>
+  fetch(`/api/race-days/${dayId}/llm-cards/preview`, {
+    method: 'POST',
+    headers: { 'content-type': 'application/json', ...(correlationId ? { 'x-correlation-id': correlationId } : {}) },
+    body: JSON.stringify({ race, cardId }),
+  }).then(asJson);
+export const lockLlmCard = (dayId, { race, requestId, bankrollCents, cardId }, correlationId) =>
+  fetch(`/api/race-days/${dayId}/llm-cards`, {
+    method: 'POST',
+    headers: { 'content-type': 'application/json', ...(correlationId ? { 'x-correlation-id': correlationId } : {}) },
+    body: JSON.stringify({ race, requestId, bankrollCents, cardId }),
+  }).then(asJson);
+export const getLlmRequests = (cardId) => fetch(`/api/cards/${cardId}/llm-requests`).then(asJson);
+
 // Replay (D55): the blind race-by-race view, reveal, close, standing.
 export const getReplayDays = () => fetch('/api/replay/days').then(asJson);
 export const getRandomReplayDay = () => fetch('/api/replay/random').then(asJson);
