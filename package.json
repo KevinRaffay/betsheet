@@ -8,7 +8,7 @@
     "start": "npm run build && node server/index.js",
     "start-qa": "npm run build && node -e \"process.env.BETSHEET_PORT ||= '8902'; import('./server/index.js')\"",
     "build": "vite build",
-    "dev": "concurrently -k -n vite,api -c cyan,magenta \"vite\" \"node --watch server/index.js\"",
+    "dev": "concurrently -k -n vite,api -c cyan,magenta \"vite\" \"node scripts/dev-watch.js\"",
     "serve": "node server/index.js",
     "check-logging": "node scripts/check-logging.js",
     "check-schema": "node scripts/check-schema.js",
