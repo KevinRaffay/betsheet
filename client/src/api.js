@@ -279,6 +279,22 @@ export const getReplayStanding = (meet) => {
   return fetch(`/api/replay/standing${q}`).then(asJson);
 };
 
+// Equibase "Off to the Races" PDF upload (D71): preview-then-confirm, same
+// contract as the At The Races PDF upload above, just persisting three
+// verbatim cards on confirm instead of consensus picks.
+export const equibaseOtrPreview = (id, file) =>
+  fetch(`/api/race-days/${id}/equibase-otr`, {
+    method: 'POST',
+    headers: { 'content-type': 'application/pdf' },
+    body: file,
+  }).then(asJson);
+export const equibaseOtrConfirm = (id, parseToken) =>
+  fetch(`/api/race-days/${id}/equibase-otr/confirm`, {
+    method: 'POST',
+    headers: { 'content-type': 'application/json' },
+    body: JSON.stringify({ parseToken }),
+  }).then(asJson);
+
 // Distributions (D20): losing days, drawdown, single-ticket dependence, per bucket.
 export const getDistribution = (engineVersion, meet) => {
   const q = new URLSearchParams();
