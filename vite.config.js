@@ -17,7 +17,37 @@ export default defineConfig({
     fs: { allow: ['..'] },
     // Tracks the API port so a second dev instance (or a verification run
     // beside an already-running npm start) can move both ports together.
-    proxy: { '/api': `http://localhost:${Number(process.env.BETSHEET_PORT) || 8788}` },
+    // 127.0.0.1, not localhost: the server binds IPv4 loopback only
+    // (invariant 10), while "localhost" on Windows resolves ::1 first.
+    proxy: {
+      '/api': {
+        target: `http://127.0.0.1:${Number(process.env.BETSHEET_PORT) || 8788}`,
+        // The API can go away mid-request in dev - a restart after a real
+        // edit, or the process not up yet. Without a handler the dropped
+        // socket surfaces as an unhandled "http proxy error: read
+        // ECONNRESET" stack in the terminal and an opaque network failure
+        // in the browser. Answer with the JSON shape client/src/api.js's
+        // `asJson` already reads, so the UI shows a sentence instead.
+        // Vite attaches its own 'error' listener AFTER this hook runs, so its
+        // red "http proxy error" stack still prints; ours goes above it and
+        // says what actually happened. Answering here first is what matters:
+        // vite's fallback only writes its own 500 when nothing else has.
+        configure: (proxy) => {
+          proxy.on('error', (err, req, res) => {
+            const detail = err?.code || err?.message || 'connection failed';
+            console.log(`[api proxy] ${req?.method ?? '?'} ${req?.url ?? '?'} - ${detail} (API restarting or down)`);
+            // `res` is a raw socket for a websocket upgrade, which has no
+            // writeHead - only an HTTP response can be answered.
+            if (!res || typeof res.writeHead !== 'function') return;
+            if (res.headersSent || res.writableEnded) return;
+            res.writeHead(503, { 'content-type': 'application/json' });
+            res.end(JSON.stringify({
+              error: `The API server did not answer (${detail}). It is restarting or not running - try again in a moment.`,
+            }));
+          });
+        },
+      },
+    },
   },
   build: {
     outDir: '../dist',
