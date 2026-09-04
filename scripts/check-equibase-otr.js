@@ -49,6 +49,51 @@ check('real fixture: all 8 races match the golden exactly', realParsed.races.len
 check('real fixture: every structural invariant holds on all 8 races (box3==box4[:3], box4[0]==show, box4[1]==win)',
   realParsed.races.every((r) => JSON.stringify(r.box3) === JSON.stringify(r.box4.slice(0, 3)) && r.box4[0] === r.showPick && r.box4[1] === r.winPick));
 
+// ========== 1b. all 16 archived files (D71 follow-up: single-file verification missed this) ==========
+//
+// D71 shipped verified against ONE file (2026-09-03). Running the SAME
+// method over every archived file (16 files, 143 races) found race 9 of
+// every 10-race day corrupted: race 10's trivia sentence sometimes prints
+// on its own y-line, absorbed into race 9's still-open column. Fixed by a
+// trivia-line guard (independent of the header) plus grammar-anchored box
+// extraction (a box list follows "#a, #b, #c and #d" - collect through the
+// first # after "and", flag anything left over as otr_trailing_tokens
+// rather than silently including it). All 16 must now be clean.
+
+const ALL_FIXTURE_DATES = [
+  '2026-08-07', '2026-08-08', '2026-08-09', '2026-08-13', '2026-08-14',
+  '2026-08-15', '2026-08-16', '2026-08-20', '2026-08-21', '2026-08-22',
+  '2026-08-23', '2026-08-27', '2026-08-28', '2026-08-29', '2026-08-30',
+  '2026-09-03',
+];
+const TEN_RACE_DAYS = new Set(['2026-08-08', '2026-08-15', '2026-08-16', '2026-08-29', '2026-08-30']);
+
+const allParsed = {};
+let totalRaces = 0;
+for (const date of ALL_FIXTURE_DATES) {
+  const pdfPath = path.join(FIXTURE_DIR, `DMR-${date}.pdf`);
+  const goldenPath = path.join(FIXTURE_DIR, `DMR-${date}.expected.json`);
+  const tsv = runPdftotextTsv(pdfPath);
+  const parsed = parseEquibaseOtrTsv(tsv);
+  const dayGolden = JSON.parse(fs.readFileSync(goldenPath, 'utf8'));
+  allParsed[date] = parsed;
+  totalRaces += parsed.races.length;
+
+  check(`${date}: matches its golden, zero warnings`, parsed.warnings.length === 0 && dayGolden.races.every((g) => {
+    const r = parsed.races.find((x) => x.race === g.race);
+    return r && r.showPick === g.showPick && r.winPick === g.winPick &&
+      JSON.stringify(r.box4) === JSON.stringify(g.box4) && JSON.stringify(r.box3) === JSON.stringify(g.box3);
+  }), JSON.stringify(parsed.warnings));
+
+  if (TEN_RACE_DAYS.has(date)) {
+    const r9 = parsed.races.find((r) => r.race === 9);
+    const r10 = parsed.races.find((r) => r.race === 10);
+    check(`${date}: race 9 has exactly 4 box4 numbers (was 5 before the fix)`, r9?.box4.length === 4, JSON.stringify(r9));
+    check(`${date}: race 10 parses normally too`, r10?.box4.length === 4 && r10?.box3.length === 3, JSON.stringify(r10));
+  }
+}
+check('all 16 files together: 143 races total', totalRaces === 143, `got ${totalRaces}`);
+
 // ========== 2. Header trivia sentence contributes no picks ==========
 
 check('R1 trivia horse "Visually" is not a captured name anywhere', !Object.values(realParsed.races.find((r) => r.race === 1).names).some((n) => n.includes('Visually')));
@@ -64,9 +109,12 @@ function wordRow(page, top, left, text) {
 }
 /** One printed line: left-tier phrase (words at x<360) + right-tier phrase (words at x>=360). */
 function tsvLine(page, top, leftPhrase, rightPhrase) {
+  // 12 units/word keeps up to ~29 words under OTR_COLUMN_BOUNDARY (360) -
+  // a long left phrase (a box line with several horse names) must never
+  // drift into right-tier x territory and get misread as a second column.
   const rows = [];
-  (leftPhrase ? leftPhrase.split(' ') : []).forEach((w, i) => rows.push(wordRow(page, top, 10 + i * 30, w)));
-  (rightPhrase ? rightPhrase.split(' ') : []).forEach((w, i) => rows.push(wordRow(page, top, 400 + i * 40, w)));
+  (leftPhrase ? leftPhrase.split(' ') : []).forEach((w, i) => rows.push(wordRow(page, top, 10 + i * 12, w)));
+  (rightPhrase ? rightPhrase.split(' ') : []).forEach((w, i) => rows.push(wordRow(page, top, 400 + i * 12, w)));
   return rows;
 }
 function buildSyntheticTsv(lines) {
@@ -104,6 +152,24 @@ check('synthetic: box3 != box4[:3] -> race still ingested with whatever parsed',
 check('synthetic: otr_structure_warning raised, non-blocking',
   mismatchParsed.warnings.some((w) => w.type === 'otr_structure_warning' && w.race === 1 && w.blocking === false),
   JSON.stringify(mismatchParsed.warnings));
+
+// ========== 4b. a stray 5th "#" after the box's printed close -> otr_trailing_tokens, box4 still length 4 ==========
+// (the exact shape of the D71 follow-up's real bug: an unrecognized line's
+// own program-number reference bleeding in AFTER the grammar's "and #N" close)
+
+const trailingTsv = buildSyntheticTsv([
+  { left: 'Race 1: some trivia sentence.' },
+  { left: '$2 to Show on #2 Tahini', right: '$2 to Win on #5 Certitude' },
+  { left: '$1 Exacta box on #2 Tahini, #5 Certitude, #3 Saratoga Special and #4 Bit\'s Tiger Magic #7 Stray Horse', right: '$2 Exacta box on #2 Tahini, #5 Certitude and #3 Saratoga Special' },
+]);
+const trailingParsed = parseEquibaseOtrTsv(trailingTsv);
+const trailingR1 = trailingParsed.races.find((r) => r.race === 1);
+check('synthetic: a stray 5th "#" after the box\'s close still yields box4 of length 4',
+  trailingR1 && JSON.stringify(trailingR1.box4) === JSON.stringify(['2', '5', '3', '4']),
+  JSON.stringify(trailingR1));
+check('synthetic: the stray token is reported as otr_trailing_tokens, non-blocking, never silently absorbed',
+  trailingParsed.warnings.some((w) => w.type === 'otr_trailing_tokens' && w.race === 1 && w.blocking === false && w.message.includes('#7')),
+  JSON.stringify(trailingParsed.warnings));
 
 // ========== real server round trip ==========
 
@@ -272,10 +338,80 @@ try {
       JSON.stringify(r.box4) === JSON.stringify(g.box4) && JSON.stringify(r.box3) === JSON.stringify(g.box3);
   }));
 
+  // -------- 11. batch CLI (D71 follow-up): ingest all 16 real files at once --------
+  // Runs the ACTUAL CLI (scripts/ingest-otr.js) as a subprocess, never the
+  // in-process function directly - server/equibase-otr.js reads
+  // BETSHEET_OTR_ARCHIVE_DIR once at module load, and this check script's
+  // own process already imported that module (for runPdftotextTsv above)
+  // before any archive-dir override could apply; a real subprocess with
+  // its own environment is the only way to keep this run off the
+  // committed archive, exactly the isolation server/dmtc-crawler.js's
+  // rawDir parameter and this same file's earlier check already rely on.
+  {
+    const { openDb } = await import('../server/db.js');
+    const { insertRaceDay } = await import('../server/ingest.js');
+    const { seedTemplates } = await import('../server/templates.js');
+
+    const batchDbPath = path.join(tmp, 'batch.sqlite');
+    const batchSourceDir = path.join(tmp, 'batch-source');
+    const batchArchiveDir = path.join(tmp, 'archive-equibase-otr-batch');
+    const batchLogDir = path.join(tmp, 'batch-logs');
+    fs.mkdirSync(batchSourceDir, { recursive: true });
+
+    const seedDb = openDb(batchDbPath);
+    seedTemplates(seedDb); // scripts/ingest-otr.js calls getDb() directly, not server/index.js's boot - seed here so 'equibase-otr' exists as a real strategy_templates row
+    for (const date of ALL_FIXTURE_DATES) {
+      fs.copyFileSync(path.join(FIXTURE_DIR, `DMR-${date}.pdf`), path.join(batchSourceDir, `${date}.pdf`));
+      const dayParsed = allParsed[date];
+      const races = dayParsed.races.map((r) => {
+        const referenced = [r.showPick, r.winPick, ...r.box4, ...r.box3].map(Number);
+        const max = Math.max(...referenced, 1);
+        return {
+          number: r.race, raceType: 'CLAIMING', conditions: 'synthetic (batch CLI check)',
+          entries: Array.from({ length: max }, (_, i) => ({
+            programNumber: String(i + 1), horseName: `Horse ${i + 1}`, morningLine: '5/1', morningLineDecimal: 5,
+          })),
+        };
+      });
+      insertRaceDay(seedDb, { track: 'Del Mar', date, bankrollCents: 20000, perRaceMinCents: 500, races }, `batch-seed-${date}`);
+    }
+    seedDb.close();
+
+    const runCli = () => new Promise((resolve) => {
+      let out = '';
+      const child = spawn(process.execPath, [path.join(ROOT, 'scripts', 'ingest-otr.js'), batchSourceDir], {
+        env: {
+          ...process.env, BETSHEET_DB: batchDbPath, BETSHEET_LOG_DIR: batchLogDir,
+          BETSHEET_OTR_ARCHIVE_DIR: batchArchiveDir,
+        },
+        stdio: ['ignore', 'pipe', 'pipe'],
+      });
+      child.stdout.on('data', (d) => { out += d; });
+      child.stderr.on('data', (d) => { out += d; });
+      child.on('close', () => resolve(out));
+    });
+
+    const run1 = await runCli();
+    check('batch CLI: 16 file(s) seen, 16 ingested, 0 queued', /16 file\(s\) seen: 16 ingested, 0 queued/.test(run1), run1);
+    check('batch CLI: 48 cards written (16 days x 3 variants)', /48 card\(s\) written/.test(run1), run1);
+
+    const verifyDb = openDb(batchDbPath);
+    const cardCount = verifyDb.prepare("SELECT COUNT(*) AS n FROM cards WHERE engine_version = 'equibase-otr'").get().n;
+    check('batch CLI: exactly 48 equibase-otr cards actually persisted', cardCount === 48, `got ${cardCount}`);
+    verifyDb.close();
+
+    const run2 = await runCli();
+    check('batch CLI re-run: idempotent - 0 ingested, 16 skipped, 0 new cards', /16 file\(s\) seen: 0 ingested, 0 queued, 16 skipped/.test(run2), run2);
+
+    const verifyDb2 = openDb(batchDbPath);
+    const cardCount2 = verifyDb2.prepare("SELECT COUNT(*) AS n FROM cards WHERE engine_version = 'equibase-otr'").get().n;
+    check('batch CLI re-run: still exactly 48 cards - a re-run never appends duplicates', cardCount2 === 48, `got ${cardCount2}`);
+    verifyDb2.close();
+  }
+
   // -------- 10. no engine-version bump; lean identity unchanged --------
   const { ENGINE_VERSION } = await import('../shared/card-engine.js');
   check('shared/card-engine.js ENGINE_VERSION unchanged at lean-1.1', ENGINE_VERSION === 'lean-1.1');
-  const leanCard = await jget(`/api/cards/${cardsAfter.find((c) => c.template !== 'equibase-otr')?.id ?? cardsAfter[0].id}`);
   const leanCards = await jget(`/api/race-days/${day.id}/cards`);
   check('a live lean card still generates fine on this day', leanCards.some((c) => c.engine_version === 'lean-1.1'), JSON.stringify(leanCards.map((c) => c.engine_version)));
 

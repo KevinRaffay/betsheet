@@ -29,6 +29,7 @@
 import { execFileSync } from 'node:child_process';
 import crypto from 'node:crypto';
 import fs from 'node:fs';
+import os from 'node:os';
 import path from 'node:path';
 import { fileURLToPath } from 'node:url';
 import express from 'express';
@@ -133,9 +134,21 @@ export function archiveOtrPdf(trackCode, date, bytes) {
   fs.mkdirSync(archiveDir(trackCode), { recursive: true });
   fs.writeFileSync(filePath, bytes);
   const manifest = readManifest(trackCode);
-  manifest[date] = { sha256: hash, uploaded_at: new Date().toISOString().replace(/\.\d+Z$/, 'Z'), bytes: bytes.length };
+  manifest[date] = { ...(manifest[date] ?? {}), sha256: hash, uploaded_at: new Date().toISOString().replace(/\.\d+Z$/, 'Z'), bytes: bytes.length };
   writeManifest(trackCode, manifest);
   return { archivePath: filePath, sha256: hash, bytes: bytes.length };
+}
+
+/** The sha256 of the file that last had cards persisted from it for (trackCode, date), or null if none yet (D71 follow-up batch CLI's idempotency key). */
+export function otrConfirmedSha256(trackCode, date) {
+  return readManifest(trackCode)[date]?.confirmed_sha256 ?? null;
+}
+
+/** Record that `sha256` has had cards persisted for (trackCode, date) - the manifest row already exists from archiveOtrPdf, this only adds the confirmation marker. */
+export function markOtrConfirmed(trackCode, date, hash) {
+  const manifest = readManifest(trackCode);
+  manifest[date] = { ...(manifest[date] ?? {}), confirmed_sha256: hash };
+  writeManifest(trackCode, manifest);
 }
 
 // ---------- ticket construction (verbatim, no interpretation) ----------
@@ -373,6 +386,105 @@ export function confirmEquibaseOtr(db, day, { parseToken, correlationId }) {
   return {
     cards: result.map(({ cardId, variant }) => ({ cardId, variant })),
     warnings: parsed.warnings, blockingCount: blocking.length, graded,
+  };
+}
+
+// ---------- batch CLI (D71 follow-up) ----------
+
+/** Read just far enough to learn the sheet's own printed track/date - used to find the matching race day before its entries can be loaded. */
+function peekOtrHeader(pdfBytes) {
+  const tmpPath = path.join(os.tmpdir(), `otr-peek-${crypto.randomUUID()}.pdf`);
+  fs.writeFileSync(tmpPath, pdfBytes);
+  let tsv;
+  try {
+    tsv = runPdftotextTsv(tmpPath);
+  } finally {
+    fs.rmSync(tmpPath, { force: true });
+  }
+  const parsed = parseEquibaseOtrTsv(tsv);
+  return { parsedTrack: parsed.parsedTrack, parsedDate: parsed.parsedDate };
+}
+
+/**
+ * Batch-ingest every PDF in `dir` (default the real committed DMR
+ * archive) through the SAME archive -> parse -> confirm path
+ * POST /equibase-otr and its /confirm route take - one file at a time,
+ * sorted by filename for a stable, reproducible run order.
+ *
+ * Policy A (D43's rule, applied here): a file whose preview carries zero
+ * BLOCKING warnings is auto-confirmed; any blocking warning (an unknown
+ * program number - see shared/parsers/equibase-otr.js) leaves the day
+ * QUEUED - unconfirmed, printed with why, for a human to finish through
+ * the normal upload panel rather than silently persisting a card with a
+ * dropped ticket. Idempotent by sha256: a file already recorded (in the
+ * per-track manifest.json's `confirmed_sha256`) as having had cards
+ * persisted for its date is SKIPPED without re-parsing - a re-run never
+ * appends duplicate cards for the same source file.
+ *
+ * Returns { files: [{file, status: 'ingested'|'queued'|'skipped',
+ * reason?, cards?}], seen, ingested, queued, skipped, cardsWritten }.
+ */
+export function batchIngestEquibaseOtr(db, { dir, correlationId, log = () => {} } = {}) {
+  const sourceDir = dir ?? archiveDir(TRACK_CODE);
+  const files = fs.existsSync(sourceDir)
+    ? fs.readdirSync(sourceDir).filter((f) => f.toLowerCase().endsWith('.pdf')).sort()
+    : [];
+
+  const results = [];
+  for (const file of files) {
+    const bytes = fs.readFileSync(path.join(sourceDir, file));
+    const hash = sha256(bytes);
+    let header;
+    try {
+      header = peekOtrHeader(bytes);
+    } catch (err) {
+      const r = { file, status: 'skipped', reason: `could not read the PDF: ${err?.message ?? err}` };
+      results.push(r); log(r); continue;
+    }
+    if (!header.parsedTrack || !header.parsedDate) {
+      const r = { file, status: 'skipped', reason: 'could not read a track/date header from this sheet' };
+      results.push(r); log(r); continue;
+    }
+
+    const trackCode = canonicalizeTrack(header.parsedTrack).code;
+    const day = db.prepare(
+      'SELECT * FROM race_days WHERE track_code = ? AND date = ? AND deleted_at IS NULL',
+    ).get(trackCode, header.parsedDate);
+    if (!day) {
+      const r = { file, status: 'skipped', reason: `no race day on file for ${header.parsedTrack} ${header.parsedDate}` };
+      results.push(r); log(r); continue;
+    }
+
+    if (otrConfirmedSha256(trackCode, day.date) === hash) {
+      const r = { file, status: 'skipped', reason: 'already ingested (identical file already confirmed for this date)' };
+      results.push(r); log(r); continue;
+    }
+
+    const preview = previewEquibaseOtr(db, day, bytes);
+    const blocking = preview.warnings.filter((w) => w.blocking);
+    if (blocking.length) {
+      const r = {
+        file, status: 'queued', raceDayId: day.id,
+        reason: `${blocking.length} blocking warning(s) - upload through the panel to review and confirm`,
+        blocking,
+      };
+      results.push(r); log(r); continue;
+    }
+
+    const confirmCid = correlationId ?? newCorrelationId();
+    const confirmed = confirmEquibaseOtr(db, day, { parseToken: preview.parseToken, correlationId: confirmCid });
+    markOtrConfirmed(trackCode, day.date, hash);
+    const r = { file, status: 'ingested', raceDayId: day.id, cards: confirmed.cards };
+    results.push(r); log(r);
+  }
+
+  return {
+    files: results,
+    seen: results.length,
+    ingested: results.filter((r) => r.status === 'ingested').length,
+    queued: results.filter((r) => r.status === 'queued').length,
+    skipped: results.filter((r) => r.status === 'skipped').length,
+    cardsWritten: results.reduce((a, r) => a + (r.cards?.length ?? 0), 0),
   };
 }
 

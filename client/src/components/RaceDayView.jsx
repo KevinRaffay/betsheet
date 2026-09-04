@@ -3,6 +3,7 @@ import { deleteRaceDay, deletionPreview, getRaceDay } from '../api.js';
 import ConsensusPanel from './ConsensusPanel.jsx';
 import CardsPanel from './CardsPanel.jsx';
 import ResultsPanel from './ResultsPanel.jsx';
+import EquibaseOtrPanel from './EquibaseOtrPanel.jsx';
 
 // Read-only view of a stored race day - what actually landed in the
 // database, not what the parser proposed.
@@ -78,6 +79,7 @@ export default function RaceDayView({ id, onBack, onOpenCard }) {
       <CardsPanel dayId={day.id} onOpenCard={onOpenCard} />
       <ResultsPanel dayId={day.id} />
       <ConsensusPanel dayId={day.id} />
+      <EquibaseOtrPanel dayId={day.id} />
       {day.races.map((race) => (
         <details className="race" key={race.id} open>
           <summary>

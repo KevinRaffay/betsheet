@@ -43,8 +43,26 @@ const BOX4_RE = /\$1 Exacta box on(.*?)(?=\$|$)/;
 const BOX3_RE = /\$2 Exacta box on(.*?)(?=\$|$)/;
 const TICKET_LABEL_RE = /\$\d+ Ticket/g;
 const PGM_RE = /#(\d+)/g;
+const PGM_SINGLE_RE = /#(\d+)/; // non-global twin - String.match() only reports .index without the 'g' flag
 const NAME_AFTER_PGM_RE = /#(\d+)\s+([^,#]+?)(?=,|$| and )/g;
 const DATE_RE = /([A-Za-z]+),\s+([A-Za-z]+)\s+(\d{1,2}),\s+(\d{4})/;
+// D71 follow-up: on every 10-race day (2026-08-15/16/29/30, found by running
+// all 16 archived files), race N+1's trivia sentence sometimes prints on its
+// OWN y-line, ABOVE the "Race N+1:" header line rather than sharing it - so
+// it isn't recognized as a header and is absorbed into race N's still-open
+// column text (its own "#N" reads as an extra box horse). Any such orphaned
+// trivia line is dropped wherever it falls, regardless of which of the two
+// printed sentence templates it uses ("#N Name is/has ..." OR "The #N
+// horse, Name, has/is ..." - both found in the real corpus). A "no $"
+// check doesn't discriminate reliably: some trivia sentences cite a
+// horse's career earnings ("#6 Maaz has earned $90,283...", real corpus)
+// and DO carry a "$". The reliable signal is the absence of one of the
+// three fixed phrases every real ticket line is built from - a line
+// carrying a program-number reference, none of those phrases, and a
+// sentence verb is trivia, never a pick.
+const TRIVIA_LINE_RE = /#\d+/;
+const TICKET_MARKER_RE = /to Show on|to Win on|Exacta box on/;
+const SENTENCE_VERB_RE = /\b(?:is|has|will|was|wins)\b/;
 
 /** Parse the raw `pdftotext -tsv` output into word records, TSV markers dropped. */
 function parseTsvWords(tsvText) {
@@ -83,11 +101,44 @@ function stripTicketLabels(s) {
   return s.replace(TICKET_LABEL_RE, ' ');
 }
 
-function extractPicks(text, re, count) {
+/** show/win: a single token, "to Show on #2 Tahini" - capture up to the next $ or end. */
+function extractPicks(text, re) {
   const m = stripTicketLabels(text).match(re);
   if (!m) return null;
-  const nums = [...m[1].matchAll(PGM_RE)].map((x) => x[1]);
-  return count != null && nums.length !== count ? nums : nums;
+  return [...m[1].matchAll(PGM_RE)].map((x) => x[1]);
+}
+
+/**
+ * A box list follows a fixed printed grammar - "#a Name, #b Name, #c Name
+ * and #d Name" - so it is parsed BY that grammar rather than "every # up to
+ * the next $": collect tokens through the first "#" that follows the word
+ * "and", then stop. Tokens matched but never fully guarded against - e.g. a
+ * still-unrecognized trivia line bleeding in behind it - land past that cut
+ * and are reported as a non-blocking `otr_trailing_tokens` warning instead
+ * of silently inflating the box (defense in depth alongside the trivia-line
+ * guard above, which is what actually fixes the D71 follow-up's real bug).
+ */
+function extractBoxByGrammar(text, re, race, ticketLabel, warnings) {
+  const m = stripTicketLabels(text).match(re);
+  if (!m) return null;
+  const segment = m[1];
+  const andIdx = segment.search(/\band\b/);
+  if (andIdx === -1) return [...segment.matchAll(PGM_RE)].map((x) => x[1]);
+
+  const tail = segment.slice(andIdx);
+  const firstAfterAnd = tail.match(PGM_SINGLE_RE);
+  if (!firstAfterAnd) return [...segment.slice(0, andIdx).matchAll(PGM_RE)].map((x) => x[1]);
+
+  const cutEnd = andIdx + firstAfterAnd.index + firstAfterAnd[0].length;
+  const kept = [...segment.slice(0, cutEnd).matchAll(PGM_RE)].map((x) => x[1]);
+  const trailing = [...segment.slice(cutEnd).matchAll(PGM_RE)].map((x) => x[1]);
+  if (trailing.length) {
+    warnings.push({
+      type: 'otr_trailing_tokens', blocking: false, race,
+      message: `Race ${race}: the ${ticketLabel} box lists extra numbers after its printed "and #N" close (${trailing.map((t) => `#${t}`).join(', ')}) - ignored.`,
+    });
+  }
+  return kept;
 }
 
 function extractNames(text) {
@@ -147,6 +198,7 @@ export function parseEquibaseOtrTsv(tsvText, { entriesByRace = {} } = {}) {
     }
     if (cur == null) continue;
     if (text.includes('Reward Opportunity') || text.includes('Copyright')) continue;
+    if (TRIVIA_LINE_RE.test(text) && !TICKET_MARKER_RE.test(text) && SENTENCE_VERB_RE.test(text)) continue;
     const left = line.words.filter((w) => w.left < OTR_COLUMN_BOUNDARY).map((w) => w.text).join(' ');
     const right = line.words.filter((w) => w.left >= OTR_COLUMN_BOUNDARY).map((w) => w.text).join(' ');
     if (left) races[cur].left.push(left);
@@ -159,9 +211,9 @@ export function parseEquibaseOtrTsv(tsvText, { entriesByRace = {} } = {}) {
       const L = races[raceNum].left.join(' ');
       const R = races[raceNum].right.join(' ');
       const showPick = extractPicks(L, SHOW_PICK_RE);
-      const box4 = extractPicks(L, BOX4_RE);
+      const box4 = extractBoxByGrammar(L, BOX4_RE, raceNum, '$1', warnings);
       const winPick = extractPicks(R, WIN_PICK_RE);
-      const box3 = extractPicks(R, BOX3_RE);
+      const box3 = extractBoxByGrammar(R, BOX3_RE, raceNum, '$2', warnings);
       const names = { ...extractNames(L), ...extractNames(R) };
 
       if (!showPick?.length || !winPick?.length || !box4?.length || !box3?.length) {
