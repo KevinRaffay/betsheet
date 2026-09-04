@@ -260,6 +260,16 @@ export function persistLlmRace(db, day, { race: raceNumber, requestId, bankrollC
     if (!card || card.race_day_id !== day.id || card.template !== 'llm') {
       throw new LlmCardError(404, 'No such LLM card on this race day.');
     }
+    // D76: a card's model is fixed at creation and never drifts - mixing
+    // models on one card would make its P/L uncomparable to either model
+    // on its own. The UI locks the picker once a card is resumed
+    // (LlmCardModal.jsx), so this is a defense-in-depth 409, not the
+    // primary guard.
+    if (card.llm_model && requestRow.model && card.llm_model !== requestRow.model) {
+      throw new LlmCardError(409,
+        `This card was generated with ${card.llm_model}; this request used ${requestRow.model}. `
+        + 'Start a new card to compare a different model.');
+    }
   }
 
   let isNewCard = false;
@@ -269,10 +279,10 @@ export function persistLlmRace(db, day, { race: raceNumber, requestId, bankrollC
       const cardNumber = db.prepare('SELECT COALESCE(MAX(card_number), 0) + 1 AS n FROM cards WHERE race_day_id = ?').get(day.id).n;
       const newCardId = db.prepare(`INSERT INTO cards
           (race_day_id, card_number, variant, strategy_template_id, bankroll_cents,
-           per_race_min_cents, status, correlation_id, consensus_completeness, engine_version)
-          VALUES (?, ?, 'default', ?, ?, ?, 'final', ?, 'LLM_GENERATED', 'llm')`)
+           per_race_min_cents, status, correlation_id, consensus_completeness, engine_version, llm_model)
+          VALUES (?, ?, 'default', ?, ?, ?, 'final', ?, 'LLM_GENERATED', 'llm', ?)`)
         .run(day.id, cardNumber, templateIdFor(db, 'llm'), bankrollCents ?? day.bankroll_cents,
-          day.per_race_min_cents ?? null, correlationId).lastInsertRowid;
+          day.per_race_min_cents ?? null, correlationId, requestRow.model ?? null).lastInsertRowid;
       card = db.prepare('SELECT * FROM cards WHERE id = ?').get(newCardId);
     }
 
@@ -304,7 +314,7 @@ export function persistLlmRace(db, day, { race: raceNumber, requestId, bankrollC
   })();
 
   if (isNewCard) {
-    traceLog.info('card_generated', { correlationId, cardId: result.id, raceDayId: day.id, engineVersion: 'llm', template: 'llm' });
+    traceLog.info('card_generated', { correlationId, cardId: result.id, raceDayId: day.id, engineVersion: 'llm', template: 'llm', llmModel: result.llm_model });
   }
   for (const t of parsed.tickets) {
     traceLog.info('ticket_added', {
@@ -322,7 +332,7 @@ export function persistLlmRace(db, day, { race: raceNumber, requestId, bankrollC
   if (hasResults) graded = gradeAndPersist(db, result.id, correlationId, { engineVersion: 'llm' });
 
   const cardCostCents = db.prepare('SELECT COALESCE(SUM(cost_cents), 0) AS n FROM tickets WHERE card_id = ?').get(result.id).n;
-  return { cardId: result.id, correlationId, tickets: parsed.tickets, raceCostCents: parsed.raceCostCents, cardCostCents, warnings: parsed.warnings, graded };
+  return { cardId: result.id, correlationId, llmModel: result.llm_model, tickets: parsed.tickets, raceCostCents: parsed.raceCostCents, cardCostCents, warnings: parsed.warnings, graded };
 }
 
 function loadDay(db, id) {

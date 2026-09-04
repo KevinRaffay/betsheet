@@ -1,5 +1,5 @@
 import React, { useEffect, useState } from 'react';
-import { generateCardApi, getTemplates, listCards } from '../api.js';
+import { generateCardApi, getTemplates, listCards, modelLabel } from '../api.js';
 import LlmCardModal from './LlmCardModal.jsx';
 
 // The cards section of a stored race day: existing cards and the generate
@@ -75,7 +75,7 @@ export default function CardsPanel({ dayId, onOpenCard }) {
                 <td><strong>#{c.card_number}</strong></td>
                 <td>{c.template ?? '—'}</td>
                 <td>{c.variant}</td>
-                <td><code>{c.engine_version ?? 'lean-0'}</code></td>
+                <td><code>{c.engine_version ?? 'lean-0'}</code>{c.llm_model && <span className="dim"> ({modelLabel(c.llm_model)})</span>}</td>
                 <td>${(c.bankroll_cents / 100).toFixed(0)}</td>
                 <td>{c.per_race_min_cents != null ? `$${(c.per_race_min_cents / 100).toFixed(0)}` : '—'}</td>
                 <td>{c.consensus_completeness}</td>

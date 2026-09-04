@@ -303,6 +303,77 @@ try {
   check('the requested (non-default) model was recorded on the request row, not silently swapped for the default',
     loggedModelChoice?.model === chosenModel, JSON.stringify(loggedModelChoice));
 
+  console.log('-- D76: llm_model recorded on the card, locked once set --');
+  const cardFresh1 = await jget(`/api/cards/${cardId}`);
+  check('card carries llm_model = the model that generated its first race (stub, in test mode)',
+    cardFresh1.llm_model === 'stub', JSON.stringify({ llm_model: cardFresh1.llm_model }));
+  const dayCardsList = await jget(`/api/race-days/${dayId}/cards`);
+  const llmCardListRow = dayCardsList.find((c) => c.id === cardId);
+  check('GET /race-days/:id/cards also carries llm_model', llmCardListRow?.llm_model === 'stub', JSON.stringify(llmCardListRow));
+
+  // Manufacture a "a different model answered this race" scenario: stub
+  // mode always records model='stub' (it never touches the model param at
+  // all - see the D75 block above), so two DIFFERENT real model values
+  // can't be produced through the stub path, and an off-stub call needs a
+  // real API key this environment deliberately doesn't have. Write the
+  // mismatch directly instead - the one place this check needs write
+  // access to the DB rather than going through the API.
+  {
+    const dbWrite = new Database(dbPath);
+    const p1c = await (await jpost(`/api/race-days/${dayId}/llm-cards/preview`, { race: 1, cardId, __stubResponse: wellFormedResponse(1, 20, 'A different model, hypothetically.') })).json();
+    dbWrite.prepare('UPDATE llm_card_requests SET model = ? WHERE id = ?').run('claude-opus-5', p1c.requestId);
+
+    const mismatchSave = await jpost(`/api/race-days/${dayId}/llm-cards`, { race: 1, requestId: p1c.requestId, cardId });
+    const mismatchBody = await mismatchSave.json();
+    check('saving a race whose request used a DIFFERENT model than the card is refused (409)',
+      mismatchSave.status === 409 && /stub/.test(mismatchBody.error) && /claude-opus-5/.test(mismatchBody.error),
+      JSON.stringify(mismatchBody));
+    const cardAfterMismatch = await jget(`/api/cards/${cardId}`);
+    check('the mismatched save changed nothing - still exactly two tickets', cardAfterMismatch.tickets.length === 2,
+      JSON.stringify(cardAfterMismatch.tickets.map((t) => t.id)));
+
+    // The SAME request, model corrected back to match the card's - saves fine.
+    dbWrite.prepare('UPDATE llm_card_requests SET model = ? WHERE id = ?').run('stub', p1c.requestId);
+    dbWrite.close();
+    const matchedSave = await jpost(`/api/race-days/${dayId}/llm-cards`, { race: 1, requestId: p1c.requestId, cardId });
+    const matchedBody = await matchedSave.json();
+    check('the SAME request, model corrected to match the card, saves normally', matchedSave.status === 201, JSON.stringify(matchedBody));
+  }
+
+  console.log('-- D76: LLM_GENERATED bucket splits by model in P/L --');
+  {
+    const otherDay = {
+      track: 'Model Compare Downs', date: '2026-09-06', bankrollCents: 20000, perRaceMinCents: 500,
+      races: [{ number: 1, wagerMenu: '$1 Exacta', entries: [entry('1', 'Other Runner', '5/2', 2.5, { rank: 1 }), entry('2', 'Other Two', '4/1', 4)] }],
+    };
+    const otherCreated = await (await jpost('/api/race-days', otherDay)).json();
+    await jpost(`/api/race-days/${otherCreated.id}/results`, {
+      track: 'MODEL COMPARE DOWNS', date: '2026-09-06', sourceKind: 'paste',
+      races: [{ number: 1, results: [{ programNumber: '1', horseName: 'Other Runner', finishPosition: 1, winCents: 700, placeCents: 340, showCents: 260 }], exotics: [], scratches: [] }],
+    });
+    const otherPreview = await (await jpost(`/api/race-days/${otherCreated.id}/llm-cards/preview`, { race: 1, __stubResponse: wellFormedResponse(1, 20, 'A second model, for comparison.') })).json();
+    const otherSave = await (await jpost(`/api/race-days/${otherCreated.id}/llm-cards`, { race: 1, requestId: otherPreview.requestId, bankrollCents: 20000 })).json();
+    check('the second-model card graded immediately (results were already on file)', otherSave.graded != null, JSON.stringify(otherSave.graded));
+    // Relabel this card's stub request/card as a distinct model directly
+    // (same technique as above) so the breakdown has two genuinely
+    // different models to actually split.
+    const dbWrite2 = new Database(dbPath);
+    dbWrite2.prepare('UPDATE cards SET llm_model = ? WHERE id = ?').run('claude-haiku-4-5-20251001', otherSave.cardId);
+    dbWrite2.close();
+
+    const plAfter = await jget('/api/pl?engineVersion=all');
+    const llmBucketAfter = plAfter.buckets.find((b) => b.completeness === 'LLM_GENERATED');
+    check('LLM_GENERATED bucket carries a byModel breakdown with both models present',
+      Array.isArray(llmBucketAfter?.byModel) && llmBucketAfter.byModel.some((m) => m.model === 'stub') && llmBucketAfter.byModel.some((m) => m.model === 'claude-haiku-4-5-20251001'),
+      JSON.stringify(llmBucketAfter?.byModel));
+    const stubRow = llmBucketAfter.byModel.find((m) => m.model === 'stub');
+    const haikuRow = llmBucketAfter.byModel.find((m) => m.model === 'claude-haiku-4-5-20251001');
+    check('each model row carries only ITS OWN card(s), the two never blended',
+      stubRow.cards === 1 && haikuRow.cards === 1 && haikuRow.label === 'Haiku 4.5', JSON.stringify({ stubRow, haikuRow }));
+    check('byModel rows sum to the bucket total (a breakdown, not a second pool)',
+      llmBucketAfter.byModel.reduce((a, m) => a + m.costCents, 0) === llmBucketAfter.costCents, JSON.stringify({ byModel: llmBucketAfter.byModel, bucket: llmBucketAfter.costCents }));
+  }
+
   console.log('-- no engine-version bump / lean fixture identity unchanged --');
   const leanCard = await (await jpost(`/api/race-days/${dayId}/cards`, {})).json();
   const { ENGINE_VERSION } = await import('../shared/card-engine.js');
