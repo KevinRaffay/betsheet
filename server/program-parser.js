@@ -449,6 +449,25 @@ function parsePanel(items, footer, warnings) {
 
 // ---------- handicapper analysis ("Bottom Line") ----------
 
+// The handicapper column's byline block - "<Track> Bottom Line By <Author>",
+// the author bio under it, the page numbers and the repeated masthead - is
+// page furniture, not analysis. It prints once, at the foot of the column's
+// last page, so it lands inside whichever race paragraph happens to run last
+// and reads as if the handicapper had written it about that race. A chunk
+// ends at the next "RACE <ordinal>" marker, so nothing following the byline
+// inside one chunk can be another race's analysis: drop from the byline to
+// the end of the chunk, which also takes the trailing page numbers and
+// masthead repeat with it regardless of what page the section ended on.
+// The masthead's track words are Title case - the same grammar
+// trackFromBottomLine reads - so the ALL-CAPS best-bet line printed right
+// before it ("BEST BET: RACE 4, RUNAWAY WIFE") can never be eaten as part
+// of the track name.
+const BYLINE_BLOCK = /(?:[A-Z][a-z][A-Za-z'.-]*\s+){1,4}Bottom Line\s+By\s+[A-Z][\s\S]*$/;
+
+export function stripBylineBlock(text) {
+  return norm(String(text ?? '').replace(BYLINE_BLOCK, ''));
+}
+
 function parseAnalysis(pagesText, warnings) {
   const text = norm(pagesText.join(' '));
   const bestBetM = text.match(/BEST BETS?:\s*RACE\s+(\d+),?\s+([A-Z][A-Z'’. ]+?)(?=\s+(?:[A-Z][a-z]|Del Mar Bottom Line|RACE\b))/);
@@ -464,7 +483,7 @@ function parseAnalysis(pagesText, warnings) {
     const raceNumber = ORDINALS[marks[i][1]];
     const start = marks[i].index + marks[i][0].length;
     const end = i + 1 < marks.length ? marks[i + 1].index : text.length;
-    const body = text.slice(start, end).trim();
+    const body = stripBylineBlock(text.slice(start, end));
     if (body.length < 80) continue; // a stray mention, not a paragraph
     chunks.push({ race: raceNumber, text: body });
   }

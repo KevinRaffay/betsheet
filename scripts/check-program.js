@@ -12,7 +12,7 @@
 import fs from 'node:fs';
 import path from 'node:path';
 import { fileURLToPath, URL } from 'node:url';
-import { parseProgramPdf, distanceFromHeader, stakesTitleFromHeader, trackFromBottomLine, splitFusedOwnerTrainer } from '../server/program-parser.js';
+import { parseProgramPdf, distanceFromHeader, stakesTitleFromHeader, trackFromBottomLine, splitFusedOwnerTrainer, stripBylineBlock } from '../server/program-parser.js';
 
 const ROOT = fileURLToPath(new URL('../', import.meta.url));
 const PDF = path.join(ROOT, 'tests', 'fixtures', 'programs', 'delmar-2026-08-30.pdf');
@@ -276,6 +276,29 @@ check('track fallback: multi-word track', trackFromBottomLine('Santa Anita Botto
 check('track fallback: no header -> null', trackFromBottomLine('BEST BET: RACE 2, SOME HORSE') === null);
 check('track fallback: the panel letters still win on the fixture (golden unchanged)',
   out.track === 'DELMAR' && !out.warnings.some((w) => w.type === 'no_track'));
+
+// --- byline block: page furniture, never analysis (D77) ---
+// The handicapper column's byline prints once at the foot of the section's
+// last page, so it lands inside whichever race paragraph ran last and reads
+// as if it were that race's analysis. It must never reach a stored
+// bottom_line, on either fixture.
+const BYLINE = /Bottom Line\s+By\s+[A-Z]/;
+check('byline: no analysis paragraph on either fixture carries it',
+  !out.analysis.some((a) => BYLINE.test(a.text)) && !out2.analysis.some((a) => BYLINE.test(a.text)),
+  [...out.analysis, ...out2.analysis].filter((a) => BYLINE.test(a.text)).map((a) => a.race).join(','));
+check('byline: every race still has its paragraph after the strip (10 + 11)',
+  out.analysis.length === 10 && out2.analysis.length === 11);
+check('byline: the strip takes the bio, the page numbers and the masthead repeat',
+  stripBylineBlock('LADY GREGORY is a 12-time winner. Del Mar Bottom Line By Brad Free Brad Free has been handicapper since 1992. 8 9 Del Mar Bottom Line')
+  === 'LADY GREGORY is a 12-time winner.');
+check('byline: the ALL-CAPS best-bet line before it is left alone',
+  stripBylineBlock('He looks sharp. SUNDAY, AUGUST 30, 2026 BEST BET: RACE 4, RUN WITH LIBERTY Del Mar Bottom Line By Brad Free bio text here.')
+  === 'He looks sharp. SUNDAY, AUGUST 30, 2026 BEST BET: RACE 4, RUN WITH LIBERTY');
+check('byline: a paragraph without one is returned unchanged',
+  stripBylineBlock('MOTORIOUS is the horse to beat in this allowance prep.') === 'MOTORIOUS is the horse to beat in this allowance prep.');
+check('byline: a masthead with no byline (the ad blocks) is NOT stripped',
+  stripBylineBlock('She has plenty upside. Del Mar Bottom Line Thoroughbred Aftercare Alliance accredits.')
+  === 'She has plenty upside. Del Mar Bottom Line Thoroughbred Aftercare Alliance accredits.');
 
 // --- fused owner/trainer (08-22 R9 #9) - the card is the dictionary ---
 const fusedDay = () => [
