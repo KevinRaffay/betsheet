@@ -79,56 +79,26 @@ export default function ResultsPanel({ dayId }) {
 
   return (
     <section className="consensus">
-      <div className="pagehead">
-        <h3>Results</h3>
-        {hasResults && (
-          <span className="dim">
-            {data.results.length} finishers · {data.exotics.length} payoffs ·
-            chart ingested {data.charts[0]?.ingested_at} ({data.charts[0]?.source_kind})
-          </span>
-        )}
-      </div>
-      {error && <p className="notice notice--error">{error}</p>}
+      {/* One collapsible card holds both the ingest controls and the saved
+          results view (moved below the controls) so the whole thing can be
+          tucked away once a day is done - open by default only while there's
+          nothing saved yet or a just-parsed preview needs review; a save
+          collapses it again. */}
+      <details className="race" open={!hasResults || !!preview}>
+        <summary>
+          Results
+          {hasResults && (
+            <span className="dim">
+              {' '}· {data.results.length} finishers · {data.exotics.length} payoffs ·
+              chart ingested {data.charts[0]?.ingested_at} ({data.charts[0]?.source_kind})
+            </span>
+          )}
+        </summary>
+        {error && <p className="notice notice--error">{error}</p>}
 
-      {hasResults && !preview && (
-        <>
-          <table className="grid">
-            <thead>
-              <tr><th>Race</th><th>Finish (win — place — show)</th><th>Exotics</th><th>Scratches</th></tr>
-            </thead>
-            <tbody>
-              {[...byRace.entries()].sort((a, b) => a[0] - b[0]).map(([race, d]) => (
-                <tr key={race}>
-                  <td className="dim">{race}</td>
-                  <td>
-                    {d.results.slice(0, 3).map((r, i) => (
-                      <div key={i}>
-                        {i + 1}. #{r.program_number} {r.horse_name}
-                        <span className="dim">
-                          {' '}{[r.win_cents, r.place_cents, r.show_cents].filter((c) => c != null).map(money).join(' — ')}
-                        </span>
-                      </div>
-                    ))}
-                  </td>
-                  <td>
-                    {d.exotics.map((x, i) => (
-                      <div key={i} className="dim">
-                        {x.bet_type.replace(/_/g, ' ')} {x.combination} {money(x.payout_cents)}
-                      </div>
-                    ))}
-                  </td>
-                  <td className="dim">
-                    {d.scratches.map((s) => `${s.program_number != null ? `#${s.program_number} ` : ''}${s.horse_name}`).join(', ')}
-                  </td>
-                </tr>
-              ))}
-            </tbody>
-          </table>
-        </>
-      )}
-
-      <details className="race" open={!hasResults}>
-        <summary>{hasResults ? 'Replace results (Equibase chart or dmtc results page)' : 'Ingest results (Equibase chart paste / PDF, or the dmtc results page)'}</summary>
+        <p className="dim">
+          {hasResults ? 'Replace results' : 'Ingest results'} — paste the Equibase chart, upload the chart PDF, or load the dmtc results page.
+        </p>
         <label className="pastebox">
           Paste the Equibase chart text
           <textarea rows={6} value={text} onChange={(e) => setText(e.target.value)}
@@ -213,6 +183,41 @@ export default function ResultsPanel({ dayId }) {
               </details>
             ))}
           </>
+        )}
+
+        {hasResults && !preview && (
+          <table className="grid">
+            <thead>
+              <tr><th>Race</th><th>Finish (win — place — show)</th><th>Exotics</th><th>Scratches</th></tr>
+            </thead>
+            <tbody>
+              {[...byRace.entries()].sort((a, b) => a[0] - b[0]).map(([race, d]) => (
+                <tr key={race}>
+                  <td className="dim">{race}</td>
+                  <td>
+                    {d.results.slice(0, 3).map((r, i) => (
+                      <div key={i}>
+                        {i + 1}. #{r.program_number} {r.horse_name}
+                        <span className="dim">
+                          {' '}{[r.win_cents, r.place_cents, r.show_cents].filter((c) => c != null).map(money).join(' — ')}
+                        </span>
+                      </div>
+                    ))}
+                  </td>
+                  <td>
+                    {d.exotics.map((x, i) => (
+                      <div key={i} className="dim">
+                        {x.bet_type.replace(/_/g, ' ')} {x.combination} {money(x.payout_cents)}
+                      </div>
+                    ))}
+                  </td>
+                  <td className="dim">
+                    {d.scratches.map((s) => `${s.program_number != null ? `#${s.program_number} ` : ''}${s.horse_name}`).join(', ')}
+                  </td>
+                </tr>
+              ))}
+            </tbody>
+          </table>
         )}
       </details>
     </section>
