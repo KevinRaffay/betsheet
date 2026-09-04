@@ -41,6 +41,7 @@ import { loadRace } from './human-cards.js';
 import { gradeAndPersist } from './grading.js';
 import { templateIdFor } from './templates.js';
 import { getLogger, newCorrelationId } from './logging.js';
+import { upsertSource, resolvePicks, storePicks, classifyAndPersist, recordAttempt } from './consensus.js';
 
 const ROOT = fileURLToPath(new URL('../', import.meta.url));
 // Overridable the same way BETSHEET_DB/BETSHEET_LOG_DIR are, so check
@@ -299,6 +300,90 @@ function perRaceCost(perRace, side) {
   return perRace.reduce((sum, r) => sum + r[side].reduce((a, t) => a + t.costCents, 0), 0);
 }
 
+// ---------- consensus (D74) ----------
+//
+// The sheet becomes a third, independent consensus source (D07 stands - no
+// fetcher, this reads the parse the confirm path already did): its show
+// pick maps to pick_type 'top', its win pick to 'second', and its other two
+// box-4 members - never ranked by the sheet - to the new 'also' type
+// (migration 021). Writes through the SAME resolvePicks/storePicks/
+// classifyAndPersist every other source uses (server/consensus.js), not a
+// parallel implementation, so entry resolution, the refresh-on-reupload
+// idempotency (storePicks deletes-then-inserts per source+race) and the
+// classification re-run behave identically to a manual paste or the ATR
+// upload.
+
+const OTR_SOURCE_NAME = 'Equibase Off to the Races';
+
+/** Adapts one confirm's parsed races into resolvePicks' {race, picks:[{programNumber, horseName, pickType, note}]} shape. */
+function otrPicksToRaces(perRace) {
+  return perRace.map((r) => {
+    const picks = [
+      { programNumber: r.showPick, horseName: r.names?.[r.showPick] ?? null, pickType: 'top', note: 'show-tier' },
+      { programNumber: r.winPick, horseName: r.names?.[r.winPick] ?? null, pickType: 'second', note: 'win-tier' },
+    ];
+    for (const pgm of r.box4 ?? []) {
+      if (pgm === r.showPick || pgm === r.winPick) continue;
+      picks.push({ programNumber: pgm, horseName: r.names?.[pgm] ?? null, pickType: 'also', note: 'box-only' });
+    }
+    return { race: r.race, picks };
+  });
+}
+
+/**
+ * Writes consensus_picks for the OTR source from a fresh parse, replacing
+ * (never duplicating) that source's rows for the day, re-classifies every
+ * race so the chips update, and audits the write (fetch_attempts + the
+ * decision-trace stream). Plain statements, not its own transaction, so it
+ * composes into confirmEquibaseOtr's existing one (better-sqlite3 nests
+ * transactions via savepoints, but there is no need to when the caller
+ * already holds one open).
+ */
+function writeOtrConsensus(db, day, parsed, { correlationId, sha256: fileHash }) {
+  const sourceId = upsertSource(db, { name: OTR_SOURCE_NAME, kind: 'algorithmic' });
+  const racesForResolve = parsed.perRace.map((r) => {
+    const { race, entries } = loadRace(db, day.id, r.race);
+    return { id: race.id, number: r.race, entries };
+  });
+  const resolveWarnings = [];
+  const resolved = resolvePicks(racesForResolve, otrPicksToRaces(parsed.perRace), resolveWarnings, OTR_SOURCE_NAME);
+  const picksStored = storePicks(db, sourceId, resolved);
+  recordAttempt(db, {
+    raceDayId: day.id, sourceId, correlationId,
+    outcome: 'manual_upload', parseOk: 1, picksExtracted: picksStored,
+  });
+  classifyAndPersist(db, { id: day.id, races: racesForResolve }, correlationId);
+  if (resolveWarnings.length) {
+    appLog.warn('otr_consensus_unmatched_picks', { correlationId, raceDayId: day.id, warnings: resolveWarnings });
+  }
+  traceLog.info('consensus_source_ingested', {
+    correlationId, raceDayId: day.id, source: 'equibase-otr', races: parsed.perRace.length, sha256: fileHash, picksStored,
+  });
+  return { picksStored, warnings: resolveWarnings };
+}
+
+/**
+ * Consensus-only re-ingest (D71/D72 follow-up batch flag `--consensus-
+ * only`): writes OTR's consensus_picks for a day that already has EQB_OTR
+ * cards from an earlier confirm, WITHOUT creating any new cards - lets the
+ * 16 archived days gain the third source without an append-only pile of
+ * duplicate pickers. Re-reads the ARCHIVED file (never trusts anything
+ * else), same as confirm.
+ */
+export function writeOtrConsensusOnly(db, day, { correlationId } = {}) {
+  const trackCode = day.track_code ?? TRACK_CODE;
+  const filePath = archivePdfPath(trackCode, day.date);
+  if (!fs.existsSync(filePath)) {
+    throw new EquibaseOtrError(404, 'No archived Off to the Races sheet for this day.');
+  }
+  const bytes = fs.readFileSync(filePath);
+  const hash = sha256(bytes);
+  const tmpPath = path.join(archiveDir(trackCode), `.consensus-${Date.now()}.pdf`);
+  const parsed = parseAgainstDay(db, day, bytes, tmpPath);
+  const cid = correlationId ?? newCorrelationId();
+  return db.transaction(() => writeOtrConsensus(db, day, parsed, { correlationId: cid, sha256: hash }))();
+}
+
 // ---------- confirm ----------
 
 /**
@@ -381,6 +466,12 @@ export function confirmEquibaseOtr(db, day, { parseToken, correlationId }) {
         insAlloc.run(cardId, raceId, raceCost);
       }
     }
+
+    // D74: the sheet is also a consensus source - write it in the same
+    // transaction as the three cards it's taken verbatim into, so a card
+    // and its consensus rows are never out of step.
+    writeOtrConsensus(db, day, parsed, { correlationId, sha256: actualHash });
+
     return cardIds;
   })();
 
@@ -456,10 +547,18 @@ function peekOtrHeader(pdfBytes) {
  * persisted for its date is SKIPPED without re-parsing - a re-run never
  * appends duplicate cards for the same source file.
  *
- * Returns { files: [{file, status: 'ingested'|'queued'|'skipped',
- * reason?, cards?}], seen, ingested, queued, skipped, cardsWritten }.
+ * `consensusOnly` (D74, `--consensus-only`): skips card creation entirely
+ * and instead writes the OTR consensus rows for days that ALREADY have
+ * EQB_OTR cards from an earlier (non-consensus-only) run - the way the 16
+ * already-archived days gain the third source without an append-only pile
+ * of duplicate pickers. A file not yet confirmed is left alone (skipped,
+ * not confirmed) in this mode - run the normal batch first.
+ *
+ * Returns { files: [{file, status: 'ingested'|'consensus_written'|
+ * 'queued'|'skipped', reason?, cards?}], seen, ingested, consensusWritten,
+ * queued, skipped, cardsWritten }.
  */
-export function batchIngestEquibaseOtr(db, { dir, correlationId, log = () => {} } = {}) {
+export function batchIngestEquibaseOtr(db, { dir, correlationId, log = () => {}, consensusOnly = false } = {}) {
   const sourceDir = dir ?? archiveDir(TRACK_CODE);
   const files = fs.existsSync(sourceDir)
     ? fs.readdirSync(sourceDir).filter((f) => f.toLowerCase().endsWith('.pdf')).sort()
@@ -490,7 +589,20 @@ export function batchIngestEquibaseOtr(db, { dir, correlationId, log = () => {} 
       results.push(r); log(r); continue;
     }
 
-    if (otrConfirmedSha256(trackCode, day.date) === hash) {
+    const alreadyConfirmed = otrConfirmedSha256(trackCode, day.date) === hash;
+
+    if (consensusOnly) {
+      if (!alreadyConfirmed) {
+        const r = { file, status: 'skipped', reason: 'not yet confirmed - run the batch without --consensus-only first to create its cards' };
+        results.push(r); log(r); continue;
+      }
+      const cid = correlationId ?? newCorrelationId();
+      const written = writeOtrConsensusOnly(db, day, { correlationId: cid });
+      const r = { file, status: 'consensus_written', raceDayId: day.id, picksStored: written.picksStored };
+      results.push(r); log(r); continue;
+    }
+
+    if (alreadyConfirmed) {
       const r = { file, status: 'skipped', reason: 'already ingested (identical file already confirmed for this date)' };
       results.push(r); log(r); continue;
     }
@@ -517,6 +629,7 @@ export function batchIngestEquibaseOtr(db, { dir, correlationId, log = () => {} 
     files: results,
     seen: results.length,
     ingested: results.filter((r) => r.status === 'ingested').length,
+    consensusWritten: results.filter((r) => r.status === 'consensus_written').length,
     queued: results.filter((r) => r.status === 'queued').length,
     skipped: results.filter((r) => r.status === 'skipped').length,
     cardsWritten: results.reduce((a, r) => a + (r.cards?.length ?? 0), 0),

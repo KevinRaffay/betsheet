@@ -130,10 +130,26 @@ PROGRAM BOTTOM LINE
 
 CONSENSUS
 {{sourceName}}: top {{top}}, 2nd {{second}}, 3rd {{third}}{{", watch/contrarian: " + flagged if any}}
-... one line per source, or ...
+... one line per RANKED source, then, only if the day has an Equibase Off
+to the Races upload (D74) ...
+Equibase Off to the Races (the free at-track sheet, algorithmic): show
+pick {{showPick}}; win pick {{winPick}} (higher-reward tier);
+{{N}}-horse exacta box {{box}}.
+... or, if there is no consensus of any kind ...
 No external consensus on file for this race - program analysis and
 morning line only.
 ```
+
+**D74 note:** Equibase OTR (D71) prints a show pick, a win pick, and two
+unranked box mentions - never a 1st/2nd/3rd order, so folding it through
+the generic `top {{top}}, 2nd {{second}}, 3rd {{third}}` line above would
+misrepresent an unranked mention as a rank the sheet never claimed. It
+gets its own sentence in its own vocabulary instead
+(`server/llm-prompt.js`'s `buildLlmRaceUserPrompt` special-cases the
+source by name, excluding it from the generic per-source loop). This is a
+prompt CONTENT change driven by data (a source landing on the day), not a
+template change - v1's template and its fixed wording are otherwise
+untouched, so no version bump.
 
 ## Fixes
 

@@ -36,8 +36,8 @@ map in the same PR.
 | Manual paste/upload fallback into the same consensus structure | D07 |
 | Fetch audit log; failed/stale sources visible in UI | D02, D07, D53 (every attempt auditable from the log alone: url, status, sitemap, candidate slug, entries scanned, nearest slug; a discovery miss is `not_published`, never a failure) |
 | Missing consensus never blocks generation; per-race source labeling | D09, D10, D11 |
-| Consensus table; UNANIMOUS/SPLIT/CHAOS classification; source-count cap | D09 |
-| Contrarian flags (algo fading favorite; corroborated longshots) | D09 |
+| Consensus table; UNANIMOUS/SPLIT/CHAOS classification; source-count cap | D09; D74 (verified no 2-source cap exists - classifyDay already counts every contributing source; with 3+ external sources UNANIMOUS still means all agree by default, CHAOS means no PAIR agrees rather than "3+ distinct picks" - the two read identically for every input reachable before a 3rd external source existed, so no prior day is reclassified; a per-race `agreement` count is now stored; a `CLASSIFY_UNANIMOUS='majority'` config exists for comparison but is off by default and flipping it is an `ENGINE_VERSION`-bumping engine change, not a side effect of a source landing) |
+| Contrarian flags (algo fading favorite; corroborated longshots) | D09; D74 (a box-only algorithmic source with no ranked order - Equibase OTR's 4-horse exacta box - fades the favorite when it's absent from the box entirely, a "partial order" variant of the ranked rule; corroborated_longshot already counted any source's pick generically, so OTR's needed no code change) |
 | No Equibase scraping; robots.txt respected, back off resistant sources | D07 (framework rule), D12/D13 (results via paste/PDF) |
 
 ## Card generation (workflow step 3)
@@ -74,7 +74,7 @@ map in the same PR.
 | All P/L, simulation and distribution reporting buckets by completeness; program-only backfill never pools with full-consensus in one aggregate | D16, D19, D20 (rule: invariant 12) |
 | Wayback Machine fetcher (web.archive.org) retrieves archived versions of each consensus source for historical dates; outcomes audited like any source | D08d (on the D07 framework) |
 | Simulator evaluates structure-layer rules (place-money, hedge cuts, exotic construction, allocation curves) independently of race classification, so historical cards benchmark bet construction even without signal data | D18 (layer split), D19 (evaluation), D48 (the templates that fire on PROGRAM_ONLY days), D49 (exotic construction isolated: split box vs mid-price straight exacta) |
-| Equibase's Off to the Races sheet ingests as a picker with its printed tickets verbatim, in its own EQB_OTR bucket, manual upload only (no Equibase fetch), archived and re-parseable | D71, D72 (upload panel, batch CLI, extraction fix verified against the full archive) |
+| Equibase's Off to the Races sheet ingests as a picker with its printed tickets verbatim, in its own EQB_OTR bucket, manual upload only (no Equibase fetch), archived and re-parseable | D71, D72 (upload panel, batch CLI, extraction fix verified against the full archive), D74 (...and feeds D09 classification, contrarian flags and the LLM generator as a third, independent algorithmic consensus source - show pick top, win pick second, its two unranked box mentions a new `also` pick type; `--consensus-only` backfills the source onto the 16 already-archived days without new picker cards) |
 
 ## Results, grading & simulation (workflow step 5)
 

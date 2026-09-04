@@ -260,3 +260,40 @@ to measure at all (4.3).
   for the runs named.
 - The earlier set #17-#26 (2026-09-02, as generated, before D49-D51)
   agrees with #27-#36 to the cent and is superseded by this file's runs.
+
+## 8. D74 addendum (2026-09-03): a third external source, pre-registered
+
+Equibase's "Off to the Races" sheet lands as a third, independent
+consensus source (D74), read by the LIVE classification pipeline
+(`shared/classification.js`'s `classifyRace`/`classifyDay`, called fresh
+at generation time by `server/cards.js`'s `assembleEngineInput` - never a
+cached column). This corpus's 70 backfilled days carry NO consensus
+picks at all (PROGRAM_ONLY by construction, per the corpus table above -
+no consensus fetcher runs on an archived day), so **nothing in this
+file's numbers changes**: `CLASSIFY_UNANIMOUS` stays `'all'` (the D74
+default), `ENGINE_VERSION` stays `lean-1.1`, and no prior day is
+reclassified by this addendum or by running the OTR sheet through any of
+them.
+
+What DOES change, effective today, for any LIVE day that gets an Equibase
+OTR upload alongside its existing SFTB/ATR consensus: a race where OTR
+agrees with a program or another external source's pick, while a third
+source disagrees, now classifies SPLIT with a stored `agreement` count
+(2-of-3) rather than the pre-D74 code's incorrect CHAOS call for that
+exact shape (see the D74 ledger row and `shared/classification.js`'s
+module doc comment for the mechanism) - a bug fix in reachability terms,
+since a 3rd external source is the only way that shape could ever occur,
+and none existed before today. The live day this was found on: **Del Mar
+2026-09-03, card #4** (the day's `equibase-otr` card set) - its races
+classify under the fixed rule as of this addendum's date and are NOT
+retroactively reclassified for any earlier stored card or grade (D74's
+non-goals: no reclassification, no template change keyed to `agreement`
+yet).
+
+Pre-registered question for whenever a fall-meet corpus carries all three
+sources on enough days to measure: does `CLASSIFY_UNANIMOUS='majority'`
+(2-of-3 external agreement promotes to UNANIMOUS) change the engine's
+UNANIMOUS-heavy allocation often enough to matter, and in which
+direction? Not measured here - `'majority'` stays off by default and
+flipping it remains an `ENGINE_VERSION`-bumping decision (invariant 14),
+never a side effect of a source landing.

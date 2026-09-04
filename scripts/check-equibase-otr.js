@@ -239,6 +239,57 @@ try {
     cardsAfter.every((c) => c.template === 'equibase-otr' && c.consensus_completeness === 'EQB_OTR' && c.engine_version === 'equibase-otr'),
     JSON.stringify(cardsAfter));
 
+  // -------- D74: the sheet also lands as a consensus source, in the SAME confirm transaction --------
+  const consensusAfterConfirm = await jget(`/api/race-days/${day.id}/consensus`);
+  const otrPicks = consensusAfterConfirm.picks.filter((p) => p.source_name === 'Equibase Off to the Races');
+  check('D74: consensus rows written for all 8 races (top + second + 2 also each = 32)', otrPicks.length === 32, `got ${otrPicks.length}`);
+  check('D74: every OTR consensus row carries source_kind algorithmic', otrPicks.every((p) => p.source_kind === 'algorithmic'), JSON.stringify(otrPicks.slice(0, 3)));
+  let mappingOk = true;
+  for (const g of golden.races) {
+    const racePicks = otrPicks.filter((p) => p.race_number === g.race);
+    const top = racePicks.find((p) => p.pick_type === 'top');
+    const second = racePicks.find((p) => p.pick_type === 'second');
+    const also = racePicks.filter((p) => p.pick_type === 'also').map((p) => p.program_number).sort();
+    const expectedAlso = g.box4.filter((n) => n !== g.showPick && n !== g.winPick).sort();
+    const rowOk = top?.program_number === g.showPick && top?.note === 'show-tier'
+      && second?.program_number === g.winPick && second?.note === 'win-tier'
+      && JSON.stringify(also) === JSON.stringify(expectedAlso)
+      && racePicks.filter((p) => p.pick_type === 'also').every((p) => p.note === 'box-only');
+    if (!rowOk) {
+      mappingOk = false;
+      console.error(`    R${g.race} mapping mismatch: ${JSON.stringify({ top: top?.program_number, second: second?.program_number, also })} vs expected show=${g.showPick} win=${g.winPick} also=${JSON.stringify(expectedAlso)}`);
+    }
+  }
+  check('D74: exact mapping on all 8 races (top=show, second=win, also=box4 minus show/win, never "third")', mappingOk);
+  check('D74: no consensus row ever uses pick_type third (the sheet ranks nothing beyond show/win)', !otrPicks.some((p) => p.pick_type === 'third'));
+
+  // The full-order fade rule (SFTB) and the new box-only fade rule (OTR)
+  // are mutually exclusive per source; confirm every race classifies with
+  // OTR counted as an external source (externalSourceCount >= 1) and that
+  // algo_fades_favorite fires exactly where the real favorite is missing
+  // from the real box4 - proved against the REAL fixture day's real
+  // morning lines, not a synthetic stand-in.
+  const favoriteByRace = {};
+  for (const r of parsedEntries.races) {
+    const fav = r.entries.filter((e) => !e.scratched && e.morningLineDecimal > 0)
+      .sort((a, b) => a.morningLineDecimal - b.morningLineDecimal)[0];
+    favoriteByRace[r.number] = fav;
+  }
+  let fadeOk = true;
+  for (const g of golden.races) {
+    const fav = favoriteByRace[g.race];
+    const raceRow = consensusAfterConfirm.races.find((r) => r.number === g.race);
+    const fired = (raceRow?.contrarianFlags ?? []).some((f) => f.type === 'algo_fades_favorite' && f.detail?.includes('Equibase Off to the Races'));
+    const favInBox = Boolean(fav) && g.box4.includes(fav.programNumber);
+    if (fired === favInBox) {
+      fadeOk = false;
+      console.error(`    R${g.race}: favorite #${fav?.programNumber} ${favInBox ? 'IS' : 'is NOT'} in box4 ${JSON.stringify(g.box4)}, fired=${fired}`);
+    }
+  }
+  check('D74: OTR partial-order algo_fades_favorite fires exactly on races where the real favorite is absent from the real box4', fadeOk);
+  check('D74: every race carries a non-null externalSourceCount >= 1 now that OTR is a source',
+    consensusAfterConfirm.races.every((r) => (r.externalSourceCount ?? 0) >= 1), JSON.stringify(consensusAfterConfirm.races.map((r) => r.externalSourceCount)));
+
   // -------- "If it hits" estimates (bug report: every equibase-otr ticket showed "-") --------
   const bothCardId = cardsAfter.find((c) => c.variant === 'both').id;
   const bothCard = await jget(`/api/cards/${bothCardId}`);
@@ -263,6 +314,13 @@ try {
   await jpost(`/api/race-days/${day.id}/equibase-otr/confirm`, { parseToken: preview2.parseToken });
   const cardsAfterReupload = await jget(`/api/race-days/${day.id}/cards`);
   check('re-upload is append-only: 6 cards total, 3 more card_numbers', cardsAfterReupload.length === 6);
+
+  // D74: cards append on re-upload (D71 behavior, unchanged), but the
+  // SOURCE'S consensus rows are REPLACED, never duplicated - same
+  // refresh-on-reupload contract every other source's storePicks follows.
+  const consensusAfterReupload = await jget(`/api/race-days/${day.id}/consensus`);
+  const otrPicksAfterReupload = consensusAfterReupload.picks.filter((p) => p.source_name === 'Equibase Off to the Races');
+  check('D74: re-upload replaces the OTR source\'s picks, not duplicates them (still 32, not 64)', otrPicksAfterReupload.length === 32, `got ${otrPicksAfterReupload.length}`);
 
   // -------- 5. unknown program number: blocking for that ticket only --------
   // A race day is one per (track, date) and the sheet's own printed date
@@ -325,7 +383,25 @@ try {
   await jpost(`/api/race-days/${day.id}/human-cards`, { race: 1, text: 'Win | #2 | $20 | test pick' }); // HUMAN card
   const llmResponse = 'Reasoning: consensus favorite.\n\n<<<TICKETS>>>\nWin | #2 | $20 | Test.\n<<<END TICKETS>>>\n';
   const llmPreview = await (await jpost(`/api/race-days/${day.id}/llm-cards/preview`, { race: 1, __stubResponse: llmResponse })).json();
-  await jpost(`/api/race-days/${day.id}/llm-cards`, { race: 1, requestId: llmPreview.requestId, bankrollCents: 2000 }); // LLM_GENERATED card
+  const llmSave = await (await jpost(`/api/race-days/${day.id}/llm-cards`, { race: 1, requestId: llmPreview.requestId, bankrollCents: 2000 })).json(); // LLM_GENERATED card
+
+  // -------- D74: the OTR source reaches the LLM prompt, in its own semantics --------
+  // The FIRST preview for race 1 (above) logged its request with card_id
+  // NULL - the card didn't exist yet at preview time (same reason
+  // check-llm-cards.js's own p1b re-previews WITH cardId to get a linked
+  // row) - so re-preview once more, now WITH the card id, to get a request
+  // row GET /api/cards/:id/llm-requests will actually return.
+  await jpost(`/api/race-days/${day.id}/llm-cards/preview`, { race: 1, cardId: llmSave.cardId, __stubResponse: llmResponse });
+  const llmRequests = await jget(`/api/cards/${llmSave.cardId}/llm-requests`);
+  const race1Request = llmRequests.find((r) => r.raceNumber === 1);
+  const r1Golden = golden.races.find((g) => g.race === 1);
+  check('D74: the LLM prompt names the OTR source by name, not folded into a generic top/2nd/3rd line',
+    race1Request?.promptText?.includes('Equibase Off to the Races (the free at-track sheet, algorithmic)'), race1Request?.promptText);
+  check('D74: the prompt states R1\'s actual show pick and win pick',
+    race1Request?.promptText?.includes(`show pick #${r1Golden.showPick}`) && race1Request?.promptText?.includes(`win pick #${r1Golden.winPick}`),
+    race1Request?.promptText);
+  check('D74: the prompt never mislabels an OTR pick as "3rd" (it has no rank)',
+    !new RegExp(`Equibase Off to the Races:[^\\n]*3rd`).test(race1Request?.promptText ?? ''), race1Request?.promptText);
 
   const pl = await jget('/api/pl?engineVersion=all');
   const bucketNames = pl.buckets.map((b) => b.completeness);
@@ -337,6 +413,22 @@ try {
   check('P/L: the lean/HUMAN/LLM_GENERATED buckets each carry exactly their own 1 card, no bleed from EQB_OTR',
     [leanBucket, 'HUMAN', 'LLM_GENERATED'].every((k) => pl.buckets.find((b) => b.completeness === k)?.cards === 1),
     JSON.stringify(pl.buckets));
+
+  // D74: a race day with NO OTR rows omits the block from the LLM prompt
+  // entirely (never prints "none") - checked AFTER the P/L bucket-isolation
+  // assertions above, since this deliberately creates a second
+  // LLM_GENERATED card (on a different day) that would otherwise throw off
+  // their "exactly 1 card" counts.
+  const noOtrDay = await (await jpost('/api/race-days', {
+    track: 'Del Mar', date: '2026-09-05', bankrollCents: 20000, perRaceMinCents: 500, races: parsedEntries.races,
+  })).json();
+  const noOtrPreview = await (await jpost(`/api/race-days/${noOtrDay.id}/llm-cards/preview`, { race: 1, __stubResponse: llmResponse })).json();
+  const noOtrCard = await (await jpost(`/api/race-days/${noOtrDay.id}/llm-cards`, { race: 1, requestId: noOtrPreview.requestId, bankrollCents: 2000 })).json();
+  await jpost(`/api/race-days/${noOtrDay.id}/llm-cards/preview`, { race: 1, cardId: noOtrCard.cardId, __stubResponse: llmResponse });
+  const noOtrRequests = await jget(`/api/cards/${noOtrCard.cardId}/llm-requests`);
+  check('D74: a day with no OTR rows omits the OTR block from the prompt entirely',
+    !noOtrRequests.find((r) => r.raceNumber === 1)?.promptText?.includes('Equibase Off to the Races'),
+    noOtrRequests.find((r) => r.raceNumber === 1)?.promptText);
 
   // -------- 9. archive + manifest; re-parse from archive matches golden --------
   const otrArchiveDir = path.join(tmp, 'archive-equibase-otr');
@@ -396,9 +488,9 @@ try {
     }
     seedDb.close();
 
-    const runCli = () => new Promise((resolve) => {
+    const runCli = (extraArgs = []) => new Promise((resolve) => {
       let out = '';
-      const child = spawn(process.execPath, [path.join(ROOT, 'scripts', 'ingest-otr.js'), batchSourceDir], {
+      const child = spawn(process.execPath, [path.join(ROOT, 'scripts', 'ingest-otr.js'), ...extraArgs, batchSourceDir], {
         env: {
           ...process.env, BETSHEET_DB: batchDbPath, BETSHEET_LOG_DIR: batchLogDir,
           BETSHEET_OTR_ARCHIVE_DIR: batchArchiveDir,
@@ -426,6 +518,36 @@ try {
     const cardCount2 = verifyDb2.prepare("SELECT COUNT(*) AS n FROM cards WHERE engine_version = 'equibase-otr'").get().n;
     check('batch CLI re-run: still exactly 48 cards - a re-run never appends duplicates', cardCount2 === 48, `got ${cardCount2}`);
     verifyDb2.close();
+
+    // D74: `--consensus-only` writes the source's consensus rows for every
+    // already-confirmed day, WITHOUT creating any new cards - the way the
+    // archived corpus gains the third source without a pile of duplicate
+    // pickers.
+    const consensusOnlyRun = await runCli(['--consensus-only']);
+    check('batch CLI --consensus-only: 16 file(s) seen, 16 consensus-written, 0 skipped',
+      /16 file\(s\) seen: 16 consensus-written, 0 skipped/.test(consensusOnlyRun), consensusOnlyRun);
+
+    const verifyDb3 = openDb(batchDbPath);
+    const cardCount3 = verifyDb3.prepare("SELECT COUNT(*) AS n FROM cards WHERE engine_version = 'equibase-otr'").get().n;
+    check('batch CLI --consensus-only: still exactly 48 cards - no new pickers created', cardCount3 === 48, `got ${cardCount3}`);
+    const otrSourceRow = verifyDb3.prepare("SELECT id FROM sources WHERE name = 'Equibase Off to the Races'").get();
+    const consensusRowCount = otrSourceRow
+      ? verifyDb3.prepare('SELECT COUNT(*) AS n FROM consensus_picks WHERE source_id = ?').get(otrSourceRow.id).n
+      : 0;
+    check('batch CLI --consensus-only: consensus rows written for all 16 days (143 races x 4 picks each)',
+      consensusRowCount === 143 * 4, `got ${consensusRowCount}`);
+    verifyDb3.close();
+
+    // A second --consensus-only run replaces (never duplicates) those rows.
+    const consensusOnlyRun2 = await runCli(['--consensus-only']);
+    check('batch CLI --consensus-only re-run: still 16 consensus-written (idempotent replace, not a skip)',
+      /16 file\(s\) seen: 16 consensus-written, 0 skipped/.test(consensusOnlyRun2), consensusOnlyRun2);
+    const verifyDb4 = openDb(batchDbPath);
+    const consensusRowCount2 = verifyDb4.prepare(
+      "SELECT COUNT(*) AS n FROM consensus_picks WHERE source_id = (SELECT id FROM sources WHERE name = 'Equibase Off to the Races')",
+    ).get().n;
+    check('batch CLI --consensus-only re-run: still exactly the same row count, never doubled', consensusRowCount2 === 143 * 4, `got ${consensusRowCount2}`);
+    verifyDb4.close();
   }
 
   // -------- 10. no engine-version bump; lean identity unchanged --------
