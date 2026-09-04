@@ -197,7 +197,7 @@ Breaking any of these is a bug regardless of what the tests say.
 | `scripts/check-sim.js` | simulator verification on the real server (check-pl's three-day scenario): a simulated day equals the live card's grade, bucket isolation, series math, overrides, listing/compare/append-only, delete/restore, the trace event; D50: the synthetic day carries a name-only chart scratch and the real chart its eight - the at-the-window card names none of them and grades with zero refunds, the default mode still equals the live card, compare keeps the two modes on separate rows. |
 | `scripts/check-templates.js` | template verification: hygiene (overrides name real knobs, layer map covers the rule set exactly), each template's signature behavior on the real day + a synthetic chaos/coverage race, place-money invariant under every non-simulation template, and the server round-trip (FK persistence, trace/export carry the template, invariant-1 422 guards, reseed after reset). |
 | `client/src/components/ResultsPanel.jsx` | the results section of a stored day: chart paste + PDF upload, warnings-first read-only preview, save/replace, per-race finish/exotics/scratches view. |
-| `server/pdf-text.js` | line-reconstructed text extraction from text-based PDFs (y-grouped, x-sorted) — the chart PDF path feeds the SAME parser as a paste. |
+| `server/pdf-text.js` | line-reconstructed text extraction from text-based PDFs (y-grouped, x-sorted) — the chart PDF path feeds the SAME parser as a paste. `extractPdfLines` races pdfjs-dist against a 45s timeout: found live 2026-09-03, a malformed chart PDF can wedge pdfjs's Node "fake worker" so the extraction promise never resolves or rejects, which without a timeout hangs the request forever. |
 | `scripts/check-charts.js` | chart-parser verification: golden + hand-checked payoffs + the program↔chart closure (every program entry is a finisher or a scratch). |
 | `scripts/check-sources.js` | per-source verification, one section per fetcher: golden + hand-checked assertions + URL-discovery units, no network. D53: the 2026-09-03 placeholder-column post as a second SFTB fixture (row order only; the favorite from the entries), live-shaped sitemap fixtures (the post found for "Del Mar" and "Delmar" two days before the race; a date with no post -> the audit fields + nearest slug; 503 index; one page failing), and the backoff rule on a temp DB (three / five not_published never back off; three real failures around one do; migration 013 columns). |
 | `shared/classification.js` | the consensus table + UNANIMOUS/SPLIT/CHAOS call (invariant 4's 2-external-source floor, program-only defaults) and contrarian flags (`algo_fades_favorite` via the algo's full expected order, `corroborated_longshot` at 10-1+ from 2+ sources), plus per-horse source counts for the lean-mode coverage rule. Pure functions — the simulator replays them. |
@@ -430,6 +430,20 @@ is the first (D52: engine `lean-1.1`, bucket PROGRAM_ONLY, the 70-day DMR
 
 ## Gotchas
 
+- **A malformed PDF can crash the whole server, not just its own request.**
+  Found live 2026-09-03: uploading a chart PDF sometimes killed every
+  in-flight request with `ECONNRESET` at the vite proxy, then `node --watch`
+  restarted the API - the giveaway was the "BetSheet listening" banner
+  reappearing right after the proxy error with no other cause. Root cause:
+  pdfjs-dist's Node "fake worker" can throw from its own message-dispatch
+  timer, outside any route's `await`/try-catch, which Node treats as an
+  uncaught exception and kills the process. Fixed in two places, `server/
+  index.js` and `server/pdf-text.js`: process-level `uncaughtException`/
+  `unhandledRejection` handlers now log via the app stream instead of
+  crashing (no route holds an open DB transaction a bad PDF could corrupt,
+  so staying up is safe), and `extractPdfLines` races extraction against a
+  45s timeout so a wedged pdfjs promise returns an honest error instead of
+  hanging the request forever.
 - **This machine's Bash tool quirks** (inherited from life-swipe, they apply
   here too): `PATH` needs exporting before node/git resolve; `/tmp` means two
   different directories (bash → AppData, node → `C:\tmp`) so use full Windows

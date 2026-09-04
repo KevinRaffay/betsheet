@@ -33,6 +33,20 @@ const log = getLogger('app');
 const PORT = Number(process.env.BETSHEET_PORT) || 8788;
 const HOST = '127.0.0.1';
 
+// pdfjs-dist (chart/program/ML PDF parsing) occasionally fires an internal
+// 'error' event or a rejection off its own scheduling rather than through
+// the awaited promise chain a route's try/catch wraps - on Node that's an
+// uncaught exception that silently kills the WHOLE process (every in-flight
+// request sees ECONNRESET, node --watch then restarts, and nothing lands in
+// the app log to explain why). Log and stay up instead: no request handler
+// here holds an open DB transaction or other state a bad PDF could corrupt.
+process.on('uncaughtException', (err) => {
+  log.error('uncaught_exception', { error: String(err?.stack ?? err) });
+});
+process.on('unhandledRejection', (err) => {
+  log.error('unhandled_rejection', { error: String(err?.stack ?? err) });
+});
+
 const app = express();
 app.use(express.json({ limit: '10mb' }));
 
