@@ -29,6 +29,7 @@ import crypto from 'node:crypto';
 import fs from 'node:fs';
 import path from 'node:path';
 import { fileURLToPath, URL } from 'node:url';
+import { probePort, holderTree, describe } from './dev-ports.js';
 
 const ROOT = fileURLToPath(new URL('../', import.meta.url));
 const ENTRY = path.join(ROOT, 'server', 'index.js');
@@ -159,6 +160,38 @@ const stop = () => {
 };
 process.on('SIGINT', stop);
 process.on('SIGTERM', stop);
+
+// ---------- port preflight ----------
+//
+// Without this, a stale dev stack produces exactly one useful line - the
+// server's own EADDRINUSE message - which names no process, so the fix is a
+// manual netstat/tasklist hunt every time. And the obvious hunt gives the
+// wrong answer: the process holding the port is a supervised child, so
+// killing it just makes its supervisor respawn it (found live 2026-09-04, an
+// hour-old `node --watch` stack that had respawned its API minutes earlier).
+//
+// So: check before spawning, name the holder AND the tree root that actually
+// has to die, and exit. Exiting non-zero matters - `concurrently -k` then
+// takes vite down too, so `npm run dev` fails as one thing instead of leaving
+// a front end running against whatever old API happens to own the port.
+const PORT = Number(process.env.BETSHEET_PORT) || 8788;
+
+if (!(await probePort(PORT))) {
+  const held = holderTree(PORT);
+  say(`port ${PORT} is already in use - not starting the API.`);
+  if (held) {
+    say(`  holder:  ${describe(held.leaf)}`);
+    if (!held.sameProcess) {
+      say(`  root:    ${describe(held.root)}`);
+      say('  the holder is supervised - killing it alone respawns it; kill the root.');
+    }
+    say(`  free it: npm run dev:clean -- --yes   (or: taskkill /T /F /PID ${held.root.pid})`);
+  } else {
+    say('  could not identify the holder - try: npm run dev:clean');
+  }
+  say(`  or move this instance: BETSHEET_PORT=8790 BETSHEET_VITE_PORT=5177 npm run dev`);
+  process.exit(1);
+}
 
 say(`watching ${WATCH_DIRS.map(rel).join(', ')} (${hashes.size} source files) - content changes only`);
 start();
