@@ -239,6 +239,25 @@ try {
     cardsAfter.every((c) => c.template === 'equibase-otr' && c.consensus_completeness === 'EQB_OTR' && c.engine_version === 'equibase-otr'),
     JSON.stringify(cardsAfter));
 
+  // -------- "If it hits" estimates (bug report: every equibase-otr ticket showed "-") --------
+  const bothCardId = cardsAfter.find((c) => c.variant === 'both').id;
+  const bothCard = await jget(`/api/cards/${bothCardId}`);
+  const showTickets = bothCard.tickets.filter((t) => t.bet_type === 'show');
+  const winTickets = bothCard.tickets.filter((t) => t.bet_type === 'win');
+  const boxTickets = bothCard.tickets.filter((t) => t.bet_type === 'exacta_box');
+  check('win tickets: "If it hits" estimate populated (exact, at the morning line)',
+    winTickets.length === 8 && winTickets.every((t) => t.est_payout_min_cents != null && t.est_payout_max_cents === t.est_payout_min_cents && t.est_is_range === 0),
+    JSON.stringify(winTickets.map((t) => ({ selections: t.selections, min: t.est_payout_min_cents, max: t.est_payout_max_cents, range: t.est_is_range }))));
+  check('exacta box tickets: "If it hits" estimate populated (a range)',
+    boxTickets.length === 16 && boxTickets.every((t) => t.est_payout_min_cents != null && t.est_payout_max_cents > t.est_payout_min_cents && t.est_is_range === 1),
+    JSON.stringify(boxTickets.slice(0, 2).map((t) => ({ selections: t.selections, min: t.est_payout_min_cents, max: t.est_payout_max_cents }))));
+  check('show tickets: no estimate (no validated formula anywhere in this codebase, same D67 reasoning)',
+    showTickets.length === 8 && showTickets.every((t) => t.est_payout_min_cents == null),
+    JSON.stringify(showTickets.map((t) => t.est_payout_min_cents)));
+  // Hand-check race 1: win #5 at ML 3.0 -> winPayout($200, 3.0) = $800 exact.
+  const r1Win = winTickets.find((t) => t.selections.legs[0][0] === '5' && t.race_id === bothCard.races.find((r) => r.number === 1)?.id);
+  check('hand-checked: race 1 win #5 (ML 3/1) -> exact $8.00', r1Win?.est_payout_min_cents === 800, JSON.stringify(r1Win));
+
   // Append-only on re-upload: uploading again adds THREE MORE cards.
   const preview2 = await (await jpostPdf(`/api/race-days/${day.id}/equibase-otr`, pdfBytes)).json();
   await jpost(`/api/race-days/${day.id}/equibase-otr/confirm`, { parseToken: preview2.parseToken });

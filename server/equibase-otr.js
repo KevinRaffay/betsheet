@@ -35,7 +35,7 @@ import { fileURLToPath } from 'node:url';
 import express from 'express';
 import { canonicalizeTrack } from '../shared/track-codes.js';
 import { parseEquibaseOtrTsv } from '../shared/parsers/equibase-otr.js';
-import { tellerCall } from '../shared/betmath.js';
+import { tellerCall, winPayout, exactaEstimate } from '../shared/betmath.js';
 import { getDb } from './db.js';
 import { loadRace } from './human-cards.js';
 import { gradeAndPersist } from './grading.js';
@@ -159,13 +159,44 @@ const TIER = {
 };
 
 /**
+ * "If it hits" estimates (bug report: equibase-otr cards showed "—" for
+ * every ticket) - reuses shared/betmath.js's SAME validated formulas D67
+ * fixed this exact gap with for LLM cards: win exact at the morning line,
+ * exacta box banded off the two shortest-priced horses in the box. Show
+ * is deliberately left without an estimate - no validated formula exists
+ * anywhere in this codebase for it (the engine itself never produces a
+ * show ticket), and inventing one alongside betmath.js's tuned constants
+ * would be guessing with money math, same reasoning D67 documented.
+ */
+function estimateOtrTicketPayouts(tickets, entries) {
+  const mlOf = (pgm) => entries.find((e) => e.program_number === pgm)?.morning_line_decimal ?? null;
+  return tickets.map((t) => {
+    if (t.betType === 'win') {
+      const ml = mlOf(t.legs[0]?.[0]);
+      if (ml == null) return t;
+      const p = winPayout(t.stakeCents, ml);
+      return { ...t, estMinCents: p, estMaxCents: p, estIsRange: false };
+    }
+    if (t.betType === 'exacta_box') {
+      const mls = (t.legs[0] ?? []).map(mlOf).filter((m) => m != null).sort((a, b) => a - b);
+      if (mls.length < 2) return t;
+      const [lo, hi] = exactaEstimate(t.stakeCents, mls[0], mls[1]);
+      return { ...t, estMinCents: lo, estMaxCents: hi, estIsRange: true };
+    }
+    return t;
+  });
+}
+
+/**
  * Build the four verbatim tickets for one parsed race: show ($2, 1
  * combo) + $1 exacta box on box4 (SOME-REWARD); win ($2, 1 combo) + $2
  * exacta box on box3 (HIGHER-REWARD). Returns { someReward: [tickets],
  * higherReward: [tickets], warnings }. Ticket shape matches every other
  * picker in this codebase (bet_type/legs/stakeCents/costCents/tellerCall).
+ * `entries` (optional) fills in "If it hits" estimates from the day's
+ * morning line; omitted, every ticket's estimate stays null.
  */
-function buildRaceTickets(parsedRace, raceNumber) {
+function buildRaceTickets(parsedRace, raceNumber, entries = []) {
   const warnings = [];
   const blocked = new Set(parsedRace.blockedTickets ?? []);
   const someReward = [];
@@ -199,7 +230,11 @@ function buildRaceTickets(parsedRace, raceNumber) {
     higherReward.push(mkTicket('exacta_box', [parsedRace.box3], 200, 6, TIER.higherReward.key, TIER.higherReward.label));
   }
 
-  return { someReward, higherReward, warnings };
+  return {
+    someReward: estimateOtrTicketPayouts(someReward, entries),
+    higherReward: estimateOtrTicketPayouts(higherReward, entries),
+    warnings,
+  };
 }
 
 // ---------- preview ----------
@@ -234,7 +269,7 @@ function parseAgainstDay(db, day, pdfBytes, tmpPath) {
   }
 
   const perRace = parsed.races.map((r) => {
-    const { someReward, higherReward, warnings } = buildRaceTickets(r, r.race);
+    const { someReward, higherReward, warnings } = buildRaceTickets(r, r.race, entriesByRace[r.race] ?? []);
     return { race: r.race, showPick: r.showPick, winPick: r.winPick, box4: r.box4, box3: r.box3, names: r.names, someReward, higherReward, warnings };
   });
 
