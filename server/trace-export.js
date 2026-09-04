@@ -183,6 +183,7 @@ export function buildCardExport(db, cardId) {
       perRaceMinCents: card.per_race_min_cents,
       consensusCompleteness: card.consensus_completeness,
       engineVersion: card.engine_version,
+      llmModel: card.llm_model,
       correlationId: card.correlation_id,
       createdAt: card.created_at,
     },

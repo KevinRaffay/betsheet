@@ -1,6 +1,6 @@
 import React, { useEffect, useState } from 'react';
 import { FAILURE_MODE_WARNINGS } from '@shared/card-engine.js';
-import { deleteCard, getCard, getGrades, gradeCardApi } from '../api.js';
+import { deleteCard, getCard, getGrades, gradeCardApi, modelLabel } from '../api.js';
 
 const RESPONSIBLE_LINE =
   'Entertainment wagering with a pre-committed budget. No mid-card increases.';
@@ -101,7 +101,8 @@ export default function CardView({ cardId, onBack, onDeleted }) {
         <span className={`chip chip--${card.consensus_completeness === 'FULL' ? 'unanimous' : card.consensus_completeness === 'PARTIAL' ? 'split' : card.consensus_completeness === 'HUMAN' ? 'human' : card.consensus_completeness === 'LLM_GENERATED' ? 'llm' : 'chaos'}`}>
           {card.consensus_completeness}
         </span>
-        {' '}consensus · template {card.template ?? '—'} · engine <code>{card.engine_version ?? 'lean-0'}</code> · bankroll {money(card.bankroll_cents)}
+        {' '}consensus · template {card.template ?? '—'} · engine <code>{card.engine_version ?? 'lean-0'}</code>
+        {card.llm_model && <> · model <code>{modelLabel(card.llm_model)}</code></>} · bankroll {money(card.bankroll_cents)}
         {' '}· per-race min {money(card.per_race_min_cents)} · generated {card.created_at}
       </p>
 

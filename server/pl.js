@@ -8,8 +8,11 @@
 
 import express from 'express';
 import { getDb } from './db.js';
+import { SELECTABLE_MODELS } from './anthropic-client.js';
 
 export const plRouter = express.Router();
+
+const MODEL_LABEL = Object.fromEntries(SELECTABLE_MODELS.map((m) => [m.id, m.label]));
 
 const BUCKET_ORDER = ['FULL', 'PARTIAL', 'PROGRAM_ONLY', 'ODDS_ONLY', 'HUMAN', 'LLM_GENERATED', 'EQB_OTR'];
 
@@ -26,7 +29,7 @@ plRouter.get('/pl', (req, res) => {
     SELECT c.id AS cardId, c.race_day_id AS raceDayId, rd.track, rd.date, rd.meet,
            c.card_number AS cardNumber, c.variant, st.name AS template,
            c.consensus_completeness AS completeness, c.bankroll_cents AS bankrollCents,
-           c.engine_version AS engineVersion,
+           c.engine_version AS engineVersion, c.llm_model AS llmModel,
            SUM(t.cost_cents) AS costCents,
            SUM(gt.returned_cents) AS returnedCents,
            SUM(gt.pl_cents) AS plCents,
@@ -59,6 +62,12 @@ plRouter.get('/pl', (req, res) => {
   const inSelection = (row) => (selectedVersion === 'all' || row.engineVersion === selectedVersion) && (selectedMeet === 'all' || row.meet === selectedMeet);
 
   const byBucket = new Map();
+  // D76: within LLM_GENERATED, a further split by which Claude model
+  // generated the card - the whole point of recording it (cards.llm_model,
+  // frozen at creation, D76) is comparing models against each other, which
+  // a single bucket total can't show. Never pools with the bucket total's
+  // own math, just a breakdown of the same rows.
+  const byModel = new Map();
   for (const row of cardRows) {
     if (!inSelection(row)) continue;
     if (!byBucket.has(row.completeness)) {
@@ -74,8 +83,28 @@ plRouter.get('/pl', (req, res) => {
     b.returnedCents += row.returnedCents;
     b.plCents += row.plCents;
     b.bankrollCents += row.bankrollCents ?? 0;
+
+    if (row.completeness === 'LLM_GENERATED') {
+      const key = row.llmModel ?? 'unknown';
+      if (!byModel.has(key)) {
+        byModel.set(key, {
+          model: key, label: MODEL_LABEL[key] ?? key, cards: 0, tickets: 0,
+          costCents: 0, returnedCents: 0, plCents: 0, bankrollCents: 0,
+        });
+      }
+      const m = byModel.get(key);
+      m.cards++;
+      m.tickets += row.tickets;
+      m.costCents += row.costCents;
+      m.returnedCents += row.returnedCents;
+      m.plCents += row.plCents;
+      m.bankrollCents += row.bankrollCents ?? 0;
+    }
   }
-  const buckets = BUCKET_ORDER.filter((k) => byBucket.has(k)).map((k) => byBucket.get(k));
+  const buckets = BUCKET_ORDER.filter((k) => byBucket.has(k)).map((k) => {
+    const b = byBucket.get(k);
+    return k === 'LLM_GENERATED' ? { ...b, byModel: [...byModel.values()].sort((a, b2) => b2.plCents - a.plCents) } : b;
+  });
 
   const ungraded = db.prepare(`
     SELECT c.id AS cardId, c.race_day_id AS raceDayId, rd.track, rd.date, rd.meet,
@@ -110,7 +139,7 @@ plRouter.get('/race-days/:id/pl', (req, res) => {
 
   const cards = db.prepare(`
     SELECT c.id, c.card_number, c.variant, st.name AS template, c.bankroll_cents,
-           c.consensus_completeness, c.engine_version, c.created_at
+           c.consensus_completeness, c.engine_version, c.llm_model, c.created_at
     FROM cards c
     LEFT JOIN strategy_templates st ON st.id = c.strategy_template_id
     WHERE c.race_day_id = ? ORDER BY c.card_number
@@ -151,7 +180,7 @@ plRouter.get('/race-days/:id/pl', (req, res) => {
     return {
       cardId: c.id, cardNumber: c.card_number, variant: c.variant, template: c.template,
       bankrollCents: c.bankroll_cents, completeness: c.consensus_completeness,
-      engineVersion: c.engine_version, createdAt: c.created_at, graded: perRace.length > 0, perRace,
+      engineVersion: c.engine_version, llmModel: c.llm_model, createdAt: c.created_at, graded: perRace.length > 0, perRace,
       costCents: sum('costCents'), returnedCents: sum('returnedCents'), plCents: sum('plCents'),
     };
   });

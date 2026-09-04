@@ -94,12 +94,20 @@ export default function LlmCardModal({ dayId, onCardChanged, onClose }) {
   const [regenerateAllResults, setRegenerateAllResults] = useState(null); // [{ race, status: 'saved'|'blocked'|'error', message }]
   const [models, setModels] = useState([]); // D75: [{id, label}]
   const [selectedModel, setSelectedModel] = useState('');
+  // D76: once a resumed card has a locked-in model (cards.llm_model, set at
+  // creation and never changed - server/llm-cards.js refuses a mismatched
+  // model with a 409), the picker is forced to it and disabled - a card's
+  // model never drifts mid-comparison. Free again once null (a new day
+  // with no LLM card yet, or after "Start a New Card").
+  const [lockedModel, setLockedModel] = useState(null);
 
   const reload = () => {
     getRaceDay(dayId).then(setDayInfo).catch((e) => setError(String(e.message)));
     listCards(dayId).then((cards) => {
       const llm = cards.filter((c) => c.template === 'llm').sort((a, b) => b.card_number - a.card_number)[0];
       setCardId(llm ? llm.id : null);
+      setLockedModel(llm?.llm_model ?? null);
+      if (llm?.llm_model) setSelectedModel(llm.llm_model);
     }).catch(() => {});
     getLlmModels().then((m) => {
       setModels(m.models ?? []);
@@ -182,7 +190,7 @@ export default function LlmCardModal({ dayId, onCardChanged, onClose }) {
     setError(null);
     try {
       const r = await lockLlmCard(dayId, { race: openRace, requestId: preview.requestId, bankrollCents: dayInfo.bankroll_cents, cardId }, correlationId);
-      if (!cardId) setCardId(r.cardId);
+      if (!cardId) { setCardId(r.cardId); setLockedModel(r.llmModel ?? selectedModel); }
       const savedRace = openRace;
       setLastSavedRace(savedRace);
       setOpenRace(null);
@@ -213,6 +221,7 @@ export default function LlmCardModal({ dayId, onCardChanged, onClose }) {
   const handleStartNewCard = () => {
     if (busy) return;
     setCardId(null);
+    setLockedModel(null); // D76: free the picker again
     setTicketsByRace(new Map());
     setExpandedRaces(new Set());
     setOpenRace(null);
@@ -256,7 +265,7 @@ export default function LlmCardModal({ dayId, onCardChanged, onClose }) {
         const r = await lockLlmCard(dayId, {
           race: raceNumber, requestId: p.requestId, bankrollCents: dayInfo.bankroll_cents, cardId: localCardId,
         }, localCorrelationId);
-        if (!localCardId) localCardId = r.cardId;
+        if (!localCardId) { localCardId = r.cardId; setLockedModel(r.llmModel ?? selectedModel); }
         results.push({ race: raceNumber, status: 'saved' });
       } catch (e) {
         results.push({ race: raceNumber, status: 'error', message: String(e.message) });
@@ -302,11 +311,16 @@ export default function LlmCardModal({ dayId, onCardChanged, onClose }) {
               <div className="formrow formrow--tight">
                 <label>
                   Model{' '}
-                  <select className="in in--sm" value={selectedModel} disabled={busy || models.length === 0}
+                  <select className="in in--sm" value={selectedModel} disabled={busy || models.length === 0 || Boolean(lockedModel)}
                     onChange={(e) => setSelectedModel(e.target.value)}>
                     {models.map((m) => <option key={m.id} value={m.id}>{m.label}</option>)}
                   </select>
                 </label>
+                {lockedModel && (
+                  <span className="dim">
+                    {' '}This card was generated with {models.find((m) => m.id === lockedModel)?.label ?? lockedModel} - start a new card to try a different model.
+                  </span>
+                )}
               </div>
 
               <div className="formrow formrow--tight">
