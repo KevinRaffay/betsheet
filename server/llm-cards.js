@@ -20,7 +20,7 @@ import express from 'express';
 import { exactaEstimate, placeEstimate, trifectaBoxEstimate, winPayout } from '../shared/betmath.js';
 import { buildConsensusTable } from '../shared/classification.js';
 import { parseHumanPicksText } from '../shared/parsers/human-picks.js';
-import { complete, hasKey, MODEL } from './anthropic-client.js';
+import { complete, hasKey, MODEL, SELECTABLE_MODELS } from './anthropic-client.js';
 import { getDb } from './db.js';
 import { gradeAndPersist } from './grading.js';
 import { loadRace, scratchedProgramNumbersFor } from './human-cards.js';
@@ -133,9 +133,11 @@ function insertRequestRow(db, { raceDayId, cardId, raceNumber, promptText, respo
  * llm_card_requests, and parses a well-formed response through the SAME
  * human-picks validation. Never persists a ticket/card - preview-first,
  * invariant 9. `stubResponseText`: test-only escape hatch (see
- * scripts/check-llm-cards.js) so CI never calls the real API.
+ * scripts/check-llm-cards.js) so CI never calls the real API. `model`
+ * (D75): overrides the server-configured default for this one call, so
+ * the user can pick a model per generation in the LLM card modal.
  */
-export async function previewLlmRace(db, day, raceNumber, cardId, { stubResponseText } = {}) {
+export async function previewLlmRace(db, day, raceNumber, cardId, { stubResponseText, model: requestedModel } = {}) {
   const { race, entries } = loadRace(db, day.id, raceNumber);
   const scratched = scratchedProgramNumbersFor(db, day.id, race, entries);
 
@@ -170,14 +172,14 @@ export async function previewLlmRace(db, day, raceNumber, cardId, { stubResponse
   });
 
   let responseText = stubResponseText ?? null;
-  let model = stubResponseText ? 'stub' : MODEL;
+  let model = stubResponseText ? 'stub' : (requestedModel || MODEL);
   let callError = null;
   if (stubResponseText == null) {
     if (!hasKey()) {
       callError = 'ANTHROPIC_API_KEY is not set.';
     } else {
       try {
-        const result = await complete({ system: SYSTEM_PROMPT, user: userPrompt });
+        const result = await complete({ system: SYSTEM_PROMPT, user: userPrompt, model });
         responseText = result.text;
         model = result.model;
       } catch (err) {
@@ -327,6 +329,12 @@ function loadDay(db, id) {
   return db.prepare('SELECT * FROM race_days WHERE id = ?').get(id) ?? null;
 }
 
+// The selectable model list + the server-configured default (D75), so the
+// modal's picker is never a second copy of anthropic-client.js's list.
+llmCardsRouter.get('/llm-models', (_req, res) => {
+  res.json({ models: SELECTABLE_MODELS, default: MODEL });
+});
+
 llmCardsRouter.post('/race-days/:id/llm-cards/preview', async (req, res) => {
   const correlationId = req.get('x-correlation-id') || newCorrelationId();
   const db = getDb();
@@ -334,9 +342,14 @@ llmCardsRouter.post('/race-days/:id/llm-cards/preview', async (req, res) => {
   if (!day) return res.status(404).json({ error: 'No such race day.' });
   const race = Number(req.body?.race);
   if (!Number.isInteger(race) || race <= 0) return res.status(400).json({ error: 'race is required.' });
+  const requestedModel = req.body?.model;
+  if (requestedModel && !SELECTABLE_MODELS.some((m) => m.id === requestedModel)) {
+    return res.status(400).json({ error: `Unknown model "${requestedModel}". Choose one of: ${SELECTABLE_MODELS.map((m) => m.id).join(', ')}.` });
+  }
   try {
     const preview = await previewLlmRace(db, day, race, req.body?.cardId, {
       stubResponseText: process.env.BETSHEET_LLM_TEST_MODE === '1' ? req.body?.__stubResponse : undefined,
+      model: requestedModel || undefined,
     });
     res.json({ correlationId, ...preview });
   } catch (err) {
