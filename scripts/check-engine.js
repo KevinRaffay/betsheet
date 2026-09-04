@@ -265,10 +265,18 @@ check('toggle: placeMoneyRule off (simulation only) -> no forced place, suppress
 // A large remainder: four CHAOS races, one win ticket each (every other
 // structure rule off), so 75% of every allocation is left over. The old
 // balancer put all $300 on one horse; round-robin lands $75 on each.
+// No program_rank here (D74): three external sources each picking a
+// different horse must be a genuine 3-way "nobody agrees" CHAOS - a
+// program_rank would add a 4th (Program analysis) source, and since it
+// would agree with source A's pick, classifyRace's D74 rule (CHAOS means
+// no PAIR agrees, not merely "3 distinct picks") correctly calls that
+// SPLIT instead, breaking this test's unrelated remainder-distribution
+// setup. Keeping program silent here isolates the fixture to what it's
+// actually testing.
 const chaosEntries = [
-  { program_number: '1', horse_name: 'Alpha', morning_line: '3/1', morning_line_decimal: 3, program_rank: 1, best_bet: 0, scratched: 0 },
-  { program_number: '2', horse_name: 'Bravo', morning_line: '4/1', morning_line_decimal: 4, program_rank: 2, best_bet: 0, scratched: 0 },
-  { program_number: '3', horse_name: 'Charlie', morning_line: '9/2', morning_line_decimal: 4.5, program_rank: 3, best_bet: 0, scratched: 0 },
+  { program_number: '1', horse_name: 'Alpha', morning_line: '3/1', morning_line_decimal: 3, program_rank: null, best_bet: 0, scratched: 0 },
+  { program_number: '2', horse_name: 'Bravo', morning_line: '4/1', morning_line_decimal: 4, program_rank: null, best_bet: 0, scratched: 0 },
+  { program_number: '3', horse_name: 'Charlie', morning_line: '9/2', morning_line_decimal: 4.5, program_rank: null, best_bet: 0, scratched: 0 },
 ];
 const chaosPicks = [
   { source_name: 'A', source_kind: 'algorithmic', pick_type: 'top', program_number: '1', horse_name: 'Alpha', note: null },

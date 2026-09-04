@@ -109,6 +109,7 @@ export function generateCard({ bankrollCents, perRaceMinCents, races, sourcesUse
       race: race.number,
       classification: c.classification,
       externalSourceCount: c.externalSourceCount,
+      agreement: c.agreement,
       cappedFromUnanimous: c.cappedFromUnanimous,
       topVotes: c.topVotes,
       contrarianFlags: c.contrarianFlags,

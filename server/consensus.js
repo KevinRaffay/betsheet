@@ -185,7 +185,7 @@ export function resolvePicks(races, pickRaces, warnings, sourceName) {
   return resolved;
 }
 
-function storePicks(db, sourceId, resolved) {
+export function storePicks(db, sourceId, resolved) {
   const del = db.prepare('DELETE FROM consensus_picks WHERE source_id = ? AND race_id = ?');
   const ins = db.prepare(`INSERT INTO consensus_picks
       (race_id, source_id, entry_id, program_number, horse_name, pick_type, note)
@@ -363,11 +363,11 @@ export function classifyAndPersist(db, day, correlationId) {
   const entriesByRace = Object.fromEntries(day.races.map((r) => [r.number, r.entries]));
   const results = classifyDay(day.races.map((r) => r.number), entriesByRace, picksByRaceNumber(db, day));
   const update = db.prepare(`UPDATE races
-      SET classification = ?, classification_source_count = ?, contrarian_flags = ?
+      SET classification = ?, classification_source_count = ?, classification_agreement = ?, contrarian_flags = ?
       WHERE race_day_id = ? AND number = ?`);
   const tx = db.transaction(() => {
     for (const r of results) {
-      update.run(r.classification, r.externalSourceCount,
+      update.run(r.classification, r.externalSourceCount, r.agreement,
         r.contrarianFlags.length ? JSON.stringify(r.contrarianFlags) : null,
         day.id, r.number);
     }
@@ -445,6 +445,7 @@ consensusRouter.get('/race-days/:id/consensus', (req, res) => {
     number: r.number,
     classification: r.classification,
     externalSourceCount: r.classification_source_count,
+    agreement: r.classification_agreement,
     contrarianFlags: r.contrarian_flags ? JSON.parse(r.contrarian_flags) : [],
   }));
   res.json({ picks, attempts, races });
