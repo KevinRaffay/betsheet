@@ -12,6 +12,16 @@ const API_VERSION = '2023-06-01';
 
 export const MODEL = process.env.BETSHEET_LLM_MODEL || 'claude-sonnet-5';
 
+// Selectable in the LLM card modal (D75) - the current Claude model family,
+// newest first. `MODEL` above stays the server-configured default when a
+// call doesn't name one.
+export const SELECTABLE_MODELS = [
+  { id: 'claude-opus-5', label: 'Opus 5' },
+  { id: 'claude-sonnet-5', label: 'Sonnet 5' },
+  { id: 'claude-haiku-4-5-20251001', label: 'Haiku 4.5' },
+  { id: 'claude-fable-5-1', label: 'Fable 5.1' },
+];
+
 export const hasKey = () => Boolean(process.env.ANTHROPIC_API_KEY);
 
 export class AnthropicError extends Error {
@@ -37,7 +47,7 @@ function buildMessages(user, prefill) {
  * rather than burning the call on a model that refuses prefills.
  */
 export async function complete({
-  system, user, prefill = '', maxTokens = 4000, temperature = 1, timeoutMs = 60000,
+  system, user, prefill = '', maxTokens = 4000, temperature = 1, timeoutMs = 60000, model = MODEL,
 }) {
   const key = process.env.ANTHROPIC_API_KEY;
   if (!key) throw new AnthropicError('ANTHROPIC_API_KEY is not set', 401);
@@ -56,7 +66,7 @@ export async function complete({
         'anthropic-version': API_VERSION,
       },
       body: JSON.stringify({
-        model: MODEL,
+        model,
         max_tokens: maxTokens,
         temperature,
         system,
@@ -74,7 +84,7 @@ export async function complete({
   if (!res.ok) {
     const body = await res.text().catch(() => '');
     if (res.status === 400 && usePrefill && /prefill/i.test(body)) {
-      return complete({ system, user, prefill: '', maxTokens, temperature, timeoutMs });
+      return complete({ system, user, prefill: '', maxTokens, temperature, timeoutMs, model });
     }
     throw new AnthropicError(`Anthropic API ${res.status}: ${body.slice(0, 300)}`, res.status);
   }
@@ -89,6 +99,6 @@ export async function complete({
     text: (usePrefill ? prefill : '') + text,
     usage: data.usage ? { input: data.usage.input_tokens ?? null, output: data.usage.output_tokens ?? null } : null,
     stopReason: data.stop_reason,
-    model: MODEL,
+    model,
   };
 }

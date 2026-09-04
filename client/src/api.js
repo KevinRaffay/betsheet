@@ -245,12 +245,15 @@ export const lockHumanCard = (dayId, { race, text, pass, bankrollCents, cardId }
   }).then(asJson);
 
 // LLM cards (D63): per-race preview (calls the model) + confirm/save, and
-// the per-race request log (reasoning + raw response).
-export const previewLlmCard = (dayId, race, cardId, correlationId) =>
+// the per-race request log (reasoning + raw response). `model` (D75):
+// which Claude model to call for this preview; omitted uses the
+// server-configured default.
+export const getLlmModels = () => fetch('/api/llm-models').then(asJson);
+export const previewLlmCard = (dayId, race, cardId, correlationId, model) =>
   fetch(`/api/race-days/${dayId}/llm-cards/preview`, {
     method: 'POST',
     headers: { 'content-type': 'application/json', ...(correlationId ? { 'x-correlation-id': correlationId } : {}) },
-    body: JSON.stringify({ race, cardId }),
+    body: JSON.stringify({ race, cardId, model }),
   }).then(asJson);
 export const lockLlmCard = (dayId, { race, requestId, bankrollCents, cardId }, correlationId) =>
   fetch(`/api/race-days/${dayId}/llm-cards`, {

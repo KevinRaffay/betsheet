@@ -275,6 +275,34 @@ try {
   check('LLM_GENERATED is its own bucket, isolated from every other bucket', llmBucket && llmBucket.cards === 1 && !humanBucket, JSON.stringify(pl.buckets.map((b) => b.completeness)));
   check('every LLM_GENERATED card row belongs to this day, none pooled from elsewhere', pl.cards.filter((c) => c.completeness === 'LLM_GENERATED').every((c) => c.raceDayId === dayId));
 
+  console.log('-- D75: model selection --');
+  const modelsResp = await jget('/api/llm-models');
+  check('GET /api/llm-models lists the selectable models and the server default',
+    Array.isArray(modelsResp.models) && modelsResp.models.length > 0 && modelsResp.models.every((m) => m.id && m.label)
+      && typeof modelsResp.default === 'string',
+    JSON.stringify(modelsResp));
+
+  const badModelPreview = await jpost(`/api/race-days/${dayId}/llm-cards/preview`, {
+    race: 1, __stubResponse: wellFormedResponse(1, 20, 'irrelevant'), model: 'gpt-not-a-claude-model',
+  });
+  const badModelBody = await badModelPreview.json();
+  check('an unknown model name is refused with 400, not silently sent to the API', badModelPreview.status === 400, JSON.stringify(badModelBody));
+
+  // Off-stub path (no __stubResponse), no API key configured (this
+  // server's env, deliberately): the call fails with "ANTHROPIC_API_KEY is
+  // not set", but the REQUESTED model must already be recorded on the
+  // logged request row before that failure - proves the picked model
+  // reaches previewLlmRace/complete() without needing a real API key or
+  // the stub escape hatch, which never touches the model parameter at all.
+  const chosenModel = modelsResp.models.find((m) => m.id !== modelsResp.default)?.id ?? modelsResp.models[0].id;
+  const noKeyPreview = await jpost(`/api/race-days/${dayId}/llm-cards/preview`, { race: 1, model: chosenModel });
+  check('no-key preview fails as expected (proves this call took the REAL path, not the stub)', noKeyPreview.status === 502);
+  const loggedModelChoice = dbCheck.prepare(
+    'SELECT model FROM llm_card_requests WHERE race_day_id = ? AND response_text IS NULL AND error IS NOT NULL ORDER BY id DESC LIMIT 1',
+  ).get(dayId);
+  check('the requested (non-default) model was recorded on the request row, not silently swapped for the default',
+    loggedModelChoice?.model === chosenModel, JSON.stringify(loggedModelChoice));
+
   console.log('-- no engine-version bump / lean fixture identity unchanged --');
   const leanCard = await (await jpost(`/api/race-days/${dayId}/cards`, {})).json();
   const { ENGINE_VERSION } = await import('../shared/card-engine.js');

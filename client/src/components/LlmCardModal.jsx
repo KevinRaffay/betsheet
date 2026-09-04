@@ -1,5 +1,5 @@
 import React, { useEffect, useState } from 'react';
-import { getRaceDay, listCards, lockLlmCard, previewLlmCard } from '../api.js';
+import { getLlmModels, getRaceDay, listCards, lockLlmCard, previewLlmCard } from '../api.js';
 
 const money = (cents) => (cents == null ? '—' : cents % 100 === 0 ? `$${cents / 100}` : `$${(cents / 100).toFixed(2)}`);
 
@@ -92,12 +92,18 @@ export default function LlmCardModal({ dayId, onCardChanged, onClose }) {
   const [errorRace, setErrorRace] = useState(null);
   const [regenerateAllProgress, setRegenerateAllProgress] = useState(null); // { index, total, raceNumber }
   const [regenerateAllResults, setRegenerateAllResults] = useState(null); // [{ race, status: 'saved'|'blocked'|'error', message }]
+  const [models, setModels] = useState([]); // D75: [{id, label}]
+  const [selectedModel, setSelectedModel] = useState('');
 
   const reload = () => {
     getRaceDay(dayId).then(setDayInfo).catch((e) => setError(String(e.message)));
     listCards(dayId).then((cards) => {
       const llm = cards.filter((c) => c.template === 'llm').sort((a, b) => b.card_number - a.card_number)[0];
       setCardId(llm ? llm.id : null);
+    }).catch(() => {});
+    getLlmModels().then((m) => {
+      setModels(m.models ?? []);
+      setSelectedModel((prev) => prev || m.default || m.models?.[0]?.id || '');
     }).catch(() => {});
   };
   useEffect(reload, [dayId]);
@@ -160,7 +166,7 @@ export default function LlmCardModal({ dayId, onCardChanged, onClose }) {
     setBusy(true);
     setError(null);
     try {
-      const p = await previewLlmCard(dayId, raceNumber, cardId, correlationId);
+      const p = await previewLlmCard(dayId, raceNumber, cardId, correlationId, selectedModel);
       if (p.correlationId) setCorrelationId(p.correlationId);
       setPreview(p);
     } catch (e) {
@@ -199,6 +205,25 @@ export default function LlmCardModal({ dayId, onCardChanged, onClose }) {
     setError(null);
   };
 
+  // D75: stop resuming the day's latest LLM card so the next Generate
+  // starts a brand-new one (the API already supports this - cardId
+  // omitted mints a new card, same D28 append-only convention every other
+  // card type follows - the modal just never exposed the path before).
+  // The old card is untouched, still visible in the Betting cards table.
+  const handleStartNewCard = () => {
+    if (busy) return;
+    setCardId(null);
+    setTicketsByRace(new Map());
+    setExpandedRaces(new Set());
+    setOpenRace(null);
+    setLastSavedRace(null);
+    setPreview(null);
+    setError(null);
+    setErrorRace(null);
+    setRegenerateAllResults(null);
+    setRegenerateAllProgress(null);
+  };
+
   // Regenerate every race, one call at a time, auto-saving each in place -
   // same generate-then-save operation "Regenerate" already does per race,
   // just run for the whole card in race order. A race whose preview comes
@@ -221,7 +246,7 @@ export default function LlmCardModal({ dayId, onCardChanged, onClose }) {
       const raceNumber = races[i].number;
       setRegenerateAllProgress({ index: i + 1, total: races.length, raceNumber });
       try {
-        const p = await previewLlmCard(dayId, raceNumber, localCardId, localCorrelationId);
+        const p = await previewLlmCard(dayId, raceNumber, localCardId, localCorrelationId, selectedModel);
         if (p.correlationId) localCorrelationId = p.correlationId;
         const blocking = p.warnings.find((w) => w.blocking);
         if (blocking) {
@@ -275,8 +300,22 @@ export default function LlmCardModal({ dayId, onCardChanged, onClose }) {
               {error && openRace == null && <p className="notice notice--error">{error}</p>}
 
               <div className="formrow formrow--tight">
+                <label>
+                  Model{' '}
+                  <select className="in in--sm" value={selectedModel} disabled={busy || models.length === 0}
+                    onChange={(e) => setSelectedModel(e.target.value)}>
+                    {models.map((m) => <option key={m.id} value={m.id}>{m.label}</option>)}
+                  </select>
+                </label>
+              </div>
+
+              <div className="formrow formrow--tight">
                 <button className="btn" disabled={busy || races.length === 0} onClick={handleRegenerateAll}>
                   Regenerate All Races
+                </button>
+                <button className="btn" disabled={busy || ticketsByRace.size === 0} onClick={handleStartNewCard}
+                  title="Start a brand-new LLM card instead of overwriting the current one - the current card stays in the Betting cards table">
+                  Start a New Card
                 </button>
                 {regenerateAllProgress && (
                   <p className="llm-loading" role="status">
