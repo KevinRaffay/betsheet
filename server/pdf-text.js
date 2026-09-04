@@ -10,8 +10,7 @@
 
 import { getDocument } from 'pdfjs-dist/legacy/build/pdf.mjs';
 
-/** Extract a PDF (path or Uint8Array) to line-reconstructed text. */
-export async function extractPdfLines(source) {
+async function extract(source) {
   const doc = await getDocument({
     ...(typeof source === 'string' ? { url: source } : { data: source }),
     useSystemFonts: true,
@@ -33,4 +32,28 @@ export async function extractPdfLines(source) {
       .join('\n'));
   }
   return pages.join('\n');
+}
+
+// pdfjs-dist's Node "fake worker" can wedge on a malformed PDF (a corrupt
+// embedded font/glyph, seen live on a downloaded chart PDF) without ever
+// resolving or rejecting the extraction promise. A caller awaiting that
+// forever is indistinguishable from a hung server, so extraction races a
+// timeout: the request still gets a prompt, honest error response instead
+// of spinning until the browser or proxy gives up and resets the socket.
+const TIMEOUT_MS = 45_000;
+
+/** Extract a PDF (path or Uint8Array) to line-reconstructed text. */
+export async function extractPdfLines(source) {
+  let timer;
+  const timeout = new Promise((_, reject) => {
+    timer = setTimeout(
+      () => reject(new Error(`PDF text extraction timed out after ${TIMEOUT_MS / 1000}s`)),
+      TIMEOUT_MS,
+    );
+  });
+  try {
+    return await Promise.race([extract(source), timeout]);
+  } finally {
+    clearTimeout(timer);
+  }
 }
