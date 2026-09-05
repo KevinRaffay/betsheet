@@ -24,6 +24,12 @@
 // Node's `--watch-path` is not an option - it restarts on ANY change under
 // the path, and server/logs/ (the D02 log streams) lives inside server/.
 
+// The dev ports come from this clone's own .env when it has them, so a second
+// checkout (the betsheet-alt scratch clone, README) just runs `npm run dev`
+// with no env prefix to remember. server/index.js already reads .env this way;
+// without it here, the server would move but the preflight, the watcher and
+// vite's /api proxy would all still be looking at the default ports.
+import 'dotenv/config';
 import { spawn } from 'node:child_process';
 import crypto from 'node:crypto';
 import fs from 'node:fs';

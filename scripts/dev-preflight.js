@@ -12,6 +12,12 @@
 // scripts/dev-watch.js keeps its own check as a backstop for being run
 // directly.
 
+// The dev ports come from this clone's own .env when it has them, so a second
+// checkout (the betsheet-alt scratch clone, README) just runs `npm run dev`
+// with no env prefix to remember. server/index.js already reads .env this way;
+// without it here, the server would move but the preflight, the watcher and
+// vite's /api proxy would all still be looking at the default ports.
+import 'dotenv/config';
 import { probePort, holderTree, describe } from './dev-ports.js';
 
 const API_PORT = Number(process.env.BETSHEET_PORT) || 8788;
