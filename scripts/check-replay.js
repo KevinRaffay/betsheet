@@ -127,6 +127,14 @@ try {
   const forbidden = ['results', 'finishOrder', 'payoffs', 'leanTickets', 'leanGraded', 'classification', 'topVotes', 'contrarianFlags'];
   check('no results/lean/classification keys before reveal or opt-in', forbidden.every((k) => !(k in blind1)), JSON.stringify(Object.keys(blind1)));
   check('locked true, tickets present, humanCardId echoed', blind1.locked === true && blind1.tickets.length === 1 && blind1.humanCardId === humanCardId);
+  // D86: the builder's edit affordance keys on anyRevealed - editing a locked
+  // race after any reveal would re-stamp picks_locked_at and silently flip the
+  // card PRE_COMMIT -> SEQUENTIAL, so the UI must be able to ask.
+  const summaryPreReveal = await jget(`/api/replay/cards/${humanCardId}/summary`);
+  check('summary.anyRevealed is false before the first reveal', summaryPreReveal.anyRevealed === false, JSON.stringify(summaryPreReveal));
+  check('summary carries no outcome fields beyond the totals it already had',
+    !('finishOrder' in summaryPreReveal) && !('payoffs' in summaryPreReveal) && !('classification' in summaryPreReveal),
+    JSON.stringify(Object.keys(summaryPreReveal)));
 
   console.log('-- reveal on a day with NO lean card -> leanGraded null, not a throw --');
   const revealNoLean = await jpost(`/api/replay/cards/${humanCardId}/races/1/reveal`);
@@ -141,6 +149,9 @@ try {
     const g = blind1After.humanGraded[0];
     return g && g.ticket.tellerCall === '$25 W 1' && g.ticket.betType === 'win' && g.outcome === 'win' && g.plCents === 6250;
   })(), JSON.stringify(blind1After.humanGraded));
+
+  const summaryPostReveal = await jget(`/api/replay/cards/${humanCardId}/summary`);
+  check('summary.anyRevealed flips to true once a race is revealed', summaryPostReveal.anyRevealed === true, JSON.stringify(summaryPostReveal));
 
   console.log('-- classification toggle: default hidden, one-way once set --');
   const blind2 = await jget(`/api/replay/days/${dayId}/races/2?cardId=${humanCardId}`);
