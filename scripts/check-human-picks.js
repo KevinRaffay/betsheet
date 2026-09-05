@@ -15,6 +15,8 @@ import fs from 'node:fs';
 import os from 'node:os';
 import path from 'node:path';
 import { fileURLToPath, URL } from 'node:url';
+import { parseHumanPicksText } from '../shared/parsers/human-picks.js';
+import { moneyToken, parseMoneyToken } from '../shared/betmath.js';
 
 const ROOT = fileURLToPath(new URL('../', import.meta.url));
 const tmp = fs.mkdtempSync(path.join(os.tmpdir(), 'betsheet-humancheck-'));
@@ -105,6 +107,149 @@ const preview = (dayId, race, text, cardId) => jpost(`/api/race-days/${dayId}/hu
 const lock = (dayId, race, text, cardId) => jpost(`/api/race-days/${dayId}/human-cards`, { race, text, cardId });
 
 try {
+  // ---------- teller grammar, pure (D84) ----------
+  // Run before the server so a grammar break is reported as a grammar break,
+  // not as a mysterious preview failure 200 lines later.
+  console.log('-- teller grammar (pure) --');
+  {
+    const tEntries = [1, 2, 3, 4, 5, 6, 7, 9].map((n) => ({ program_number: String(n), horse_name: `Horse ${n}` }));
+    const tMenu = '$1 Exacta / $2 Quinella / 50c Trifecta / $1 Superfecta (10c min)';
+    const tp = (text, opts = {}) => parseHumanPicksText({
+      text, race: 1, entries: tEntries, wagerMenu: tMenu,
+      scratchedProgramNumbers: opts.scratched ?? [],
+    });
+
+    // The exact string from the request that started D84.
+    const EXAMPLE = '$10 W 5 / $5 W 2 / $3 W 4 / $2 EX BOX 2-4-5 / $1 EX 5 WITH 1-2-4-6 '
+      + '/ $1 TRI 5 WITH 2-4 WITH 2-4 / $1 TRI 2-4 WITH 5 WITH 1-6-9 '
+      + '/ $1 SUPER 5 WITH 2-4 WITH 2-4 WITH 1-6-7-9';
+    const ex = tp(EXAMPLE);
+    check('the worked example: 8 tickets, no warnings', ex.tickets.length === 8 && ex.warnings.length === 0,
+      JSON.stringify(ex.warnings));
+    check('the worked example: per-ticket costs, per-combo money x combination count', (() => {
+      const want = [1000, 500, 300, 1200, 400, 200, 600, 800];
+      return ex.tickets.length === want.length && want.every((c, i) => ex.tickets[i].costCents === c);
+    })(), JSON.stringify(ex.tickets.map((t) => t.costCents)));
+    check('the worked example: $50.00 for the race', ex.raceCostCents === 5000, String(ex.raceCostCents));
+    check('repeat-dropping is real: "5 WITH 2-4 WITH 2-4" is 2 combos, not 4',
+      ex.tickets[5].costCents === 200 && ex.tickets[5].stakeCents === 100);
+
+    // The property the whole design rests on: what tellerCall emits, this
+    // parser reads back to the identical ticket. Checked over every ticket
+    // the example produces AND every ticket the column grammar produces.
+    const roundTrips = (t) => {
+      const back = tp(t.tellerCall);
+      if (back.tickets.length !== 1) return false;
+      const b = back.tickets[0];
+      return b.betType === t.betType && b.stakeCents === t.stakeCents && b.costCents === t.costCents
+        && JSON.stringify(b.legs) === JSON.stringify(t.legs) && b.tellerCall === t.tellerCall;
+    };
+    check('every teller ticket round-trips through its own tellerCall', ex.tickets.every(roundTrips),
+      JSON.stringify(ex.tickets.filter((t) => !roundTrips(t)).map((t) => t.tellerCall)));
+    check('every COLUMN-grammar ticket round-trips through its own tellerCall too', (() => {
+      const col = tp(DESIGN_TABLE.replace(/#/g, '')).tickets;
+      return col.length === 5 && col.every(roundTrips);
+    })());
+    check('the example is byte-identical to its own re-emission (canonical input)',
+      ex.tickets.map((t) => t.tellerCall).join(' / ') === EXAMPLE.replace(/\s+/g, ' '));
+
+    // Money tokens: canonical out, tolerant in.
+    check('moneyToken/parseMoneyToken are inverses over every stake that matters',
+      [2500, 200, 100, 50, 10, 250].every((c) => parseMoneyToken(moneyToken(c)) === c));
+    check('a 50c trifecta canonicalizes to $0.50', (() => {
+      const r = tp('50c TRI 5 WITH 2-4 WITH 2-4');
+      return r.tickets.length === 1 && r.tickets[0].stakeCents === 50
+        && r.tickets[0].tellerCall === '$0.50 TRI 5 WITH 2-4 WITH 2-4';
+    })(), JSON.stringify(tp('50c TRI 5 WITH 2-4 WITH 2-4').tickets.map((t) => t.tellerCall)));
+    check('"50-cent", "$.50" and ".50" all read as 50 cents',
+      ['50-cent', '$.50', '.50'].every((m) => tp(`${m} TRI 5 WITH 2-4 WITH 2-4`).tickets[0]?.stakeCents === 50));
+    check('a 10-cent superfecta base survives the round trip', (() => {
+      const r = tp('$0.10 SUPER 5 WITH 2-4 WITH 2-4 WITH 1-6-7-9');
+      return r.tickets[0]?.stakeCents === 10 && r.tickets[0].costCents === 80 && roundTrips(r.tickets[0]);
+    })());
+
+    // Synonyms and case.
+    check('OVER is WITH, lowercase is fine, "," is "-"', (() => {
+      const a = tp('$1 ex 5 over 1-2').tickets[0];
+      const b = tp('$1 EX 5 WITH 1,2').tickets[0];
+      return a && b && a.tellerCall === b.tellerCall && a.tellerCall === '$1 EX 5 WITH 1-2';
+    })());
+    check('full words work as well as abbreviations', (() => {
+      const a = tp('$2 EXACTA BOX 2,4,5').tickets[0];
+      const b = tp('$2 EX BOX 2-4-5').tickets[0];
+      return a && b && a.tellerCall === b.tellerCall && a.costCents === 1200;
+    })());
+    check('longest match wins: SUPER is superfecta, not show', (() => {
+      const r = tp('$0.10 SUPER 5 WITH 2-4 WITH 2-4 WITH 1-6-7-9');
+      return r.tickets[0]?.betType === 'superfecta';
+    })());
+
+    // Odds + rationale ride in a trailing parenthetical.
+    check('a trailing parenthetical carries odds then rationale', (() => {
+      const r = tp('$10 W 5 (9/2 big overlay) / $2 EX BOX 2-4-5 (spread the chalk)');
+      const [a, b] = r.tickets;
+      return r.tickets.length === 2
+        && a.odds_at_bet === '9/2' && a.rationale_text === 'big overlay'
+        && b.odds_at_bet === null && b.rationale_text === 'spread the chalk';
+    })());
+    check('a rationale containing " / " does not split the ticket in half', (() => {
+      const r = tp('$2 EX BOX 2-4-5 (good spot / bad post)');
+      return r.tickets.length === 1 && r.tickets[0].rationale_text === 'good spot / bad post';
+    })());
+
+    // Structural rules the teller grammar makes one keystroke away.
+    check('"$1 EX 5" - a straight exacta with one position - blocks', (() => {
+      const ws = tp('$1 EX 5').warnings;
+      return tp('$1 EX 5').tickets.length === 0
+        && ws.some((x) => x.type === 'insufficient_selections' && x.blocking === true);
+    })());
+    check('"$1 EX 5 WITH 2 WITH 3" - three positions on a two-position bet - blocks', (() => {
+      const ws = tp('$1 EX 5 WITH 2 WITH 3').warnings;
+      return ws.some((x) => x.type === 'too_many_positions' && x.blocking === true);
+    })());
+    check('a win bet on two horses is TWO tickets, not one two-combo ticket', (() => {
+      const r = tp('$10 W 2-5');
+      return r.tickets.length === 2 && r.raceCostCents === 2000
+        && r.tickets.every((t) => t.costCents === 1000 && t.legs[0].length === 1)
+        && r.warnings.some((x) => x.type === 'wps_split' && x.blocking === false);
+    })(), JSON.stringify(tp('$10 W 2-5').tickets.map((t) => t.tellerCall)));
+    check('the WPS split preserves the total under the column grammar too', (() => {
+      const r = parseHumanPicksText({ text: 'Win | 2,5 | $20', race: 1, entries: tEntries, wagerMenu: tMenu });
+      return r.tickets.length === 2 && r.raceCostCents === 2000;
+    })());
+
+    // Rejections.
+    check('a multi-race teller ticket is rejected, not silently mis-saved', (() => {
+      const ws = tp('Races 1-2 $2 DD 5 WITH 2-4').warnings;
+      return ws.some((x) => x.type === 'multi_race_unsupported' && x.blocking === true);
+    })());
+    check('a ticket segment with no money token blocks on the stake', (() => {
+      const ws = tp('$10 W 5 / W 2').warnings;
+      return ws.some((x) => x.type === 'unrecognized_stake' && x.blocking === true);
+    })());
+    check('a scratched horse still blocks in the teller grammar', (() => {
+      const ws = tp('$5 W 5', { scratched: ['5'] }).warnings;
+      return ws.some((x) => x.type === 'scratched_selection' && x.blocking === true);
+    })());
+    check('an off-increment per-combo stake blocks', (() => {
+      const ws = tp('$1.50 EX 2 WITH 4').warnings;
+      return ws.some((x) => x.type === 'non_multiple_stake' && x.blocking === true);
+    })());
+    check('a coupled entry (1A) resolves in the teller grammar', (() => {
+      const r = parseHumanPicksText({
+        text: '$10 W 1A', race: 1, wagerMenu: tMenu,
+        entries: [...tEntries, { program_number: '1A', horse_name: 'Coupled Colt' }],
+      });
+      return r.tickets.length === 1 && r.tickets[0].legs[0][0] === '1A' && r.tickets[0].tellerCall === '$10 W 1A';
+    })());
+
+    // Detection: the two grammars coexist in one paste without interfering.
+    check('a teller line and a column line in the SAME paste both parse', (() => {
+      const r = tp('$10 W 5 / $2 EX BOX 2-4-5\nWin | 2 | $25\nTrifecta | 2,4/2,4/3,5 | $20');
+      return r.tickets.length === 4 && r.warnings.length === 0 && r.raceCostCents === 1000 + 1200 + 2500 + 2000;
+    })(), JSON.stringify(tp('$10 W 5 / $2 EX BOX 2-4-5\nWin | 2 | $25\nTrifecta | 2,4/2,4/3,5 | $20').tickets.map((t) => t.tellerCall)));
+  }
+
   let up = false;
   for (let i = 0; i < 50 && !up; i++) {
     try { up = (await fetch(`${BASE}/api/health`)).ok; } catch { await new Promise((rr) => setTimeout(rr, 200)); }
@@ -138,8 +283,11 @@ try {
     const tri = byType('trifecta')[0];
     return tri && tri.stakeCents === 500 && tri.costCents === 2000 && tri.legs.length === 3;
   })(), JSON.stringify(byType('trifecta')));
-  check('teller calls formatted (shared/betmath.js tellerCall, same as an engine ticket)',
-    p1.tickets.every((t) => typeof t.tellerCall === 'string' && t.tellerCall.startsWith('Race 1,')));
+  check('teller calls are the D84 grammar, exact strings', (() => {
+    const want = ['$25 W 2', '$15 W 4', '$10 EX BOX 2-4', '$5 TRI 2-4 WITH 2-4 WITH 3-5', '$20 W 5'];
+    const got = p1.tickets.map((t) => t.tellerCall);
+    return want.length === got.length && want.every((w, i) => got[i] === w);
+  })(), JSON.stringify(p1.tickets.map((t) => t.tellerCall)));
 
   console.log('-- locking the design-note table --');
   const lockRes1 = await lock(dayId, 1, DESIGN_TABLE);
@@ -214,9 +362,9 @@ try {
     const ws = await w('Win\t#7\t$10');
     return ws.some((x) => x.type === 'scratched_selection' && x.blocking === true);
   })(), 'Chart Scratch Cal was scratched in the results chart, not at program time');
-  check('multi-race type rejected, names the Replay PR', await (async () => {
+  check('multi-race type rejected, names the deliverable that will cover it', await (async () => {
     const ws = await w('Daily Double\t2/4\t$10');
-    return ws.some((x) => x.type === 'multi_race_unsupported' && x.blocking === true && /replay/i.test(x.message));
+    return ws.some((x) => x.type === 'multi_race_unsupported' && x.blocking === true && /D88/.test(x.message));
   })());
 
   console.log('-- save independently enforces blocking (not just the preview UI) --');
