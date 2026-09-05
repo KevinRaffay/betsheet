@@ -262,6 +262,17 @@ export const MODEL_LABEL = {
   'claude-fable-5-1': 'Fable 5.1',
 };
 export const modelLabel = (id) => (id ? (MODEL_LABEL[id] ?? id) : null);
+// Analyst notes (D92). Keyed by day + race - race 0 is the day-level note -
+// because notes belong to a RACE, not a card: the same commentary feeds a
+// Sonnet card and an Opus card. Empty text deletes the note.
+export const getLlmNotes = (dayId) => fetch(`/api/race-days/${dayId}/llm-notes`).then(asJson);
+export const saveLlmNote = (dayId, { race, text, sourceLabel }, correlationId) =>
+  fetch(`/api/race-days/${dayId}/llm-notes`, {
+    method: 'PUT',
+    headers: { 'content-type': 'application/json', ...(correlationId ? { 'x-correlation-id': correlationId } : {}) },
+    body: JSON.stringify({ race, text, sourceLabel }),
+  }).then(asJson);
+
 export const previewLlmCard = (dayId, race, cardId, correlationId, model) =>
   fetch(`/api/race-days/${dayId}/llm-cards/preview`, {
     method: 'POST',
