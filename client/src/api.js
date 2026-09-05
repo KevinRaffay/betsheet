@@ -243,6 +243,14 @@ export const lockHumanCard = (dayId, { race, text, pass, bankrollCents, cardId }
     headers: { 'content-type': 'application/json', ...(correlationId ? { 'x-correlation-id': correlationId } : {}) },
     body: JSON.stringify({ race, text, pass, bankrollCents, cardId }),
   }).then(asJson);
+// D102: delete ONE ticket from a locked, unrevealed race - the day builder's
+// remedy for a ticket it locked on close. Refused server-side once the race is
+// revealed or the card is graded.
+export const deleteHumanTicket = (cardId, ticketId, correlationId) =>
+  fetch(`/api/cards/${cardId}/human-tickets/${ticketId}`, {
+    method: 'DELETE',
+    headers: { ...(correlationId ? { 'x-correlation-id': correlationId } : {}) },
+  }).then(asJson);
 
 // LLM cards (D63): per-race preview (calls the model) + confirm/save, and
 // the per-race request log (reasoning + raw response). `model` (D75):

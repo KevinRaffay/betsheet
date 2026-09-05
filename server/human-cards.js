@@ -247,6 +247,94 @@ export function persistHumanRace(db, day, { race: raceNumber, text, pass = false
   };
 }
 
+/**
+ * Delete ONE ticket from a locked, unrevealed race on a human card (D102).
+ *
+ * The day builder locks whatever is previewed when it closes, so a mistake
+ * now lands in the database rather than evaporating with the dialog - and the
+ * remedy has to be delete, not edit. Editing a locked race re-stamps
+ * `picks_locked_at`, which is exactly what `computeBlindness` reads (invariant
+ * 15); deleting a ticket touches no timestamp at all, so the card's derived
+ * blindness is the same before and after.
+ *
+ * Two refusals, both about not rewriting a record someone has already read:
+ *  - a REVEALED race is closed to change (the D28 remedy is a new card, the
+ *    same rule persistHumanRace enforces on a re-lock);
+ *  - a card with ANY grade set is closed too - deleting a graded ticket would
+ *    move a P/L figure that has already been reported (invariant 14's spirit).
+ *
+ * Deleting the LAST ticket of a race retires the race entirely: its allocation
+ * and its human_race_state row go, so it reads "Not played" again and can be
+ * built afresh. `race_days.replayed_at` is deliberately NOT rolled back - it
+ * records that this day was played at all, which stays true.
+ */
+export function deleteHumanTicket(db, { cardId, ticketId, correlationId }) {
+  const card = db.prepare(`
+    SELECT c.*, st.name AS template FROM cards c
+    LEFT JOIN strategy_templates st ON st.id = c.strategy_template_id
+    WHERE c.id = ?
+  `).get(Number(cardId));
+  if (!card || card.template !== 'human') throw new HumanCardError(404, 'No such human card.');
+
+  const day = db.prepare('SELECT * FROM race_days WHERE id = ?').get(card.race_day_id);
+  if (day?.deleted_at) throw new HumanCardError(410, 'This race day is deleted. Restore it first.');
+
+  const ticket = db.prepare('SELECT * FROM tickets WHERE id = ? AND card_id = ?').get(Number(ticketId), card.id);
+  if (!ticket) throw new HumanCardError(404, 'No such ticket on this card.');
+
+  const race = db.prepare('SELECT * FROM races WHERE id = ?').get(ticket.race_id);
+  const state = db.prepare(
+    'SELECT * FROM human_race_state WHERE card_id = ? AND race_number = ?',
+  ).get(card.id, race.number);
+  if (state?.results_revealed_at) {
+    throw new HumanCardError(409,
+      `Race ${race.number} has already been revealed on card #${card.card_number} - ` +
+      'its tickets are the record of what you played. Start a new card to play it differently.');
+  }
+
+  const anyGrade = db.prepare(`
+    SELECT 1 FROM graded_tickets gt JOIN tickets t ON t.id = gt.ticket_id
+    WHERE t.card_id = ? LIMIT 1
+  `).get(card.id);
+  if (anyGrade) {
+    throw new HumanCardError(409,
+      `Card #${card.card_number} has been graded against results - deleting a ticket now would ` +
+      'move a P/L figure that has already been reported. Start a new card instead.');
+  }
+
+  const out = db.transaction(() => {
+    db.prepare('DELETE FROM tickets WHERE id = ?').run(ticket.id);
+    const remaining = db.prepare(
+      'SELECT COALESCE(SUM(cost_cents), 0) AS cost, COUNT(*) AS n FROM tickets WHERE card_id = ? AND race_id = ?',
+    ).get(card.id, race.id);
+    if (remaining.n > 0) {
+      db.prepare('UPDATE allocations SET amount_cents = ? WHERE card_id = ? AND race_id = ?')
+        .run(remaining.cost, card.id, race.id);
+    } else {
+      db.prepare('DELETE FROM allocations WHERE card_id = ? AND race_id = ?').run(card.id, race.id);
+      db.prepare('DELETE FROM human_race_state WHERE card_id = ? AND race_number = ?').run(card.id, race.number);
+    }
+    return remaining;
+  })();
+
+  traceLog.info('human_ticket_deleted', {
+    correlationId: correlationId ?? card.correlation_id, cardId: card.id, raceDayId: card.race_day_id,
+    race: race.number, ticketId: ticket.id, betType: ticket.bet_type,
+    tellerCall: ticket.teller_call, costCents: ticket.cost_cents,
+    raceRetired: out.n === 0,
+  });
+  appLog.info('human_ticket_deleted', {
+    correlationId: correlationId ?? card.correlation_id, cardId: card.id,
+    race: race.number, ticketId: ticket.id, remainingTickets: out.n,
+  });
+
+  const cardCostCents = db.prepare('SELECT COALESCE(SUM(cost_cents), 0) AS n FROM tickets WHERE card_id = ?').get(card.id).n;
+  return {
+    cardId: card.id, race: race.number, remainingTickets: out.n,
+    raceCostCents: out.cost, cardCostCents, raceRetired: out.n === 0,
+  };
+}
+
 function loadDay(db, id) {
   const day = db.prepare('SELECT * FROM race_days WHERE id = ?').get(id);
   return day ?? null;
@@ -293,6 +381,20 @@ humanCardsRouter.post('/race-days/:id/human-cards', (req, res) => {
     if (err instanceof HumanCardError) {
       return res.status(err.status).json({ error: err.message, warnings: err.warnings ?? undefined });
     }
+    throw err;
+  }
+});
+
+// D102: the day builder's only remedy for a ticket it locked on close.
+humanCardsRouter.delete('/cards/:cardId/human-tickets/:ticketId', (req, res) => {
+  const correlationId = req.get('x-correlation-id') || newCorrelationId();
+  try {
+    const out = deleteHumanTicket(getDb(), {
+      cardId: req.params.cardId, ticketId: req.params.ticketId, correlationId,
+    });
+    res.json({ correlationId, ...out });
+  } catch (err) {
+    if (err instanceof HumanCardError) return res.status(err.status).json({ error: err.message });
     throw err;
   }
 });

@@ -222,6 +222,9 @@ replayRouter.get('/replay/days/:id/races', (req, res) => {
     if (state && !state.passed && card) {
       row.tickets = db.prepare('SELECT * FROM tickets WHERE card_id = ? AND race_id = ? ORDER BY sequence').all(card.id, race.id)
         .map((t) => ({
+          // `id` (D102) is what the day builder's per-ticket delete addresses.
+          // Additive: every other field keeps its value.
+          id: t.id,
           betType: t.bet_type, legs: JSON.parse(t.selections).legs, stakeCents: t.stake_cents, costCents: t.cost_cents,
           tellerCall: t.teller_call, rationaleText: t.rationale_text, oddsAtBet: t.odds_at_bet,
         }));
@@ -281,6 +284,9 @@ replayRouter.get('/replay/days/:id/races/:number', (req, res) => {
     if (state && !state.passed) {
       out.tickets = db.prepare('SELECT * FROM tickets WHERE card_id = ? AND race_id = ? ORDER BY sequence').all(card.id, race.id)
         .map((t) => ({
+          // `id` (D102) is what the day builder's per-ticket delete addresses.
+          // Additive: every other field keeps its value.
+          id: t.id,
           betType: t.bet_type, legs: JSON.parse(t.selections).legs, stakeCents: t.stake_cents, costCents: t.cost_cents,
           tellerCall: t.teller_call, rationaleText: t.rationale_text, oddsAtBet: t.odds_at_bet,
         }));
