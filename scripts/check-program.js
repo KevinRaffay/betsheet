@@ -277,7 +277,7 @@ check('track fallback: no header -> null', trackFromBottomLine('BEST BET: RACE 2
 check('track fallback: the panel letters still win on the fixture (golden unchanged)',
   out.track === 'DELMAR' && !out.warnings.some((w) => w.type === 'no_track'));
 
-// --- byline block: page furniture, never analysis (D77) ---
+// --- byline block: page furniture, never analysis (D77-B) ---
 // The handicapper column's byline prints once at the foot of the section's
 // last page, so it lands inside whichever race paragraph ran last and reads
 // as if it were that race's analysis. It must never reach a stored

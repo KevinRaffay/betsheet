@@ -284,6 +284,16 @@ try {
   check('card generated before results: no grade yet (gradeSummary null)',
     genRes.status === 201 && genCard.gradeSummary === null);
 
+  // Before any results land, the card document must still carry the results
+  // key, empty - the sheet renders a per-race panel only where a finisher
+  // exists, so "no results yet" has to be an empty list, never a missing key
+  // the client would have to guard against.
+  const preDoc = await (await fetch(`${BASE}/api/cards/${genCard.id}`)).json();
+  check('before results: card carries an EMPTY results set, not a missing key', (() => {
+    const r = preDoc.results;
+    return r && r.finishers.length === 0 && r.exotics.length === 0 && r.scratches.length === 0;
+  })(), JSON.stringify(preDoc.results));
+
   const early = await jpost(`/api/cards/${genCard.id}/grade`, {});
   check('grading before results is refused (409)', early.status === 409,
     `${early.status} ${JSON.stringify(await early.json())}`);
@@ -302,6 +312,42 @@ try {
     dayResultsRead.scratches.length > 0 &&
     dayResultsRead.scratches.some((s) => s.program_number != null),
     JSON.stringify(dayResultsRead.scratches.slice(0, 3)));
+
+  // The sheet renders a per-race results panel straight off GET /cards/:id,
+  // so the card document has to carry the day's results - and carry them
+  // SEPARATELY from the footer's program-time scratches, which are a
+  // different set of horses (entries.scratched, known before the race) than
+  // the chart's (result_scratches).
+  const cardDoc = await (await fetch(`${BASE}/api/cards/${genCard.id}`)).json();
+  check('card document carries the day results (finishers, exotics, scratches)', (() => {
+    const r = cardDoc.results;
+    return r && Array.isArray(r.finishers) && Array.isArray(r.exotics) && Array.isArray(r.scratches) &&
+      r.finishers.length === dayResultsRead.results.length &&
+      r.exotics.length === dayResultsRead.exotics.length &&
+      r.scratches.length === dayResultsRead.scratches.length;
+  })(), JSON.stringify({ got: Object.keys(cardDoc.results ?? {}), finishers: cardDoc.results?.finishers?.length }));
+  check('card results agree with the day results endpoint, row for row', (() => {
+    const key = (f) => `${f.race_number}|${f.finish_position}|${f.program_number}|${f.win_cents}`;
+    return cardDoc.results.finishers.map(key).join(',') === dayResultsRead.results.map(key).join(',');
+  })());
+  check("chart scratches stay OUT of the footer's program-time scratch list", (() => {
+    // Both lists exist and are not the same thing: the footer's come from
+    // entries.scratched, the results panel's from the chart.
+    const footer = (cardDoc.scratches ?? []).map((s) => `${s.race_number}#${s.program_number}`).sort();
+    const chartScr = cardDoc.results.scratches.map((s) => `${s.race_number}#${s.program_number}`).sort();
+    return Array.isArray(cardDoc.scratches) && chartScr.length > 0 &&
+      JSON.stringify(footer) !== JSON.stringify(chartScr);
+  })(), JSON.stringify({ footer: cardDoc.scratches?.length, chart: cardDoc.results.scratches.length }));
+  check('every race with a finisher can render a panel (finish positions ordered, winner present)', (() => {
+    const byRace = new Map();
+    for (const f of cardDoc.results.finishers) {
+      if (!byRace.has(f.race_number)) byRace.set(f.race_number, []);
+      byRace.get(f.race_number).push(f);
+    }
+    if (byRace.size === 0) return false;
+    return [...byRace.values()].every((rows) => rows.some((r) => r.finish_position === 1) &&
+      rows.every((r, i) => i === 0 || rows[i - 1].finish_position <= r.finish_position));
+  })(), `${new Set(cardDoc.results.finishers.map((f) => f.race_number)).size} races with finishers`);
 
   const grades = await (await fetch(`${BASE}/api/cards/${genCard.id}/grades`)).json();
   check('grades read back: one row per ticket, summary consistent', (() => {

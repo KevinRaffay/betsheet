@@ -78,6 +78,19 @@ export default function CardView({ cardId, onBack, onDeleted }) {
     return triggers.map((t) => ({ race: a.race_number, text: t }));
   });
 
+  // Results grouped per race, keyed only where a finisher landed - a race with
+  // no result gets no entry, so the sheet shows the panel exactly on the races
+  // that have one. Same grouping ResultsPanel.jsx does for the day view.
+  const resultsByRace = new Map();
+  for (const r of card.results?.finishers ?? []) {
+    if (!resultsByRace.has(r.race_number)) {
+      resultsByRace.set(r.race_number, { finishers: [], exotics: [], scratches: [] });
+    }
+    resultsByRace.get(r.race_number).finishers.push(r);
+  }
+  for (const x of card.results?.exotics ?? []) resultsByRace.get(x.race_number)?.exotics.push(x);
+  for (const s of card.results?.scratches ?? []) resultsByRace.get(s.race_number)?.scratches.push(s);
+
   return (
     <section className="card-sheet">
       <div className="pagehead">
@@ -150,6 +163,7 @@ export default function CardView({ cardId, onBack, onDeleted }) {
       {card.allocations.map((a) => {
         const race = (card.races ?? []).find((r) => r.number === a.race_number);
         const entries = race?.entries ?? [];
+        const raceResults = resultsByRace.get(a.race_number);
         const raceTickets = singles.filter((t) => {
           const races = t.selections.races ?? [];
           return races.length === 1 && races[0] === a.race_number;
@@ -202,6 +216,7 @@ export default function CardView({ cardId, onBack, onDeleted }) {
                 </tbody>
               </table>
             </details>
+            {raceResults && <RaceResults d={raceResults} />}
             {raceTickets.length === 0
               ? <p className="dim">No tickets this race.</p>
               : (
@@ -259,6 +274,61 @@ export default function CardView({ cardId, onBack, onDeleted }) {
       </div>
       <p className="responsible">{RESPONSIBLE_LINE}</p>
     </section>
+  );
+}
+
+/**
+ * One race's official result, below its entries. Collapsed by default, like
+ * the Entries and Bottom Line panels it sits with - the sheet is read for the
+ * tickets, and an expanded result on every race would bury them.
+ *
+ * The full finish order, not just the top three: the day view already shows
+ * the WPS placings, and what the sheet is read for afterwards is why a ticket
+ * missed, which usually means finding a horse that ran 4th or 6th.
+ */
+function RaceResults({ d }) {
+  const winner = d.finishers.find((f) => f.finish_position === 1) ?? d.finishers[0];
+  return (
+    <details className="race-results">
+      <summary>
+        Results ({d.finishers.length} finishers)
+        {winner && (
+          <span className="dim">
+            {' '}· won by {winner.program_number != null ? `#${winner.program_number} ` : ''}{winner.horse_name}
+          </span>
+        )}
+      </summary>
+      <table className="grid grid--results">
+        <thead>
+          <tr><th>Fin</th><th>#</th><th>Horse</th><th>Win</th><th>Place</th><th>Show</th></tr>
+        </thead>
+        <tbody>
+          {d.finishers.map((f) => (
+            <tr key={f.id}>
+              <td>{f.finish_position}</td>
+              <td>{f.program_number ?? '—'}</td>
+              <td>{f.horse_name}</td>
+              {/* A price is only printed for a horse that finished in the
+                  money, and only for pools that actually paid - an unhit or
+                  absent pool is a dash, never a zero. */}
+              <td>{f.win_cents != null ? money(f.win_cents) : '—'}</td>
+              <td>{f.place_cents != null ? money(f.place_cents) : '—'}</td>
+              <td>{f.show_cents != null ? money(f.show_cents) : '—'}</td>
+            </tr>
+          ))}
+        </tbody>
+      </table>
+      {d.exotics.length > 0 && (
+        <p className="dim result-payoffs">
+          {d.exotics.map((x) => `${x.bet_type.replace(/_/g, ' ')} ${x.combination} ${money(x.payout_cents)}`).join(' · ')}
+        </p>
+      )}
+      {d.scratches.length > 0 && (
+        <p className="dim result-payoffs">
+          Scratched: {d.scratches.map((s) => `${s.program_number != null ? `#${s.program_number} ` : ''}${s.horse_name}`).join(', ')}
+        </p>
+      )}
+    </details>
   );
 }
 
