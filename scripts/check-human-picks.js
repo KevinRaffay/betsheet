@@ -482,11 +482,11 @@ try {
   }
   const revealedRelock = await lock(dayId, 1, 'Win\t#2\t$25', humanCardId);
   check('re-lock on a revealed race -> 409, D28 explanation', revealedRelock.status === 409 && /new card/i.test((await revealedRelock.json()).error));
-  // D102: the same race is closed to a DELETE too, and for the same reason -
+  // D103: the same race is closed to a DELETE too, and for the same reason -
   // its tickets are the record of what was played. The revealed guard runs
   // before the graded one, so the message names the reveal even though this
   // card is also graded (this fixture day has results).
-  check('D102: deleting a ticket on a REVEALED race -> 409, and it names the reveal', await (async () => {
+  check('D103: deleting a ticket on a REVEALED race -> 409, and it names the reveal', await (async () => {
     const card = await jget(`/api/cards/${humanCardId}`);
     const r = await jdel(`/api/cards/${humanCardId}/human-tickets/${card.tickets[0].id}`);
     return r.status === 409 && /revealed/i.test((await r.json()).error);
@@ -564,7 +564,7 @@ try {
     return sum.blindness === null && sum.closed === false && sum.anyRevealed === false;
   })(), JSON.stringify(await jget(`/api/replay/cards/${liveCardId}/summary`)));
 
-  // ---------- D102: deleting a ticket from a locked, unrevealed race ----------
+  // ---------- D103: deleting a ticket from a locked, unrevealed race ----------
   // The day builder locks whatever is previewed when it CLOSES, so a mistake
   // now lands in the database rather than evaporating with the dialog. Delete
   // is the remedy - never edit, because a re-lock re-stamps picks_locked_at
@@ -573,16 +573,16 @@ try {
   // Runs on its OWN human card (D28 append-only makes a second one free) and
   // BEFORE the results save, so the ungraded path is exercised where it
   // actually lives; the graded refusal is asserted after the chart lands.
-  console.log('-- D102: delete a locked ticket --');
+  console.log('-- D103: delete a locked ticket --');
   const delLocked = await (await lock(liveDayId, 2, '$10 W 1 / $2 EX BOX 1-2')).json();
   const delCardId = delLocked.cardId;
-  check('D102: a second human card on the live day locks two tickets',
+  check('D103: a second human card on the live day locks two tickets',
     Number.isInteger(delCardId) && delCardId !== liveCardId, JSON.stringify(delLocked));
 
   const racesOf = async (cardId) => (await jget(`/api/replay/days/${liveDayId}/races?cardId=${cardId}`)).races;
   const raceRow = async (cardId, n) => (await racesOf(cardId)).find((r) => r.raceNumber === n);
 
-  check('D102: the day-landing projection carries a ticket id per locked ticket', await (async () => {
+  check('D103: the day-landing projection carries a ticket id per locked ticket', await (async () => {
     const row = await raceRow(delCardId, 2);
     return row.tickets.length === 2 && row.tickets.every((t) => Number.isInteger(t.id));
   })(), JSON.stringify((await raceRow(delCardId, 2)).tickets));
@@ -591,16 +591,16 @@ try {
   const exacta = before.tickets.find((t) => t.betType !== 'win');
   const delOne = await jdel(`/api/cards/${delCardId}/human-tickets/${exacta.id}`);
   const delOneBody = await delOne.json();
-  check('D102: deleting one of two tickets returns 200 and the race stays locked',
+  check('D103: deleting one of two tickets returns 200 and the race stays locked',
     delOne.status === 200 && delOneBody.remainingTickets === 1 && delOneBody.raceRetired === false,
     JSON.stringify(delOneBody));
-  check('D102: the deleted ticket is gone and the other is untouched', await (async () => {
+  check('D103: the deleted ticket is gone and the other is untouched', await (async () => {
     const row = await raceRow(delCardId, 2);
     return row.locked === true && row.tickets.length === 1 && row.tickets[0].tellerCall === '$10 W 1';
   })(), JSON.stringify((await raceRow(delCardId, 2)).tickets));
   // The allocation is the race's spend and every P/L surface reads it, so it
   // has to follow the tickets down rather than keep the pre-delete total.
-  check('D102: the race allocation is recomputed to what is left', await (async () => {
+  check('D103: the race allocation is recomputed to what is left', await (async () => {
     const card = await jget(`/api/cards/${delCardId}`);
     const alloc = card.allocations.find((a) => a.race_number === 2);
     return alloc && alloc.amount_cents === 1000;
@@ -608,26 +608,26 @@ try {
 
   const last = (await raceRow(delCardId, 2)).tickets[0];
   const delLast = await (await jdel(`/api/cards/${delCardId}/human-tickets/${last.id}`)).json();
-  check('D102: deleting the LAST ticket retires the race', delLast.raceRetired === true, JSON.stringify(delLast));
-  check('D102: a retired race reads "not played" again and can be rebuilt', await (async () => {
+  check('D103: deleting the LAST ticket retires the race', delLast.raceRetired === true, JSON.stringify(delLast));
+  check('D103: a retired race reads "not played" again and can be rebuilt', await (async () => {
     const row = await raceRow(delCardId, 2);
     return row.locked === false && row.pass === false && !row.tickets;
   })(), JSON.stringify(await raceRow(delCardId, 2)));
-  check('D102: its allocation row went with it', await (async () => {
+  check('D103: its allocation row went with it', await (async () => {
     const card = await jget(`/api/cards/${delCardId}`);
     return !card.allocations.some((a) => a.race_number === 2);
   })());
   // replayed_at is NOT rolled back: it records that this day was played at
   // all, which stays true however the tickets are edited afterwards.
-  check('D102: race_days.replayed_at survives the delete', await (async () => {
+  check('D103: race_days.replayed_at survives the delete', await (async () => {
     const d = await jget(`/api/race-days/${liveDayId}`);
     return typeof d.replayed_at === 'string' && d.replayed_at.length > 0;
   })());
-  check('D102: the race can be locked again after being retired', await (async () => {
+  check('D103: the race can be locked again after being retired', await (async () => {
     const r = await lock(liveDayId, 2, '$6 W 2', delCardId);
     return r.status === 201;
   })());
-  check('D102: an unknown ticket is 404, and a non-human card is refused', await (async () => {
+  check('D103: an unknown ticket is 404, and a non-human card is refused', await (async () => {
     const a = await jdel(`/api/cards/${delCardId}/human-tickets/99999`);
     const engine = await (await jpost(`/api/race-days/${liveDayId}/cards`, { variant: 'd102-engine' })).json();
     const engineTicket = (await jget(`/api/cards/${engine.id}`)).tickets[0];
@@ -679,12 +679,12 @@ try {
   // Once a card is graded, a delete would move a P/L figure that has already
   // been reported - invariant 14's spirit, and the reason the guard is on the
   // CARD rather than the ticket.
-  check('D102: deleting a ticket on a GRADED card is refused 409', await (async () => {
+  check('D103: deleting a ticket on a GRADED card is refused 409', await (async () => {
     const card = await jget(`/api/cards/${liveCardId}`);
     const r = await jdel(`/api/cards/${liveCardId}/human-tickets/${card.tickets[0].id}`);
     return r.status === 409 && /graded/i.test((await r.json()).error);
   })());
-  check('D102: the refused delete changed nothing', await (async () => {
+  check('D103: the refused delete changed nothing', await (async () => {
     const card = await jget(`/api/cards/${liveCardId}`);
     return card.tickets.length === 2;
   })());

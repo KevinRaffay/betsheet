@@ -25,12 +25,12 @@ const money = (cents) => (cents == null ? '—' : cents % 100 === 0 ? `$${cents 
 // modal posts that text to D54's own endpoints, so the server still re-parses
 // independently (invariant 9) and nothing here constructs a ticket.
 //
-// D102: CLOSING THE DIALOG LOCKS EVERY RACE THAT HAS A CLEAN PREVIEW. A
+// D103: CLOSING THE DIALOG LOCKS EVERY RACE THAT HAS A CLEAN PREVIEW. A
 // preview is the deliberate act - it is already "read-only, exactly what Lock
 // will store" - so closing commits it rather than discarding it, and the
 // footer button says so whenever there is something to commit. Races with text
 // but no preview, or a preview carrying a blocking warning, are left as drafts
-// (D101): nothing is ever saved that the server has not agreed to.
+// (D102): nothing is ever saved that the server has not agreed to.
 //
 // A race that is already locked is shown read-only and can only be DELETED,
 // ticket by ticket - never edited. That asymmetry is the blindness rule, not
@@ -39,7 +39,7 @@ const money = (cents) => (cents == null ? '—' : cents % 100 === 0 ? `$${cents 
 // a card from PRE_COMMIT to SEQUENTIAL. A delete touches no timestamp. Editing
 // proper still lives in the race view, which owns that rule.
 //
-// D101: a race BUILT but not LOCKED is kept as a draft (client/src/drafts.js)
+// D102: a race BUILT but not LOCKED is kept as a draft (client/src/drafts.js)
 // and restored the next time the modal opens on this day, so closing it no
 // longer throws the work away. A restored draft comes back in the TEXT box,
 // never the builder: TicketBuilder is a one-way text producer that starts
@@ -196,7 +196,7 @@ export default function DayTicketBuilderModal({
     return out;
   };
 
-  // Closing IS the commit (D102). A failure keeps the dialog open with its
+  // Closing IS the commit (D103). A failure keeps the dialog open with its
   // results block showing, rather than closing over an error nobody saw.
   const handleClose = async () => {
     if (busy) return;
