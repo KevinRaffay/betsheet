@@ -50,9 +50,38 @@ export function loadDayResultsFor(db, raceDayId) {
  * the graded_tickets_latest view. `engineVersion` is overridable for the
  * check scripts only.
  */
-export function gradeAndPersist(db, cardId, correlationId, { engineVersion = ENGINE_VERSION } = {}) {
+/**
+ * Which version a grade set for this card should be stamped with (D99).
+ *
+ * An ENGINE card has a real version axis, and invariant 14 is built on it: a
+ * regrade under a newer version APPENDS a set and the older one stays
+ * readable, which is how improvement is measured. So it grades under the
+ * CURRENT ENGINE_VERSION, whatever produced it - including a legacy `lean-0`
+ * card, whose regrade is supposed to append a `lean-1.1` set.
+ *
+ * A HUMAN / LLM_GENERATED / EQB_OTR card has NO such axis. Its
+ * `engine_version` is a fixed label, not a version, and no engine produced it,
+ * so stamping its grades with the engine's version is a false provenance
+ * claim. It grades under its own label.
+ *
+ * Keyed on the `lean-` prefix rather than a list of the non-engine labels, so
+ * a future bucket gets the right behaviour without editing this function.
+ */
+export function gradeVersionFor(card) {
+  const v = card?.engine_version;
+  if (!v) return ENGINE_VERSION;
+  return /^lean-/.test(v) ? ENGINE_VERSION : v;
+}
+
+export function gradeAndPersist(db, cardId, correlationId, { engineVersion } = {}) {
   const card = db.prepare('SELECT * FROM cards WHERE id = ?').get(cardId);
   if (!card) return { error: 'No such card.', status: 404 };
+  // Defaulted from the CARD, not from ENGINE_VERSION - that default is what
+  // let the results-save hook and the manual regrade button stamp `lean-1.1`
+  // onto cards no engine produced. The three writers that pass a version
+  // explicitly (human / llm / equibase-otr) now pass what this would compute
+  // anyway; they are kept explicit as documentation at the write site.
+  const version = engineVersion ?? gradeVersionFor(card);
   const dayResults = loadDayResultsFor(db, card.race_day_id);
   if (!dayResults) return { error: 'No results ingested for this race day yet.', status: 409 };
 
@@ -69,12 +98,12 @@ export function gradeAndPersist(db, cardId, correlationId, { engineVersion = ENG
 
   const save = db.transaction(() => {
     db.prepare(`DELETE FROM graded_tickets WHERE engine_version = ? AND ticket_id IN
-        (SELECT id FROM tickets WHERE card_id = ?)`).run(engineVersion, cardId);
+        (SELECT id FROM tickets WHERE card_id = ?)`).run(version, cardId);
     const ins = db.prepare(`INSERT INTO graded_tickets
         (ticket_id, engine_version, outcome, returned_cents, pl_cents, details, correlation_id)
         VALUES (?, ?, ?, ?, ?, ?, ?)`);
     for (const g of grades) {
-      ins.run(g.ticket.id, engineVersion, g.outcome, g.returnedCents, g.plCents,
+      ins.run(g.ticket.id, version, g.outcome, g.returnedCents, g.plCents,
         JSON.stringify({ note: g.note }), card.correlation_id);
     }
   });
@@ -87,7 +116,7 @@ export function gradeAndPersist(db, cardId, correlationId, { engineVersion = ENG
       correlationId: card.correlation_id,
       cardId,
       ticketId: g.ticket.id,
-      engineVersion,
+      engineVersion: version,
       betType: g.ticket.betType,
       races: g.ticket.races,
       legs: g.ticket.legs,
@@ -99,18 +128,23 @@ export function gradeAndPersist(db, cardId, correlationId, { engineVersion = ENG
     });
   }
   traceLog.info('card_graded', {
-    correlationId: card.correlation_id, cardId, gradedBy: correlationId, engineVersion, ...summary,
+    correlationId: card.correlation_id, cardId, gradedBy: correlationId, engineVersion: version, ...summary,
   });
   log.info('card_graded', { correlationId, cardId, raceDayId: card.race_day_id, ...summary });
-  return { cardId, engineVersion, summary, grades };
+  return { cardId, engineVersion: version, summary, grades };
 }
 
 /** Grade every card of a race day (the auto-hook after results save). */
+// The hook a results save runs over every card of the day. Each card is
+// graded under ITS OWN version (D99) - this is the site that used to stamp
+// `lean-1.1` onto HUMAN / LLM_GENERATED / EQB_OTR cards, and the live
+// race-day flow (D98) makes it the ONLY thing that ever grades them, since
+// the card is locked hours before the chart exists.
 export function gradeAllCards(db, raceDayId, correlationId) {
-  const cards = db.prepare('SELECT id FROM cards WHERE race_day_id = ?').all(raceDayId);
+  const cards = db.prepare('SELECT id, engine_version FROM cards WHERE race_day_id = ?').all(raceDayId);
   const out = [];
   for (const c of cards) {
-    const res = gradeAndPersist(db, c.id, correlationId);
+    const res = gradeAndPersist(db, c.id, correlationId, { engineVersion: gradeVersionFor(c) });
     if (!res.error) out.push({ cardId: c.id, plCents: res.summary.plCents });
   }
   return out;

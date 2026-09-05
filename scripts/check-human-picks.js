@@ -563,24 +563,38 @@ try {
     const g = await jget(`/api/cards/${liveCardId}/grades`);
     return g.grades.length === 2 && g.summary != null;
   })(), JSON.stringify(await jget(`/api/cards/${liveCardId}/grades`)));
-  // KNOWN BUG, pinned rather than asserted-as-correct (D99, backlogged):
-  // server/grading.js's gradeAllCards - the hook a results save runs - calls
-  // gradeAndPersist with no engineVersion, so it stamps EVERY card of the day
-  // with ENGINE_VERSION, including HUMAN / LLM_GENERATED / EQB_OTR cards that
-  // no engine produced. persistHumanRace passes { engineVersion: 'human' }
-  // explicitly, which is why the replay path (results first, lock second) never
-  // showed it - and why the LIVE path, where the results save is ALWAYS what
-  // grades the card, hits it every time. Invariant 14 says a grade set records
-  // the version it was produced under; this records a false one. No P/L figure
-  // moves today (server/pl.js filters on cards.engine_version, not the grade
-  // set's), but a future ENGINE_VERSION bump would append another junk set to
-  // every non-engine card. Already in the real corpus: 64 EQB_OTR and 134 LLM
-  // graded rows carry lean-1.1. Flip this to 'human' when D99 lands.
-  check('PINNED BUG (D99): the results-save hook stamps the human card with the ENGINE version', await (async () => {
+  // D99 fixed: the results-save hook used to stamp EVERY card of the day with
+  // ENGINE_VERSION, including HUMAN / LLM / EQB_OTR cards no engine produced.
+  // persistHumanRace passed 'human' explicitly, which is why the replay order
+  // (results first, lock second) never showed it - and why the LIVE order,
+  // where the results save is the ONLY thing that ever grades the card, hit it
+  // every time. This is the assertion that was pinned to the bug.
+  check('D99: the results-save hook stamps the human card "human", not the engine version', await (async () => {
     const g = await jget(`/api/cards/${liveCardId}/grades`);
+    return g.grades.length === 2 && g.grades.every((x) => x.engine_version === 'human');
+  })(), JSON.stringify((await jget(`/api/cards/${liveCardId}/grades`)).grades.map((x) => x.engine_version)));
+  check('D99: no lean-* grade set exists for the human card at all', await (async () => {
+    const g = await jget(`/api/cards/${liveCardId}/grades`);
+    return !g.grades.some((x) => String(x.engine_version).startsWith('lean-'));
+  })());
+  // The manual "Grade vs results" button (POST /cards/:id/grade) took the same
+  // default and so had the same bug - one fix in gradeAndPersist covers both.
+  check('D99: the manual regrade route also stamps "human"', await (async () => {
+    const r = await jpost(`/api/cards/${liveCardId}/grade`, {});
+    if (r.status !== 200 && r.status !== 201) return false;
+    const g = await jget(`/api/cards/${liveCardId}/grades`);
+    return g.grades.every((x) => x.engine_version === 'human');
+  })());
+  // ...and an ENGINE card must be unaffected: it keeps a real version axis, so
+  // it still grades under the CURRENT ENGINE_VERSION (invariant 14's
+  // append-a-newer-set rule depends on exactly that).
+  check('D99: an engine card on the same day still grades under ENGINE_VERSION', await (async () => {
     const { ENGINE_VERSION } = await import('../shared/card-engine.js');
-    return g.grades.every((x) => x.engine_version === ENGINE_VERSION);
-  })(), JSON.stringify((await jget(`/api/cards/${liveCardId}/grades`)).grades.map((g) => g.engine_version)));
+    const gen = await (await jpost(`/api/race-days/${liveDayId}/cards`, { variant: 'd99-engine' })).json();
+    const g = await jget(`/api/cards/${gen.id}/grades`);
+    return g.grades.length > 0 && g.grades.every((x) => x.engine_version === ENGINE_VERSION);
+  })());
+
   check('saving results reveals nothing by itself - the card stays open and undetermined', await (async () => {
     const sum = await jget(`/api/replay/cards/${liveCardId}/summary`);
     return sum.blindness === null && sum.closed === false && sum.anyRevealed === false;
