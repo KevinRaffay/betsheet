@@ -57,7 +57,7 @@ export default function ReplayRaceView({ dayId, initialRace = 1, onBack, onOpenS
     if (!cardId) { setSummary(null); return; }
     getReplaySummary(cardId).then(setSummary).catch(() => {});
   };
-  useEffect(refreshSummary, [cardId]); // eslint-disable-line react-hooks/exhaustive-deps
+  useEffect(() => { refreshSummary(); }, [cardId]); // eslint-disable-line react-hooks/exhaustive-deps
 
   const withBusy = (fn) => async (...args) => {
     setBusy(true); setError(null);

@@ -35,7 +35,12 @@ export default function ReplayDayBuilderModal({ dayId, cardId: initialCardId, ba
   const reload = () => getReplayDayRaces(dayId, cardId)
     .then((d) => setRaces(d.races))
     .catch((e) => setError(String(e.message)));
-  useEffect(reload, [dayId, cardId]); // eslint-disable-line react-hooks/exhaustive-deps
+  // Wrapped so the effect returns undefined, never the promise `reload`
+  // hands back: React treats an effect's return value as its cleanup and
+  // calls it on unmount, so a bare `useEffect(reload, ...)` here threw
+  // "destroy is not a function" the moment the modal closed and took the
+  // whole app down with it. Same shape as CardsPanel/ConsensusPanel.
+  useEffect(() => { reload(); }, [dayId, cardId]); // eslint-disable-line react-hooks/exhaustive-deps
 
   useEffect(() => {
     const onKey = (e) => { if (e.key === 'Escape') onClose(); };
