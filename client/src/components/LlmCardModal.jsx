@@ -114,7 +114,7 @@ export default function LlmCardModal({ dayId, onCardChanged, onClose }) {
       setSelectedModel((prev) => prev || m.default || m.models?.[0]?.id || '');
     }).catch(() => {});
   };
-  useEffect(reload, [dayId]);
+  useEffect(() => { reload(); }, [dayId]); // eslint-disable-line react-hooks/exhaustive-deps
 
   const refreshTickets = (requestedCardId = cardId) => {
     if (!requestedCardId) { setTicketsByRace(new Map()); return; }
@@ -141,7 +141,7 @@ export default function LlmCardModal({ dayId, onCardChanged, onClose }) {
       setTicketsByRace(byRace);
     }).catch(() => {});
   };
-  useEffect(refreshTickets, [cardId]); // eslint-disable-line react-hooks/exhaustive-deps
+  useEffect(() => { refreshTickets(); }, [cardId]); // eslint-disable-line react-hooks/exhaustive-deps
 
   // Close on Escape, from anywhere in the dialog.
   useEffect(() => {
