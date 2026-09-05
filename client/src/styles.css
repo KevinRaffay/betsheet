@@ -407,6 +407,9 @@ label.btn.btn--primary { color: var(--color-accent-text); }
 .race--sheet[open] > summary::before { content: '▼'; }
 .race--sheet > summary > .race-sheet-head { flex: 1; min-width: 0; padding: 0; }
 .btnrow--collapse { justify-content: flex-end; margin: 10px 0 0; }
+/* A restored ticket draft, shown on a collapsed race in the day builder. */
+.draft-line { margin: 6px 0 0; }
+.draft-line code { font-size: 12px; word-break: break-word; }
 .thesis {
   margin: 6px 0 2px;
   font-size: 14px;

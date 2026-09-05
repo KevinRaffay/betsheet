@@ -1,5 +1,6 @@
 import React, { useEffect, useState } from 'react';
-import { getReplayDayRaces, lockHumanCard, previewHumanCard } from '../api.js';
+import { deleteHumanTicket, getReplayDayRaces, lockHumanCard, previewHumanCard } from '../api.js';
+import { clearDraft, loadDayDrafts, saveDraft } from '../drafts.js';
 import TicketBuilder from './TicketBuilder.jsx';
 
 const money = (cents) => (cents == null ? '—' : cents % 100 === 0 ? `$${cents / 100}` : `$${(cents / 100).toFixed(2)}`);
@@ -24,10 +25,27 @@ const money = (cents) => (cents == null ? '—' : cents % 100 === 0 ? `$${cents 
 // modal posts that text to D54's own endpoints, so the server still re-parses
 // independently (invariant 9) and nothing here constructs a ticket.
 //
-// A race that is already locked is shown read-only. Editing one lives in the
-// race view, which owns the blindness rule (re-locking after any reveal would
-// flip the card PRE_COMMIT -> SEQUENTIAL); this modal is for building a day
-// that has not been played yet, so it never offers to re-lock.
+// D102: CLOSING THE DIALOG LOCKS EVERY RACE THAT HAS A CLEAN PREVIEW. A
+// preview is the deliberate act - it is already "read-only, exactly what Lock
+// will store" - so closing commits it rather than discarding it, and the
+// footer button says so whenever there is something to commit. Races with text
+// but no preview, or a preview carrying a blocking warning, are left as drafts
+// (D101): nothing is ever saved that the server has not agreed to.
+//
+// A race that is already locked is shown read-only and can only be DELETED,
+// ticket by ticket - never edited. That asymmetry is the blindness rule, not
+// squeamishness: re-locking re-stamps `picks_locked_at`, which is exactly what
+// `computeBlindness` reads (invariant 15), so an edit here could silently flip
+// a card from PRE_COMMIT to SEQUENTIAL. A delete touches no timestamp. Editing
+// proper still lives in the race view, which owns that rule.
+//
+// D101: a race BUILT but not LOCKED is kept as a draft (client/src/drafts.js)
+// and restored the next time the modal opens on this day, so closing it no
+// longer throws the work away. A restored draft comes back in the TEXT box,
+// never the builder: TicketBuilder is a one-way text producer that starts
+// empty and emits '' on mount, so seeding it is impossible and OPENING a
+// drafted race into it would wipe the draft on the spot. That is also why the
+// typing toggle (ReplayRaceView's own, D86) had to come with this.
 export default function DayTicketBuilderModal({
   dayId, cardId: initialCardId, bankrollCents, onClose, onCardChanged, context = 'replay',
 }) {
@@ -36,6 +54,10 @@ export default function DayTicketBuilderModal({
   const [races, setRaces] = useState(null);
   const [open, setOpen] = useState(() => new Set());
   const [textByRace, setTextByRace] = useState(() => new Map());
+  const [draftAt, setDraftAt] = useState(() => new Map());
+  // Races showing the raw text box rather than the builder. A restored draft
+  // starts here by necessity; anyone can switch either way per race.
+  const [typing, setTyping] = useState(() => new Set());
   const [previewByRace, setPreviewByRace] = useState(() => new Map());
   const [correlationId, setCorrelationId] = useState(null);
   const [busy, setBusy] = useState(false);
@@ -54,12 +76,41 @@ export default function DayTicketBuilderModal({
   useEffect(() => { reload(); }, [dayId, cardId]); // eslint-disable-line react-hooks/exhaustive-deps
 
   useEffect(() => {
-    const onKey = (e) => { if (e.key === 'Escape') onClose(); };
+    const onKey = (e) => { if (e.key === 'Escape') closeRef.current(); };
     window.addEventListener('keydown', onKey);
     return () => window.removeEventListener('keydown', onKey);
-  }, [onClose]);
+  }, []);
 
-  const setText = (n, t) => setTextByRace((m) => new Map(m).set(n, t));
+  // Restore this day's drafts once. Deliberately not merged into the reload
+  // effect: that one re-runs whenever the card id changes (the first lock
+  // mints it), and re-reading storage there would resurrect a draft the lock
+  // had just cleared.
+  useEffect(() => {
+    const stored = loadDayDrafts(dayId);
+    if (stored.size === 0) return;
+    setTextByRace(new Map(Array.from(stored, ([n, d]) => [n, d.text])));
+    setDraftAt(new Map(Array.from(stored, ([n, d]) => [n, d.savedAt])));
+    setTyping(new Set(stored.keys()));
+  }, [dayId]);
+
+  const setText = (n, t) => {
+    setTextByRace((m) => new Map(m).set(n, t));
+    const savedAt = saveDraft(dayId, n, t);
+    setDraftAt((m) => {
+      const next = new Map(m);
+      if (savedAt) next.set(n, savedAt); else next.delete(n);
+      return next;
+    });
+  };
+
+  // Forget one race's draft everywhere at once - storage, text, timestamp,
+  // preview. Called on lock, on PASS, and by the explicit Discard draft.
+  const forgetDraft = (n) => {
+    clearDraft(dayId, n);
+    setTextByRace((m) => { const next = new Map(m); next.delete(n); return next; });
+    setDraftAt((m) => { const next = new Map(m); next.delete(n); return next; });
+    setPreviewByRace((m) => { const next = new Map(m); next.delete(n); return next; });
+  };
   const toggleOpen = (n) => setOpen((s) => {
     const next = new Set(s);
     if (next.has(n)) next.delete(n); else next.add(n);
@@ -92,8 +143,7 @@ export default function DayTicketBuilderModal({
     try {
       const r = await saveRace(n, cardId, correlationId);
       setCardId(r.cardId); setCorrelationId(r.correlationId);
-      setPreviewByRace((m) => { const next = new Map(m); next.delete(n); return next; });
-      setTextByRace((m) => { const next = new Map(m); next.delete(n); return next; });
+      forgetDraft(n);
       await reload();
       onCardChanged?.();
     } catch (e) { setError(String(e.message)); } finally { setBusy(false); }
@@ -104,6 +154,7 @@ export default function DayTicketBuilderModal({
     try {
       const r = await lockHumanCard(dayId, { race: n, pass: true, bankrollCents, cardId }, correlationId);
       setCardId(r.cardId ?? cardId);
+      forgetDraft(n);
       await reload();
       onCardChanged?.();
     } catch (e) { setError(String(e.message)); } finally { setBusy(false); }
@@ -118,7 +169,7 @@ export default function DayTicketBuilderModal({
     return p && p.tickets.length > 0 && !p.warnings.some((w) => w.blocking);
   });
 
-  const handleLockAll = async () => {
+  const lockPending = async () => {
     setBusy(true); setError(null); setResults(null);
     let localCard = cardId;
     let localCorr = correlationId;
@@ -130,27 +181,60 @@ export default function DayTicketBuilderModal({
         const r = await saveRace(n, localCard, localCorr);
         localCard = r.cardId; localCorr = r.correlationId;
         out.push({ race: n, status: 'locked' });
+        // Per race, not wholesale: a race that FAILED must keep its text and
+        // its draft, or the batch would eat exactly the work worth keeping.
+        forgetDraft(n);
       } catch (e) {
         out.push({ race: n, status: 'error', detail: String(e.message) });
       }
     }
     setCardId(localCard); setCorrelationId(localCorr);
     setProgress(null); setResults(out);
-    setPreviewByRace(new Map()); setTextByRace(new Map());
     await reload();
     onCardChanged?.();
     setBusy(false);
+    return out;
+  };
+
+  // Closing IS the commit (D102). A failure keeps the dialog open with its
+  // results block showing, rather than closing over an error nobody saw.
+  const handleClose = async () => {
+    if (busy) return;
+    if (pending.length === 0) { onClose(); return; }
+    const out = await lockPending();
+    if (out.some((r) => r.status !== 'locked')) return;
+    onClose();
+  };
+
+  // The Escape / backdrop handlers are registered once but must call the
+  // CURRENT close, which closes over `pending` - hence the ref.
+  const closeRef = React.useRef(handleClose);
+  closeRef.current = handleClose;
+
+  const handleDeleteTicket = async (ticketId) => {
+    setBusy(true); setError(null);
+    try {
+      await deleteHumanTicket(cardId, ticketId, correlationId);
+      await reload();
+      onCardChanged?.();
+    } catch (e) { setError(String(e.message)); } finally { setBusy(false); }
   };
 
   const totalStaged = pending.reduce((a, r) => a + (previewByRace.get(r.raceNumber)?.raceCostCents ?? 0), 0);
+  // Drafts still held: an unlocked race with text. Counted off the races the
+  // server says are unlocked, so a draft for a race locked in another tab is
+  // never advertised as pending work.
+  const draftCount = (races ?? []).filter(
+    (r) => !r.locked && (textByRace.get(r.raceNumber) ?? '').trim(),
+  ).length;
   const anyRevealed = (races ?? []).some((r) => r.revealed);
 
   return (
-    <div className="modal-backdrop" onClick={onClose}>
+    <div className="modal-backdrop" onClick={() => closeRef.current()}>
       <div className="modal" role="dialog" aria-modal="true" aria-label={live ? 'Build the card by hand' : 'Build tickets for the day'} onClick={(e) => e.stopPropagation()}>
         <div className="modal__header">
           <h3>{live ? 'Build the card by hand' : 'Build tickets for the day'}</h3>
-          <button className="modal__close" onClick={onClose} aria-label="Close">×</button>
+          <button className="modal__close" disabled={busy} onClick={handleClose} aria-label="Close">×</button>
         </div>
 
         <div className="modal__body">
@@ -168,6 +252,13 @@ export default function DayTicketBuilderModal({
               : <>Build as many races as you like, then lock them together — every lock landing before any
                   reveal is what makes the card read as Pre-commit. Bankroll {money(bankrollCents)}.</>}
           </p>
+          <p className="dim">
+            <strong>Closing this dialog locks every race you have previewed</strong> — a preview is already
+            exactly what Lock would store, so it is committed rather than thrown away. A race you built but
+            did not preview (or whose preview is blocking) is kept as a draft on this browser instead, and
+            comes back the next time you open this day. A locked race can then be deleted ticket by ticket,
+            but not edited.
+          </p>
           {live && (
             <p className="dim">
               A locked card is not finished. It grades itself when you save the day's results, but its
@@ -183,12 +274,16 @@ export default function DayTicketBuilderModal({
                 const p = previewByRace.get(r.raceNumber);
                 const blocking = p?.warnings.some((w) => w.blocking);
                 const status = r.revealed ? 'Revealed' : r.pass ? 'Passed' : r.locked ? 'Locked' : 'Not played';
+                const draftText = (textByRace.get(r.raceNumber) ?? '').trim();
+                const hasDraft = !r.locked && draftText.length > 0;
+                const isTyping = typing.has(r.raceNumber);
                 return (
                   <article className="race-card" key={r.raceNumber}>
                     <div className="race-card__header">
                       <strong>Race {r.raceNumber}</strong>
                       <span className="dim">{r.distance ?? '?'} · {r.raceType ?? '?'}</span>
                       <span className={`chip${r.locked ? ' chip--human' : ''}`}>{status}</span>
+                      {hasDraft && <span className="tag tag--gold">draft</span>}
                       {!r.locked && (
                         <button className="btn btn--sm" disabled={busy} onClick={() => toggleOpen(r.raceNumber)}>
                           {open.has(r.raceNumber) ? 'Collapse' : 'Build'}
@@ -197,36 +292,92 @@ export default function DayTicketBuilderModal({
                     </div>
 
                     {r.locked && Array.isArray(r.tickets) && r.tickets.length > 0 && (
-                      <table className="grid">
-                        <thead><tr><th>Bet type</th><th>Say to the teller</th><th>Cost</th></tr></thead>
-                        <tbody>
-                          {r.tickets.map((t, i) => (
-                            <tr key={i}>
-                              <td className="bt">{t.betType.replace(/_/g, ' ')}</td>
-                              <td className="teller">{t.tellerCall}</td>
-                              <td>{money(t.costCents)}</td>
+                      <>
+                        <table className="grid">
+                          <thead>
+                            <tr>
+                              <th>Bet type</th><th>Say to the teller</th><th>Cost</th>
+                              {!r.revealed && <th />}
                             </tr>
-                          ))}
-                        </tbody>
-                      </table>
+                          </thead>
+                          <tbody>
+                            {r.tickets.map((t, i) => (
+                              <tr key={t.id ?? i}>
+                                <td className="bt">{t.betType.replace(/_/g, ' ')}</td>
+                                <td className="teller">{t.tellerCall}</td>
+                                <td>{money(t.costCents)}</td>
+                                {!r.revealed && (
+                                  <td>
+                                    <button className="btn btn--sm btn--danger" disabled={busy || t.id == null}
+                                      onClick={() => handleDeleteTicket(t.id)}>Delete</button>
+                                  </td>
+                                )}
+                              </tr>
+                            ))}
+                          </tbody>
+                        </table>
+                        {!r.revealed && (
+                          <p className="dim">
+                            Locked tickets can be deleted, not edited — editing would re-stamp when this race
+                            was locked. Delete the last one and the race is yours to build again.
+                          </p>
+                        )}
+                      </>
                     )}
                     {r.locked && r.pass && <p className="dim">PASSED this race.</p>}
 
+                    {hasDraft && !open.has(r.raceNumber) && (
+                      <p className="dim draft-line">
+                        <code>{draftText}</code>
+                        <br />saved, not yet locked — open to preview and lock it
+                      </p>
+                    )}
+
                     {!r.locked && open.has(r.raceNumber) && (
                       <>
-                        <TicketBuilder
-                          raceNumber={r.raceNumber}
-                          entries={r.entries ?? []}
-                          wagerMenu={r.wagerMenu}
-                          disabled={busy}
-                          onChange={(t) => setText(r.raceNumber, t)}
-                        />
+                        {isTyping ? (
+                          <textarea
+                            className="in" rows={4} disabled={busy}
+                            value={textByRace.get(r.raceNumber) ?? ''}
+                            onChange={(e) => setText(r.raceNumber, e.target.value)}
+                            placeholder={'$10 W 5 / $2 EX BOX 2-4-5'}
+                          />
+                        ) : (
+                          <TicketBuilder
+                            raceNumber={r.raceNumber}
+                            entries={r.entries ?? []}
+                            wagerMenu={r.wagerMenu}
+                            disabled={busy}
+                            onChange={(t) => setText(r.raceNumber, t)}
+                          />
+                        )}
+                        <p className="dim">
+                          <button type="button" className="linkish" disabled={busy}
+                            onClick={() => setTyping((sx) => {
+                              const next = new Set(sx);
+                              if (next.has(r.raceNumber)) next.delete(r.raceNumber);
+                              else next.add(r.raceNumber);
+                              return next;
+                            })}>
+                            {isTyping ? 'Use the ticket builder' : 'Type it instead'}
+                          </button>
+                          {/* The builder emits '' on mount, so switching INTO it
+                              replaces whatever is in the box. Said plainly here
+                              rather than discovered by losing a draft. */}
+                          {isTyping && draftText
+                            ? <span> — switching back starts the builder empty and clears this text.</span>
+                            : null}
+                        </p>
                         <div className="formrow formrow--tight">
                           <button className="btn btn--sm" disabled={busy || !(textByRace.get(r.raceNumber) ?? '').trim()}
                             onClick={() => handlePreview(r.raceNumber)}>Preview</button>
                           <button className="btn btn--sm btn--primary" disabled={busy || !p || blocking}
                             onClick={() => handleLockOne(r.raceNumber)}>Lock race {r.raceNumber}</button>
                           <button className="btn btn--sm" disabled={busy} onClick={() => handlePass(r.raceNumber)}>PASS</button>
+                          {hasDraft && (
+                            <button className="btn btn--sm" disabled={busy}
+                              onClick={() => forgetDraft(r.raceNumber)}>Discard draft</button>
+                          )}
                         </div>
                         {p && (
                           <>
@@ -264,11 +415,14 @@ export default function DayTicketBuilderModal({
           {progress && <span className="dim">{progress}</span>}
           <span className="dim">
             {pending.length} race{pending.length === 1 ? '' : 's'} previewed and ready · {money(totalStaged)}
+            {draftCount > 0 && <> · {draftCount} draft{draftCount === 1 ? '' : 's'} kept</>}
           </span>
-          <button className="btn btn--primary" disabled={busy || pending.length === 0} onClick={handleLockAll}>
+          <button className="btn btn--primary" disabled={busy || pending.length === 0} onClick={lockPending}>
             Lock all previewed races
           </button>
-          <button className="btn" onClick={onClose}>Close</button>
+          <button className="btn" disabled={busy} onClick={handleClose}>
+            {pending.length > 0 ? `Lock ${pending.length} & close` : 'Close'}
+          </button>
         </div>
       </div>
     </div>
