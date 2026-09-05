@@ -504,6 +504,88 @@ try {
       engineCards.reduce((a, c) => a + c.costCents, 0) === engineBucket.costCents;
   })(), JSON.stringify(pl.buckets));
 
+  // ---------- D98: the LIVE race-day path - lock before any results ----------
+  // Every other check in this file saves the results chart first ("so grading
+  // runs on lock"), so the path the /day hand-builder makes primary - a card
+  // locked on the morning of a race day, hours before a chart exists - had no
+  // coverage at all. It is also the only path where PRE_COMMIT is a real
+  // commitment against an unknown future rather than a replayed one.
+  //
+  // Placed AFTER the P/L bucket check on purpose: that check asserts every
+  // HUMAN card belongs to the first fixture day, so a second day carrying one
+  // would break it if this ran earlier.
+  console.log('-- live race day: lock with no results on file --');
+  const liveCreated = await (await jpost('/api/race-days', { ...day, date: '2026-09-05' })).json();
+  const liveDayId = liveCreated.id;
+  check('a second fixture day saves with NO results chart', Number.isInteger(liveDayId), JSON.stringify(liveCreated));
+
+  const liveLockRes = await lock(liveDayId, 1, '$10 W 2 / $2 EX BOX 2-4');
+  const liveLocked = await liveLockRes.json();
+  const liveCardId = liveLocked.cardId;
+  check('locking a race on a day with no results returns 201',
+    liveLockRes.status === 201 && Number.isInteger(liveCardId), JSON.stringify(liveLocked));
+  check('grading is SKIPPED rather than attempted - graded comes back null',
+    liveLocked.graded === null, JSON.stringify(liveLocked.graded));
+  check('the tickets persisted anyway, in the HUMAN bucket', await (async () => {
+    const card = await jget(`/api/cards/${liveCardId}`);
+    return card.tickets.length === 2 && card.consensus_completeness === 'HUMAN'
+      && card.engine_version === 'human' && card.template === 'human';
+  })());
+  // D91's estimator reads morning lines, not results, so a live card must
+  // carry "If it hits" from the moment it is locked - the D96 backfill exists
+  // because pre-D91 rows did not.
+  check('estimates are filled with no results on file (they read the M/L, not the chart)', await (async () => {
+    const card = await jget(`/api/cards/${liveCardId}`);
+    const win = card.tickets.find((t) => t.bet_type === 'win');
+    return win && win.est_payout_min_cents === 5500 && !win.est_is_range;
+  })(), JSON.stringify((await jget(`/api/cards/${liveCardId}`)).tickets.map((t) => t.est_payout_min_cents)));
+  check('the first live lock stamps race_days.replayed_at', await (async () => {
+    const d = await jget(`/api/race-days/${liveDayId}`);
+    return typeof d.replayed_at === 'string' && d.replayed_at.length > 0;
+  })());
+  // Blindness is UNDETERMINED, not PRE_COMMIT, while nothing has been revealed -
+  // computeBlindness returns null with an empty reveal list on purpose, because
+  // "every lock landed before every reveal" is not yet a claim you can make.
+  // Pinned because it is the state a live card sits in all afternoon, and the
+  // /day builder's copy must not over-promise a Pre-commit that is not recorded
+  // until the day is revealed and closed.
+  check('a live card reads UNDETERMINED (null) until something is revealed, and is not closed', await (async () => {
+    const sum = await jget(`/api/replay/cards/${liveCardId}/summary`);
+    return sum.blindness === null && sum.closed === false && sum.anyRevealed === false;
+  })(), JSON.stringify(await jget(`/api/replay/cards/${liveCardId}/summary`)));
+
+  // The second act: the chart lands that evening and the already-locked card
+  // grades itself through the results save's own gradeAllCards hook.
+  const liveResults = await jpost(`/api/race-days/${liveDayId}/results`,
+    { track: chart.track, date: '2026-09-05', sourceKind: 'paste', races: chart.races });
+  check('results save on a day whose human card was locked hours earlier', liveResults.status === 201);
+  check('the already-locked live card is graded by the results save itself', await (async () => {
+    const g = await jget(`/api/cards/${liveCardId}/grades`);
+    return g.grades.length === 2 && g.summary != null;
+  })(), JSON.stringify(await jget(`/api/cards/${liveCardId}/grades`)));
+  // KNOWN BUG, pinned rather than asserted-as-correct (D99, backlogged):
+  // server/grading.js's gradeAllCards - the hook a results save runs - calls
+  // gradeAndPersist with no engineVersion, so it stamps EVERY card of the day
+  // with ENGINE_VERSION, including HUMAN / LLM_GENERATED / EQB_OTR cards that
+  // no engine produced. persistHumanRace passes { engineVersion: 'human' }
+  // explicitly, which is why the replay path (results first, lock second) never
+  // showed it - and why the LIVE path, where the results save is ALWAYS what
+  // grades the card, hits it every time. Invariant 14 says a grade set records
+  // the version it was produced under; this records a false one. No P/L figure
+  // moves today (server/pl.js filters on cards.engine_version, not the grade
+  // set's), but a future ENGINE_VERSION bump would append another junk set to
+  // every non-engine card. Already in the real corpus: 64 EQB_OTR and 134 LLM
+  // graded rows carry lean-1.1. Flip this to 'human' when D99 lands.
+  check('PINNED BUG (D99): the results-save hook stamps the human card with the ENGINE version', await (async () => {
+    const g = await jget(`/api/cards/${liveCardId}/grades`);
+    const { ENGINE_VERSION } = await import('../shared/card-engine.js');
+    return g.grades.every((x) => x.engine_version === ENGINE_VERSION);
+  })(), JSON.stringify((await jget(`/api/cards/${liveCardId}/grades`)).grades.map((g) => g.engine_version)));
+  check('saving results reveals nothing by itself - the card stays open and undetermined', await (async () => {
+    const sum = await jget(`/api/replay/cards/${liveCardId}/summary`);
+    return sum.blindness === null && sum.closed === false && sum.anyRevealed === false;
+  })());
+
   console.log('-- no-version-bump identity --');
   const { ENGINE_VERSION } = await import('../shared/card-engine.js');
   check('ENGINE_VERSION unchanged at lean-1.1', ENGINE_VERSION === 'lean-1.1', ENGINE_VERSION);

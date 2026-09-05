@@ -4,10 +4,18 @@ import TicketBuilder from './TicketBuilder.jsx';
 
 const money = (cents) => (cents == null ? '—' : cents % 100 === 0 ? `$${cents / 100}` : `$${(cents / 100).toFixed(2)}`);
 
-// The day-level ticket builder (D87). Build several races, then lock them -
+// The day-level ticket builder (D87; opened from BOTH the Replay day landing
+// and the ordinary /day view since D98). Build several races, then lock them -
 // which is exactly the shape PRE_COMMIT was designed to detect: every lock
 // lands before any reveal, so shared/replay.js's computeBlindness (max lock
 // vs. min reveal) reads the card as genuinely pre-committed.
+//
+// `context` changes NOTHING but the wording. A card built on a live race day
+// and a card built by replaying a past one are the same HUMAN card - same
+// template, same engine_version, same bucket, same derived blindness - and
+// keeping one component is what guarantees that. Only the framing differs:
+// on a live day there is no result to be blind to yet, so "before any reveal"
+// is better said as "before the gates open".
 //
 // Structure is LlmCardModal.jsx's, deliberately: same modal chrome, same
 // per-race collapsible cards, same sequential save loop threading a local
@@ -20,7 +28,10 @@ const money = (cents) => (cents == null ? '—' : cents % 100 === 0 ? `$${cents 
 // race view, which owns the blindness rule (re-locking after any reveal would
 // flip the card PRE_COMMIT -> SEQUENTIAL); this modal is for building a day
 // that has not been played yet, so it never offers to re-lock.
-export default function ReplayDayBuilderModal({ dayId, cardId: initialCardId, bankrollCents, onClose, onCardChanged }) {
+export default function DayTicketBuilderModal({
+  dayId, cardId: initialCardId, bankrollCents, onClose, onCardChanged, context = 'replay',
+}) {
+  const live = context === 'live';
   const [cardId, setCardId] = useState(initialCardId ?? null);
   const [races, setRaces] = useState(null);
   const [open, setOpen] = useState(() => new Set());
@@ -136,9 +147,9 @@ export default function ReplayDayBuilderModal({ dayId, cardId: initialCardId, ba
 
   return (
     <div className="modal-backdrop" onClick={onClose}>
-      <div className="modal" role="dialog" aria-modal="true" aria-label="Build tickets for the day" onClick={(e) => e.stopPropagation()}>
+      <div className="modal" role="dialog" aria-modal="true" aria-label={live ? 'Build the card by hand' : 'Build tickets for the day'} onClick={(e) => e.stopPropagation()}>
         <div className="modal__header">
-          <h3>Build tickets for the day</h3>
+          <h3>{live ? 'Build the card by hand' : 'Build tickets for the day'}</h3>
           <button className="modal__close" onClick={onClose} aria-label="Close">×</button>
         </div>
 
@@ -151,9 +162,20 @@ export default function ReplayDayBuilderModal({ dayId, cardId: initialCardId, ba
             </p>
           )}
           <p className="dim">
-            Build as many races as you like, then lock them together — every lock landing before any
-            reveal is what makes the card read as Pre-commit. Bankroll {money(bankrollCents)}.
+            {live
+              ? <>Build the card you'll actually play, then lock the races together before the gates open.
+                  Bankroll {money(bankrollCents)}.</>
+              : <>Build as many races as you like, then lock them together — every lock landing before any
+                  reveal is what makes the card read as Pre-commit. Bankroll {money(bankrollCents)}.</>}
           </p>
+          {live && (
+            <p className="dim">
+              A locked card is not finished. It grades itself when you save the day's results, but its
+              blindness reads <em>undetermined</em> until you reveal those results from Replay and close
+              the day — only then is it recorded as a Pre-commit and counted in the standing table.
+              Until then it is a card in progress, not a missing one.
+            </p>
+          )}
 
           {!races ? <p className="placeholder">Loading…</p> : (
             <div className="race-grid">
