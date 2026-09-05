@@ -153,6 +153,38 @@ try {
   const summaryPostReveal = await jget(`/api/replay/cards/${humanCardId}/summary`);
   check('summary.anyRevealed flips to true once a race is revealed', summaryPostReveal.anyRevealed === true, JSON.stringify(summaryPostReveal));
 
+  // D87: the day landing feeds the day-level ticket builder, so it now carries
+  // entries + wagerMenu per race. Same key-set discipline as the blind view one
+  // level up: pre-race data only, never an unrevealed race's outcome.
+  console.log('-- day landing carries what the builder needs, and nothing more --');
+  const landing = await jget(`/api/replay/days/${dayId}/races?cardId=${humanCardId}`);
+  check('every landing row carries entries and a wagerMenu key', landing.races.length > 0
+    && landing.races.every((r) => Array.isArray(r.entries) && 'wagerMenu' in r),
+    JSON.stringify(landing.races.map((r) => ({ n: r.raceNumber, e: r.entries?.length }))));
+  check('landing entries carry the fields the builder renders', (() => {
+    const e = landing.races[0].entries[0];
+    return e && typeof e.programNumber === 'string' && typeof e.horseName === 'string'
+      && typeof e.scratched === 'boolean' && 'morningLine' in e;
+  })(), JSON.stringify(landing.races[0].entries[0]));
+  check('landing entries agree with the blind view for the same race', (() => {
+    const fromLanding = landing.races.find((r) => r.raceNumber === 1).entries;
+    return JSON.stringify(fromLanding) === JSON.stringify(blind1After.entries);
+  })());
+  check('an UNREVEALED landing row leaks no outcome (null PL, no finishOrder/payoffs/classification)', (() => {
+    const unrevealed = landing.races.filter((r) => !r.revealed);
+    return unrevealed.length > 0 && unrevealed.every((r) => r.humanRacePl === null && r.leanRacePl === null
+      && !('finishOrder' in r) && !('payoffs' in r) && !('classification' in r));
+  })(), JSON.stringify(landing.races.filter((r) => !r.revealed)));
+  check('a locked race carries its own tickets so the modal can show them read-only', (() => {
+    const locked = landing.races.find((r) => r.locked && !r.pass);
+    return locked && Array.isArray(locked.tickets) && locked.tickets.length === 1
+      && locked.tickets[0].tellerCall === '$25 W 1';
+  })(), JSON.stringify(landing.races.filter((r) => r.locked)));
+  check('an unplayed race has no tickets', (() => {
+    const unplayed = landing.races.find((r) => !r.locked);
+    return unplayed && unplayed.tickets === null;
+  })());
+
   console.log('-- classification toggle: default hidden, one-way once set --');
   const blind2 = await jget(`/api/replay/days/${dayId}/races/2?cardId=${humanCardId}`);
   check('race 2 (unrevealed) still hides classification by default', !('classification' in blind2.consensus));
@@ -217,6 +249,44 @@ try {
   check('blindness and sawClassification never pooled into one group',
     new Set(standing.groups.map((g) => `${g.blindness}::${g.sawClassification}`)).size === standing.groups.length);
   check('pickerAgreement line present on the standing response', typeof standing.pickerAgreement === 'object');
+
+  // D87: the day-level builder's "lock all previewed races" is a sequential
+  // loop that threads ONE card id - the first save mints it, every later race
+  // must land on the SAME card - and locks every race before anything is
+  // revealed. That is the shape PRE_COMMIT exists to detect, so assert the
+  // semantics here rather than only in the UI.
+  console.log('-- batch lock: one card, every lock before any reveal -> PRE_COMMIT --');
+  {
+    // No results needed: locking never requires them (grading just doesn't run),
+    // and blindness is computed purely from the lock/reveal timestamps.
+    const batchDay = await (await jpost('/api/race-days', { ...day, date: '2026-08-27' })).json();
+
+    let batchCard = null;
+    const locked = [];
+    for (const n of [1, 2]) {
+      const r = await (await jpost(`/api/race-days/${batchDay.id}/human-cards`, {
+        race: n, text: n === 1 ? '$25 W 1' : '$10 W 1', bankrollCents: 20000, cardId: batchCard,
+      })).json();
+      batchCard = r.cardId;
+      locked.push(r.cardId);
+    }
+    check('every race in the batch landed on ONE card (first save minted it)',
+      locked.length === 2 && locked[0] === locked[1] && Number.isInteger(locked[0]), JSON.stringify(locked));
+
+    const bt = await jget(`/api/replay/cards/${batchCard}/summary`);
+    check('nothing revealed during the batch', bt.anyRevealed === false, JSON.stringify(bt));
+
+    const landing2 = await jget(`/api/replay/days/${batchDay.id}/races?cardId=${batchCard}`);
+    check('both batch-locked races report their tickets on the landing', (() => {
+      const withTickets = landing2.races.filter((r) => Array.isArray(r.tickets) && r.tickets.length > 0);
+      return withTickets.length === 2 && withTickets[0].tickets[0].tellerCall === '$25 W 1';
+    })(), JSON.stringify(landing2.races.map((r) => ({ n: r.raceNumber, t: r.tickets?.length }))));
+
+    const afterClose = await (await jpost(`/api/replay/cards/${batchCard}/close`)).json();
+    check('a fully batch-locked day closes as PRE_COMMIT',
+      afterClose.closed === true && afterClose.blindness === 'PRE_COMMIT', JSON.stringify(afterClose));
+
+  }
 
   console.log('-- bucket isolation + no-version-bump identity (defense in depth) --');
   const leanCard = await (await jpost(`/api/race-days/${dayId}/cards`, {})).json();

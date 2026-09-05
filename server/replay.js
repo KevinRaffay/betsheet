@@ -171,6 +171,28 @@ function revealedPayload(db, card, race, raceNumber) {
 
 // ---------- day landing (D62): every race at a glance, PL once revealed ----------
 
+/**
+ * The entry rows both the blind race view and the day landing expose (D87 -
+ * ONE function so the two can never drift). `scratched` is the SAME set
+ * shared/parsers/human-picks.js blocks on - program-time scratches UNION the
+ * chart's (D86) - because a scratch is known at the window, and offering a
+ * horse the server will always refuse is worse than useless in a builder.
+ * That is pre-race information: no finish order, no payoff, nothing withheld.
+ */
+function entriesPayload(db, day, race) {
+  const rows = db.prepare('SELECT * FROM entries WHERE race_id = ? ORDER BY post_position, program_number').all(race.id);
+  const scratchedPgms = scratchedProgramNumbersFor(db, day.id, race, rows);
+  return {
+    rows,
+    payload: rows.map((e) => ({
+      programNumber: e.program_number, horseName: e.horse_name, jockey: e.jockey, trainer: e.trainer,
+      morningLine: e.morning_line, programRank: e.program_rank, bestBet: Boolean(e.best_bet),
+      scratched: scratchedPgms.has(e.program_number),
+      scratchedOnProgram: Boolean(e.scratched),
+    })),
+  };
+}
+
 replayRouter.get('/replay/days/:id/races', (req, res) => {
   const db = getDb();
   const day = db.prepare('SELECT * FROM race_days WHERE id = ?').get(Number(req.params.id));
@@ -187,7 +209,23 @@ replayRouter.get('/replay/days/:id/races', (req, res) => {
       raceNumber: race.number, distance: race.distance, surface: race.surface, raceType: race.race_type,
       locked: Boolean(state), pass: Boolean(state?.passed), revealed: Boolean(state?.results_revealed_at),
       humanRacePl: null, humanAllocatedCents: null, leanRacePl: null, leanAllocatedCents: null,
+      // D87: the day-level builder needs a horse list and a wager menu per
+      // race. Both are pre-race data the blind view already exposes in full,
+      // so nothing withheld is added - and sending them once beats the modal
+      // making N calls to an endpoint that would also recompute a consensus
+      // table and, per revealed race, a full revealedPayload regrade it does
+      // not need.
+      wagerMenu: race.wager_menu,
+      entries: entriesPayload(db, day, race).payload,
+      tickets: null,
     };
+    if (state && !state.passed && card) {
+      row.tickets = db.prepare('SELECT * FROM tickets WHERE card_id = ? AND race_id = ? ORDER BY sequence').all(card.id, race.id)
+        .map((t) => ({
+          betType: t.bet_type, legs: JSON.parse(t.selections).legs, stakeCents: t.stake_cents, costCents: t.cost_cents,
+          tellerCall: t.teller_call, rationaleText: t.rationale_text, oddsAtBet: t.odds_at_bet,
+        }));
+    }
     if (state?.results_revealed_at) {
       const revealed = revealedPayload(db, card, race, race.number);
       row.humanRacePl = revealed.humanRacePl;
@@ -211,8 +249,7 @@ replayRouter.get('/replay/days/:id/races/:number', (req, res) => {
   const race = db.prepare('SELECT * FROM races WHERE race_day_id = ? AND number = ?').get(day.id, raceNumber);
   if (!race) return res.status(404).json({ error: 'No such race.' });
 
-  const entries = db.prepare('SELECT * FROM entries WHERE race_id = ? ORDER BY post_position, program_number').all(race.id);
-  const scratchedPgms = scratchedProgramNumbersFor(db, day.id, race, entries);
+  const { rows: entries, payload: entriesOut } = entriesPayload(db, day, race);
   const picks = db.prepare(`
     SELECT cp.*, s.name AS source_name, s.kind AS source_kind
     FROM consensus_picks cp JOIN sources s ON s.id = cp.source_id
@@ -225,18 +262,7 @@ replayRouter.get('/replay/days/:id/races/:number', (req, res) => {
 
   const out = {
     raceNumber,
-    entries: entries.map((e) => ({
-      programNumber: e.program_number, horseName: e.horse_name, jockey: e.jockey, trainer: e.trainer,
-      morningLine: e.morning_line, programRank: e.program_rank, bestBet: Boolean(e.best_bet),
-      // D86: the SAME set shared/parsers/human-picks.js blocks on - program-time
-      // scratches UNION the chart's - not just entries.scratched. A scratch is
-      // known at the window, so this is not results information (no finish
-      // order, no payoff), and withholding it made the ticket builder offer
-      // horses the server would always refuse. Replay is only ever played on a
-      // day that HAS results, so before this every chart scratch was invisible.
-      scratched: scratchedPgms.has(e.program_number),
-      scratchedOnProgram: Boolean(e.scratched),
-    })),
+    entries: entriesOut,
     wagerMenu: race.wager_menu, postTime: race.post_time, distance: race.distance, surface: race.surface,
     raceType: race.race_type, conditions: race.conditions, bottomLineText: race.bottom_line ?? null,
     consensus: { table },
