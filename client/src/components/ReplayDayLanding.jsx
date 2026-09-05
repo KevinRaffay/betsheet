@@ -1,6 +1,7 @@
 import React, { useEffect, useState } from 'react';
 import { getRaceDay, getReplayDayRaces, listCards } from '../api.js';
 import ReplayRaceView from './ReplayRaceView.jsx';
+import ReplayDayBuilderModal from './ReplayDayBuilderModal.jsx';
 
 const money = (cents) => (cents == null ? '—' : cents % 100 === 0 ? `$${cents / 100}` : `$${(cents / 100).toFixed(2)}`);
 const signed = (cents) => (cents == null ? '—' : (
@@ -20,6 +21,7 @@ export default function ReplayDayLanding({ dayId, onBack, onOpenStanding }) {
   const [error, setError] = useState(null);
   const [selectedRace, setSelectedRace] = useState(null);
   const [refreshKey, setRefreshKey] = useState(0);
+  const [building, setBuilding] = useState(false);
 
   useEffect(() => {
     getRaceDay(dayId).then(setDayInfo).catch((e) => setError(String(e.message)));
@@ -53,10 +55,20 @@ export default function ReplayDayLanding({ dayId, onBack, onOpenStanding }) {
       <div className="pagehead">
         <h2>{dayInfo.track} — {dayInfo.date} · Replay</h2>
         <div className="formrow formrow--tight">
+          <button className="btn btn--primary" onClick={() => setBuilding(true)}>Build tickets for the day</button>
           <button className="btn" onClick={onOpenStanding}>Standing</button>
           <button className="btn" onClick={onBack}>Back</button>
         </div>
       </div>
+      {building && (
+        <ReplayDayBuilderModal
+          dayId={dayId}
+          cardId={cardId}
+          bankrollCents={dayInfo.bankroll_cents}
+          onCardChanged={() => setRefreshKey((k) => k + 1)}
+          onClose={() => { setBuilding(false); setRefreshKey((k) => k + 1); }}
+        />
+      )}
       <table className="grid grid--click">
         <thead>
           <tr><th>Race</th><th>Distance</th><th>Type</th><th>Status</th><th>Human P/L</th><th>Lean P/L</th></tr>
