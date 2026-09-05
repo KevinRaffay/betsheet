@@ -11,6 +11,8 @@
     "dev": "node scripts/dev-preflight.js && concurrently -k -n vite,api -c cyan,magenta \"vite\" \"node scripts/dev-watch.js\"",
     "serve": "node server/index.js",
     "dev:clean": "node scripts/dev-clean.js",
+    "dev:restart": "node scripts/dev-clean.js --yes && npm run dev",
+    "dev:preview": "node scripts/dev-preview.js",
     "check-logging": "node scripts/check-logging.js",
     "check-schema": "node scripts/check-schema.js",
     "check-parsers": "node scripts/check-parsers.js",
