@@ -1,0 +1,47 @@
+#!/bin/sh
+# Refuse a direct push to main (D100).
+#
+# This repo's delivery workflow is one deliverable per branch per PR, and every
+# deliverable this session followed it - but nothing ENFORCED it. Server-side
+# branch protection would, and GitHub refuses it here: the account is on Free
+# and the repo is private, so both classic protection and rulesets answer
+# "Upgrade to GitHub Pro or make this repository public".
+#
+# So this is the free approximation, and its limits are worth stating plainly
+# rather than discovering later:
+#   - it is LOCAL. A fresh clone does not get it until `npm run install-hooks`.
+#   - it is BYPASSABLE with `git push --no-verify`, deliberately - it guards
+#     against an accidental push, it is not an access control.
+#   - it cannot gate a merge on checks passing, which real protection can.
+#
+# git feeds pre-push one line per ref on stdin:
+#   <local ref> <local sha> <remote ref> <remote sha>
+
+blocked=0
+while read -r _local_ref _local_sha remote_ref _remote_sha; do
+  case "$remote_ref" in
+    refs/heads/main|refs/heads/master) blocked=1 ;;
+  esac
+done
+
+if [ "$blocked" -eq 1 ]; then
+  cat >&2 <<'MSG'
+[pre-push] refusing to push directly to main.
+
+  This repo's workflow is one deliverable per branch per PR, and main moves by
+  merging a reviewed PR - never by a direct push.
+
+  Put the work on a branch instead:
+      git switch -c <short-kebab-name>
+      git push -u origin <short-kebab-name>
+
+  If you genuinely mean to push straight to main:
+      git push --no-verify ...
+
+  (This hook is local and bypassable by design. Real enforcement needs GitHub
+  Pro or a public repo - see the D100 ledger row.)
+MSG
+  exit 1
+fi
+
+exit 0
