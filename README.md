@@ -63,11 +63,36 @@ npm install --ignore-scripts   # see the note below
 copy C:\repos\betsheet\.env .env
 ```
 
-Run it from the `betsheet-alt` entry in `C:\repos\.claude\launch.json`, or by
-hand:
+Put the scratch clone's ports in its own `.env`. Every dev entry point reads
+it — `server/index.js`, `scripts/dev-preflight.js`, `scripts/dev-watch.js`,
+`scripts/dev-clean.js` and vite's `/api` proxy — so the whole stack moves
+together and there is nothing to remember on the command line:
+
+```
+# C:\repos\betsheet-alt\.env
+BETSHEET_PORT=8798
+BETSHEET_VITE_PORT=5178
+```
+
+Then run it from the `betsheet-alt` entry in `C:\repos\.claude\launch.json`,
+or by hand:
 
 ```bash
-set BETSHEET_PORT=8798&& set BETSHEET_VITE_PORT=5178&& npm run dev
+npm run dev
+```
+
+To override the ports for one run instead, use your shell's own syntax — and
+note that `set X=Y` is **cmd.exe**, not Git Bash. In Git Bash `set` assigns
+positional parameters and exports nothing, so the variables stay unset, the
+preflight checks the *default* ports and reports the main app as the process
+in the way:
+
+```bash
+BETSHEET_PORT=8798 BETSHEET_VITE_PORT=5178 npm run dev            # Git Bash
+```
+
+```powershell
+$env:BETSHEET_PORT=8798; $env:BETSHEET_VITE_PORT=5178; npm run dev  # PowerShell
 ```
 
 ### Why a separate clone, and not env vars
@@ -98,13 +123,25 @@ breaks the verification suite. `8788`/`5175` are the main app, `8787` and
 `5173`/`5174` belong to life-swipe, and `8890` is reserved for the
 containerized QA instance (D79, backlogged).
 
+The two clones can run side by side indefinitely: each takes its ports from
+its own `.env`, `strictPort` means neither will wander onto the other's, and
+the preflight refuses rather than half-starting. The one place they used to
+reach across was `npm run dev:clean`, which also sweeps vite's fallback range
+— `5176`–`5180` from the main checkout, which covers the scratch clone's
+`5178`. It now leaves a fallback port alone unless the process tree holding it
+is provably this checkout's (every member of a dev stack names its own
+directory), so a clean in one clone cannot stop the other. Each clone's own
+two configured ports are still swept whoever holds them: you cannot start
+without those.
+
 ### Sharing the archive, safely
 
 The scratch clone starts empty. To give it something real to work with,
 point it at the main checkout's 900 MB crawler archive instead of copying it:
 
-```bash
-set BETSHEET_RAW_DIR=C:\repos\betsheet\data\raw
+```
+# C:\repos\betsheet-alt\.env
+BETSHEET_RAW_DIR=C:\repos\betsheet\data\raw
 ```
 
 This is safe, not merely convenient: the archive is read-only on every
