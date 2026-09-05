@@ -3,6 +3,7 @@ import {
   closeReplayCard, getRaceDay, getReplayRace, getReplaySummary, listCards, lockHumanCard, previewHumanCard,
   revealClassification, revealReplayRace,
 } from '../api.js';
+import TicketBuilder from './TicketBuilder.jsx';
 
 const money = (cents) => (cents == null ? '—' : cents % 100 === 0 ? `$${cents / 100}` : `$${(cents / 100).toFixed(2)}`);
 const signed = (cents) => (cents == null ? '—' : (
@@ -29,6 +30,8 @@ export default function ReplayRaceView({ dayId, initialRace = 1, onBack, onOpenS
   const [summary, setSummary] = useState(null);
   const [error, setError] = useState(null);
   const [busy, setBusy] = useState(false);
+  const [typing, setTyping] = useState(false);   // D86: the escape hatch back to raw text
+  const [editing, setEditing] = useState(false); // re-open a locked, unrevealed race
 
   useEffect(() => {
     getRaceDay(dayId).then((d) => { setDayInfo(d); setTotalRaces(d.races.length); }).catch((e) => setError(String(e.message)));
@@ -45,7 +48,7 @@ export default function ReplayRaceView({ dayId, initialRace = 1, onBack, onOpenS
   }, [dayId]);
 
   const reload = () => getReplayRace(dayId, raceNumber, cardId).then(setBlind).catch((e) => setError(String(e.message)));
-  useEffect(() => { setPreview(null); setText(''); reload(); /* eslint-disable-next-line react-hooks/exhaustive-deps */ }, [raceNumber, cardId]);
+  useEffect(() => { setPreview(null); setText(''); setEditing(false); reload(); /* eslint-disable-next-line react-hooks/exhaustive-deps */ }, [raceNumber, cardId]);
 
   // `summary.closed` is server truth, not "did I click Close in this tab" -
   // a day closed in an earlier session (or by revealing every race without
@@ -71,8 +74,9 @@ export default function ReplayRaceView({ dayId, initialRace = 1, onBack, onOpenS
     const r = await lockHumanCard(dayId, { race: raceNumber, text, bankrollCents: dayInfo?.bankroll_cents, cardId }, correlationId);
     if (r.correlationId) setCorrelationId(r.correlationId);
     if (!cardId) setCardId(r.cardId);
-    setPreview(null); setText('');
+    setPreview(null); setText(''); setEditing(false);
     await reload();
+    refreshSummary();
   });
 
   const handlePass = withBusy(async () => {
@@ -199,17 +203,47 @@ export default function ReplayRaceView({ dayId, initialRace = 1, onBack, onOpenS
           )}
         </details>
 
-        {!blind.locked && (
+        {(!blind.locked || editing) && (
           <div className="formrow">
-            <textarea className="in" rows={6} value={text} onChange={(e) => setText(e.target.value)}
-              placeholder={'Bet type | selections | stake | [odds] | [rationale]\ne.g. Win | #2 | $25\nExacta Box | #4,#5 | $20'} />
-            <p className="dim">One ticket per line: bet type | selections | stake | odds (optional) | rationale (optional). Pasted from a spreadsheet works too - tabs are read the same way.</p>
+            {editing && (
+              <p className="notice notice--warn">
+                Re-locking re-stamps this race's lock time. Nothing has been revealed on this card yet,
+                so the card stays Pre-commit.
+              </p>
+            )}
+            {typing ? (
+              <>
+                <textarea className="in" rows={6} value={text} onChange={(e) => setText(e.target.value)}
+                  placeholder={'$10 W 5 / $2 EX BOX 2-4-5 / $1 TRI 5 WITH 2-4 WITH 2-4\n\nor the spreadsheet grammar:\nWin | #2 | $25'} />
+                <p className="dim">
+                  Teller format, tickets separated by " / " - the money first and per combo,
+                  WITH between finishing positions, "-" within one. A trailing "(9/2 big overlay)"
+                  records odds and a rationale. The spreadsheet grammar
+                  (bet type | selections | total stake) still works, tabs included.
+                </p>
+              </>
+            ) : (
+              <TicketBuilder
+                raceNumber={raceNumber}
+                entries={blind.entries}
+                wagerMenu={blind.wagerMenu}
+                disabled={busy}
+                onChange={setText}
+              />
+            )}
+            <p className="dim">
+              <button type="button" className="linkish" onClick={() => setTyping((v) => !v)}>
+                {typing ? 'Use the ticket builder' : 'Type it instead'}
+              </button>
+            </p>
             <div className="formrow formrow--tight">
               <button className="btn" disabled={busy || !text.trim()} onClick={handlePreview}>Preview</button>
               <button className="btn btn--primary" disabled={busy || !preview || preview.warnings.some((w) => w.blocking)} onClick={handleLock}>
-                Lock race
+                {editing ? 'Re-lock race' : 'Lock race'}
               </button>
-              <button className="btn" disabled={busy} onClick={handlePass}>PASS this race</button>
+              {editing
+                ? <button className="btn" disabled={busy} onClick={() => { setEditing(false); setPreview(null); setText(''); }}>Cancel</button>
+                : <button className="btn" disabled={busy} onClick={handlePass}>PASS this race</button>}
             </div>
             <p className="dim">Read-only preview of exactly what Lock will store. To correct something, fix the pasted text and preview again.</p>
             {preview && (
@@ -257,7 +291,28 @@ export default function ReplayRaceView({ dayId, initialRace = 1, onBack, onOpenS
           </table>
         )}
 
-        {blind.locked && !revealed && (
+        {/* Editing a locked race after ANY race on the card was revealed would
+            re-stamp picks_locked_at past the first reveal, silently flipping the
+            card PRE_COMMIT -> SEQUENTIAL in the standing table. Invariant 15 says
+            blindness is derived from the timestamps, never hand-set, so this is a
+            rule rather than a warning: the affordance is simply absent, and the
+            D28 remedy (an edit after a reveal is a NEW card) is named instead. */}
+        {blind.locked && !editing && !revealed && !summary?.anyRevealed && (
+          <p className="dim">
+            <button type="button" className="linkish" disabled={busy} onClick={() => { setEditing(true); setPreview(null); setText(''); }}>
+              Edit this race
+            </button>
+          </p>
+        )}
+        {blind.locked && !editing && !revealed && summary?.anyRevealed && (
+          <p className="dim">
+            A race on this card has already been revealed, so this one can no longer be edited -
+            re-locking would change the card's recorded blindness from Pre-commit to Sequential.
+            Per D28, an edit after a reveal is a new card: play the day again to start one.
+          </p>
+        )}
+
+        {blind.locked && !editing && !revealed && (
           <button className="btn btn--primary" disabled={busy} onClick={handleReveal}>Reveal results</button>
         )}
 

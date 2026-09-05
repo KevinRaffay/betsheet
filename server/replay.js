@@ -13,6 +13,7 @@ import { computeBlindness, isCardClosed, maxDrawdown, pickerAgreement } from '..
 import { getDb } from './db.js';
 import { loadDayResultsFor } from './grading.js';
 import { getLogger, newCorrelationId } from './logging.js';
+import { scratchedProgramNumbersFor } from './human-cards.js';
 
 const traceLog = getLogger('decision-trace');
 
@@ -83,6 +84,14 @@ function buildSummary(db, card) {
 
   return {
     cardId: card.id, raceDayId: card.race_day_id, closed, blindness, sawClassification: Boolean(card.saw_classification),
+    // D86: whether ANY race on this card has been revealed. The builder's
+    // edit affordance keys on it - re-locking re-stamps picks_locked_at, and
+    // computeBlindness compares max-lock vs min-reveal, so an edit after any
+    // reveal silently flips the card PRE_COMMIT -> SEQUENTIAL and re-buckets it
+    // in the standing table. Invariant 15 says blindness is derived, never
+    // hand-set; a UI click should not be able to quietly degrade it. Leaks
+    // nothing about outcomes - only that a reveal happened.
+    anyRevealed: states.some((s) => s.results_revealed_at != null),
     human: {
       wageredCents: humanTotals.cost, returnedCents: humanTotals.returned, plCents: humanTotals.pl,
       roiOnWageredPct: roiOf(humanTotals.pl, humanTotals.cost), roiOnBankrollPct: roiOf(humanTotals.pl, card.bankroll_cents),
@@ -203,6 +212,7 @@ replayRouter.get('/replay/days/:id/races/:number', (req, res) => {
   if (!race) return res.status(404).json({ error: 'No such race.' });
 
   const entries = db.prepare('SELECT * FROM entries WHERE race_id = ? ORDER BY post_position, program_number').all(race.id);
+  const scratchedPgms = scratchedProgramNumbersFor(db, day.id, race, entries);
   const picks = db.prepare(`
     SELECT cp.*, s.name AS source_name, s.kind AS source_kind
     FROM consensus_picks cp JOIN sources s ON s.id = cp.source_id
@@ -217,7 +227,15 @@ replayRouter.get('/replay/days/:id/races/:number', (req, res) => {
     raceNumber,
     entries: entries.map((e) => ({
       programNumber: e.program_number, horseName: e.horse_name, jockey: e.jockey, trainer: e.trainer,
-      morningLine: e.morning_line, programRank: e.program_rank, bestBet: Boolean(e.best_bet), scratched: Boolean(e.scratched),
+      morningLine: e.morning_line, programRank: e.program_rank, bestBet: Boolean(e.best_bet),
+      // D86: the SAME set shared/parsers/human-picks.js blocks on - program-time
+      // scratches UNION the chart's - not just entries.scratched. A scratch is
+      // known at the window, so this is not results information (no finish
+      // order, no payoff), and withholding it made the ticket builder offer
+      // horses the server would always refuse. Replay is only ever played on a
+      // day that HAS results, so before this every chart scratch was invisible.
+      scratched: scratchedPgms.has(e.program_number),
+      scratchedOnProgram: Boolean(e.scratched),
     })),
     wagerMenu: race.wager_menu, postTime: race.post_time, distance: race.distance, surface: race.surface,
     raceType: race.race_type, conditions: race.conditions, bottomLineText: race.bottom_line ?? null,
