@@ -297,5 +297,24 @@ cardsRouter.get('/cards/:id', (req, res) => {
     ORDER BY r.number
   `).all(card.race_day_id);
 
-  res.json({ ...card, races, allocations, tickets, sources, scratches });
+  // The day's results, for the per-race results panel on the sheet. Nested
+  // rather than flattened alongside the footer's `scratches` above: those are
+  // PROGRAM-time scratches (entries.scratched), while these come off the
+  // result chart, and silently merging two different scratch sets under one
+  // name is how a card would start claiming a horse was scratched at a time
+  // it wasn't. Empty arrays when the day has no results - the client renders
+  // the panel per race, only where there is a finisher.
+  const results = {
+    finishers: db.prepare(
+      'SELECT * FROM race_results WHERE race_day_id = ? ORDER BY race_number, finish_position',
+    ).all(card.race_day_id),
+    exotics: db.prepare(
+      'SELECT * FROM exotic_payoffs WHERE race_day_id = ? ORDER BY race_number, id',
+    ).all(card.race_day_id),
+    scratches: db.prepare(
+      'SELECT * FROM result_scratches WHERE race_day_id = ? ORDER BY race_number, id',
+    ).all(card.race_day_id),
+  };
+
+  res.json({ ...card, races, allocations, tickets, sources, scratches, results });
 });

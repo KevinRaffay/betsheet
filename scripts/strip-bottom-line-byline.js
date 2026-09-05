@@ -1,4 +1,4 @@
-// D77: one-off retroactive fix. server/program-parser.js's parseAnalysis
+// D77-B: one-off retroactive fix. server/program-parser.js's parseAnalysis
 // used to hand back the handicapper column's byline block - "<Track> Bottom
 // Line By <Author>", the author bio, the page numbers and the repeated
 // masthead - glued onto whichever race paragraph ran last on the section's

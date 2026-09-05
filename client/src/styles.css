@@ -344,6 +344,18 @@ label.btn.btn--primary { color: var(--color-accent-text); }
   font-size: 12px;
 }
 .grid--entries { font-size: 13px; }
+.race-results { margin: 8px 0 10px; }
+.race-results > summary {
+  cursor: pointer;
+  color: var(--color-text-muted);
+  font-size: 12px;
+}
+.grid--results { font-size: 13px; }
+.result-payoffs {
+  margin: 6px 0 0;
+  font-size: 12px;
+  line-height: 1.45;
+}
 .llm-loading {
   display: flex;
   align-items: center;
