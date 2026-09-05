@@ -24,7 +24,16 @@ const splitThesis = (text) => {
 
 // The betting card - the sheet itself. One table per race:
 // Bet Type | Selections / Rationale | Say to the teller | If it hits | Cost.
-export default function CardView({ cardId, onBack, onDeleted }) {
+//
+// `embedded` (D95) drops the pagehead - the title line and the Export /
+// Grade / Delete / Back row - so the sheet can be mounted inside another
+// view that owns its own header and navigation. Nothing else changes: the
+// embedded sheet is the same component reading the same two endpoints, which
+// is the point (a second renderer would be a second copy of the money,
+// subtotal and grade-join logic, free to drift from the real card page).
+// Delete in particular has no business firing from a page whose subject is a
+// race day rather than this card.
+export default function CardView({ cardId, onBack, onDeleted, embedded = false }) {
   const [card, setCard] = useState(null);
   const [gradeData, setGradeData] = useState(null);
   const [error, setError] = useState(null);
@@ -93,22 +102,24 @@ export default function CardView({ cardId, onBack, onDeleted }) {
 
   return (
     <section className="card-sheet">
-      <div className="pagehead">
-        <h2>
-          {card.track} — {card.date} · card #{card.card_number}
-          {card.variant !== 'default' ? ` (${card.variant})` : ''}
-        </h2>
-        <div className="btnrow">
-          <a className="btn" href={`/api/cards/${cardId}/export`}>Export JSON</a>
-          <button className="btn" onClick={handleGrade} disabled={busy}>
-            {graded ? 'Regrade vs results' : 'Grade vs results'}
-          </button>
-          <button className="btn btn--danger" onClick={handleDelete} disabled={busy}>
-            Delete card
-          </button>
-          <button className="btn" onClick={onBack}>Back</button>
+      {!embedded && (
+        <div className="pagehead">
+          <h2>
+            {card.track} — {card.date} · card #{card.card_number}
+            {card.variant !== 'default' ? ` (${card.variant})` : ''}
+          </h2>
+          <div className="btnrow">
+            <a className="btn" href={`/api/cards/${cardId}/export`}>Export JSON</a>
+            <button className="btn" onClick={handleGrade} disabled={busy}>
+              {graded ? 'Regrade vs results' : 'Grade vs results'}
+            </button>
+            <button className="btn btn--danger" onClick={handleDelete} disabled={busy}>
+              Delete card
+            </button>
+            <button className="btn" onClick={onBack}>Back</button>
+          </div>
         </div>
-      </div>
+      )}
       {error && <p className="notice notice--error">{error}</p>}
       <p className="dim">
         <span className={`chip chip--${card.consensus_completeness === 'FULL' ? 'unanimous' : card.consensus_completeness === 'PARTIAL' ? 'split' : card.consensus_completeness === 'HUMAN' ? 'human' : card.consensus_completeness === 'LLM_GENERATED' ? 'llm' : 'chaos'}`}>

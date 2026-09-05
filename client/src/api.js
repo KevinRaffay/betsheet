@@ -262,6 +262,14 @@ export const MODEL_LABEL = {
   'claude-fable-5-1': 'Fable 5.1',
 };
 export const modelLabel = (id) => (id ? (MODEL_LABEL[id] ?? id) : null);
+
+// D95: the same treatment for a card's derived blindness (invariant 15 -
+// computed from timestamps, never set by hand). Three views render it and
+// two of them already carried their own private copy of this map; a third
+// copy in ReplayDayLanding is what prompted moving it here. An unknown value
+// still displays, as its own raw string.
+export const BLINDNESS_LABEL = { PRE_COMMIT: 'Pre-commit', SEQUENTIAL: 'Sequential', NON_BLIND: 'Non-blind' };
+export const blindnessLabel = (b) => (b ? (BLINDNESS_LABEL[b] ?? b) : 'undetermined');
 // Analyst notes (D92). Keyed by day + race - race 0 is the day-level note -
 // because notes belong to a RACE, not a card: the same commentary feeds a
 // Sonnet card and an Opus card. Empty text deletes the note.
