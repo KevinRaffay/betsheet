@@ -76,7 +76,10 @@ export default function RaceDayView({ id, onBack, onOpenCard }) {
         {' '}· per-race min {day.per_race_min_cents != null ? `$${(day.per_race_min_cents / 100).toFixed(0)}` : '—'}
         {' '}· {day.races.length} races
       </p>
-      <CardsPanel dayId={day.id} onOpenCard={onOpenCard} />
+      {/* D98: the hand-builder posts to D54's own endpoints, which take the
+          card's bankroll. RaceDayView already holds the day, so pass it down
+          rather than making CardsPanel fetch the day a second time. */}
+      <CardsPanel dayId={day.id} bankrollCents={day.bankroll_cents} onOpenCard={onOpenCard} />
       <ResultsPanel dayId={day.id} />
       <ConsensusPanel dayId={day.id} />
       <EquibaseOtrPanel dayId={day.id} />

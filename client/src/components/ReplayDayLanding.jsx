@@ -1,7 +1,7 @@
 import React, { useEffect, useState } from 'react';
 import { blindnessLabel, getRaceDay, getReplayDayRaces, getReplaySummary, listCards } from '../api.js';
 import ReplayRaceView from './ReplayRaceView.jsx';
-import ReplayDayBuilderModal from './ReplayDayBuilderModal.jsx';
+import DayTicketBuilderModal from './DayTicketBuilderModal.jsx';
 import CardView from './CardView.jsx';
 
 const money = (cents) => (cents == null ? '—' : cents % 100 === 0 ? `$${cents / 100}` : `$${(cents / 100).toFixed(2)}`);
@@ -90,7 +90,8 @@ export default function ReplayDayLanding({ dayId, onBack, onOpenStanding }) {
         </div>
       </div>
       {building && (
-        <ReplayDayBuilderModal
+        <DayTicketBuilderModal
+          context="replay"
           dayId={dayId}
           cardId={cardId}
           bankrollCents={dayInfo.bankroll_cents}
