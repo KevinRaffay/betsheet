@@ -364,7 +364,12 @@ llmCardsRouter.get('/race-days/:id/llm-notes', (req, res) => {
   const day = loadDay(db, Number(req.params.id));
   if (!day) return res.status(404).json({ error: 'No such race day.' });
   if (day.deleted_at) return res.status(410).json({ error: 'This race day is deleted.' });
-  res.json(readNotes(db, day.id));
+  res.json({
+    ...readNotes(db, day.id),
+    // So the modal can say up front that notes written now are not blind,
+    // rather than only after the first save comes back.
+    postResult: Boolean(db.prepare('SELECT 1 FROM race_results WHERE race_day_id = ? LIMIT 1').get(day.id)),
+  });
 });
 
 llmCardsRouter.put('/race-days/:id/llm-notes', (req, res) => {
@@ -449,5 +454,8 @@ llmCardsRouter.get('/cards/:id/llm-requests', (req, res) => {
   res.json(rows.map((r) => ({
     id: r.id, raceNumber: r.race_number, model: r.model, requestedAt: r.requested_at, error: r.error,
     promptText: r.prompt_text, responseText: r.response_text,
+    // D93: what the badge needs to say whether the draft has MOVED since
+    // this generation - the snapshot's own entered-at, not the call time.
+    notesPresent: Boolean(r.notes_present), notesEnteredAt: r.notes_entered_at,
   })));
 });

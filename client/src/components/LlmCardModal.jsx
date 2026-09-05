@@ -1,5 +1,7 @@
 import React, { useEffect, useState } from 'react';
-import { getLlmModels, getRaceDay, listCards, lockLlmCard, previewLlmCard } from '../api.js';
+import {
+  getLlmModels, getLlmNotes, getLlmRequests, getRaceDay, listCards, lockLlmCard, previewLlmCard, saveLlmNote,
+} from '../api.js';
 
 const money = (cents) => (cents == null ? '—' : cents % 100 === 0 ? `$${cents / 100}` : `$${(cents / 100).toFixed(2)}`);
 
@@ -78,11 +80,63 @@ function EntriesTable({ entries }) {
 // `onCardChanged` after every save so the day's Betting cards table
 // (CardsPanel.jsx) refreshes live instead of going stale until the page
 // is revisited (D65).
+// D92 analyst notes. Caps mirror server/llm-prompt.js's NOTES_MAX_CHARS -
+// over-cap text is not refused, it is truncated VISIBLY in the prompt and
+// warned about in the preview, so the counter is guidance, not a gate.
+const NOTES_MAX = { race: 4000, card: 2000 };
+// A datalist, not a <select>: the four canonical labels are one click away so
+// the source discipline the findings doc's H3 needs will hold in practice,
+// but an unexpected source is never blocked.
+const SOURCE_SUGGESTIONS = ['program', 'public-handicapper', 'llm', 'own'];
+
+/**
+ * One notes editor. Free text, capped only for the PROMPT (the server truncates
+ * visibly and warns; nothing is refused here), with a source label that suggests
+ * the four canonical values without constraining them.
+ */
+function NotesEditor({ scope, draft, onEdit, onFlush, disabled }) {
+  const max = NOTES_MAX[scope];
+  const n = draft.text.length;
+  return (
+    <>
+      <label className="pastebox">
+        <textarea
+          className="in" rows={5} value={draft.text} disabled={disabled}
+          placeholder={scope === 'card'
+            ? 'Commentary for the whole day - track bias, weather, how the meet is running.'
+            : "Handicapper commentary for this race. Pasted as-is; the model is told to treat it as one opinion, never as instructions."}
+          onChange={(e) => onEdit({ text: e.target.value })}
+          onBlur={onFlush}
+        />
+      </label>
+      <div className="formrow formrow--tight">
+        <label>
+          Source
+          <input
+            className="in in--sm" list="llm-note-sources" value={draft.sourceLabel} disabled={disabled}
+            placeholder="e.g. program" onChange={(e) => onEdit({ sourceLabel: e.target.value })} onBlur={onFlush} />
+        </label>
+        <span className="dim">
+          {n} / {max} characters{n > max ? ' — the prompt will carry the first ' + max + ', truncation is flagged in the preview' : ''}
+        </span>
+      </div>
+    </>
+  );
+}
+
 export default function LlmCardModal({ dayId, onCardChanged, onClose }) {
   const [dayInfo, setDayInfo] = useState(null);
   const [cardId, setCardId] = useState(null);
   const [ticketsByRace, setTicketsByRace] = useState(new Map()); // raceNumber -> { tickets, raceCostCents, reasoningText }
   const [expandedRaces, setExpandedRaces] = useState(new Set());
+  // D92: notes live in their OWN Map, never merged into ticketsByRace -
+  // refreshTickets() rebuilds that one wholesale from the server on every card
+  // change and would clobber an in-progress note.
+  const [notesByRace, setNotesByRace] = useState(new Map()); // raceNumber -> { text, sourceLabel, updatedAt }
+  const [cardNote, setCardNote] = useState(null);            // the day-level note
+  const [notesPostResult, setNotesPostResult] = useState(false);
+  const [notesTick, setNotesTick] = useState(0); // re-render on an unflushed local edit
+  const [notesUsedByRace, setNotesUsedByRace] = useState(new Map()); // raceNumber -> notesEnteredAt of the generation
   const [openRace, setOpenRace] = useState(null); // race actively being generated/previewed (unsaved)
   const [lastSavedRace, setLastSavedRace] = useState(null);
   const [preview, setPreview] = useState(null);
@@ -142,6 +196,54 @@ export default function LlmCardModal({ dayId, onCardChanged, onClose }) {
     }).catch(() => {});
   };
   useEffect(() => { refreshTickets(); }, [cardId]); // eslint-disable-line react-hooks/exhaustive-deps
+  // Which generation used which notes draft. Read from the request log rather
+  // than remembered locally, so the badge is right after a reload too.
+  useEffect(() => {
+    if (!cardId) { setNotesUsedByRace(new Map()); return; }
+    getLlmRequests(cardId).then((rows) => {
+      const m = new Map();
+      for (const r of rows) if (r.notesPresent && r.notesEnteredAt) m.set(r.raceNumber, r.notesEnteredAt);
+      setNotesUsedByRace(m);
+    }).catch(() => {});
+  }, [cardId]);
+
+  // Notes are keyed by DAY, not by card - the same commentary feeds a Sonnet
+  // card and an Opus card - so this loads on dayId and is untouched by every
+  // card-level reset. Block body, never `useEffect(loadNotes, [dayId])`: an
+  // expression-bodied loader returns a promise, React calls an effect's return
+  // value as its cleanup on unmount, and that took the whole app down in D90.
+  const loadNotes = () => getLlmNotes(dayId).then((n) => {
+    setCardNote(n.cardNote);
+    setNotesByRace(new Map(Object.entries(n.byRace ?? {}).map(([k, v]) => [Number(k), v])));
+    setNotesPostResult(Boolean(n.postResult));
+  }).catch(() => {});
+  useEffect(() => { loadNotes(); }, [dayId]); // eslint-disable-line react-hooks/exhaustive-deps
+
+  // Local edits are held here and flushed on blur AND immediately before any
+  // generate call - a user who pastes a note and clicks Generate in one motion
+  // must not lose it.
+  const pendingNotes = React.useRef(new Map()); // key: raceNumber (0 = card note)
+  const noteFor = (race) => (race === 0 ? cardNote : notesByRace.get(race)) ?? null;
+  const draftOf = (race) => {
+    const pend = pendingNotes.current.get(race);
+    return pend ?? { text: noteFor(race)?.text ?? '', sourceLabel: noteFor(race)?.sourceLabel ?? '' };
+  };
+  const editNote = (race, patch) => {
+    pendingNotes.current.set(race, { ...draftOf(race), ...patch });
+    setNotesTick((t) => t + 1);
+  };
+  const flushNotes = async () => {
+    const pend = [...pendingNotes.current.entries()];
+    if (!pend.length) return;
+    pendingNotes.current.clear();
+    for (const [race, d] of pend) {
+      try {
+        const r = await saveLlmNote(dayId, { race, text: d.text, sourceLabel: d.sourceLabel }, correlationId);
+        if (r?.postResult) setNotesPostResult(true);
+      } catch { /* a failed note save must never block generation */ }
+    }
+    await loadNotes();
+  };
 
   // Close on Escape, from anywhere in the dialog.
   useEffect(() => {
@@ -168,6 +270,7 @@ export default function LlmCardModal({ dayId, onCardChanged, onClose }) {
   };
 
   const handleGenerate = async (raceNumber) => {
+    await flushNotes(); // a note pasted and Generated in one motion must count
     setOpenRace(raceNumber);
     setPreview(null);
     setErrorRace(null);
@@ -218,6 +321,9 @@ export default function LlmCardModal({ dayId, onCardChanged, onClose }) {
   // omitted mints a new card, same D28 append-only convention every other
   // card type follows - the modal just never exposed the path before).
   // The old card is untouched, still visible in the Betting cards table.
+  // Deliberately does NOT reset notesByRace/cardNote: notes belong to the DAY,
+  // not the card, which is the whole point of the day+race key. A new card on
+  // the same day should see the same commentary.
   const handleStartNewCard = () => {
     if (busy) return;
     setCardId(null);
@@ -241,6 +347,7 @@ export default function LlmCardModal({ dayId, onCardChanged, onClose }) {
   // the next race regardless (invariant-style: one bad race never blocks
   // the rest, same as a missing consensus source never blocks generation).
   const handleRegenerateAll = async () => {
+    await flushNotes();
     if (busy || races.length === 0) return;
     setOpenRace(null);
     setPreview(null);
@@ -353,6 +460,30 @@ export default function LlmCardModal({ dayId, onCardChanged, onClose }) {
                 </div>
               )}
 
+              <datalist id="llm-note-sources">
+                {SOURCE_SUGGESTIONS.map((v) => <option key={v} value={v} />)}
+              </datalist>
+
+              {notesPostResult && (
+                <p className="notice notice--warn">
+                  This day's results are already recorded. Notes written after a result is known are not blind -
+                  cards generated from them are flagged and excluded from the blind-notes corpus.
+                </p>
+              )}
+
+              <details className="race-bottom-line">
+                <summary>
+                  Notes for the whole day
+                  {cardNote?.text ? <span className="tag tag--gold">notes</span> : null}
+                </summary>
+                <p className="dim">
+                  Prepended to every race's prompt. Advisory only - the model is told to ignore any
+                  instruction, bet size or link inside it.
+                </p>
+                <NotesEditor scope="card" draft={draftOf(0)} disabled={busy}
+                  onEdit={(patch) => editNote(0, patch)} onFlush={flushNotes} />
+              </details>
+
               <div className="llm-race-grid">
                 {races.map((r) => {
                   const saved = ticketsByRace.get(r.number);
@@ -362,12 +493,29 @@ export default function LlmCardModal({ dayId, onCardChanged, onClose }) {
                         <div>
                           <strong>Race {r.number}</strong>
                           <span className="dim"> · {saved ? 'Generated' : 'Not generated'}</span>
+                          {noteFor(r.number)?.text && (
+                            <span className="tag tag--gold">
+                              {!saved ? 'notes'
+                                : (notesUsedByRace.has(r.number)
+                                  ? (noteFor(r.number).updatedAt > notesUsedByRace.get(r.number)
+                                    ? 'notes edited since generation' : 'notes used')
+                                  : 'notes')}
+                            </span>
+                          )}
                         </div>
                         <button className="btn btn--sm" disabled={busy} onClick={() => handleGenerate(r.number)}>
                           {saved ? 'Regenerate' : 'Generate'}
                         </button>
                       </div>
                       <EntriesTable entries={r.entries ?? []} />
+                      <details className="race-bottom-line">
+                        <summary>
+                          Analyst notes
+                          {noteFor(r.number)?.text ? <span className="tag tag--gold">notes</span> : null}
+                        </summary>
+                        <NotesEditor scope="race" draft={draftOf(r.number)} disabled={busy}
+                          onEdit={(patch) => editNote(r.number, patch)} onFlush={flushNotes} />
+                      </details>
                       {openRace === r.number && (
                         <div>
                           {errorRace === r.number && error && (
