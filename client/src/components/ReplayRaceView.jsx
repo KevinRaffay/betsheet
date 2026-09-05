@@ -1,6 +1,6 @@
 import React, { useEffect, useState } from 'react';
 import {
-  closeReplayCard, getRaceDay, getReplayRace, getReplaySummary, listCards, lockHumanCard, previewHumanCard,
+  blindnessLabel, closeReplayCard, getRaceDay, getReplayRace, getReplaySummary, listCards, lockHumanCard, previewHumanCard,
   revealClassification, revealReplayRace,
 } from '../api.js';
 import TicketBuilder from './TicketBuilder.jsx';
@@ -10,7 +10,6 @@ const signed = (cents) => (cents == null ? '—' : (
   <span className={cents >= 0 ? 'pl--pos' : 'pl--neg'}>{cents >= 0 ? '+' : '−'}{money(Math.abs(cents))}</span>
 ));
 const pct = (x) => (x == null ? '—' : `${x >= 0 ? '+' : ''}${(100 * x).toFixed(1)}%`);
-const BLINDNESS_LABEL = { PRE_COMMIT: 'Pre-commit', SEQUENTIAL: 'Sequential', NON_BLIND: 'Non-blind' };
 
 // Replay (D55) blind race view: paste/preview/lock/PASS call D54's own
 // endpoints directly - this component adds nothing to how a human ticket
@@ -127,7 +126,7 @@ export default function ReplayRaceView({ dayId, initialRace = 1, onBack, onOpenS
 
       {summary?.closed && (
         <div className="notice">
-          <p><strong>Day closed.</strong> Blindness: <span className="chip chip--human">{BLINDNESS_LABEL[summary.blindness] ?? summary.blindness ?? 'undetermined'}</span></p>
+          <p><strong>Day closed.</strong> Blindness: <span className="chip chip--human">{blindnessLabel(summary.blindness)}</span></p>
           <p>
             Human: {money(summary.human.wageredCents)} wagered, {signed(summary.human.plCents)}
             {' '}· ROI wagered {pct(summary.human.roiOnWageredPct)} / bankroll {pct(summary.human.roiOnBankrollPct)} · {summary.human.hits} hits

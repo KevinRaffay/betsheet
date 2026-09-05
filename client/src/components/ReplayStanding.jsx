@@ -1,12 +1,11 @@
 import React, { useEffect, useState } from 'react';
-import { getReplayStanding } from '../api.js';
+import { blindnessLabel, getReplayStanding } from '../api.js';
 
 const money = (cents) => (cents == null ? '—' : cents % 100 === 0 ? `$${cents / 100}` : `$${(cents / 100).toFixed(2)}`);
 const signed = (cents) => (cents == null ? '—' : (
   <span className={cents >= 0 ? 'pl--pos' : 'pl--neg'}>{cents >= 0 ? '+' : '−'}{money(Math.abs(cents))}</span>
 ));
 const pct = (x) => (x == null ? '—' : `${x >= 0 ? '+' : ''}${(100 * x).toFixed(1)}%`);
-const BLINDNESS_LABEL = { PRE_COMMIT: 'Pre-commit', SEQUENTIAL: 'Sequential', NON_BLIND: 'Non-blind' };
 
 // Replay standing (D55): human vs lean over every closed, played day.
 // Meets pool by default (mirrors P/L and Distributions - a handful of
@@ -56,7 +55,7 @@ export default function ReplayStanding({ onBack }) {
           <tbody>
             {data.groups.map((g) => (
               <tr key={`${g.blindness}-${g.sawClassification}`}>
-                <td><span className="chip chip--human">{BLINDNESS_LABEL[g.blindness] ?? g.blindness ?? 'Undetermined'}</span></td>
+                <td><span className="chip chip--human">{blindnessLabel(g.blindness)}</span></td>
                 <td className="dim">{g.sawClassification ? 'yes' : 'no'}</td>
                 <td>{g.days}</td>
                 <td>{money(g.human.wageredCents)}</td>
