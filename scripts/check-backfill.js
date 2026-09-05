@@ -240,6 +240,15 @@ const goldenB = path.join(tmp, 'goldenB');
 fs.mkdirSync(path.join(goldenB, 'DMR-2026-summer'), { recursive: true });
 const drifted = readJson(gp.expected); drifted.merged.races[0].entries[0].horseName = 'Someone Else';
 fs.writeFileSync(goldenPaths(goldenB, 'DMR-2026-summer').expected, JSON.stringify(drifted));
+
+// D92 tripwire: analyst notes are an INTERACTIVE input and must never reach a
+// batch prompt. previewLlmRace refuses without `interactive: true`, but this
+// fails loudly the day someone wires an LLM path into the runner without
+// reading that guard - the guard is cheap, discovering a contaminated corpus
+// months later is not.
+check('a backfill run records no notes-bearing LLM request',
+  count(dbA, 'SELECT COUNT(*) n FROM llm_card_requests WHERE notes_present = 1') === 0);
+
 const dbB = openDb(path.join(tmp, 'b.sqlite'));
 const rB = await runBackfill({ from: dFirst, to: dClean, rawDir: rawA, goldenDir: goldenB, docsDir: docsA, db: dbB, parsers: stubParsers });
 check('golden drift: the current parse differing from the audited golden halts the run before any write',

@@ -35,7 +35,7 @@ const tables = db.prepare(
 
 const expected = [
   'actual_stakes', 'allocations', 'backfill_queue', 'cards', 'consensus_picks', 'entries',
-  'exotic_payoffs', 'fetch_attempts', 'graded_tickets', 'human_race_state', 'llm_card_requests', 'publishes',
+  'exotic_payoffs', 'fetch_attempts', 'graded_tickets', 'human_race_state', 'llm_card_requests', 'llm_notes', 'publishes',
   'race_days', 'race_results', 'races', 'result_charts', 'result_scratches',
   'schema_migrations', 'simulation_results', 'simulation_runs', 'sources',
   'strategy_templates', 'tickets',
@@ -52,6 +52,19 @@ check('race_days has a track_code column (D35, migration 014)',
 
 check('cards has a saw_classification column, default 0 (D55, migration 017)',
   db.prepare("SELECT COUNT(*) c FROM pragma_table_info('cards') WHERE name = 'saw_classification' AND \"dflt_value\" = '0'").get().c === 1);
+
+// D92 analyst notes (migration 023).
+check('cards.notes_present exists, default 0 - a LATCH ("at least one race used notes"), not a freeze',
+  db.prepare("SELECT COUNT(*) c FROM pragma_table_info('cards') WHERE name = 'notes_present' AND \"dflt_value\" = '0'").get().c === 1);
+check('llm_card_requests carries the whole notes snapshot, so the log is self-describing',
+  db.prepare(`SELECT COUNT(*) c FROM pragma_table_info('llm_card_requests') WHERE name IN
+    ('notes_present','notes_race_text','notes_card_text','notes_source_label',
+     'notes_hash','notes_char_count','notes_entered_at','notes_post_result')`).get().c === 8);
+check('llm_notes is keyed by day+race and carries NO card_id (notes belong to a race, not a card)', (() => {
+  const names = db.prepare("SELECT name FROM pragma_table_info('llm_notes')").all().map((r) => r.name);
+  return names.includes('race_day_id') && names.includes('race_number')
+    && names.includes('notes_text') && !names.includes('card_id');
+})());
 
 // --- track canonicalization backfill (D35): the migration's own SQL,
 // exercised directly against rows shaped like the ones it was written to

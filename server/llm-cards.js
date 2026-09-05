@@ -22,10 +22,11 @@ import { buildConsensusTable } from '../shared/classification.js';
 import { parseHumanPicksText } from '../shared/parsers/human-picks.js';
 import { complete, hasKey, MODEL, SELECTABLE_MODELS } from './anthropic-client.js';
 import { getDb } from './db.js';
+import { loadNotesForRace, readNotes, writeNote } from './llm-notes.js';
 import { gradeAndPersist } from './grading.js';
 import { loadRace, scratchedProgramNumbersFor } from './human-cards.js';
 import { getLogger, newCorrelationId } from './logging.js';
-import { buildLlmRaceUserPrompt, extractTicketBlock, SYSTEM_PROMPT } from './llm-prompt.js';
+import { buildLlmRaceUserPrompt, buildSystemPrompt, extractNotesReport, extractTicketBlock } from './llm-prompt.js';
 import { templateIdFor } from './templates.js';
 
 const traceLog = getLogger('decision-trace');
@@ -67,11 +68,21 @@ function racesRemaining(db, cardId, dayId, excludeRaceId) {
 }
 
 
-function insertRequestRow(db, { raceDayId, cardId, raceNumber, promptText, responseText, model, error }) {
+function insertRequestRow(db, { raceDayId, cardId, raceNumber, promptText, responseText, model, error, notes }) {
+  // D92: the notes snapshot rides along on the same insert. It is what makes
+  // the log self-describing - the draft in llm_notes is mutable, so a later
+  // read must not have to trust it to know what this call actually sent.
+  const n = notes?.snapshot ?? {
+    notes_present: 0, notes_race_text: null, notes_card_text: null, notes_source_label: null,
+    notes_hash: null, notes_char_count: null, notes_entered_at: null, notes_post_result: 0,
+  };
   return db.prepare(`
-    INSERT INTO llm_card_requests (race_day_id, card_id, race_number, prompt_text, response_text, model, requested_at, error)
-    VALUES (?, ?, ?, ?, ?, ?, ?, ?)
-  `).run(raceDayId, cardId ?? null, raceNumber, promptText, responseText ?? null, model ?? null, now(), error ?? null).lastInsertRowid;
+    INSERT INTO llm_card_requests (race_day_id, card_id, race_number, prompt_text, response_text, model, requested_at, error,
+      notes_present, notes_race_text, notes_card_text, notes_source_label, notes_hash, notes_char_count, notes_entered_at, notes_post_result)
+    VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+  `).run(raceDayId, cardId ?? null, raceNumber, promptText, responseText ?? null, model ?? null, now(), error ?? null,
+    n.notes_present, n.notes_race_text, n.notes_card_text, n.notes_source_label,
+    n.notes_hash, n.notes_char_count, n.notes_entered_at, n.notes_post_result).lastInsertRowid;
 }
 
 /**
@@ -83,7 +94,7 @@ function insertRequestRow(db, { raceDayId, cardId, raceNumber, promptText, respo
  * (D75): overrides the server-configured default for this one call, so
  * the user can pick a model per generation in the LLM card modal.
  */
-export async function previewLlmRace(db, day, raceNumber, cardId, { stubResponseText, model: requestedModel } = {}) {
+export async function previewLlmRace(db, day, raceNumber, cardId, { stubResponseText, model: requestedModel, interactive = false } = {}) {
   const { race, entries } = loadRace(db, day.id, raceNumber);
   const scratched = scratchedProgramNumbersFor(db, day.id, race, entries);
 
@@ -104,6 +115,19 @@ export async function previewLlmRace(db, day, raceNumber, cardId, { stubResponse
   `).all(race.id);
   const consensusTable = buildConsensusTable(entries, picks);
 
+  // Analyst notes (D92). A POSITIVE `interactive` gate, so a future batch
+  // runner that forgets the flag gets a notes-free prompt by default rather
+  // than silently attaching them - fail closed. When notes DO exist and the
+  // caller is not interactive we refuse loudly: silently dropping them would
+  // produce a corpus that differs from what the operator believed they ran,
+  // which is the exact failure the guard exists to prevent.
+  const notes = loadNotesForRace(db, day.id, raceNumber);
+  if (notes.present && !interactive) {
+    throw new LlmCardError(409,
+      'Analyst notes are an interactive input; a batch run must not attach them. '
+      + 'Clear the notes for this day, or run this race from the LLM card modal.');
+  }
+
   const totalRaces = raceNumbersFor(db, day.id).length;
   const userPrompt = buildLlmRaceUserPrompt({
     raceNumber, totalRaces, track: day.track, date: day.date,
@@ -115,6 +139,7 @@ export async function previewLlmRace(db, day, raceNumber, cardId, { stubResponse
     bottomLineText: race.bottom_line ?? null,
     consensusTable,
     bankroll: { perRaceCents, remainingCents, racesRemaining: remaining },
+    notes: notes.prompt,
   });
 
   let responseText = stubResponseText ?? null;
@@ -125,7 +150,7 @@ export async function previewLlmRace(db, day, raceNumber, cardId, { stubResponse
       callError = 'ANTHROPIC_API_KEY is not set.';
     } else {
       try {
-        const result = await complete({ system: SYSTEM_PROMPT, user: userPrompt, model });
+        const result = await complete({ system: buildSystemPrompt({ hasNotes: notes.present }), user: userPrompt, model });
         responseText = result.text;
         model = result.model;
       } catch (err) {
@@ -136,7 +161,7 @@ export async function previewLlmRace(db, day, raceNumber, cardId, { stubResponse
 
   const requestId = insertRequestRow(db, {
     raceDayId: day.id, cardId: card?.id, raceNumber, promptText: userPrompt,
-    responseText, model, error: callError,
+    responseText, model, error: callError, notes,
   });
 
   if (callError) throw new LlmCardError(502, `LLM call failed: ${callError}`);
@@ -155,9 +180,40 @@ export async function previewLlmRace(db, day, raceNumber, cardId, { stubResponse
   parsed.tickets = estimateTicketPayouts(parsed.tickets,
     (pgm) => entries.find((e) => e.program_number === pgm)?.morning_line_decimal ?? null);
 
+  // The notes report is telemetry, never a contract: absent or malformed is
+  // null, never an error. Every response stored before D92 lacks one, and
+  // persistLlmRace re-parses STORED responses - a hard failure here would
+  // retroactively make historical requests unsaveable.
+  const notesReport = notes.present ? extractNotesReport(extracted.trailingText) : null;
+  if (notes.present) {
+    // All NON-BLOCKING (D92): handicapper prose routinely names horses from
+    // other races ("beat Chrome last out"), so blocking would refuse most real
+    // notes. Pushed AFTER the parse, so they can never reach persistLlmRace's
+    // blocking filter - notes structurally cannot refuse a save.
+    for (const t of notes.truncated) {
+      parsed.warnings.push({
+        type: 'notes_truncated', blocking: false, race: raceNumber,
+        message: `Race ${raceNumber}: the ${t.scope} note was truncated to ${t.cap} characters for the prompt (${t.omitted} omitted).`,
+      });
+    }
+    if (!notesReport) {
+      parsed.warnings.push({
+        type: 'notes_report_missing', blocking: false, race: raceNumber,
+        message: `Race ${raceNumber}: notes were sent but the model returned no notes report.`,
+      });
+    }
+    for (const c of notesReport?.conflicts ?? []) {
+      parsed.warnings.push({
+        type: 'notes_conflict', blocking: false, race: raceNumber,
+        message: `Race ${raceNumber}: the notes reference "${c.token}" (${c.kind ?? 'unresolved'}) - not matched to an entry in this race.`,
+      });
+    }
+  }
+
   const cardCostCents = spentCents + parsed.raceCostCents;
   return {
     requestId, model, reasoningText: extracted.reasoningText,
+    notesPresent: notes.present, notesReport, notesSourceLabel: notes.sourceLabel,
     ...parsed, perRaceBankrollCents: perRaceCents, cardCostCents, bankrollCents,
     overBankroll: cardCostCents > bankrollCents,
   };
@@ -227,11 +283,21 @@ export function persistLlmRace(db, day, { race: raceNumber, requestId, bankrollC
       const cardNumber = db.prepare('SELECT COALESCE(MAX(card_number), 0) + 1 AS n FROM cards WHERE race_day_id = ?').get(day.id).n;
       const newCardId = db.prepare(`INSERT INTO cards
           (race_day_id, card_number, variant, strategy_template_id, bankroll_cents,
-           per_race_min_cents, status, correlation_id, consensus_completeness, engine_version, llm_model)
-          VALUES (?, ?, 'default', ?, ?, ?, 'final', ?, 'LLM_GENERATED', 'llm', ?)`)
+           per_race_min_cents, status, correlation_id, consensus_completeness, engine_version, llm_model, notes_present)
+          VALUES (?, ?, 'default', ?, ?, ?, 'final', ?, 'LLM_GENERATED', 'llm', ?, ?)`)
         .run(day.id, cardNumber, templateIdFor(db, 'llm'), bankrollCents ?? day.bankroll_cents,
-          day.per_race_min_cents ?? null, correlationId, requestRow.model ?? null).lastInsertRowid;
+          day.per_race_min_cents ?? null, correlationId, requestRow.model ?? null,
+          requestRow.notes_present ? 1 : 0).lastInsertRowid;
       card = db.prepare('SELECT * FROM cards WHERE id = ?').get(newCardId);
+    }
+
+    // D92: notes LATCH, they never freeze. Unlike llm_model (fixed at creation,
+    // a mismatch is a 409), a user will realistically have commentary for 3 of
+    // 8 races - refusing the other 5 would make the feature unusable. So the
+    // flag means "AT LEAST ONE race on this card used notes", never "every race
+    // did"; per-race truth lives on llm_card_requests.notes_present.
+    if (requestRow.notes_present) {
+      db.prepare('UPDATE cards SET notes_present = 1 WHERE id = ? AND notes_present = 0').run(card.id);
     }
 
     db.prepare('DELETE FROM tickets WHERE card_id = ? AND race_id = ?').run(card.id, race.id);
@@ -289,6 +355,36 @@ function loadDay(db, id) {
 
 // The selectable model list + the server-configured default (D75), so the
 // modal's picker is never a second copy of anthropic-client.js's list.
+// ---------- analyst notes (D92): the mutable draft store ----------
+// Keyed by day + race, never by card - notes belong to a RACE, so the same
+// commentary can feed a Sonnet card and an Opus card. race 0 is the day note.
+
+llmCardsRouter.get('/race-days/:id/llm-notes', (req, res) => {
+  const db = getDb();
+  const day = loadDay(db, Number(req.params.id));
+  if (!day) return res.status(404).json({ error: 'No such race day.' });
+  if (day.deleted_at) return res.status(410).json({ error: 'This race day is deleted.' });
+  res.json(readNotes(db, day.id));
+});
+
+llmCardsRouter.put('/race-days/:id/llm-notes', (req, res) => {
+  const db = getDb();
+  const day = loadDay(db, Number(req.params.id));
+  if (!day) return res.status(404).json({ error: 'No such race day.' });
+  if (day.deleted_at) return res.status(410).json({ error: 'This race day is deleted.' });
+  const race = Number(req.body?.race);
+  // 0 is the day-level note; anything else must be a real race number.
+  if (!Number.isInteger(race) || race < 0) return res.status(400).json({ error: 'race is required (0 for the card-level note).' });
+  const row = writeNote(db, day.id, race, req.body?.text, req.body?.sourceLabel);
+  res.json({
+    race,
+    note: row ? { text: row.notes_text, sourceLabel: row.source_label, updatedAt: row.updated_at, createdAt: row.created_at } : null,
+    // Notes written after a result is known are not blind. Recorded, never
+    // refused (D92 decision) - the corpus filter is notes_post_result.
+    postResult: Boolean(db.prepare('SELECT 1 FROM race_results WHERE race_day_id = ? LIMIT 1').get(day.id)),
+  });
+});
+
 llmCardsRouter.get('/llm-models', (_req, res) => {
   res.json({ models: SELECTABLE_MODELS, default: MODEL });
 });
@@ -308,6 +404,9 @@ llmCardsRouter.post('/race-days/:id/llm-cards/preview', async (req, res) => {
     const preview = await previewLlmRace(db, day, race, req.body?.cardId, {
       stubResponseText: process.env.BETSHEET_LLM_TEST_MODE === '1' ? req.body?.__stubResponse : undefined,
       model: requestedModel || undefined,
+      // The ONE interactive caller. Nothing else passes this, so a batch path
+      // that grows an LLM call later gets a notes-free prompt by default.
+      interactive: true,
     });
     res.json({ correlationId, ...preview });
   } catch (err) {
