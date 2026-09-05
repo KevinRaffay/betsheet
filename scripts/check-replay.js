@@ -139,7 +139,7 @@ try {
   check('finishOrder/payoffs/humanGraded present now', Array.isArray(blind1After.finishOrder) && Array.isArray(blind1After.humanGraded));
   check('the actual betting card is reconstructable: each graded ticket carries its tellerCall (not just outcome/plCents)', (() => {
     const g = blind1After.humanGraded[0];
-    return g && g.ticket.tellerCall === 'Race 1, $25 win, 1' && g.ticket.betType === 'win' && g.outcome === 'win' && g.plCents === 6250;
+    return g && g.ticket.tellerCall === '$25 W 1' && g.ticket.betType === 'win' && g.outcome === 'win' && g.plCents === 6250;
   })(), JSON.stringify(blind1After.humanGraded));
 
   console.log('-- classification toggle: default hidden, one-way once set --');

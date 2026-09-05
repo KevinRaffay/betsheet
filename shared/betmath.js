@@ -53,6 +53,49 @@ export const dollars = (cents) => {
   return `$${(cents / 100).toFixed(2)}`;
 };
 
+// ---------- teller money token (D84) ----------
+// The canonical money token the teller grammar emits and parses. Deliberately
+// separate from dollars() above, which keeps its prose spellings ("50-cent")
+// for engine warning text and the OTR panel: a teller ticket always LEADS with
+// the money, so the token has to be uniform enough to detect a line by.
+
+/** Canonical emission: $25, $1, $2.50, $0.50, $0.10. Always leads with '$'. */
+export const moneyToken = (cents) =>
+  cents % 100 === 0 ? `$${cents / 100}` : `$${(cents / 100).toFixed(2)}`;
+
+/**
+ * Accepts anything a human might write for a stake and canonicalizes it:
+ * '$25', '$2.50', '$.50', '.50', '50c', '50¢', '50-cent', '10 cents'.
+ * Returns cents, or null when the string is not a money token at all -
+ * `parseMoneyToken(moneyToken(c)) === c` for every c >= 1.
+ */
+export function parseMoneyToken(raw) {
+  const s = String(raw ?? '').trim();
+  if (!s) return null;
+  const cent = s.match(/^(\d+(?:\.\d+)?)\s*(?:c|¢|-?cents?)$/i);
+  if (cent) return Math.round(Number(cent[1]));
+  const dollar = s.match(/^\$?(\d*(?:\.\d+)?)$/);
+  if (!dollar || dollar[1] === '' || dollar[1] === '.') return null;
+  const n = Number(dollar[1]);
+  return Number.isFinite(n) ? Math.round(n * 100) : null;
+}
+
+// The printed-menu patterns, module level so parseWagerMenu (which minimum?)
+// and wagerMenuOffered (is it sold at all?) can never drift apart.
+const MENU_PATTERNS = [
+  ['exacta', /(\$[\d.]+|\d+c)\s+Exacta/i],
+  ['quinella', /(\$[\d.]+|\d+c)\s+Quinella/i],
+  ['trifecta', /(\$[\d.]+|\d+c)\s+Trifecta/i],
+  ['daily_double', /(\$[\d.]+|\d+c)\s+(?:Rolling\s+)?(?:Daily\s+)?Double/i],
+  ['pick3', /(\$[\d.]+|\d+c)\s+(?:Rolling\s+)?Pick\s*3/i],
+  ['parlay', /(\$[\d.]+|\d+c)\s+WPS\s+Parlay/i],
+];
+const SUPER_MIN_RE = /Superfecta\s*\((\d+)c\s*min\)/i;
+const SUPER_FLAT_RE = /(\$[\d.]+|\d+c)\s+Superfecta/i;
+const menuCents = (tok) => (tok.endsWith('c')
+  ? Number(tok.slice(0, -1))
+  : Math.round(Number(tok.replace('$', '')) * 100));
+
 /**
  * Parse a race's printed wager menu ("$1 Exacta / 50c Trifecta / $1
  * Superfecta (10c min) / $2 WPS Parlay") into per-bet minimum stakes in
@@ -62,32 +105,37 @@ export function parseWagerMenu(text) {
   const menu = { ...BET.minimums };
   if (!text) return menu;
   const t = String(text);
-  const grab = (re) => {
+  for (const [key, re] of MENU_PATTERNS) {
     const m = t.match(re);
-    if (!m) return null;
-    if (m[1].endsWith('c')) return Number(m[1].slice(0, -1));
-    return Math.round(Number(m[1].replace('$', '')) * 100);
-  };
-  const patterns = [
-    ['exacta', /(\$[\d.]+|\d+c)\s+Exacta/i],
-    ['quinella', /(\$[\d.]+|\d+c)\s+Quinella/i],
-    ['trifecta', /(\$[\d.]+|\d+c)\s+Trifecta/i],
-    ['daily_double', /(\$[\d.]+|\d+c)\s+(?:Rolling\s+)?(?:Daily\s+)?Double/i],
-    ['pick3', /(\$[\d.]+|\d+c)\s+(?:Rolling\s+)?Pick\s*3/i],
-    ['parlay', /(\$[\d.]+|\d+c)\s+WPS\s+Parlay/i],
-  ];
-  for (const [key, re] of patterns) {
-    const v = grab(re);
-    if (v) menu[key] = v;
+    if (m) {
+      const v = menuCents(m[1]);
+      if (v) menu[key] = v;
+    }
   }
   // "$1 Superfecta (10c min)" - the parenthetical minimum wins.
-  const superMin = t.match(/Superfecta\s*\((\d+)c\s*min\)/i);
-  const superFlat = t.match(/(\$[\d.]+|\d+c)\s+Superfecta/i);
+  const superMin = t.match(SUPER_MIN_RE);
+  const superFlat = t.match(SUPER_FLAT_RE);
   if (superMin) menu.superfecta = Number(superMin[1]);
-  else if (superFlat) menu.superfecta = superFlat[1].endsWith('c')
-    ? Number(superFlat[1].slice(0, -1))
-    : Math.round(Number(superFlat[1].replace('$', '')) * 100);
+  else if (superFlat) menu.superfecta = menuCents(superFlat[1]);
   return menu;
+}
+
+/**
+ * Which bet types the printed menu ACTUALLY names (D84). parseWagerMenu can't
+ * answer this - it always returns every key, falling back to BET.minimums, so
+ * `menu.trifecta` is 50 even on a race whose menu never says "Trifecta". The
+ * builder uses this only to LABEL a minimum honestly ("this race's menu" vs
+ * "assumed"); it never gates what can be built, because races.wager_menu is
+ * free text and frequently null, and hiding a bet type that is in fact sold is
+ * worse than offering one that isn't.
+ */
+export function wagerMenuOffered(text) {
+  const offered = new Set();
+  if (!text) return offered;
+  const t = String(text);
+  for (const [key, re] of MENU_PATTERNS) if (re.test(t)) offered.add(key);
+  if (SUPER_MIN_RE.test(t) || SUPER_FLAT_RE.test(t)) offered.add('superfecta');
+  return offered;
 }
 
 // ---------- payout estimates ----------
@@ -129,35 +177,53 @@ export function doubleEstimate(stakeCents, mlA, mlB) {
 export const parlayPayout = (stakeCents, mls) =>
   Math.round(mls.reduce((a, m) => a * (m + 1), stakeCents));
 
-// ---------- teller calls ----------
-// "Race N, $X bet type, numbers" - program numbers, never horse names.
+// ---------- teller calls (D84) ----------
+// The grammar you actually say at the window, and the ONE format this codebase
+// emits and parses:
+//
+//   [Races a-b ] <money> <TYPE> <pos1> [WITH <pos2> [WITH <pos3> ...]]
+//
+// e.g. "$10 W 5", "$2 EX BOX 2-4-5", "$1 TRI 5 WITH 2-4 WITH 2-4".
+//
+// The money is the PER-COMBO base, exactly as a teller quotes it - total cost
+// is stakeCents x the combination count, never stated. WITH separates finishing
+// POSITIONS; '-' separates alternatives within a position (and the horses of a
+// box). A race prefix appears only on multi-race tickets, which span races and
+// have nowhere else to say so; a single-race ticket is bare, so the string the
+// ticket builder composes is byte-identical to the one stored and displayed.
+//
+// shared/parsers/human-picks.js parses this back; the two are exact inverses
+// and scripts/check-human-picks.js proves it over every ticket it builds.
+
+const BET_ABBR = {
+  win: 'W', place: 'P', show: 'S',
+  exacta: 'EX', exacta_box: 'EX BOX',
+  trifecta: 'TRI', trifecta_box: 'TRI BOX',
+  superfecta: 'SUPER', superfecta_box: 'SUPER BOX',
+  daily_double: 'DD', parlay: 'PARLAY',
+};
+
+/**
+ * The printed type token for a bet. Deliberately no quinella entry: grading it
+ * is broken today (shared/grading.js counts a quinella's combinations with the
+ * ordered-exotic formula while matching it as an unordered set), so it is not
+ * a bet this grammar advertises. It still formats via the generic fallback if
+ * something ever constructs one.
+ */
+export const abbrForBetType = (betType) => {
+  const t = String(betType ?? '');
+  if (BET_ABBR[t]) return BET_ABBR[t];
+  const pick = t.match(/^pick(\d)$/);
+  if (pick) return `PICK ${pick[1]}`;
+  return t.replace(/_/g, ' ').toUpperCase();
+};
 
 export function tellerCall(betType, raceNumbers, stakeCents, legs) {
-  const races = raceNumbers.length > 1
-    ? `Races ${raceNumbers.join('-')}`
-    : `Race ${raceNumbers[0]}`;
-  const money = dollars(stakeCents);
-  switch (betType) {
-    case 'win':
-    case 'place':
-    case 'show':
-      return `${races}, ${money} ${betType}, ${legs[0].join(',')}`;
-    case 'exacta':
-      return `${races}, ${money} exacta, ${legs[0].join(',')} over ${legs[1].join(',')}`;
-    case 'exacta_box':
-      return `${races}, ${money} exacta box, ${legs[0].join('-')}`;
-    case 'trifecta_box':
-      return `${races}, ${money} trifecta box, ${legs[0].join('-')}`;
-    case 'daily_double':
-      return `${races}, ${money} daily double, ${legs[0].join(',')} with ${legs[1].join(',')}`;
-    case 'pick3':
-      return `${races}, ${money} Pick 3, ${legs.map((l) => l.join(',')).join(' with ')}`;
-    case 'parlay':
-      return `${races}, ${money} win parlay, ${legs.map((l) => l.join(',')).join(' with ')}`;
-    default:
-      return `${races}, ${money} ${betType}, ${legs.map((l) => l.join(',')).join(' / ')}`;
-  }
+  const prefix = raceNumbers.length > 1 ? `Races ${raceNumbers.join('-')} ` : '';
+  const selections = legs.map((l) => l.join('-')).join(' WITH ');
+  return `${prefix}${moneyToken(stakeCents)} ${abbrForBetType(betType)} ${selections}`;
 }
+
 
 /** Cost of a straight exotic across legs (product of leg sizes) at stake per combo. */
 export const comboCost = (stakeCents, legs) =>

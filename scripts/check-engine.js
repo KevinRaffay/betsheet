@@ -13,6 +13,7 @@ import fs from 'node:fs';
 import os from 'node:os';
 import path from 'node:path';
 import { fileURLToPath, URL } from 'node:url';
+import { tellerCall } from '../shared/betmath.js';
 
 const ROOT = fileURLToPath(new URL('../', import.meta.url));
 const tmp = fs.mkdtempSync(path.join(os.tmpdir(), 'betsheet-enginecheck-'));
@@ -159,8 +160,14 @@ check('exotic estimates are ranges, labeled', card.tickets
   .filter((t) => ['exacta', 'exacta_box', 'trifecta_box', 'daily_double'].includes(t.betType))
   .every((t) => t.estIsRange && t.estMaxCents > t.estMinCents));
 
-check('teller calls: race first, amount, type, program numbers', card.tickets.every((t) =>
-  /^Races? [\d-]+, (\$[\d.]+|50-cent|10-cent) .+, .+$/.test(t.tellerCall)));
+// Re-derived, not shape-matched: the stored string must BE what the formatter
+// emits for that ticket. A regex over the shape rotted silently once already.
+check('teller calls are exactly what shared/betmath.js tellerCall emits', card.tickets.every((t) =>
+  t.tellerCall === tellerCall(t.betType, t.raceNumbers, t.stakeCents, t.legs)));
+check('teller calls lead with the money (D83 grammar), race prefix only when multi-race',
+  card.tickets.every((t) => (t.raceNumbers.length > 1
+    ? /^Races [\d-]+ \$/.test(t.tellerCall)
+    : /^\$/.test(t.tellerCall))));
 
 check('exacta stakes respect the $1 menu minimum', card.tickets
   .filter((t) => t.betType === 'exacta')
