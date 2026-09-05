@@ -132,6 +132,38 @@ export default function PLView({ onBack, onOpenCard, onOpenDay }) {
               </table>
             </details>
           )}
+
+          {/* D94: only when BOTH sides exist. A one-sided split is not a
+              comparison, and a single row invites reading a lone number as a
+              result. NOTE notes_present LATCHES - it means "at least one race
+              on this card used notes", never "every race did". */}
+          {data.buckets.find((b) => b.completeness === 'LLM_GENERATED')?.byNotes?.length > 1 && (
+            <details className="race" open>
+              <summary>LLM_GENERATED with vs. without analyst notes (a card counts as "with" if ANY race used notes)</summary>
+              <table className="grid">
+                <thead>
+                  <tr><th>Notes</th><th>Cards</th><th>Tickets</th><th>Wagered</th><th>Returned</th><th>P/L</th><th>ROI (wagered)</th></tr>
+                </thead>
+                <tbody>
+                  {data.buckets.find((b) => b.completeness === 'LLM_GENERATED').byNotes.map((n) => (
+                    <tr key={String(n.notes)}>
+                      <td>{n.label}</td>
+                      <td>{n.cards}</td>
+                      <td>{n.tickets}</td>
+                      <td>{money(n.costCents)}</td>
+                      <td>{money(n.returnedCents)}</td>
+                      <td>{signed(n.plCents)}</td>
+                      <td>{roi(n.plCents, n.costCents)}</td>
+                    </tr>
+                  ))}
+                </tbody>
+              </table>
+              <p className="dim">
+                A difference here is not yet a finding - see docs/findings/llm-analyst-notes-v1.md
+                for what this split can and cannot answer at the current corpus size.
+              </p>
+            </details>
+          )}
         </>
       )}
 
@@ -156,7 +188,7 @@ export default function PLView({ onBack, onOpenCard, onOpenDay }) {
                   <td><strong>#{c.cardNumber}</strong></td>
                   <td>{c.template ?? '—'}</td>
                   <td>{c.variant}</td>
-                  <td><code>{c.engineVersion}</code>{c.llmModel && <span className="dim"> ({modelLabel(c.llmModel)})</span>}</td>
+                  <td><code>{c.engineVersion}</code>{c.llmModel && <span className="dim"> ({modelLabel(c.llmModel)})</span>}{c.notesPresent && <span className="tag tag--gold">notes</span>}</td>
                   <td><span className={`chip chip--${BUCKET_CHIP[c.completeness] ?? 'guess'}`}>{c.completeness}</span></td>
                   <td>{money(c.bankrollCents)}</td>
                   <td>{money(c.costCents)}</td>

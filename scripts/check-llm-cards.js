@@ -642,6 +642,25 @@ Place | #1 | $20 | Safe.
     return reqRow(p.requestId).notes_present === 0;
   })());
 
+  console.log('-- D94: LLM_GENERATED splits by analyst notes in P/L --');
+  {
+    const pl = await jget('/api/pl?engineVersion=all');
+    const llm = pl.buckets.find((b) => b.completeness === 'LLM_GENERATED');
+    check('the bucket carries a byNotes breakdown with BOTH sides present', (() => {
+      if (!Array.isArray(llm?.byNotes) || llm.byNotes.length !== 2) return false;
+      return llm.byNotes.some((n) => n.notes === true) && llm.byNotes.some((n) => n.notes === false);
+    })(), JSON.stringify(llm?.byNotes));
+    check('notes-first ordering is deterministic (two fixed rows, not a P/L sort)',
+      llm.byNotes[0].notes === true && llm.byNotes[0].label === 'With analyst notes');
+    check('byNotes rows sum to the bucket total (a breakdown, never a second pool)', (() => {
+      const sum = (f) => llm.byNotes.reduce((a, n) => a + n[f], 0);
+      return sum('costCents') === llm.costCents && sum('returnedCents') === llm.returnedCents
+        && sum('plCents') === llm.plCents && sum('cards') === llm.cards;
+    })(), JSON.stringify({ byNotes: llm.byNotes, bucket: { cards: llm.cards, costCents: llm.costCents, plCents: llm.plCents } }));
+    check('every card row echoes notesPresent, so a reader can cut it finer',
+      pl.cards.filter((c) => c.completeness === 'LLM_GENERATED').every((c) => typeof c.notesPresent === 'boolean'));
+  }
+
   console.log('-- no engine-version bump / lean fixture identity unchanged --');
   const leanCard = await (await jpost(`/api/race-days/${dayId}/cards`, {})).json();
   const { ENGINE_VERSION } = await import('../shared/card-engine.js');
