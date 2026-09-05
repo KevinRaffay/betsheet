@@ -48,7 +48,8 @@
     "remove-sftb-picks": "node scripts/remove-sftb-picks.js",
     "export-trace": "node scripts/export-trace.js",
     "reformat-teller-calls": "node scripts/reformat-teller-calls.js",
-    "fix-grade-set-versions": "node scripts/fix-grade-set-versions.js"
+    "fix-grade-set-versions": "node scripts/fix-grade-set-versions.js",
+    "backfill-payout-estimates": "node scripts/backfill-payout-estimates.js"
   },
   "dependencies": {
     "@radix-ui/colors": "^3.0.0",
