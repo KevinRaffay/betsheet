@@ -115,7 +115,7 @@ export default function CardView({ cardId, onBack, onDeleted }) {
           {card.consensus_completeness}
         </span>
         {' '}consensus · template {card.template ?? '—'} · engine <code>{card.engine_version ?? 'lean-0'}</code>
-        {card.llm_model && <> · model <code>{modelLabel(card.llm_model)}</code></>} · bankroll {money(card.bankroll_cents)}
+        {card.llm_model && <> · model <code>{modelLabel(card.llm_model)}</code></>}{card.notes_present ? <> · <span className="tag tag--gold">analyst notes</span></> : null} · bankroll {money(card.bankroll_cents)}
         {' '}· per-race min {money(card.per_race_min_cents)} · generated {card.created_at}
       </p>
 

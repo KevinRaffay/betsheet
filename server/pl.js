@@ -29,7 +29,7 @@ plRouter.get('/pl', (req, res) => {
     SELECT c.id AS cardId, c.race_day_id AS raceDayId, rd.track, rd.date, rd.meet,
            c.card_number AS cardNumber, c.variant, st.name AS template,
            c.consensus_completeness AS completeness, c.bankroll_cents AS bankrollCents,
-           c.engine_version AS engineVersion, c.llm_model AS llmModel,
+           c.engine_version AS engineVersion, c.llm_model AS llmModel, c.notes_present AS notesPresent,
            SUM(t.cost_cents) AS costCents,
            SUM(gt.returned_cents) AS returnedCents,
            SUM(gt.pl_cents) AS plCents,
@@ -68,6 +68,12 @@ plRouter.get('/pl', (req, res) => {
   // a single bucket total can't show. Never pools with the bucket total's
   // own math, just a breakdown of the same rows.
   const byModel = new Map();
+  // D94: the same rows again, grouped by whether the card used analyst notes -
+  // a breakdown, never a second pool, exactly like byModel above. NOTE the flag
+  // LATCHES (D92): it means "at least one race on this card used notes", never
+  // "every race did". Deliberately NOT cross-tabbed with model - with a handful
+  // of cards each cell would be a pool of one.
+  const byNotes = new Map();
   for (const row of cardRows) {
     if (!inSelection(row)) continue;
     if (!byBucket.has(row.completeness)) {
@@ -99,11 +105,32 @@ plRouter.get('/pl', (req, res) => {
       m.returnedCents += row.returnedCents;
       m.plCents += row.plCents;
       m.bankrollCents += row.bankrollCents ?? 0;
+
+      const notesKey = row.notesPresent ? 'notes' : 'no_notes';
+      if (!byNotes.has(notesKey)) {
+        byNotes.set(notesKey, {
+          notes: Boolean(row.notesPresent),
+          label: row.notesPresent ? 'With analyst notes' : 'No analyst notes',
+          cards: 0, tickets: 0, costCents: 0, returnedCents: 0, plCents: 0, bankrollCents: 0,
+        });
+      }
+      const nb = byNotes.get(notesKey);
+      nb.cards++;
+      nb.tickets += row.tickets;
+      nb.costCents += row.costCents;
+      nb.returnedCents += row.returnedCents;
+      nb.plCents += row.plCents;
+      nb.bankrollCents += row.bankrollCents ?? 0;
     }
   }
   const buckets = BUCKET_ORDER.filter((k) => byBucket.has(k)).map((k) => {
     const b = byBucket.get(k);
-    return k === 'LLM_GENERATED' ? { ...b, byModel: [...byModel.values()].sort((a, b2) => b2.plCents - a.plCents) } : b;
+    if (k !== 'LLM_GENERATED') return b;
+    return {
+      ...b,
+      byModel: [...byModel.values()].sort((a, b2) => b2.plCents - a.plCents),
+      byNotes: [...byNotes.values()].sort((a, b2) => Number(b2.notes) - Number(a.notes)),
+    };
   });
 
   const ungraded = db.prepare(`
@@ -124,7 +151,12 @@ plRouter.get('/pl', (req, res) => {
     ORDER BY rd.date DESC, rd.track, c.card_number DESC
   `).all();
 
-  res.json({ buckets, cards: cardRows.filter((r) => selectedMeet === 'all' || r.meet === selectedMeet), ungraded: ungraded.filter((r) => selectedMeet === 'all' || r.meet === selectedMeet), engineVersions, selectedVersion, meets, selectedMeet });
+  // notesPresent is a SQLite 0/1; emit a real boolean so the client can test it
+  // the same way it tests every other flag on the row.
+  const cardsOut = cardRows
+    .filter((r) => selectedMeet === 'all' || r.meet === selectedMeet)
+    .map((r) => ({ ...r, notesPresent: Boolean(r.notesPresent) }));
+  res.json({ buckets, cards: cardsOut, ungraded: ungraded.filter((r) => selectedMeet === 'all' || r.meet === selectedMeet), engineVersions, selectedVersion, meets, selectedMeet });
 });
 
 // One day's cards side by side, broken down per race - the variant-compare
@@ -139,7 +171,7 @@ plRouter.get('/race-days/:id/pl', (req, res) => {
 
   const cards = db.prepare(`
     SELECT c.id, c.card_number, c.variant, st.name AS template, c.bankroll_cents,
-           c.consensus_completeness, c.engine_version, c.llm_model, c.created_at
+           c.consensus_completeness, c.engine_version, c.llm_model, c.notes_present, c.created_at
     FROM cards c
     LEFT JOIN strategy_templates st ON st.id = c.strategy_template_id
     WHERE c.race_day_id = ? ORDER BY c.card_number
@@ -180,7 +212,7 @@ plRouter.get('/race-days/:id/pl', (req, res) => {
     return {
       cardId: c.id, cardNumber: c.card_number, variant: c.variant, template: c.template,
       bankrollCents: c.bankroll_cents, completeness: c.consensus_completeness,
-      engineVersion: c.engine_version, llmModel: c.llm_model, createdAt: c.created_at, graded: perRace.length > 0, perRace,
+      engineVersion: c.engine_version, llmModel: c.llm_model, notesPresent: Boolean(c.notes_present), createdAt: c.created_at, graded: perRace.length > 0, perRace,
       costCents: sum('costCents'), returnedCents: sum('returnedCents'), plCents: sum('plCents'),
     };
   });
