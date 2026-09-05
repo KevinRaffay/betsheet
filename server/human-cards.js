@@ -248,7 +248,7 @@ export function persistHumanRace(db, day, { race: raceNumber, text, pass = false
 }
 
 /**
- * Delete ONE ticket from a locked, unrevealed race on a human card (D102).
+ * Delete ONE ticket from a locked, unrevealed race on a human card (D103).
  *
  * The day builder locks whatever is previewed when it closes, so a mistake
  * now lands in the database rather than evaporating with the dialog - and the
@@ -385,7 +385,7 @@ humanCardsRouter.post('/race-days/:id/human-cards', (req, res) => {
   }
 });
 
-// D102: the day builder's only remedy for a ticket it locked on close.
+// D103: the day builder's only remedy for a ticket it locked on close.
 humanCardsRouter.delete('/cards/:cardId/human-tickets/:ticketId', (req, res) => {
   const correlationId = req.get('x-correlation-id') || newCorrelationId();
   try {

@@ -1,4 +1,4 @@
-// Unlocked ticket drafts for the day-level builder (D101), per (race day, race).
+// Unlocked ticket drafts for the day-level builder (D102), per (race day, race).
 //
 // A race you have BUILT but not LOCKED lives only in the modal's React state,
 // so Escape, a backdrop click or Close threw the work away - the thing the
