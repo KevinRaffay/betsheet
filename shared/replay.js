@@ -43,7 +43,7 @@ export function isCardClosed({ raceNumbers, raceStates }) {
 /**
  * The human's top pick vs. the program's rank-1 pick, over every played
  * race in scope. `rows`: [{ race, humanWinTickets: [{programNumber,
- * stakeCents}], programRank1Pgm, sftbTopPgm, humanTopGraded: {outcome,
+ * stakeCents}], programRank1Pgm, externalTopPgm, humanTopGraded: {outcome,
  * returnedCents} | null, programTopGraded: {outcome, returnedCents} |
  * null }]. A race with no human win ticket, or a tie for the largest
  * stake, is EXCLUDED (never guessed) and counted with its reason.
@@ -53,9 +53,9 @@ export function pickerAgreement(rows) {
   let excludedNoWinTicket = 0;
   let excludedTiedStakes = 0;
   let matchesProgramRank1 = 0;
-  let matchesSftbTop = 0;
+  let matchesExternalTop = 0;
   let matchesNeither = 0;
-  let sftbComparable = 0;
+  let externalComparable = 0;
   let humanCost = 0; let humanReturned = 0; let humanWins = 0;
   let programCost = 0; let programReturned = 0; let programWins = 0;
   const FLAT_STAKE_CENTS = 200;
@@ -70,11 +70,11 @@ export function pickerAgreement(rows) {
     const humanTopPgm = top[0].programNumber;
 
     if (humanTopPgm === row.programRank1Pgm) matchesProgramRank1++;
-    if (row.sftbTopPgm != null) {
-      sftbComparable++;
-      if (humanTopPgm === row.sftbTopPgm) matchesSftbTop++;
+    if (row.externalTopPgm != null) {
+      externalComparable++;
+      if (humanTopPgm === row.externalTopPgm) matchesExternalTop++;
     }
-    if (humanTopPgm !== row.programRank1Pgm && (row.sftbTopPgm == null || humanTopPgm !== row.sftbTopPgm)) matchesNeither++;
+    if (humanTopPgm !== row.programRank1Pgm && (row.externalTopPgm == null || humanTopPgm !== row.externalTopPgm)) matchesNeither++;
 
     if (row.humanTopGraded) {
       humanCost += FLAT_STAKE_CENTS;
@@ -93,9 +93,9 @@ export function pickerAgreement(rows) {
     racesConsidered,
     excludedRaces: excludedNoWinTicket + excludedTiedStakes,
     excludedReasons: { no_win_ticket: excludedNoWinTicket, tied_stakes: excludedTiedStakes },
-    sftbComparable,
+    externalComparable,
     matchesProgramRank1,
-    matchesSftbTop,
+    matchesExternalTop,
     matchesNeither,
     humanWinPct: racesConsidered > 0 ? humanWins / racesConsidered : null,
     humanFlatRoi: roi(humanReturned, humanCost),

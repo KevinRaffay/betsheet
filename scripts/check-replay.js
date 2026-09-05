@@ -58,16 +58,16 @@ console.log('-- pure: pickerAgreement --');
 {
   const win = (pgm, outcome, returnedCents) => (pgm ? { outcome, returnedCents } : null);
   const rows = [
-    { race: 1, humanWinTickets: [{ programNumber: '2', stakeCents: 2500 }], programRank1Pgm: '2', sftbTopPgm: '2', humanTopGraded: win('2', 'win', 1100), programTopGraded: win('2', 'win', 1100) },
-    { race: 2, humanWinTickets: [{ programNumber: '4', stakeCents: 1500 }], programRank1Pgm: '1', sftbTopPgm: '4', humanTopGraded: win('4', 'loss', 0), programTopGraded: win('1', 'win', 600) },
-    { race: 3, humanWinTickets: [], programRank1Pgm: '1', sftbTopPgm: null, humanTopGraded: null, programTopGraded: null }, // excluded: no win ticket
-    { race: 4, humanWinTickets: [{ programNumber: '2', stakeCents: 1000 }, { programNumber: '3', stakeCents: 1000 }], programRank1Pgm: '2', sftbTopPgm: null, humanTopGraded: null, programTopGraded: null }, // excluded: tied stakes
+    { race: 1, humanWinTickets: [{ programNumber: '2', stakeCents: 2500 }], programRank1Pgm: '2', externalTopPgm: '2', humanTopGraded: win('2', 'win', 1100), programTopGraded: win('2', 'win', 1100) },
+    { race: 2, humanWinTickets: [{ programNumber: '4', stakeCents: 1500 }], programRank1Pgm: '1', externalTopPgm: '4', humanTopGraded: win('4', 'loss', 0), programTopGraded: win('1', 'win', 600) },
+    { race: 3, humanWinTickets: [], programRank1Pgm: '1', externalTopPgm: null, humanTopGraded: null, programTopGraded: null }, // excluded: no win ticket
+    { race: 4, humanWinTickets: [{ programNumber: '2', stakeCents: 1000 }, { programNumber: '3', stakeCents: 1000 }], programRank1Pgm: '2', externalTopPgm: null, humanTopGraded: null, programTopGraded: null }, // excluded: tied stakes
   ];
   const pa = pickerAgreement(rows);
   check('two races considered, two excluded (one no-win-ticket, one tied)',
     pa.racesConsidered === 2 && pa.excludedRaces === 2 && pa.excludedReasons.no_win_ticket === 1 && pa.excludedReasons.tied_stakes === 1, JSON.stringify(pa));
-  check('matches program rank 1 on race 1 only; matches SFTB top on races 1 and 2',
-    pa.matchesProgramRank1 === 1 && pa.matchesSftbTop === 2, JSON.stringify(pa));
+  check('matches program rank 1 on race 1 only; matches the top external pick on races 1 and 2',
+    pa.matchesProgramRank1 === 1 && pa.matchesExternalTop === 2, JSON.stringify(pa));
   check('human win% and flat ROI computed over the 2 considered races ($2 flat)',
     pa.humanWinPct === 0.5 && pa.humanFlatRoi === (1100 - 400) / 400, JSON.stringify(pa));
 }

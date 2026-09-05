@@ -376,9 +376,18 @@ replayRouter.get('/replay/standing', (req, res) => {
       const winTickets = db.prepare(`SELECT selections, stake_cents FROM tickets WHERE card_id = ? AND race_id = ? AND bet_type = 'win'`)
         .all(r.card.id, race.id).map((t) => ({ programNumber: JSON.parse(t.selections).legs[0][0], stakeCents: t.stake_cents }));
       const rank1 = db.prepare('SELECT program_number FROM entries WHERE race_id = ? AND program_rank = 1 AND scratched = 0').get(race.id);
-      const sftbTop = db.prepare(`
+      // The external consensus the human is measured against. Was pinned to
+      // one source by name (SFTB, removed in D82); now it is whichever
+      // EXTERNAL source the day actually has a top pick from - At The Races,
+      // Equibase OTR, or a manual paste. Program-kind sources are excluded:
+      // the program is already the other side of this comparison, via
+      // program_rank 1, and counting it twice would inflate agreement.
+      // Lowest source id wins when a race has several, so the answer is
+      // stable across runs rather than depending on row order.
+      const externalTop = db.prepare(`
         SELECT cp.program_number FROM consensus_picks cp JOIN sources s ON s.id = cp.source_id
-        WHERE cp.race_id = ? AND s.name = 'Sports from the Basement' AND cp.pick_type = 'top'
+        WHERE cp.race_id = ? AND cp.pick_type = 'top' AND s.kind != 'program'
+        ORDER BY s.id LIMIT 1
       `).get(race.id);
       const grade1 = (pgm) => {
         if (!pgm) return null;
@@ -389,7 +398,7 @@ replayRouter.get('/replay/standing', (req, res) => {
       const top = winTickets.filter((w) => w.stakeCents === maxStake);
       pickerRows.push({
         race: n, humanWinTickets: winTickets,
-        programRank1Pgm: rank1?.program_number ?? null, sftbTopPgm: sftbTop?.program_number ?? null,
+        programRank1Pgm: rank1?.program_number ?? null, externalTopPgm: externalTop?.program_number ?? null,
         humanTopGraded: top.length === 1 ? grade1(top[0].programNumber) : null,
         programTopGraded: grade1(rank1?.program_number ?? null),
       });

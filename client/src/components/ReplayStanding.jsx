@@ -88,7 +88,7 @@ export default function ReplayStanding({ onBack }) {
           </p>
           <p>
             Human's largest win ticket matched the program's rank-1 pick on <strong>{data.pickerAgreement.matchesProgramRank1}</strong> race{data.pickerAgreement.matchesProgramRank1 === 1 ? '' : 's'},
-            {' '}the SFTB top pick on <strong>{data.pickerAgreement.matchesSftbTop}</strong> (of {data.pickerAgreement.sftbComparable} comparable),
+            {' '}the top external-source pick on <strong>{data.pickerAgreement.matchesExternalTop}</strong> (of {data.pickerAgreement.externalComparable} comparable),
             {' '}neither on <strong>{data.pickerAgreement.matchesNeither}</strong>.
           </p>
           <p className="dim">

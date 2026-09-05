@@ -32,7 +32,8 @@ function check(name, ok, detail = '') {
 
 process.env.BETSHEET_LOG_DIR = path.join(tmp, 'unit-logs');
 const { parsePicksText } = await import('../shared/picks-parser.js');
-const { parseRobots } = await import('../server/consensus.js');
+const { parseRobots, recentFailures } = await import('../server/consensus.js');
+const { openDb } = await import('../server/db.js');
 
 const pp = parsePicksText("Race 1: 4, 2, 7\nR2: Howie's Law, 6 | watch: 3, Late Horse\n3: 5, 1A | contrarian: 9\njunk line\n");
 check('picks parser: ranked, flagged, coupled and named picks', (() => {
@@ -49,6 +50,33 @@ check('picks parser: junk line warned, not fatal',
   pp.warnings.some((w) => w.type === 'unrecognized_line'));
 check('picks parser: empty input warns no_picks',
   parsePicksText('').warnings.some((w) => w.type === 'no_picks'));
+
+// ---------- not_published never counts toward the backoff (D07 rule, D53) ----------
+// Moved here from check-sources.js when the SFTB fetcher was removed (D82):
+// the rule is the consensus FRAMEWORK's, not any one source's - a discovery
+// miss means the source has not posted yet, which is the normal state of a
+// morning fetch and must not push a source toward being backed off.
+{
+  const dbPath = path.join(tmp, 'backoff.sqlite');
+  const db = openDb(dbPath);
+  const day = db.prepare("INSERT INTO race_days (track, date, bankroll_cents, per_race_min_cents, correlation_id) VALUES ('Del Mar', '2026-09-03', 20000, 500, 'cid')").run().lastInsertRowid;
+  const src = db.prepare("INSERT INTO sources (name, kind) VALUES ('Some algorithmic source', 'algorithmic')").run().lastInsertRowid;
+  const SITEMAP_URL = 'https://example.test/sitemap-index-1.xml';
+  const add = (outcome) => db.prepare('INSERT INTO fetch_attempts (race_day_id, source_id, outcome, fallback_reason, candidate_slug, entries_scanned, nearest_slug, sitemap_url, sitemap_status) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)')
+    .run(day, src, outcome, outcome === 'not_published' ? 'no post yet' : 'HTTP 500', 'candidate-slug-for-the-day', 22, 'nearest-slug-one-day-later', SITEMAP_URL, 200);
+  add('not_published'); add('not_published'); add('not_published');
+  check('three not_published attempts in a row: the source is NOT backed off (the morning fetch before the post is normal)', recentFailures(db, day, src) === false);
+  add('not_published'); add('not_published');
+  check('five of them: still not backed off', recentFailures(db, day, src) === false);
+  add('http_error'); add('not_published'); add('http_error'); add('http_error');
+  check('three real failures with a not_published between them: backed off (not_published neither resets nor extends the streak)', recentFailures(db, day, src) === true);
+  add('ok');
+  check('a success clears it', recentFailures(db, day, src) === false);
+  const row = db.prepare('SELECT outcome, candidate_slug, entries_scanned, nearest_slug, sitemap_url, sitemap_status FROM fetch_attempts WHERE outcome = ? LIMIT 1').get('not_published');
+  check('migration 013: not_published is a valid outcome and the discovery columns persist on the row',
+    row && row.candidate_slug && row.entries_scanned === 22 && row.nearest_slug && row.sitemap_url === SITEMAP_URL && row.sitemap_status === 200);
+  db.close();
+}
 
 check('robots parser: * group only, comments stripped',
   JSON.stringify(parseRobots('User-agent: googlebot\nDisallow: /a\nUser-agent: *\nDisallow: /private # hidden\nDisallow:\nUser-agent: other\nDisallow: /b\n'))
