@@ -17,7 +17,7 @@
 // preview, exactly like D54's human flow.
 
 import express from 'express';
-import { exactaEstimate, placeEstimate, trifectaBoxEstimate, winPayout } from '../shared/betmath.js';
+import { estimateTicketPayouts } from '../shared/betmath.js';
 import { buildConsensusTable } from '../shared/classification.js';
 import { parseHumanPicksText } from '../shared/parsers/human-picks.js';
 import { complete, hasKey, MODEL, SELECTABLE_MODELS } from './anthropic-client.js';
@@ -66,60 +66,6 @@ function racesRemaining(db, cardId, dayId, excludeRaceId) {
   return Math.max(1, total - withTickets);
 }
 
-/**
- * Fills estMinCents/estMaxCents/estIsRange on each parsed ticket, reusing
- * the SAME validated formulas shared/card-engine.js uses (shared/betmath.js)
- * - so an LLM ticket's "If it hits" column (CardView.jsx) isn't empty the
- * way a human's own pasted ticket's is by design (shared/parsers/
- * human-picks.js always sets these null; a human already knows what they
- * bet, an LLM's picks are meant to be reviewed the way lean's are). Needs
- * each selection's morning-line odds, from the day's entries.
- *
- * Bet types with no validated formula anywhere in this codebase - show,
- * straight trifecta, superfecta, superfecta box - are left without an
- * estimate rather than inventing unvalidated multipliers alongside the
- * ones betmath.js's constants were tuned against real payouts for; a
- * blank "If it hits" there is an honest gap, not a bug, same as it would
- * be for an engine card (the engine itself never produces those types).
- */
-function estimatePayouts(tickets, entries) {
-  const mlOf = (pgm) => entries.find((e) => e.program_number === pgm)?.morning_line_decimal ?? null;
-  return tickets.map((t) => {
-    const legs = t.legs;
-    if (t.betType === 'win') {
-      const ml = mlOf(legs[0]?.[0]);
-      if (ml == null) return t;
-      const p = winPayout(t.stakeCents, ml);
-      return { ...t, estMinCents: p, estMaxCents: p, estIsRange: false };
-    }
-    if (t.betType === 'place') {
-      const ml = mlOf(legs[0]?.[0]);
-      if (ml == null) return t;
-      const [lo, hi] = placeEstimate(t.stakeCents, ml);
-      return { ...t, estMinCents: lo, estMaxCents: hi, estIsRange: true };
-    }
-    if (t.betType === 'exacta') {
-      const mlTop = mlOf(legs[0]?.[0]);
-      const mlUnder = mlOf(legs[1]?.[0]);
-      if (mlTop == null || mlUnder == null) return t;
-      const [lo, hi] = exactaEstimate(t.stakeCents, mlTop, mlUnder);
-      return { ...t, estMinCents: lo, estMaxCents: hi, estIsRange: true };
-    }
-    if (t.betType === 'exacta_box') {
-      const mls = (legs[0] ?? []).map(mlOf).filter((m) => m != null).sort((a, b) => a - b);
-      if (mls.length < 2) return t;
-      const [lo, hi] = exactaEstimate(t.stakeCents, mls[0], mls[1]);
-      return { ...t, estMinCents: lo, estMaxCents: hi, estIsRange: true };
-    }
-    if (t.betType === 'trifecta_box') {
-      const mls = (legs[0] ?? []).map(mlOf).filter((m) => m != null);
-      if (mls.length < 3) return t;
-      const [lo, hi] = trifectaBoxEstimate(t.stakeCents, mls);
-      return { ...t, estMinCents: lo, estMaxCents: hi, estIsRange: true };
-    }
-    return t;
-  });
-}
 
 function insertRequestRow(db, { raceDayId, cardId, raceNumber, promptText, responseText, model, error }) {
   return db.prepare(`
@@ -206,7 +152,8 @@ export async function previewLlmRace(db, day, raceNumber, cardId, { stubResponse
     text: extracted.ticketBlockText, race: raceNumber, entries, wagerMenu: race.wager_menu,
     scratchedProgramNumbers: scratched, ruleTag: 'llm',
   });
-  parsed.tickets = estimatePayouts(parsed.tickets, entries);
+  parsed.tickets = estimateTicketPayouts(parsed.tickets,
+    (pgm) => entries.find((e) => e.program_number === pgm)?.morning_line_decimal ?? null);
 
   const cardCostCents = spentCents + parsed.raceCostCents;
   return {
@@ -248,7 +195,8 @@ export function persistLlmRace(db, day, { race: raceNumber, requestId, bankrollC
     err.warnings = parsed.warnings;
     throw err;
   }
-  parsed.tickets = estimatePayouts(parsed.tickets, entries);
+  parsed.tickets = estimateTicketPayouts(parsed.tickets,
+    (pgm) => entries.find((e) => e.program_number === pgm)?.morning_line_decimal ?? null);
 
   let card = null;
   if (cardId) {

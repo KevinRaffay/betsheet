@@ -16,7 +16,8 @@ import os from 'node:os';
 import path from 'node:path';
 import { fileURLToPath, URL } from 'node:url';
 import { parseHumanPicksText } from '../shared/parsers/human-picks.js';
-import { moneyToken, parseMoneyToken } from '../shared/betmath.js';
+import { estimateTicketPayouts, exactaEstimate, moneyToken, parseMoneyToken, placeEstimate,
+  trifectaBoxEstimate, winPayout } from '../shared/betmath.js';
 
 const ROOT = fileURLToPath(new URL('../', import.meta.url));
 const tmp = fs.mkdtempSync(path.join(os.tmpdir(), 'betsheet-humancheck-'));
@@ -107,6 +108,63 @@ const preview = (dayId, race, text, cardId) => jpost(`/api/race-days/${dayId}/hu
 const lock = (dayId, race, text, cardId) => jpost(`/api/race-days/${dayId}/human-cards`, { race, text, cardId });
 
 try {
+  // ---------- payout estimates, pure (D91) ----------
+  // Runs before the server so a math break reports as a math break. The
+  // identity assertions are the point: they are what stops a future
+  // "helpful" multiplier being invented for a type this codebase has no
+  // validated formula for.
+  console.log('-- payout estimator (pure) --');
+  {
+    const ML = { 1: 2.5, 2: 4, 6: 12, 7: 3 };
+    const mlOf = (p) => ML[p] ?? null;
+    const T = (betType, legs, stakeCents) => ({ betType, legs, stakeCents, estMinCents: null, estMaxCents: null, estIsRange: false });
+    const one = (t) => estimateTicketPayouts([t], mlOf)[0];
+
+    check('win is exact, not a band', (() => {
+      const r = one(T('win', [['6']], 3000));
+      return r.estMinCents === winPayout(3000, 12) && r.estMinCents === r.estMaxCents && r.estIsRange === false;
+    })(), JSON.stringify(one(T('win', [['6']], 3000))));
+    check('win: $30 on a 12-1 shot is $390 exact', one(T('win', [['6']], 3000)).estMinCents === 39000);
+    check('place is a band off the same horse', (() => {
+      const r = one(T('place', [['1']], 1000));
+      const [lo, hi] = placeEstimate(1000, 2.5);
+      return r.estMinCents === lo && r.estMaxCents === hi && r.estIsRange === true;
+    })());
+    check('straight exacta bands top over under', (() => {
+      const r = one(T('exacta', [['1'], ['2']], 200));
+      const [lo, hi] = exactaEstimate(200, 2.5, 4);
+      return r.estMinCents === lo && r.estMaxCents === hi;
+    })());
+    // Written with the box in DESCENDING price order so "it happened to take
+    // legs[0][0] and legs[0][1]" cannot pass by accident.
+    check('exacta box uses the two SHORTEST-priced, whatever order they are pasted in', (() => {
+      const descending = one(T('exacta_box', [['6', '2', '1']], 1100));   // ML 12, 4, 2.5
+      const [lo, hi] = exactaEstimate(1100, 2.5, 4);
+      return descending.estMinCents === lo && descending.estMaxCents === hi;
+    })(), JSON.stringify(one(T('exacta_box', [['6', '2', '1']], 1100))));
+    check('trifecta box uses the three shortest', (() => {
+      const r = one(T('trifecta_box', [['6', '1', '2', '7']], 100));      // shortest three: 2.5, 3, 4
+      const [lo, hi] = trifectaBoxEstimate(100, [2.5, 3, 4]);
+      return r.estMinCents === lo && r.estMaxCents === hi;
+    })());
+
+    // Identity, not a copy: an untouched ticket must be the SAME object.
+    const untouched = [
+      ['show', T('show', [['1']], 200)],
+      ['trifecta (straight)', T('trifecta', [['1'], ['2'], ['7']], 100)],
+      ['superfecta', T('superfecta', [['1'], ['2'], ['7'], ['6']], 10)],
+      ['superfecta_box', T('superfecta_box', [['1', '2', '7', '6']], 10)],
+      ['no morning line for the selection', T('win', [['99']], 500)],
+    ];
+    for (const [label, t] of untouched) {
+      check(`${label}: left null, returned by identity`, (() => {
+        const out = estimateTicketPayouts([t], mlOf);
+        return out[0] === t && out[0].estMinCents === null;
+      })());
+    }
+    check('an empty ticket list is fine', estimateTicketPayouts([], mlOf).length === 0);
+  }
+
   // ---------- teller grammar, pure (D84) ----------
   // Run before the server so a grammar break is reported as a grammar break,
   // not as a mysterious preview failure 200 lines later.
@@ -299,6 +357,29 @@ try {
     return card.consensus_completeness === 'HUMAN' && card.engine_version === 'human' && card.template === 'human' &&
       card.tickets.length === 5 && card.tickets.every((t) => t.rule_tags.includes('human'));
   })());
+  // D91 + invariant 9, mechanically: the preview must be exactly what Save
+  // stores, for the estimate column too - not just a claim in a doc comment.
+  check('"If it hits" is populated on a saved human ticket (D91 reverses D54)', await (async () => {
+    const card = await jget(`/api/cards/${humanCardId}`);
+    const win = card.tickets.find((t) => t.bet_type === 'win');
+    const box = card.tickets.find((t) => t.bet_type === 'exacta_box');
+    // #2 Tahini is 9/2 -> 4.5 decimal; $25 win pays $137.50 exact.
+    return win && win.est_payout_min_cents === 13750 && win.est_is_range === 0
+      && box && box.est_payout_min_cents != null && box.est_is_range === 1;
+  })(), JSON.stringify((await jget(`/api/cards/${humanCardId}`)).tickets.map((t) => [t.bet_type, t.est_payout_min_cents, t.est_is_range])));
+  check('preview and save agree on the estimate (invariant 9)', await (async () => {
+    const p = await preview(dayId, 1, 'Win	#4	$15');
+    const previewed = p.tickets[0];
+    const card = await jget(`/api/cards/${humanCardId}`);
+    const saved = card.tickets.find((t) => t.bet_type === 'win' && t.cost_cents === 1500);
+    return previewed.estMinCents != null && saved && saved.est_payout_min_cents === previewed.estMinCents
+      && Boolean(saved.est_is_range) === previewed.estIsRange;
+  })());
+  check('a show ticket saves with NO estimate - the honest gap, pinned', await (async () => {
+    const p = await preview(dayId, 1, '$10 S 2');
+    return p.tickets.length === 1 && p.tickets[0].estMinCents === null;
+  })());
+
   check('grading ran immediately (results already existed) under engine_version "human"', await (async () => {
     const grades = await jget(`/api/cards/${humanCardId}/grades`);
     return grades.grades.length === 5 && grades.summary.engineVersion === 'human';

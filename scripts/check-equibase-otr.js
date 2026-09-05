@@ -296,6 +296,13 @@ try {
   const showTickets = bothCard.tickets.filter((t) => t.bet_type === 'show');
   const winTickets = bothCard.tickets.filter((t) => t.bet_type === 'win');
   const boxTickets = bothCard.tickets.filter((t) => t.bet_type === 'exacta_box');
+  // D91: the shared estimator has branches (place, straight exacta,
+  // trifecta box) this path can never reach. Assert that rather than argue it -
+  // if buildRaceTickets ever emits a new type, this fails and the estimate
+  // assertions below stop being a complete account of the card.
+  check('every OTR ticket is show / win / exacta_box - the estimator branches this path reaches',
+    bothCard.tickets.every((t) => ['show', 'win', 'exacta_box'].includes(t.bet_type)),
+    JSON.stringify([...new Set(bothCard.tickets.map((t) => t.bet_type))]));
   check('win tickets: "If it hits" estimate populated (exact, at the morning line)',
     winTickets.length === 8 && winTickets.every((t) => t.est_payout_min_cents != null && t.est_payout_max_cents === t.est_payout_min_cents && t.est_is_range === 0),
     JSON.stringify(winTickets.map((t) => ({ selections: t.selections, min: t.est_payout_min_cents, max: t.est_payout_max_cents, range: t.est_is_range }))));

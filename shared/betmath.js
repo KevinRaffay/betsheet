@@ -177,6 +177,71 @@ export function doubleEstimate(stakeCents, mlA, mlB) {
 export const parlayPayout = (stakeCents, mls) =>
   Math.round(mls.reduce((a, m) => a * (m + 1), stakeCents));
 
+/**
+ * "If it hits" for a card's tickets (D91). ONE dispatcher over the validated
+ * formulas above, shared by every non-engine picker: server/human-cards.js,
+ * server/llm-cards.js (D67) and server/equibase-otr.js (D73) each had their
+ * own copy - the OTR one a strict subset of the LLM one - and a third would
+ * have arrived with human cards.
+ *
+ * `mlOf(programNumber) -> decimal odds | null` rather than an entries array:
+ * `program_number` / `morning_line_decimal` are DB vocabulary and this file is
+ * browser-safe with no imports, so the shape boundary stays at the caller's
+ * one-line adapter. It also lets a backfill feed per-race SQL straight in.
+ *
+ * A ticket is returned UNCHANGED BY IDENTITY when its type has no validated
+ * formula here, or when a selection has no morning line. Deliberately absent:
+ * show, straight trifecta, superfecta, superfecta_box - no validated formula
+ * exists anywhere in this codebase (the engine never emits them) and inventing
+ * a multiplier beside BET.estimates' tuned constants would be guessing with
+ * money math. Leave them null; the sheet prints an honest dash.
+ *
+ * NOT to be unified with shared/card-engine.js's own inline estimates. Those
+ * are computed mid-construction with context this dispatcher does not have
+ * (mlForPlaceRule, the box's own est list, straight exactas priced off the
+ * LONGEST-priced under, and the rebalancer rewriting est after a stake moves).
+ * Folding them in would change every stored lean estimate and would be an
+ * engine change requiring an ENGINE_VERSION bump (invariant 14).
+ */
+export function estimateTicketPayouts(tickets, mlOf) {
+  const shortestFirst = (leg) => (leg ?? []).map(mlOf).filter((m) => m != null).sort((a, b) => a - b);
+  const band = (t, [lo, hi]) => ({ ...t, estMinCents: lo, estMaxCents: hi, estIsRange: true });
+
+  return tickets.map((t) => {
+    const legs = t.legs ?? [];
+    switch (t.betType) {
+      case 'win': {
+        const ml = mlOf(legs[0]?.[0]);
+        if (ml == null) return t;
+        const p = winPayout(t.stakeCents, ml);
+        return { ...t, estMinCents: p, estMaxCents: p, estIsRange: false };
+      }
+      case 'place': {
+        const ml = mlOf(legs[0]?.[0]);
+        return ml == null ? t : band(t, placeEstimate(t.stakeCents, ml));
+      }
+      case 'exacta': {
+        const top = mlOf(legs[0]?.[0]);
+        const under = mlOf(legs[1]?.[0]);
+        return (top == null || under == null) ? t : band(t, exactaEstimate(t.stakeCents, top, under));
+      }
+      case 'exacta_box': {
+        // The two SHORTEST-priced in the box: the low end of what the box can
+        // return. Identical across HUMAN / LLM_GENERATED / EQB_OTR on purpose -
+        // it is what keeps those buckets comparable.
+        const mls = shortestFirst(legs[0]);
+        return mls.length < 2 ? t : band(t, exactaEstimate(t.stakeCents, mls[0], mls[1]));
+      }
+      case 'trifecta_box': {
+        const mls = shortestFirst(legs[0]);
+        return mls.length < 3 ? t : band(t, trifectaBoxEstimate(t.stakeCents, mls));
+      }
+      default:
+        return t;
+    }
+  });
+}
+
 // ---------- teller calls (D84) ----------
 // The grammar you actually say at the window, and the ONE format this codebase
 // emits and parses:

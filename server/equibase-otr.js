@@ -35,7 +35,7 @@ import { fileURLToPath } from 'node:url';
 import express from 'express';
 import { canonicalizeTrack } from '../shared/track-codes.js';
 import { parseEquibaseOtrTsv } from '../shared/parsers/equibase-otr.js';
-import { tellerCall, winPayout, exactaEstimate } from '../shared/betmath.js';
+import { tellerCall, estimateTicketPayouts } from '../shared/betmath.js';
 import { getDb } from './db.js';
 import { loadRace } from './human-cards.js';
 import { gradeAndPersist } from './grading.js';
@@ -160,35 +160,6 @@ const TIER = {
 };
 
 /**
- * "If it hits" estimates (bug report: equibase-otr cards showed "—" for
- * every ticket) - reuses shared/betmath.js's SAME validated formulas D67
- * fixed this exact gap with for LLM cards: win exact at the morning line,
- * exacta box banded off the two shortest-priced horses in the box. Show
- * is deliberately left without an estimate - no validated formula exists
- * anywhere in this codebase for it (the engine itself never produces a
- * show ticket), and inventing one alongside betmath.js's tuned constants
- * would be guessing with money math, same reasoning D67 documented.
- */
-function estimateOtrTicketPayouts(tickets, entries) {
-  const mlOf = (pgm) => entries.find((e) => e.program_number === pgm)?.morning_line_decimal ?? null;
-  return tickets.map((t) => {
-    if (t.betType === 'win') {
-      const ml = mlOf(t.legs[0]?.[0]);
-      if (ml == null) return t;
-      const p = winPayout(t.stakeCents, ml);
-      return { ...t, estMinCents: p, estMaxCents: p, estIsRange: false };
-    }
-    if (t.betType === 'exacta_box') {
-      const mls = (t.legs[0] ?? []).map(mlOf).filter((m) => m != null).sort((a, b) => a - b);
-      if (mls.length < 2) return t;
-      const [lo, hi] = exactaEstimate(t.stakeCents, mls[0], mls[1]);
-      return { ...t, estMinCents: lo, estMaxCents: hi, estIsRange: true };
-    }
-    return t;
-  });
-}
-
-/**
  * Build the four verbatim tickets for one parsed race: show ($2, 1
  * combo) + $1 exacta box on box4 (SOME-REWARD); win ($2, 1 combo) + $2
  * exacta box on box3 (HIGHER-REWARD). Returns { someReward: [tickets],
@@ -202,6 +173,10 @@ function buildRaceTickets(parsedRace, raceNumber, entries = []) {
   const blocked = new Set(parsedRace.blockedTickets ?? []);
   const someReward = [];
   const higherReward = [];
+
+  // The DB-shape boundary for shared/betmath.js's estimateTicketPayouts (D91):
+  // it takes a lookup, not entry rows, so it can stay browser-safe.
+  const mlOf = (pgm) => entries.find((e) => e.program_number === pgm)?.morning_line_decimal ?? null;
 
   const mkTicket = (betType, legs, stakeCents, combos, tierKey, tierLabel) => ({
     raceNumbers: [raceNumber], betType, legs,
@@ -232,8 +207,8 @@ function buildRaceTickets(parsedRace, raceNumber, entries = []) {
   }
 
   return {
-    someReward: estimateOtrTicketPayouts(someReward, entries),
-    higherReward: estimateOtrTicketPayouts(higherReward, entries),
+    someReward: estimateTicketPayouts(someReward, mlOf),
+    higherReward: estimateTicketPayouts(higherReward, mlOf),
     warnings,
   };
 }

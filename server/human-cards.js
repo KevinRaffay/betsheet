@@ -14,6 +14,7 @@
 
 import express from 'express';
 import { parseHumanPicksText } from '../shared/parsers/human-picks.js';
+import { estimateTicketPayouts } from '../shared/betmath.js';
 import { getDb } from './db.js';
 import { gradeAndPersist } from './grading.js';
 import { templateIdFor } from './templates.js';
@@ -68,6 +69,14 @@ export function previewHumanRace(db, day, raceNumber, text, cardId) {
     text, race: raceNumber, entries, wagerMenu: race.wager_menu,
     scratchedProgramNumbers: scratched,
   });
+  // D91: fill "If it hits" from the day's morning line, the same
+  // dispatcher server/llm-cards.js and server/equibase-otr.js use.
+  // D54 left these null ("a human already knows their own bet"); the
+  // Replay day sheet now shows the column, so an empty one would read as
+  // broken rather than deliberate. Types with no validated formula (show,
+  // straight trifecta, superfecta, superfecta box) stay null by design.
+  const mlOf = (pgm) => entries.find((e) => e.program_number === pgm)?.morning_line_decimal ?? null;
+  parsed.tickets = estimateTicketPayouts(parsed.tickets, mlOf);
 
   let cardCostCents = null;
   let bankrollCents = null;
@@ -136,6 +145,11 @@ export function persistHumanRace(db, day, { race: raceNumber, text, pass = false
       err.warnings = parsed.warnings;
       throw err;
     }
+    // Same estimator the preview ran, applied at the same point relative to
+    // the blocking check, so the preview is exactly what Save stores
+    // (invariant 9) - mirrors persistLlmRace's ordering.
+    const mlOf = (pgm) => entries.find((e) => e.program_number === pgm)?.morning_line_decimal ?? null;
+    parsed.tickets = estimateTicketPayouts(parsed.tickets, mlOf);
   }
 
   const now = new Date().toISOString().replace(/\.\d+Z$/, 'Z');
