@@ -14,6 +14,14 @@ export default defineConfig({
   },
   server: {
     port: Number(process.env.BETSHEET_VITE_PORT) || 5175,
+    // Fail instead of walking to the next free port. Vite's default fallback
+    // is silent, and the API has no equivalent - so a stale dev stack used to
+    // produce a NEW front end on 5176 proxying /api to the OLD stack's server
+    // on 8788, with no error anywhere and edits appearing not to take effect.
+    // Found live 2026-09-04. Loud beats convenient: scripts/dev-watch.js's
+    // preflight fails the same way on the API side, so both halves of
+    // `npm run dev` refuse a port they do not own.
+    strictPort: true,
     fs: { allow: ['..'] },
     // Tracks the API port so a second dev instance (or a verification run
     // beside an already-running npm start) can move both ports together.
