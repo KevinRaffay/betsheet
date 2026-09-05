@@ -18,7 +18,7 @@ import fs from 'node:fs';
 import os from 'node:os';
 import path from 'node:path';
 import { fileURLToPath, URL } from 'node:url';
-import { exactaEstimate, winPayout } from '../shared/betmath.js';
+import { exactaEstimate, placeEstimate, winPayout } from '../shared/betmath.js';
 
 const ROOT = fileURLToPath(new URL('../', import.meta.url));
 const tmp = fs.mkdtempSync(path.join(os.tmpdir(), 'betsheet-llmcheck-'));
@@ -131,6 +131,20 @@ try {
   const p1 = await (await jpost(`/api/race-days/${dayId}/llm-cards/preview`, { race: 1, __stubResponse: wellFormedResponse(1, 25, 'Strong on the morning line.') })).json();
   check('preview parses one ticket, no blocking warnings, ruleTags carry llm', p1.tickets.length === 1 && p1.warnings.every((w) => !w.blocking) && p1.tickets[0].ruleTags?.[0] === 'llm', JSON.stringify(p1));
   check('preview win ticket carries its If it hits estimate', p1.tickets[0].estMinCents === 8750 && p1.tickets[0].estMaxCents === 8750 && p1.tickets[0].estIsRange === false, JSON.stringify(p1.tickets[0]));
+  // D91: place is the one estimator branch no other suite pins numerically.
+  check('preview place ticket carries a BANDED estimate off the same morning line', await (async () => {
+    const r = await (await jpost(`/api/race-days/${dayId}/llm-cards/preview`, {
+      race: 1, __stubResponse: `Reasoning: place.
+
+<<<TICKETS>>>
+Place | #1 | $20 | Safe.
+<<<END TICKETS>>>
+`,
+    })).json();
+    const t = r.tickets?.[0];
+    const [lo, hi] = placeEstimate(2000, 2.5);
+    return t && t.betType === 'place' && t.estMinCents === lo && t.estMaxCents === hi && t.estIsRange === true;
+  })());
   check('reasoning text extracted separately from the ticket block', p1.reasoningText === 'Reasoning: Strong on the morning line.', p1.reasoningText);
   check('per-race bankroll on the first (cardless) preview = bankroll / totalRaces', p1.perRaceBankrollCents === 10000, JSON.stringify(p1));
   check('requestId present (the audit log row)', Number.isInteger(p1.requestId));
