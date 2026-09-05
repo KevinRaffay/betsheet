@@ -1,5 +1,5 @@
 #!/bin/sh
-# Refuse a direct push to main (D100).
+# Refuse a direct push to main (D101).
 #
 # This repo's delivery workflow is one deliverable per branch per PR, and every
 # deliverable this session followed it - but nothing ENFORCED it. Server-side
@@ -39,7 +39,7 @@ if [ "$blocked" -eq 1 ]; then
       git push --no-verify ...
 
   (This hook is local and bypassable by design. Real enforcement needs GitHub
-  Pro or a public repo - see the D100 ledger row.)
+  Pro or a public repo - see the D101 ledger row.)
 MSG
   exit 1
 fi

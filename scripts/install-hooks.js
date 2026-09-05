@@ -1,4 +1,4 @@
-// Point git at this repo's tracked hooks (D100).
+// Point git at this repo's tracked hooks (D101).
 //
 // Git does not version .git/hooks, so a hook committed to the repo does
 // nothing until someone opts in. Rather than COPYING hooks into .git/hooks -

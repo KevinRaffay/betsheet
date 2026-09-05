@@ -386,6 +386,27 @@ label.btn.btn--primary { color: var(--color-accent-text); }
   font-weight: 700;
   color: var(--color-accent);
 }
+/* The sheet's per-race block is a <details>; its head line is the summary.
+   The head is a flex row, so the summary has to be one too - which drops the
+   native marker (a block-level flex child would otherwise wrap below it), so
+   the caret is drawn here and flipped on [open]. */
+.race--sheet > summary {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  list-style: none;
+  padding: 6px 0 2px;
+}
+.race--sheet > summary::-webkit-details-marker { display: none; }
+.race--sheet > summary::before {
+  content: '▶';
+  color: var(--color-text-muted);
+  font-size: 10px;
+  line-height: 1;
+}
+.race--sheet[open] > summary::before { content: '▼'; }
+.race--sheet > summary > .race-sheet-head { flex: 1; min-width: 0; padding: 0; }
+.btnrow--collapse { justify-content: flex-end; margin: 10px 0 0; }
 .thesis {
   margin: 6px 0 2px;
   font-size: 14px;

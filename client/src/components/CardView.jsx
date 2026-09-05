@@ -38,6 +38,11 @@ export default function CardView({ cardId, onBack, onDeleted, embedded = false }
   const [gradeData, setGradeData] = useState(null);
   const [error, setError] = useState(null);
   const [busy, setBusy] = useState(false);
+  // Which races are collapsed. Open is the default: the sheet is read for its
+  // tickets, so a race hides only when the reader asks. Held as the collapsed
+  // set rather than the open one so a race that appears later (a reload after
+  // a regrade) is open without having to be added anywhere.
+  const [collapsedRaces, setCollapsedRaces] = useState(() => new Set());
 
   useEffect(() => {
     getCard(cardId).then(setCard).catch((e) => setError(String(e.message)));
@@ -171,6 +176,20 @@ export default function CardView({ cardId, onBack, onDeleted, embedded = false }
         )}
       </div>
 
+      {card.allocations.length > 1 && (
+        <div className="btnrow btnrow--collapse">
+          <button className="btn btn--sm" onClick={() => setCollapsedRaces(new Set())}>
+            Expand all races
+          </button>
+          <button
+            className="btn btn--sm"
+            onClick={() => setCollapsedRaces(new Set(card.allocations.map((x) => x.race_number)))}
+          >
+            Collapse all races
+          </button>
+        </div>
+      )}
+
       {card.allocations.map((a) => {
         const race = (card.races ?? []).find((r) => r.number === a.race_number);
         const entries = race?.entries ?? [];
@@ -183,17 +202,36 @@ export default function CardView({ cardId, onBack, onDeleted, embedded = false }
         const { thesis, triggers } = splitThesis(a.thesis);
         const flags = a.contrarian_flags ? JSON.parse(a.contrarian_flags) : [];
         return (
-          <div className="race race--sheet" key={a.race_number}>
-            <div className="race-sheet-head">
-              <strong>Race {a.race_number}</strong>
-              <span className={`chip chip--${(a.classification ?? 'chaos').toLowerCase()}`}>{a.classification ?? '—'}</span>
-              <span className="dim">
-                post {a.post_time ?? '?'} · {a.surface ?? '?'} · {a.distance ?? '?'} · {a.race_type ?? '?'}
+          <details
+            className="race race--sheet"
+            key={a.race_number}
+            open={!collapsedRaces.has(a.race_number)}
+            onToggle={(e) => {
+              // `toggle` does not bubble, but a nested <details> (Entries,
+              // Bottom Line, Results) must never be mistaken for this one.
+              if (e.target !== e.currentTarget) return;
+              const isOpen = e.currentTarget.open;
+              setCollapsedRaces((prev) => {
+                const next = new Set(prev);
+                if (isOpen) next.delete(a.race_number);
+                else next.add(a.race_number);
+                return next;
+              });
+            }}
+          >
+            <summary>
+              <span className="race-sheet-head">
+                <strong>Race {a.race_number}</strong>
+                <span className={`chip chip--${(a.classification ?? 'chaos').toLowerCase()}`}>{a.classification ?? '—'}</span>
+                <span className="dim">
+                  post {a.post_time ?? '?'} · {a.surface ?? '?'} · {a.distance ?? '?'} · {a.race_type ?? '?'}
+                </span>
+                <span className="race-alloc">
+                  {money(a.amount_cents)} allocated · {money(subtotal)} spent
+                  {raceTickets.length > 0 && <span className="dim"> · {raceTickets.length} tickets</span>}
+                </span>
               </span>
-              <span className="race-alloc">
-                {money(a.amount_cents)} allocated · {money(subtotal)} spent
-              </span>
-            </div>
+            </summary>
             {thesis && <p className="thesis">{thesis}</p>}
             {triggers.map((t, i) => <p className="trigger" key={i}>• {t}</p>)}
             {flags.map((f, i) => (
@@ -251,7 +289,7 @@ export default function CardView({ cardId, onBack, onDeleted, embedded = false }
                   </tbody>
                 </table>
               )}
-          </div>
+          </details>
         );
       })}
 

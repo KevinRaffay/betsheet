@@ -1,4 +1,4 @@
-// GitHub API access using the credential git already has (D100).
+// GitHub API access using the credential git already has (D101).
 //
 // The failure this exists for, twice in one session: `gh` is not installed and
 // the repo is private, so an unauthenticated API call returns "Not Found" and a
