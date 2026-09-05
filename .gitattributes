@@ -5,3 +5,8 @@ server/migrations/*.sql text eol=lf
 # The committed fixtures are byte-compared against audited goldens; keep
 # their endings exactly as captured.
 tests/fixtures/** -text
+
+# Git hooks are executed by sh. With core.autocrlf=true a checkout would give
+# them CRLF endings, and sh then fails on the shebang ("bad interpreter:
+# /bin/sh^M") - so the guard on main would silently stop guarding. Pin LF.
+scripts/git-hooks/* text eol=lf
