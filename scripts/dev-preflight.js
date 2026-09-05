@@ -58,7 +58,16 @@ for (const { held, ports } of roots.values()) {
 }
 
 say('');
-say('  free them:  npm run dev:clean -- --yes');
-say('  or move this instance to its own ports:');
+// The one-command remedy comes first: the two-step (clean, then re-run)
+// is the whole reason a stale stack stayed in the way long enough to be
+// reported twice. `dev:restart` is dev:clean --yes followed by this.
+say('  stop them and start:  npm run dev:restart');
+say('  or just look first:   npm run dev:clean');
+say('  or move this instance to its own ports (POSIX shell syntax):');
 say('    BETSHEET_PORT=8790 BETSHEET_VITE_PORT=5177 npm run dev');
+// An agent's browser-verification stack is NOT supposed to show up here
+// any more - .claude/launch.json runs `npm run dev:preview`, which sits on
+// 8795/5185. A `dev:preview` process named above means that isolation was
+// bypassed (an explicit BETSHEET_PORT, or a launch config pointed back at
+// plain `dev`), not that the ports are shared again by design.
 process.exit(1);

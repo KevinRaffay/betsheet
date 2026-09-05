@@ -195,6 +195,7 @@ if (!(await probePort(PORT))) {
   } else {
     say('  could not identify the holder - try: npm run dev:clean');
   }
+  say('  stop them and start:  npm run dev:restart');
   say(`  or move this instance: BETSHEET_PORT=8790 BETSHEET_VITE_PORT=5177 npm run dev`);
   process.exit(1);
 }

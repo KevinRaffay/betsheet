@@ -157,6 +157,7 @@ Breaking any of these is a bug regardless of what the tests say.
 | `client/src/components/BackfillQueue.jsx` | the Backfill queue view: pending days with their blocking types, the read-only preview (`ParsePreview.jsx`, shared with New race day) + Confirm / Reject with a note; decided items link to the saved day. |
 | `scripts/dev-ports.js` | dev port ownership (D80), shared by the preflight and the cleaner: `probePort` (a real bind attempt on BOTH loopback families - the API binds 127.0.0.1 while vite binds ::1, so a v4-only probe calls a vite-held port free) and `holderTree` (the listener's process chain from a single PowerShell lookup, walked UP to the topmost ancestor still recognisable as a dev stack). The root is the answer that matters: the process holding the port is a supervised child, so killing it alone just makes its supervisor respawn it. The walk stops at the first shell or non-dev ancestor, so a terminal is never named as a kill target. |
 | `scripts/dev-preflight.js` | runs BEFORE `concurrently` in the `dev` script (D80): if the api or vite port is taken, prints the holder, the tree root and the exact way to free it, then exits 1 so nothing half-starts. It runs first because it has to - vite binds in ~50ms while a process lookup takes longer, so `concurrently -k` used to SIGTERM the diagnosing half before it could speak. |
+| `scripts/dev-preview.js` | `npm run dev:preview` (D97): the dev stack an AGENT starts, on ports that are never the human's - api **8795**, vite **5185**. `.claude/launch.json` points here instead of at `dev`, so a browser-verification preview structurally cannot take 8788/5175 (it did, repeatedly, and D80's preflight could only report the collision after the fact - naming a process the person had never started). It sets the two env vars and spawns the ordinary `dev` script rather than re-implementing it, so the preflight, the watcher and vite stay defined in one place; precedence is explicit env > this clone's `.env` > these defaults. The ports dodge life-swipe, the human's pair, the human's vite fallback range 5176-5180 (`dev-clean.js` sweeps those when the tree is provably this checkout's - and an agent stack IS this checkout, so a person's `dev:clean` would otherwise kill an agent mid-verify, the same bug D83 fixed for betsheet-alt), betsheet-alt, the 8790/5177 escape hatch the preflight prints, and the 8899-8920 check band. |
 | `scripts/dev-clean.js` | `npm run dev:clean` (D80): finds stale dev stacks BY PORT (api, vite, and vite's fallback range), groups them by tree root, and stops each tree with `taskkill /T`. Dry run by default, `--yes` kills; re-probes afterwards rather than claiming success. D83: a FALLBACK port is only swept when the holding tree is provably this checkout's (a chain command line under this repo root, trailing separator included - `C:\repos\betsheet` is a string prefix of `C:\repos\betsheet-alt`), because the scratch clone's vite port 5178 sits inside main's fallback range 5176-5180 and a clean in main would otherwise stop it. The clone's own two configured ports are still swept whoever holds them - you cannot start without those. |
 | `shared/distribution.js` | distribution reporting (D20, pure, browser + Node): `dependenceFor` (single-ticket dependence gross = top ticket / total returned incl. refunds, net = top ticket net / day net profit on winning days; the > 0.8 flag is NET), `maxDrawdown` (deepest peak-to-trough of the running P/L, dates + span), `distributionFor` (per completeness bucket: losing-day share, drawdown, dependence counts, refunds, mean day, per-day rows; never a pooled total). |
 | `server/distribution.js` | `GET /api/distribution?engineVersion=&meet=`: the P/L selection rules (latest version by default, `all` pools by choice, meet filter, deleted days out), ONE card per day per bucket (latest card number), figures from the pure module. |
@@ -260,6 +261,8 @@ their PRs.
 npm start              # build + serve on 127.0.0.1:8788
 npm run dev            # vite :5175 + api :8788 (api restarts via scripts/dev-watch.js)
 npm run dev:clean [-- --yes]  # find (and stop) stale dev stacks holding :8788 / :5175
+npm run dev:restart    # D97: dev:clean --yes then dev, in one command - the two-step is why a stale stack stayed in the way
+npm run dev:preview    # D97: the AGENT's dev stack, api :8795 / vite :5185, never the human's ports (.claude/launch.json runs this)
 npm run check-logging  # logging: rotation, sweep, retention, torn lines
 npm run check-schema   # schema: constraints, cascades, migrations, tamper guard
 npm run check-parsers  # entries parser vs. fixtures (golden + hard assertions)
@@ -353,6 +356,7 @@ where a compressed row dropped a detail its ledger row words differently.
 | feature | state | notes |
 | --- | --- | --- |
 | Replay day landing: the final card, once the day is closed (D95) | in review | branch `replay-final-card` - the original screenshot ask: the day landing showed a race-by-race P/L table and nothing else, so the card you actually played was only reachable one race at a time. It now renders `CardView` itself (new `embedded` prop, no chrome) once `summary.closed` - the same gate, for the same reason, D60 uses. Presentation-only. Known gap it does not close: every ticket on the two closed cards predates D91, so "If it hits" reads "—" until those rows are backfilled. Full record: DELIVERABLES.md D95. |
+| Dev harness: the agent's preview stack stops taking the human's ports (D97) | in review | branch `dev-preview-ports` - reported as "this continues to be a problem" after `npm run dev` was refused by a process the user never started. It was the session's own browser-verification server: `.claude/launch.json` ran `npm run dev`, so every agent verification took 8788/5175. `scripts/dev-preview.js` moves the agent to api 8795 / vite 5185 and the launch config points there, keeping the name `betsheet` so the isolation cannot be forgotten. Plus `npm run dev:restart` (dev:clean --yes then dev), because the two-step remedy was itself part of the problem. Full record: DELIVERABLES.md D97. |
 | Day-level ticket builder modal (D87) | merged | PR [#121](https://github.com/KevinRaffay/betsheet/pull/121), branch `day-builder-modal` - build several races in one modal then lock them together, which is the shape PRE_COMMIT exists to detect. Full record: DELIVERABLES.md D87. |
 | Ticket builder, inline in the Replay race view (D86) | merged | PR [#120](https://github.com/KevinRaffay/betsheet/pull/120), branch `ticket-builder` - click horses into finishing-position strips and watch the teller call compose itself; browser verification caught chart scratches being invisible to the client. Full record: DELIVERABLES.md D86. |
 | Stored teller calls reformatted into the D84 grammar (D85) | merged | PR [#119](https://github.com/KevinRaffay/betsheet/pull/119), branch `reformat-teller-calls` - 2321 tickets across 74 days re-derived so one format exists; a factory reset was offered and rejected on evidence. Full record: DELIVERABLES.md D85. |
@@ -509,10 +513,16 @@ is the first (D52: engine `lean-1.1`, bucket PROGRAM_ONLY, the 70-day DMR
   paths for anything node opens; heredocs truncate near 8KB — write long
   files in chunks; git identity may not resolve from the global config —
   this repo carries a local `user.name`/`user.email`.
-- **Ports**: BetSheet uses api :8788 / vite :5175. life-swipe owns :8787 and
-  :5173/:5174 on this machine — don't squat on them. The check scripts each
-  bind a fixed port in **8899–8920** (betsheet-alt sits on 8902, inside that
-  band), so a long-running instance must stay out of it.
+- **Ports**: BetSheet uses api :8788 / vite :5175 for the HUMAN's `npm run dev`
+  and for `npm start`. An AGENT's browser-verification stack must use
+  `npm run dev:preview` (api :8795 / vite :5185, D97) and never the human's
+  pair - `.claude/launch.json` already points there, so `preview_start` gets
+  it for free; do not hand-run `npm run dev` to verify. betsheet-alt is
+  :8798/:5178. life-swipe owns :8787 and :5173/:5174 on this machine — don't
+  squat on them. The check scripts each bind a fixed port in **8899–8920**
+  (betsheet-alt's old 8902 sat inside that band), so a long-running instance
+  must stay out of it. 8790/5177 is the escape hatch the preflight prints;
+  leave it free.
 - **A stale `npm run dev` outlives its shell, and used to fail silently** (D80).
   `concurrently -k` only kills siblings when concurrently itself exits, so a
   closed terminal or an ended session orphans the whole tree, which keeps
@@ -524,6 +534,13 @@ is the first (D52: engine `lean-1.1`, bucket PROGRAM_ONLY, the 70-day DMR
   before either half starts and names the process AND its tree root, and
   `npm run dev:clean` stops stale stacks. Killing the process that holds the
   port is usually wrong - it is supervised, and its parent respawns it.
+  **A dev stack is not the only thing that holds 8788** (found live
+  2026-09-05): `npm start` binds it too, so "port in use" can mean a served
+  build rather than a stale `npm run dev`. `dev:clean` catches it anyway - it
+  sweeps whoever holds a CONFIGURED port, since you cannot start without
+  those - but the holder line is worth reading before assuming an orphan.
+  D97 adds `npm run dev:restart` (dev:clean --yes then dev) because the
+  two-step remedy is itself part of why a stale stack stayed in the way.
 - **The scratch instance is a SEPARATE CLONE now (D83).** `betsheet-alt` in C:/repos/.claude/launch.json runs `C:\repos\betsheet-alt`, its own checkout, with ONLY `BETSHEET_PORT=8798` / `BETSHEET_VITE_PORT=5178` overridden (plus `BETSHEET_RAW_DIR` pointed at this repo's archive, which a reset provably never touches). Those overrides live in that clone's own `.env` and every dev entry point loads it - `server/index.js` always did, and `scripts/dev-preflight.js`, `scripts/dev-watch.js`, `scripts/dev-clean.js` and `vite.config.js` do since D83 - so the whole stack moves together and no env prefix has to be remembered on the command line. That matters because `set X=Y&& ...` is cmd.exe syntax: in Git Bash `set` assigns positional parameters and exports nothing, so the ports silently stayed at 8788/5175 and the preflight correctly (and confusingly) named the MAIN app as the process in the way - hit live 2026-09-04 following this repo's own README. It used to run THIS checkout with `BETSHEET_DB` / `BETSHEET_LOG_DIR` / `BETSHEET_OTR_ARCHIVE_DIR` redirected, which was correct only as long as every override was remembered - one missing var and `npm run reset -- --yes` lands on the real 74-day corpus. In a separate clone every path default resolves inside that clone, so the isolation is structural. The original lesson stands and is what motivated all of it: the two instances once shared `server/logs`, and either side's factory reset silently wiped the other's decision traces (found live: exports came back `traceStatus=missing`) - never point two instances at one log dir, one DB, or one OTR archive (a confirm's `confirmed_sha256` in the archive's manifest.json is what makes `npm run ingest-otr` skip a day as already done). A reset touches exactly two paths, `BETSHEET_DB` and `BETSHEET_LOG_DIR`; `data/raw`, `data/archive`, `tests/fixtures`, `docs/backfill` and `data/meets` are never touched. Ports: stay out of **8899-8920**, the check-script band - the old alt port 8902 sat inside it. See README's "The scratch environment" for the full setup.
 - **A React effect must never be handed a promise-returning function.**
   `useEffect(reload, deps)` where `reload` is `() => fetch(...).then(...)` stores
