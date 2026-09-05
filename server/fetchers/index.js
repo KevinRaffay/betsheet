@@ -22,13 +22,15 @@
 // pickType vocabulary is the consensus_picks CHECK constraint:
 // top / second / third / watch_out / contrarian.
 //
-// Concrete fetchers land one PR per source (D08a-c) and register here.
+// Concrete fetchers register here. Only the ML sheet (D40) is fetched
+// today: D08a/D08b were closed manual-only, and D08c's Sports from the
+// Basement was removed (D82) - At The Races and Equibase OTR are manual
+// uploads, not fetchers.
 // BETSHEET_EXTRA_FETCHERS (comma-separated module paths, each default-
 // exporting an array of fetchers) exists for the check scripts, which point
 // it at stub sources on a local port - the framework is exercised end to
 // end without touching the network.
 
-import sftbFetcher from './sftb.js';
 import dmtcMlFetcher from './dmtc-ml.js';
 
 const fetchers = [];
@@ -48,7 +50,6 @@ export const listFetchers = () => [...fetchers];
 // Built-in sources. Check scripts set BETSHEET_DISABLE_BUILTIN_FETCHERS so
 // their stub-only runs can never touch the network.
 if (!process.env.BETSHEET_DISABLE_BUILTIN_FETCHERS) {
-  registerFetcher(sftbFetcher);
   registerFetcher(dmtcMlFetcher);
 }
 

@@ -38,7 +38,7 @@
 // Contrarian flags:
 //   * algo_fades_favorite - two variants. An algorithmic source that
 //     publishes a full expected order (its top pick's note carries JSON
-//     `{fullOrder}`, e.g. SFTB) fades the favorite when that order ranks it
+//     `{fullOrder}`) fades the favorite when that order ranks it
 //     4th or worse. An algorithmic source that publishes only a BOX (no
 //     rank at all, e.g. D74's Equibase OTR - its 4-horse exacta box) fades
 //     the favorite when it is absent from the box entirely - a distinct,
@@ -197,10 +197,13 @@ export function contrarianFlags(entries, picks) {
     // covered by the ranked rule) so it is never flagged twice.
     // A source's fullOrder status is decided once, from its 'top' pick,
     // then applied to EVERY row of that source (not just the 'top' row) -
-    // a fullOrder source (SFTB) that also writes 'second'/'third' picks
-    // must not leak those into a phantom "box" here (found live: SFTB's
-    // non-top rows were slipping through when only the 'top' row itself
-    // was checked, double-flagging the same fade under two rule names).
+    // a fullOrder source that also writes 'second'/'third' picks must not
+    // leak those into a phantom "box" here (found live on the then-live
+    // ranked source, removed in D82: its non-top rows slipped through when
+    // only the 'top' row itself was checked, double-flagging the same fade
+    // under two rule names). No ranked source ships today - ATR and
+    // Equibase OTR are both unranked - but the rule stays keyed on the
+    // note's shape, never on a source name, so one can return for free.
     const fullOrderSources = new Set();
     for (const p of picks) {
       if (p.source_kind !== 'algorithmic' || p.pick_type !== 'top' || !p.note) continue;

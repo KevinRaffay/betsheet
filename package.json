@@ -18,7 +18,6 @@
     "check-ingest": "node scripts/check-ingest.js",
     "check-consensus": "node scripts/check-consensus.js",
     "check-atr-pdf": "node scripts/check-atr-pdf.js",
-    "check-sources": "node scripts/check-sources.js",
     "check-classification": "node scripts/check-classification.js",
     "check-engine": "node scripts/check-engine.js",
     "reset": "node scripts/reset.js",
@@ -44,6 +43,7 @@
     "check-distribution": "node scripts/check-distribution.js",
     "backfill-bottom-line": "node scripts/backfill-bottom-line.js",
     "strip-bottom-line-byline": "node scripts/strip-bottom-line-byline.js",
+    "remove-sftb-picks": "node scripts/remove-sftb-picks.js",
     "export-trace": "node scripts/export-trace.js"
   },
   "dependencies": {
