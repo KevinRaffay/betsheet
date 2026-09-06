@@ -1,6 +1,6 @@
 # Equibase entries ingest, from a manually saved page
 
-**Status: specified, not scheduled.** No deliverable IDs assigned — they get claimed when
+**Status: parser built (D104); ingest wiring not scheduled.** No deliverable IDs assigned — they get claimed when
 the work is picked up, not before. Written 2026-09-05 from a real sample; every structural
 claim below was verified against that file rather than read off the rendered page.
 
@@ -50,7 +50,9 @@ Recorded so nobody re-opens the PDF route without knowing it was measured.
 ## What the HTML contains — verified against the sample
 
 Sample, committed at `tests/fixtures/equibase-entries/DMR090626USA-EQB.view-source.html`:
-Equibase entries page, **Del Mar, 6 September 2026, 11 races, 116 entry rows**.
+Equibase entries page, **Del Mar, 6 September 2026, 11 races, 113 entries**.
+*(Corrected while implementing D104: the tables hold 116 data rows, but three of them
+are `Also Eligibles:` separators rather than entries.)*
 
 | needed | present as |
 | --- | --- |
@@ -62,7 +64,7 @@ Equibase entries page, **Del Mar, 6 September 2026, 11 races, 116 entry rows**.
 | conditions | same block, full paragraph |
 | entries | header row `P#, PP, Horse, VS, A/S, Med, Jockey, Wgt, Trainer, M/L, LiveOdds` — **but see rule 1: a claiming race adds a `Claim $` column** |
 | horse + state suffix | a single cell — `Broheim (KY)`, `Prime Artist (FR)`. The split-on-parenthetical risk the PDF spec worried about does not arise |
-| live odds | the `LiveOdds` column exists on every race and is **empty in all 116 rows** of this capture — an entries page saved before wagering opened. See the correction under Open questions |
+| live odds | the `LiveOdds` column exists on every race and is **empty in all 113 entries** of this capture — an entries page saved before wagering opened. See the correction under Open questions |
 | scratches | 3 in this card (races 3, 5, 7) |
 | also-eligibles | a 1-cell `Also Eligibles:` separator row in races 3, 10 and 11; entries after it are AEs |
 
@@ -162,7 +164,7 @@ HTML as given — so nobody has to remember which way a file was captured.
 1. **"Track-agnostic" is a claim, not a finding.** The verified sample is Del Mar; the actual
    target is Kentucky Downs. Capturing the KD page and parsing it is the first real test, and
    should happen before the parser is described as generic anywhere.
-2. **Live odds were empty in the entire sample** — all 116 rows. This capture predates
+2. **Live odds were empty in the entire sample** — all 113 entries. This capture predates
    wagering, so the M/L fallback is not merely the common path, it is the ONLY path this
    fixture exercises. A second capture taken close to post is needed before the live-odds
    branch can be tested at all, and blank live odds must never be read as a parser fault.
