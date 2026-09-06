@@ -1,6 +1,6 @@
 # Equibase entries ingest, from a manually saved page
 
-**Status: parser (D104), schema (D115) and ingest route + UI (D116) all landed. Only the staleness indicator remains.** No deliverable IDs assigned — they get claimed when
+**Status: COMPLETE.** Parser D104, schema D115, ingest route + UI D116, staleness indicator D117. No deliverable IDs assigned — they get claimed when
 the work is picked up, not before. Written 2026-09-05 from a real sample; every structural
 claim below was verified against that file rather than read off the rendered page.
 
@@ -164,9 +164,13 @@ HTML as given — so nobody has to remember which way a file was captured.
    also found two defects in it: `conditions` was capturing the page's navigation strip and
    inline JavaScript, and neither the race type nor the **load-bearing** wager menu was being
    read at all - see the D116 ledger row.
-4. **Staleness indicator.** Per race, "Entries as of {odds_captured_at}, post {post_time}",
-   with fresh / aging / past-post states from one exported threshold constant (default
-   75 minutes, configurable). Non-blocking — visible, not obstructive.
+4. **Staleness indicator.** *Delivered as D117.* Per race, from one exported
+   `STALE_AFTER_MINUTES` (75, overridable per call), non-blocking. **One deviation
+   worth stating**: "past-post" is only asserted where it needs no timezone - the day
+   is before or after the viewer's today - because `races.post_time` is a printed
+   local string and nothing stores the zone the parser reads off the page. On the day
+   itself the comparison IS made but flagged as assuming the viewer's own clock, and
+   a race with no parseable post time returns `null` rather than a guess.
 
 ---
 
