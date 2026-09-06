@@ -194,6 +194,31 @@ function parseEntryRow(cells, fields, raceNumber, warnings) {
 }
 
 /**
+ * Last position of `needle` inside `haystack`, comparing letters and digits
+ * only, and reported as offsets into the ORIGINAL haystack so a caller can
+ * slice it. Returns null when it is not there.
+ *
+ * Exists because a track's name is not printed consistently even within one
+ * page: "Lethbridge Rmtc" in the header, "Lethbridge - Rmtc" in every race
+ * block. Comparing the squeezed forms is what makes the wager-menu split
+ * survive that, without loosening into a fuzzy match that could land on the
+ * wrong boundary.
+ */
+function looseIndexOf(haystack, needle) {
+  const keep = (c) => /[a-z0-9]/i.test(c);
+  const map = [];
+  let squeezed = '';
+  for (let i = 0; i < haystack.length; i += 1) {
+    if (keep(haystack[i])) { squeezed += haystack[i].toUpperCase(); map.push(i); }
+  }
+  const target = [...String(needle)].filter(keep).join('').toUpperCase();
+  if (!target) return null;
+  const at = squeezed.lastIndexOf(target);
+  if (at < 0) return null;
+  return { start: map[at], end: map[at + target.length - 1] + 1 };
+}
+
+/**
  * Race metadata lives in the block of markup immediately before its table.
  *
  * The block has a stable printed grammar, and D116 anchors on it rather than
@@ -245,10 +270,16 @@ function parseHeaderBlock(block, raceNumber, warnings, track) {
   const purseAt = purse ? tail.indexOf(purse[0]) : -1;
   if (toolsMatch && purseAt > toolsMatch.index) {
     const span = tail.slice(toolsMatch.index + toolsMatch[0].length, purseAt);
-    const at = track ? span.toUpperCase().lastIndexOf(String(track).toUpperCase()) : -1;
-    if (at > 0) {
-      wagerMenu = span.slice(0, at).trim() || null;
-      raceType = span.slice(at + String(track).length).trim() || null;
+    // D122: the SAME page can spell its own track two ways - the header says
+    // "Lethbridge Rmtc" while every race block says "Lethbridge - Rmtc". An
+    // exact search misses, and the menu and race type both come back null on
+    // every race of the card. Matched on letters and digits only, so spacing,
+    // hyphens and punctuation cannot break the split; the offsets are then
+    // mapped back to the original string, because that is what gets sliced.
+    const at = track ? looseIndexOf(span, String(track)) : null;
+    if (at && at.start > 0) {
+      wagerMenu = span.slice(0, at.start).trim() || null;
+      raceType = span.slice(at.end).trim() || null;
     } else {
       // No track marker inside the span: the whole thing is more likely the
       // race type than a wager menu, so claim neither rather than mislabel.
@@ -334,6 +365,31 @@ export function parseEquibaseEntriesHtml(rawHtml, { track = null, date = null } 
       });
     }
 
+    // D122: some tracks get a REDUCED table with no `P#` column at all -
+    // `PP, Horse, VS, A/S, Med, [Claim $,] Jockey, Wgt, Trainer`, 8 or 9 wide
+    // against the familiar 11/12. Found across 18 of 91 real pages, all of them
+    // quarter-horse or Canadian meets (Ajax Downs, Assiniboia, Century Mile,
+    // Lethbridge, Fort Erie, Los Alamitos...). They also print no M/L and no
+    // live odds, so those stay genuinely empty - see the ledger.
+    //
+    // Without a program number a day cannot be stored at all: the column is
+    // NOT NULL and UNIQUE per race. The post position is the only identifier
+    // the page gives, and at these tracks it IS the betting number - the
+    // reduced table has no coupled-entry column for a `1A` to live in. So it
+    // is used, and SAID OUT LOUD with a warning rather than substituted
+    // silently, because a program number is what every ticket keys on and what
+    // every refund is graded against.
+    const hasProgramColumn = fields.includes('programNumber');
+    if (!hasProgramColumn && fields.includes('postPosition')) {
+      warnings.push({
+        type: 'program_number_from_post_position', race: raceNumber, blocking: false,
+        message: `Race ${raceNumber}: this page has no program-number or morning-line column `
+          + `(${headerCells.length} columns) - Equibase publishes those closer to race day. The post `
+          + `position is used as the program number and MAY CHANGE when the field is drawn, so treat `
+          + `these numbers as provisional and re-save the page nearer to post before betting.`,
+      });
+    }
+
     const entries = [];
     let alsoEligibleFrom = null;
     for (const tr of trs.slice(1)) {
@@ -347,6 +403,13 @@ export function parseEquibaseEntriesHtml(rawHtml, { track = null, date = null } 
       }
       const entry = parseEntryRow(cells, fields, raceNumber, warnings);
       if (entry) {
+        // D122: reduced table - the post position is the only number printed.
+        // Never invented where the page prints neither (a scratch row carries
+        // no cells at all), so a genuinely numberless entry stays null and the
+        // writer gives it its own placeholder.
+        if (!hasProgramColumn && entry.programNumber == null && entry.postPosition != null) {
+          entry.programNumber = entry.postPosition;
+        }
         entry.alsoEligible = alsoEligibleFrom != null;
         entries.push(entry);
       }
