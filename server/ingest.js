@@ -196,13 +196,25 @@ export function insertRaceDay(db, payload, correlationId) {
       toInt(race.claimingPriceCents), race.wagerMenu ?? null,
       bottomLineByRace.get(race.number) ?? null,
     );
+    // D122: a race can carry MORE THAN ONE horse with no printed program
+    // number - two scratches in one race is ordinary, and it broke 10 of 91
+    // real Equibase days outright: both became 'SCR', collided on
+    // UNIQUE(race_id, program_number), and the whole day's insert failed. The
+    // fix is uniqueness, not renaming: the first numberless entry in a race is
+    // still plain 'SCR', so the common single-scratch case is byte-identical
+    // to every row already stored, and only the second onward is suffixed.
+    let numberless = 0;
+    const placeholder = () => {
+      numberless += 1;
+      return numberless === 1 ? 'SCR' : `SCR-${numberless}`;
+    };
     for (const e of race.entries) {
-      // A scratched horse straight from the program can have no number;
-      // the column is NOT NULL, so mark it visibly rather than dropping it.
+      // A scratched horse can have no number printed at all; the column is
+      // NOT NULL, so mark it visibly rather than dropping the horse.
       const equipment = [e.equipment, e.equipmentChange].filter(Boolean).join('; ') || null;
       insertEntry.run(
         raceInfo.lastInsertRowid,
-        e.programNumber ?? 'SCR',
+        e.programNumber ?? placeholder(),
         toInt(e.postPosition), e.horseName ?? '(unnamed)',
         e.morningLine ?? null, e.morningLineDecimal ?? null,
         e.jockey ?? null, e.trainer ?? null, toInt(e.weight), equipment,

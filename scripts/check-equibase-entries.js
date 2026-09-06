@@ -182,6 +182,57 @@ for (const junk of ['', '<html></html>', 'not html at all', '<table class="fullw
     Array.isArray(r.races) && r.warnings.some((w) => w.blocking));
 }
 
+console.log('\n-- the REDUCED table: no program number, no morning line (D122) --');
+{
+  // Thistledown 2026-09-10, saved 4 days out. Equibase serves a narrower
+  // entries table for a card that far ahead - `PP, Horse, VS, A/S, Med,
+  // [Claim $,] Jockey, Wgt, Trainer`, 8 or 9 columns against the familiar
+  // 11/12 - because the program numbers and morning lines DO NOT EXIST YET.
+  // Measured across 91 real pages: 0-2 days out is always the full table,
+  // 3+ days out is often this one. 18 of the 91, at tracks as ordinary as
+  // Churchill Downs, Gulfstream, Woodbine and Parx - it is a function of lead
+  // time, not of track.
+  const doc = fs.readFileSync(path.join(DIR, 'TDN091026USA-EQB.reduced-table.html'), 'utf8');
+  const r = parseEquibaseEntriesHtml(doc);
+  check('a reduced-table card still parses every race', r.races.length === 8, String(r.races.length));
+  check('...at 8 or 9 columns, not 11/12',
+    r.races.every((x) => x.columnCount === 8 || x.columnCount === 9),
+    JSON.stringify([...new Set(r.races.map((x) => x.columnCount))]));
+  check('...and every active entry gets a program number from its post position',
+    r.races.every((x) => x.entries.filter((e) => !e.scratched).every((e) => e.programNumber != null
+      && e.programNumber === e.postPosition)));
+  check('...announced as an assumption, never silent, and non-blocking',
+    r.warnings.some((w) => w.type === 'program_number_from_post_position' && !w.blocking));
+  check('...with the message saying the numbers are provisional',
+    /provisional|MAY CHANGE/i.test(r.warnings.find((w) => w.type === 'program_number_from_post_position')?.message ?? ''));
+  check('...and the morning line stays genuinely EMPTY rather than invented',
+    r.races.every((x) => x.entries.every((e) => e.morningLine === null && e.morningLineDecimal === null)));
+  // This card is also one of the six whose page prints no wager menu at all.
+  check('a page that prints no wager menu yields null, never a guessed split',
+    r.races.every((x) => x.wagerMenu === null));
+}
+
+console.log('\n-- a track spelled two ways on its own page (D122) --');
+{
+  // Lethbridge: the header says "Lethbridge Rmtc", every race block says
+  // "Lethbridge - Rmtc". The wager-menu split searches for the track name
+  // between "Free Tools:" and "Purse", so an exact match missed and BOTH the
+  // menu and the race type came back null on all six races - and a null menu
+  // is a silent fallback to Del Mar's minimums, not a visible failure.
+  const doc = fs.readFileSync(path.join(DIR, 'LBG090626CAN-EQB.hyphenated-track.html'), 'utf8');
+  const r = parseEquibaseEntriesHtml(doc);
+  check('the header track is the un-hyphenated spelling', r.track === 'Lethbridge Rmtc', String(r.track));
+  check('every race splits its wager menu despite the hyphenated spelling',
+    r.races.every((x) => x.wagerMenu), JSON.stringify(r.races.map((x) => x.wagerMenu)));
+  check('...and the race type comes back with it',
+    r.races.every((x) => x.raceType), JSON.stringify(r.races.map((x) => x.raceType)));
+  check('...so no race falls back to the no_wager_menu warning',
+    !r.warnings.some((w) => w.type === 'no_wager_menu'));
+  check('the menu does not swallow the track name or the race type',
+    r.races.every((x) => !/lethbridge/i.test(x.wagerMenu) && !/purse/i.test(x.wagerMenu)),
+    JSON.stringify(r.races[0].wagerMenu));
+}
+
 console.log('\n-- the wrong page, diagnosed rather than shrugged at (D121) --');
 {
   // The mistake a real person makes, with the real artifact they make it with:

@@ -187,6 +187,8 @@ for (const file of files) {
     row.activeEntries = parsed.races.reduce((a, r) => a + r.activeEntries, 0);
     row.warnings = parsed.warnings.map((w) => ({ type: w.type, race: w.race ?? null, blocking: w.blocking }));
     row.columnCounts = [...new Set(parsed.races.map((r) => r.columnCount))].sort();
+    row.wagerMenus = parsed.races.filter((r) => r.wagerMenu).length;
+    row.reducedTable = parsed.warnings.some((w) => w.type === 'program_number_from_post_position');
     row.trackRecognized = parsed.track ? canonicalizeTrack(parsed.track).recognized : null;
 
     if (row.warnings.some((w) => w.type === 'index_page_not_entries')) {
@@ -229,6 +231,7 @@ for (const file of files) {
 // otherwise be invisible here.
 
 let verifyMismatches = 0;
+const noMenuDays = [];
 for (const row of results.filter((r) => r.status === 'imported')) {
   const day = db.prepare('SELECT id, entries_source, odds_captured_at FROM race_days WHERE track = ? AND date = ?')
     .get(canonicalizeTrack(row.track).display, row.date);
@@ -243,8 +246,17 @@ for (const row of results.filter((r) => r.status === 'imported')) {
   if (day && day.entries_source !== 'equibase_html') problems.push(`entries_source=${day.entries_source}`);
   if (day && !day.odds_captured_at) problems.push('odds_captured_at not stored');
   if (day) {
+    // A null wager menu is NOT a mismatch, and it was wrong to treat it as
+    // one: several tracks print no menu on this page at all ("Free Tools:
+    // <Track> ALLOWANCE", with nothing in between), so an empty menu is the
+    // SOURCE's limitation rather than a disagreement between parser and
+    // database. What IS a mismatch is the count moving between the two.
+    // Still surfaced loudly on its own line, because TicketBuilder and
+    // human-picks.js then fall back to BET.minimums - Del Mar's numbers - and
+    // mis-costing every ticket at another track is a silent money error.
     const menus = db.prepare('SELECT COUNT(*) AS n FROM races WHERE race_day_id = ? AND wager_menu IS NOT NULL').get(day.id).n;
-    if (menus === 0) problems.push('no race stored a wager menu (TicketBuilder would fall back to Del Mar minimums)');
+    if (menus !== (row.wagerMenus ?? 0)) problems.push(`wager menus stored ${menus} != parsed ${row.wagerMenus}`);
+    if ((row.wagerMenus ?? 0) === 0) noMenuDays.push(`${row.track} ${row.date}`);
   }
   if (problems.length) {
     verifyMismatches += 1;
@@ -289,6 +301,11 @@ for (const [field, why] of UNMAPPED) console.log(`  - ${field}: ${why}`);
 if (allNotes.size) {
   console.log('\n...of which these were actually PRESENT in this batch:');
   for (const d of allNotes) console.log(`  - ${d}`);
+}
+
+if (noMenuDays.length) {
+  console.log(`\ndays whose page prints NO wager menu at all (${noMenuDays.length}) - minimums fall back to Del Mar's:`);
+  for (const d of noMenuDays) console.log(`  - ${d}`);
 }
 
 console.log("\ntracks NOT in shared/track-codes.js's registry (derived code, never blocked):");
