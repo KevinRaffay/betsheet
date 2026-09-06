@@ -385,12 +385,14 @@ export default function DayTicketBuilderModal({
             {pending.length} race{pending.length === 1 ? '' : 's'} previewed and ready · {money(totalStaged)}
             {draftCount > 0 && <> · {draftCount} draft{draftCount === 1 ? '' : 's'} kept</>}
           </span>
-          <button className="btn btn--primary" disabled={busy || pending.length === 0} onClick={lockPending}>
-            Lock all previewed races
-          </button>
-          <button className="btn" disabled={busy} onClick={handleClose}>
-            {pending.length > 0 ? `Lock ${pending.length} & close` : 'Close'}
-          </button>
+          <div className="modal__footer-actions">
+            <button className="btn btn--primary" disabled={busy || pending.length === 0} onClick={lockPending}>
+              Lock all previewed races
+            </button>
+            <button className="btn" disabled={busy} onClick={handleClose}>
+              {pending.length > 0 ? `Lock ${pending.length} & close` : 'Close'}
+            </button>
+          </div>
         </div>
       </div>
     </div>

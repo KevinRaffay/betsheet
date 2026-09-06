@@ -545,10 +545,20 @@ label.btn.btn--primary { color: var(--color-accent-text); }
 }
 .modal__footer {
   flex: 0 0 auto;
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 16px;
   margin: 0 -24px;
   padding: 12px 24px 20px;
   border-top: 1px solid var(--color-border);
   background: var(--color-bg);
+}
+.modal__footer-actions {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  margin-left: auto;
 }
 .modal__header {
   display: flex;
