@@ -182,6 +182,31 @@ for (const junk of ['', '<html></html>', 'not html at all', '<table class="fullw
     Array.isArray(r.races) && r.warnings.some((w) => w.blocking));
 }
 
+console.log('\n-- the wrong page, diagnosed rather than shrugged at (D121) --');
+{
+  // The mistake a real person makes, with the real artifact they make it with:
+  // Equibase's race-card INDEX page. It looks near-identical to the entries
+  // page in a browser tab and carries one row per race - purse, type, distance,
+  // surface, starters, post time - and NOT ONE HORSE. Found live 2026-09-06
+  // across 93 saved pages spanning ~40 tracks, every one of them the index.
+  // Before this the parser said "No race tables found": true, unhelpful, and
+  // reading like a parser bug rather than a save-the-other-page instruction.
+  const indexPage = fs.readFileSync(path.join(DIR, 'KD090626-index-page.html'), 'utf8');
+  const r = parseEquibaseEntriesHtml(indexPage);
+  const w = r.warnings.find((x) => x.type === 'index_page_not_entries');
+  check('an index page is identified as an index page, blocking', Boolean(w) && w.blocking);
+  check('...and the message names the page to save instead',
+    /static\/entry\/.*EQB/.test(w?.message ?? ''), w?.message);
+  check('...and it does NOT fall through to the generic no_races warning',
+    !r.warnings.some((x) => x.type === 'no_races'));
+  check('...and no race or entry is invented from it', r.races.length === 0);
+  // The generic warning must survive for genuinely unrecognizable input, or
+  // the specific one has quietly replaced rather than refined it.
+  check('a non-Equibase page still gets the generic no_races warning',
+    parseEquibaseEntriesHtml('<html><table class="whatever"></table></html>')
+      .warnings.some((x) => x.type === 'no_races'));
+}
+
 console.log('\n-- golden --');
 if (writeGolden) {
   fs.writeFileSync(GOLDEN, `${JSON.stringify(out, null, 2)}\n`);
