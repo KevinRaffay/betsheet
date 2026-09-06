@@ -127,7 +127,7 @@ for (const d of DAYS) {
   check(`${d}: ${tickets.length} synthetic tickets grade to identical cents from both sources (${winners} cash)`, diffs.length === 0 && winners > 20, diffs.slice(0, 4).join(' | '));
 }
 // The real 08-30 card: program golden + SFTB + a second source -> card -> both views.
-const prog = JSON.parse(fs.readFileSync(path.join(ROOT, 'tests/fixtures/programs/delmar-2026-08-30.expected.json'), 'utf8'));
+const prog = JSON.parse(fs.readFileSync(path.join(ROOT, 'tests/fixtures/days/delmar-2026-08-30.entries.json'), 'utf8'));
 const sftb = JSON.parse(fs.readFileSync(path.join(ROOT, 'tests/fixtures/sources/sftb-delmar-2026-08-30.expected.json'), 'utf8'));
 const toDb = (e) => ({ program_number: e.programNumber, horse_name: e.horseName, morning_line: e.morningLine, morning_line_decimal: e.morningLineDecimal, program_rank: e.programRank, best_bet: e.bestBet ? 1 : 0, scratched: e.scratched ? 1 : 0 });
 const entriesByRace = Object.fromEntries(prog.races.map((r) => [r.number, r.entries.map(toDb)]));
@@ -185,9 +185,19 @@ try {
   const chart = pages['2026-08-30'].chart;
   const saveChart = await jpost(`/api/race-days/${day.id}/results`, { track: chart.track, date: chart.date, sourceKind: 'pdf', races: chart.races });
   const gradesChart = await jget(`/api/cards/${liveCard.id}/grades`);
-  const fromArchive = await jpost(`/api/race-days/${day.id}/results/from-archive`);
-  const archived = await fromArchive.json();
-  check('from-archive: the archived page previews with the calendar race count satisfied', fromArchive.status === 200 && archived.sourceKind === 'dmtc_html' && archived.races.length === 10 && archived.archivedAt === '2026-09-02T00:00:00Z', JSON.stringify(archived.error ?? archived.races?.length));
+  // The archived page used to be previewed through
+  // POST .../results/from-archive, which read the raw archive the dmtc
+  // crawler built. D113 removed the crawler and that route; the SAME page is
+  // still parsed here, through the /parse/results-html endpoint a person uses
+  // when they upload the file themselves. The cross-source proof below - the
+  // point of this whole file - is unchanged, because it never depended on
+  // where the HTML came from.
+  const archivedHtml = fs.readFileSync(path.join(ROOT, 'tests/fixtures/dmtc/results-2026-08-30.html'), 'utf8');
+  const archivedRes = await jpost('/api/parse/results-html', { html: archivedHtml });
+  const archived = await archivedRes.json();
+  check('the dmtc page previews through the upload endpoint, all 10 races',
+    archivedRes.status === 200 && archived.races.length === 10,
+    JSON.stringify(archived.error ?? archived.races?.length));
   const saveDmtc = await jpost(`/api/race-days/${day.id}/results`, { track: archived.track, date: archived.date, sourceKind: 'dmtc_html', races: archived.races });
   const saveBody = await saveDmtc.json();
   const gradesDmtc = await jget(`/api/cards/${liveCard.id}/grades`);
@@ -198,12 +208,13 @@ try {
     diffs.length === 0 && gradesChart.summary.plCents === gradesDmtc.summary.plCents, diffs.slice(0, 3).map(([a, b]) => `${a.bet_type}: ${a.returned_cents} vs ${b.returned_cents}`).join(' | '));
   const stored = await jget(`/api/race-days/${day.id}/results`);
   check('provenance: newest result_charts row is dmtc_html, the earlier equibase_pdf row kept', stored.charts[0].source_kind === 'dmtc_html' && stored.charts[1].source_kind === 'equibase_pdf', JSON.stringify(stored.charts));
-  writeManifest(9);
-  const mismatch = await jpost(`/api/race-days/${day.id}/results/from-archive`);
-  check('from-archive: calendar race count 9 vs 10 parsed -> hard error 422', mismatch.status === 422 && /calendar lists 9/.test((await mismatch.json()).error));
-  fs.rmSync(path.join(rawDir, 'DMR', '20260830', 'results.html'));
-  check('from-archive: no archived page -> 404 naming the fetch command', (await jpost(`/api/race-days/${day.id}/results/from-archive`)).status === 404);
-  check('from-archive: unknown day -> 404', (await jpost('/api/race-days/99999/results/from-archive')).status === 404);
+  // Three from-archive guards lived here - a race-count mismatch against the
+  // crawler's calendar manifest (422), a missing archived page (404), and an
+  // unknown day (404). All three were about the ARCHIVE, which D113 deleted
+  // along with the manifest they read. The upload path's own guard is what
+  // remains to check: empty input is refused rather than parsed into nothing.
+  check('the results-html endpoint refuses empty input -> 400',
+    (await jpost('/api/parse/results-html', { html: '' })).status === 400);
 } finally {
   server.kill();
   await new Promise((rr) => setTimeout(rr, 300));

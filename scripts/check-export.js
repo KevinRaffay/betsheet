@@ -35,7 +35,7 @@ function check(name, ok, detail = '') {
   else { failures++; console.error(`  FAIL  ${name}${detail ? ` - ${detail}` : ''}`); }
 }
 
-const prog = JSON.parse(fs.readFileSync(path.join(ROOT, 'tests/fixtures/programs/delmar-2026-08-30.expected.json'), 'utf8'));
+const prog = JSON.parse(fs.readFileSync(path.join(ROOT, 'tests/fixtures/days/delmar-2026-08-30.entries.json'), 'utf8'));
 const sftb = JSON.parse(fs.readFileSync(path.join(ROOT, 'tests/fixtures/sources/sftb-delmar-2026-08-30.expected.json'), 'utf8'));
 const chart = JSON.parse(fs.readFileSync(path.join(ROOT, 'tests/fixtures/charts/dmr-2026-08-30.expected.json'), 'utf8'));
 

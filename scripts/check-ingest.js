@@ -128,47 +128,35 @@ try {
   });
   check('bad payload -> 400', bad.status === 400);
 
-  const badPdf = await fetch(`${BASE}/api/parse/program-pdf`, {
-    method: 'POST',
-    headers: { 'content-type': 'application/pdf' },
-    body: Buffer.from('this is not a pdf'),
-  });
-  check('corrupt pdf -> 422 with message, not a crash', badPdf.status === 422);
-
-  // --- the real program PDF, end to end over HTTP ---
-  const pdf = fs.readFileSync(path.join(ROOT, 'tests', 'fixtures', 'programs', 'delmar-2026-08-30.pdf'));
-  const pdfRes = await fetch(`${BASE}/api/parse/program-pdf?track=Del%20Mar&date=2026-08-30`, {
-    method: 'POST',
-    headers: { 'content-type': 'application/pdf' },
-    body: pdf,
-  });
-  const pdfParsed = await pdfRes.json();
-  check('program-pdf endpoint: 10 races, 98 entries, best bet present',
-    pdfRes.ok && pdfParsed.races.length === 10 &&
-    pdfParsed.races.reduce((a, r) => a + r.entries.length, 0) === 98 &&
-    pdfParsed.races[3].entries.some((e) => e.bestBet));
-  const raceFourAnalysis = pdfParsed.analysis?.find((a) => a.race === 4)?.text;
-  check('program-pdf endpoint: per-race Bottom Line analysis present',
-    typeof raceFourAnalysis === 'string' && raceFourAnalysis.length > 80);
-
-  // Saving the PDF parse for its own (different) date must coexist with the
-  // pasted day rather than conflict.
+  // The program-PDF endpoint and its 12MB fixture went with Del Mar program
+  // ingestion (D113). The SECOND day those assertions built - the one the
+  // delete / restore / 410 guards below operate on - is still needed, so it
+  // is saved straight from the day fixture that parse used to produce. The
+  // entries, program ranks, Best Bet and Bottom Line text are the same rows;
+  // only the PDF parse in front of them is gone.
+  const dayFixture = JSON.parse(fs.readFileSync(
+    path.join(ROOT, 'tests', 'fixtures', 'days', 'delmar-2026-08-30.entries.json'), 'utf8'));
   const savePdf = await fetch(`${BASE}/api/race-days`, {
     method: 'POST',
     headers: { 'content-type': 'application/json' },
     body: JSON.stringify({
-      track: 'Del Mar', date: pdfParsed.date, bankrollCents: 20000,
-      perRaceMinCents: 500, races: pdfParsed.races, analysis: pdfParsed.analysis,
+      track: 'Del Mar', date: dayFixture.date, bankrollCents: 20000,
+      perRaceMinCents: 500, races: dayFixture.races, analysis: dayFixture.analysis,
     }),
   });
   const listBoth = await fetch(`${BASE}/api/race-days`).then((r) => r.json());
   check('both days stored side by side', savePdf.status === 201 && listBoth.length === 2);
-  const pdfDay = await fetch(`${BASE}/api/race-days/${(await savePdf.json?.(), listBoth.find((d) => d.date === '2026-08-30').id)}`).then((r) => r.json());
+  const pdfDay = await fetch(`${BASE}/api/race-days/${listBoth.find((d) => d.date === '2026-08-30').id}`).then((r) => r.json());
+  check('the fixture day stored 10 races and 98 entries',
+    pdfDay.races.length === 10 && pdfDay.races.reduce((a, r) => a + r.entries.length, 0) === 98,
+    JSON.stringify({ races: pdfDay.races.length }));
   const bb = pdfDay.races.find((r) => r.number === 4).entries.find((e) => e.best_bet === 1);
-  check('pdf day: best bet and program ranks persisted',
+  check('fixture day: best bet and program ranks persisted',
     bb?.horse_name === 'Run With Liberty' && bb?.program_rank === 1);
-  check('pdf day: Bottom Line text persists on the matching race',
-    pdfDay.races.find((r) => r.number === 4)?.bottom_line === raceFourAnalysis);
+  const raceFourAnalysis = dayFixture.analysis?.find((a) => a.race === 4)?.text;
+  check('fixture day: Bottom Line text persists on the matching race',
+    typeof raceFourAnalysis === 'string' && raceFourAnalysis.length > 80
+      && pdfDay.races.find((r) => r.number === 4)?.bottom_line === raceFourAnalysis);
 
   // ---- results-chart parse endpoints (preview only; nothing persists) ----
 
@@ -295,7 +283,7 @@ try {
     method: 'POST', headers: { 'content-type': 'application/json' },
     body: JSON.stringify({
       track: 'Del Mar', date: pdfDay.date, bankrollCents: 20000, perRaceMinCents: 500,
-      races: pdfParsed.races,
+      races: dayFixture.races,
     }),
   });
   const reingestBody = await reingest.json();

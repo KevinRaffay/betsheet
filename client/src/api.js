@@ -24,20 +24,6 @@ export function parseEntriesText(text, correlationId) {
   }).then(asJson);
 }
 
-export function parseProgramPdf(file, { track, date, correlationId } = {}) {
-  const params = new URLSearchParams();
-  if (track) params.set('track', track);
-  if (date) params.set('date', date);
-  const qs = params.toString();
-  return fetch(`/api/parse/program-pdf${qs ? `?${qs}` : ''}`, {
-    method: 'POST',
-    headers: {
-      'content-type': 'application/pdf',
-      ...(correlationId ? { 'x-correlation-id': correlationId } : {}),
-    },
-    body: file,
-  }).then(asJson);
-}
 
 export function saveRaceDay(payload, correlationId) {
   return fetch('/api/race-days', {
@@ -141,29 +127,6 @@ export const manualPicksSave = (id, sourceName, races) =>
 
 
 // ML sheet ingest (D40).
-export function parseMlPdf(file, { track, date, correlationId } = {}) {
-  const params = new URLSearchParams();
-  if (track) params.set('track', track);
-  if (date) params.set('date', date);
-  const qs = params.toString();
-  return fetch(`/api/parse/ml-pdf${qs ? `?${qs}` : ''}`, {
-    method: 'POST',
-    headers: { 'content-type': 'application/pdf', ...(correlationId ? { 'x-correlation-id': correlationId } : {}) },
-    body: file,
-  }).then(asJson);
-}
-export const mergeParses = (ml, program, correlationId) =>
-  fetch('/api/parse/merge', {
-    method: 'POST',
-    headers: { 'content-type': 'application/json', ...(correlationId ? { 'x-correlation-id': correlationId } : {}) },
-    body: JSON.stringify({ ml, program }),
-  }).then(asJson);
-export const fetchMlSheet = (track, date, correlationId) =>
-  fetch('/api/fetch/ml-sheet', {
-    method: 'POST',
-    headers: { 'content-type': 'application/json', ...(correlationId ? { 'x-correlation-id': correlationId } : {}) },
-    body: JSON.stringify({ track, date }),
-  }).then(asJson);
 
 // dmtc results page (D42).
 export const parseResultsHtml = (html, correlationId) =>
@@ -171,11 +134,6 @@ export const parseResultsHtml = (html, correlationId) =>
     method: 'POST',
     headers: { 'content-type': 'application/json', ...(correlationId ? { 'x-correlation-id': correlationId } : {}) },
     body: JSON.stringify({ html }),
-  }).then(asJson);
-export const resultsFromArchive = (dayId, correlationId) =>
-  fetch(`/api/race-days/${dayId}/results/from-archive`, {
-    method: 'POST',
-    headers: { ...(correlationId ? { 'x-correlation-id': correlationId } : {}) },
   }).then(asJson);
 
 // Human cards (D54): paste parser preview/lock/pass for one race.
