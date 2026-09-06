@@ -217,3 +217,18 @@ Specified but NOT scheduled - deliverable IDs get claimed when the work is picke
 | Per-card `track` + `entries_source = EQB_MANUAL_UPLOAD` for grading-dashboard hygiene, so these cards never blend into the Del Mar engine corpus (invariant 13) | - (not scheduled) |
 | Per-race staleness shown as "entries as of X, post Y", non-blocking | - (not scheduled) |
 | The PDF route is rejected on evidence, not preference: the sample print-to-PDF has no text layer at all (zero embedded fonts; pdftotext 14 bytes; pdfjs 0 chars) | - (rejected) |
+
+## Card source model (pivot Phase 3, scoped 2026-09-06)
+
+Full specification, with what checking it against the code and the live 108-card corpus
+found: [docs/requirements/card-source-model.md](docs/requirements/card-source-model.md).
+Specified but NOT scheduled - deliverable IDs get claimed when the work is picked up.
+
+| Requirement | Deliverables |
+| --- | --- |
+| Every card carries a source (OTR / LLM / HUMAN) visible in every list and dashboard view - DERIVED from `engine_version`, never a fourth stored column, because `engine_version`, `template` and `consensus_completeness` already agree 1:1 on it across all 108 stored cards | - (not scheduled) |
+| A card created without naming its completeness bucket is REFUSED, not silently filed as `PROGRAM_ONLY` - the column's current default is a retired engine bucket nothing can legitimately enter | - (not scheduled) |
+| A HUMAN card records WHOSE picks it holds (`source_label` from a seeded vocabulary, free text kept separately in `source_label_other` so grouping stays clean), frozen at creation the way `llm_model` is | - (not scheduled) |
+| Several HUMAN cards coexist on one race day, each an independent bankroll grading and reporting separately - the database already allows this (day 27 has two); the constraint is a UI resume rule | - (not scheduled) |
+| Blindness is `null` for a card that is not the operator's own picks, and for one that is it derives from the DAY's reveals rather than from card ordering - the current "not the first human card of the day" rule reads three side-by-side labelled cards as NON_BLIND, which is false | - (not scheduled) |
+| `llm_model` recorded for every LLM card; 2 of 12 stored cards predate the column, one exactly recoverable from its request rows and one only by inference | - (not scheduled) |
