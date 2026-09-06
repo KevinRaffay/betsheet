@@ -1,6 +1,6 @@
 import React, { useEffect, useState } from 'react';
 import {
-  fetchConsensus, getConsensus, manualPicksPreview, manualPicksSave, atrPdfPreview, atrPdfSave,
+  fetchConsensus, getConsensus, manualPicksPreview, manualPicksSave,
 } from '../api.js';
 
 const TYPE_LABEL = { top: 'top', second: '2nd', third: '3rd', watch_out: 'watch', contrarian: 'contra' };
@@ -38,9 +38,6 @@ export default function ConsensusPanel({ dayId }) {
   const [pasteText, setPasteText] = useState('');
   const [preview, setPreview] = useState(null);
 
-  const [atrSourceName, setAtrSourceName] = useState('At The Races');
-  const [atrFile, setAtrFile] = useState(null);
-  const [atrPreview, setAtrPreview] = useState(null);
 
   const reload = () => getConsensus(dayId).then(setData).catch((e) => setError(String(e.message)));
   useEffect(() => { reload(); }, [dayId]);
@@ -86,32 +83,6 @@ export default function ConsensusPanel({ dayId }) {
     }
   };
 
-  const handleAtrPreview = async () => {
-    setBusy(true);
-    setError(null);
-    try {
-      setAtrPreview(await atrPdfPreview(dayId, atrSourceName, atrFile));
-    } catch (e) {
-      setError(String(e.message));
-    } finally {
-      setBusy(false);
-    }
-  };
-
-  const handleAtrConfirm = async () => {
-    setBusy(true);
-    setError(null);
-    try {
-      await atrPdfSave(dayId, atrPreview.sourceName || atrSourceName, atrPreview.races);
-      setAtrPreview(null);
-      setAtrFile(null);
-      await reload();
-    } catch (e) {
-      setError(String(e.message));
-    } finally {
-      setBusy(false);
-    }
-  };
 
   const byRace = new Map();
   for (const p of data?.picks ?? []) {
@@ -253,57 +224,6 @@ export default function ConsensusPanel({ dayId }) {
         )}
       </details>
 
-      <details className="race">
-        <summary>At The Races PDF upload (top pick + watch pick, every race in one file)</summary>
-        <p className="dim">
-          Print <code>attheraces.com/racecards/&lt;track&gt;/&lt;date&gt;</code> to PDF the same day and upload it here,
-          instead of pasting each race's Top Tip / Watch out for by hand.
-        </p>
-        <div className="formrow">
-          <label>Source name
-            <input value={atrSourceName} onChange={(e) => setAtrSourceName(e.target.value)} />
-          </label>
-        </div>
-        <div className="formrow">
-          <input type="file" accept="application/pdf" onChange={(e) => setAtrFile(e.target.files?.[0] ?? null)} />
-        </div>
-        <div className="formrow">
-          <button className="btn" disabled={busy || !atrFile || !atrSourceName.trim()} onClick={handleAtrPreview}>
-            Preview
-          </button>
-        </div>
-
-        {atrPreview && (
-          <>
-            <p className="dim">
-              Read-only preview. To correct something, fix the PDF (or use manual paste above) and preview again.
-            </p>
-            {atrPreview.warnings.length > 0 && (
-              <div className="notice notice--warn">
-                <ul>{atrPreview.warnings.map((w, i) => <li key={i}>{w.message}</li>)}</ul>
-              </div>
-            )}
-            <table className="grid">
-              <thead><tr><th>Race</th><th>Pick</th><th>Horse</th></tr></thead>
-              <tbody>
-                {atrPreview.races.flatMap((r) => r.picks.map((p, i) => (
-                  <tr key={`${r.race}-${i}`}>
-                    <td className="dim">{i === 0 ? r.race : ''}</td>
-                    <td>{TYPE_LABEL[p.pickType] ?? p.pickType}</td>
-                    <td>
-                      #{p.programNumber ?? '?'} {p.horseName ?? ''}
-                      {p.entryId == null ? <span className="tag tag--red">unmatched</span> : null}
-                    </td>
-                  </tr>
-                )))}
-              </tbody>
-            </table>
-            <button className="btn btn--primary" disabled={busy || atrPreview.races.length === 0} onClick={handleAtrConfirm}>
-              Confirm &amp; save picks
-            </button>
-          </>
-        )}
-      </details>
 
       {data && data.attempts.length > 0 && (
         <details className="race">

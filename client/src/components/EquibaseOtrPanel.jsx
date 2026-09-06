@@ -6,10 +6,11 @@ const dollars = (cents) => `$${(cents / 100).toFixed(2)}`;
 
 // Equibase "Off to the Races" PDF upload (D71 follow-up): the free
 // at-track sheet's own printed tickets, verbatim, into three cards
-// (some-reward / higher-reward / both) in the EQB_OTR bucket. Same
-// preview-then-confirm shape as ConsensusPanel's At The Races PDF upload
-// (D69) - a picker source, not a consensus source, so it lives on the day
-// view itself rather than inside Consensus.
+// (some-reward / higher-reward / both) in the EQB_OTR bucket. The
+// preview-then-confirm shape it was styled against was ConsensusPanel's
+// At The Races PDF upload (D69), removed in D110 - a picker source, not a
+// consensus source, so it lives on the day view itself rather than inside
+// Consensus.
 export default function EquibaseOtrPanel({ dayId }) {
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState(null);
