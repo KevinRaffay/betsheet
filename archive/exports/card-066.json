@@ -1,0 +1,6464 @@
+{
+  "export": {
+    "schema": "betsheet.card-trace-export",
+    "schemaVersion": 1,
+    "exportedAt": "2026-09-06T04:53:15.539Z",
+    "docs": "docs/trace-schema.md"
+  },
+  "card": {
+    "id": 66,
+    "cardNumber": 1,
+    "variant": "default",
+    "template": "lean",
+    "bankrollCents": 20000,
+    "perRaceMinCents": 500,
+    "consensusCompleteness": "PROGRAM_ONLY",
+    "engineVersion": "lean-1.1",
+    "llmModel": null,
+    "correlationId": "e667a1ce-d659-4f10-be53-a3d8e0ec589b",
+    "createdAt": "2026-09-02T12:42:27Z"
+  },
+  "raceDay": {
+    "id": 37,
+    "track": "Del Mar",
+    "date": "2025-08-02"
+  },
+  "sources": {
+    "used": [],
+    "unavailable": []
+  },
+  "races": [
+    {
+      "number": 1,
+      "raceType": "MAIDEN",
+      "surface": "TURF",
+      "distance": "Five Furlongs",
+      "postTime": "2:00PM",
+      "conditions": "5F. (Turf). Maiden. Purse $80,000. F. 2 yo. (Rail at 12 Feet)",
+      "classification": null,
+      "contrarianFlags": [],
+      "wagerMenu": "$1 Exacta / $2 Quinella / 50c Trifecta / $2 Rolling Double / 50c Rolling Pick Three / $1 Superfecta (10c min) / 50c Early Pick 5 / $2 WPS Parlay",
+      "entries": [
+        {
+          "programNumber": "1",
+          "horseName": "Jewlz",
+          "morningLine": "8/1",
+          "morningLineDecimal": 8,
+          "programRank": null,
+          "bestBet": false,
+          "scratched": false
+        },
+        {
+          "programNumber": "2",
+          "horseName": "Miss Queue",
+          "morningLine": "12/1",
+          "morningLineDecimal": 12,
+          "programRank": null,
+          "bestBet": false,
+          "scratched": false
+        },
+        {
+          "programNumber": "3",
+          "horseName": "South Bay",
+          "morningLine": "4/1",
+          "morningLineDecimal": 4,
+          "programRank": 1,
+          "bestBet": false,
+          "scratched": false
+        },
+        {
+          "programNumber": "4",
+          "horseName": "Miss Donna",
+          "morningLine": "8/1",
+          "morningLineDecimal": 8,
+          "programRank": 2,
+          "bestBet": false,
+          "scratched": false
+        },
+        {
+          "programNumber": "5",
+          "horseName": "We Salute You",
+          "morningLine": "8/1",
+          "morningLineDecimal": 8,
+          "programRank": null,
+          "bestBet": false,
+          "scratched": false
+        },
+        {
+          "programNumber": "6",
+          "horseName": "Radiant View",
+          "morningLine": "7/2",
+          "morningLineDecimal": 3.5,
+          "programRank": 4,
+          "bestBet": false,
+          "scratched": false
+        },
+        {
+          "programNumber": "7",
+          "horseName": "Hypergamy",
+          "morningLine": "3/1",
+          "morningLineDecimal": 3,
+          "programRank": 3,
+          "bestBet": false,
+          "scratched": false
+        },
+        {
+          "programNumber": "8",
+          "horseName": "Salty Siss",
+          "morningLine": "12/1",
+          "morningLineDecimal": 12,
+          "programRank": null,
+          "bestBet": false,
+          "scratched": false
+        },
+        {
+          "programNumber": "9",
+          "horseName": "Copper Luna",
+          "morningLine": "10/1",
+          "morningLineDecimal": 10,
+          "programRank": null,
+          "bestBet": false,
+          "scratched": false
+        }
+      ]
+    },
+    {
+      "number": 2,
+      "raceType": "MAIDEN CLAIMING",
+      "surface": "DIRT",
+      "distance": "Six Furlongs",
+      "postTime": "2:31PM",
+      "conditions": "6F. Maiden Claiming. Purse $34,000. 3 yo's & up. Clm Price $40,000 to $35,000.",
+      "classification": null,
+      "contrarianFlags": [],
+      "wagerMenu": "$1 Exacta / $2 Quinella / 50c Trifecta / $2 Rolling Double / 50c Rolling Pick Three / $1 Superfecta (10c min) / $1 Place Pick All / 50c Early Pick 4 / $2 WPS Parlay",
+      "entries": [
+        {
+          "programNumber": "1",
+          "horseName": "Veracruz",
+          "morningLine": "5/2",
+          "morningLineDecimal": 2.5,
+          "programRank": 2,
+          "bestBet": false,
+          "scratched": false
+        },
+        {
+          "programNumber": "2",
+          "horseName": "Smiling Tizzy",
+          "morningLine": "8/1",
+          "morningLineDecimal": 8,
+          "programRank": null,
+          "bestBet": false,
+          "scratched": false
+        },
+        {
+          "programNumber": "3",
+          "horseName": "Beneficial",
+          "morningLine": "4/1",
+          "morningLineDecimal": 4,
+          "programRank": null,
+          "bestBet": false,
+          "scratched": false
+        },
+        {
+          "programNumber": "4",
+          "horseName": "About Last Night",
+          "morningLine": "20/1",
+          "morningLineDecimal": 20,
+          "programRank": null,
+          "bestBet": false,
+          "scratched": false
+        },
+        {
+          "programNumber": "5",
+          "horseName": "Charlie Foxtrot",
+          "morningLine": "3/1",
+          "morningLineDecimal": 3,
+          "programRank": 1,
+          "bestBet": false,
+          "scratched": false
+        },
+        {
+          "programNumber": "6",
+          "horseName": "Magic Connection",
+          "morningLine": "8/1",
+          "morningLineDecimal": 8,
+          "programRank": null,
+          "bestBet": false,
+          "scratched": false
+        },
+        {
+          "programNumber": "7",
+          "horseName": "Mutt Dillin",
+          "morningLine": "12/1",
+          "morningLineDecimal": 12,
+          "programRank": null,
+          "bestBet": false,
+          "scratched": false
+        },
+        {
+          "programNumber": "8",
+          "horseName": "Kid Dynasty",
+          "morningLine": "5/1",
+          "morningLineDecimal": 5,
+          "programRank": 3,
+          "bestBet": false,
+          "scratched": false
+        }
+      ]
+    },
+    {
+      "number": 3,
+      "raceType": "ALLOWANCE/CLAIMING",
+      "surface": "TURF",
+      "distance": "One Mile And Three Eighths",
+      "postTime": "3:02PM",
+      "conditions": "1 3/8M. (Turf). Allowance/claiming. Purse $82,000. 3 yo's & up. Clm Price $100,000 (Rail at 12 Feet)",
+      "classification": null,
+      "contrarianFlags": [],
+      "wagerMenu": "$1 Exacta / $2 Quinella / 50c Trifecta / $2 Rolling Double / 50c Rolling Pick Three / $1 Superfecta (10c min) / $2 WPS Parlay",
+      "entries": [
+        {
+          "programNumber": "1",
+          "horseName": "Dicey Mo Chara (GB)",
+          "morningLine": "3/1",
+          "morningLineDecimal": 3,
+          "programRank": 3,
+          "bestBet": false,
+          "scratched": false
+        },
+        {
+          "programNumber": "2",
+          "horseName": "Lahaina Flavor",
+          "morningLine": "4/1",
+          "morningLineDecimal": 4,
+          "programRank": null,
+          "bestBet": false,
+          "scratched": false
+        },
+        {
+          "programNumber": "3",
+          "horseName": "Phosphorescence (FR)",
+          "morningLine": "12/1",
+          "morningLineDecimal": 12,
+          "programRank": null,
+          "bestBet": false,
+          "scratched": false
+        },
+        {
+          "programNumber": "4",
+          "horseName": "Irish Prophet",
+          "morningLine": "15/1",
+          "morningLineDecimal": 15,
+          "programRank": null,
+          "bestBet": false,
+          "scratched": false
+        },
+        {
+          "programNumber": "5",
+          "horseName": "Mondego (GB)",
+          "morningLine": "6/1",
+          "morningLineDecimal": 6,
+          "programRank": null,
+          "bestBet": false,
+          "scratched": false
+        },
+        {
+          "programNumber": "6",
+          "horseName": "British Isles",
+          "morningLine": "10/1",
+          "morningLineDecimal": 10,
+          "programRank": null,
+          "bestBet": false,
+          "scratched": false
+        },
+        {
+          "programNumber": "7",
+          "horseName": "Packs a Wahlop",
+          "morningLine": "5/2",
+          "morningLineDecimal": 2.5,
+          "programRank": 2,
+          "bestBet": false,
+          "scratched": false
+        },
+        {
+          "programNumber": "8",
+          "horseName": "Lammas (GB)",
+          "morningLine": "6/1",
+          "morningLineDecimal": 6,
+          "programRank": 1,
+          "bestBet": true,
+          "scratched": false
+        }
+      ]
+    },
+    {
+      "number": 4,
+      "raceType": "MAIDEN CLAIMING",
+      "surface": "DIRT",
+      "distance": "Five And One Half Furlongs",
+      "postTime": "3:33PM",
+      "conditions": "5 1/2F. Maiden Claiming. Purse $30,000. F & M. 3 yo's & up. Clm Price $20,000",
+      "classification": null,
+      "contrarianFlags": [],
+      "wagerMenu": "$1 Exacta / $2 Quinella / 50c Trifecta / $2 Rolling Double / 50c Rolling Pick Three / 50c Middle Pick 4 / $1 Superfecta (10c min) / $2 WPS Parlay",
+      "entries": [
+        {
+          "programNumber": "1",
+          "horseName": "Lucky Nea",
+          "morningLine": "15/1",
+          "morningLineDecimal": 15,
+          "programRank": null,
+          "bestBet": false,
+          "scratched": false
+        },
+        {
+          "programNumber": "2",
+          "horseName": "The Perfect Spice",
+          "morningLine": "20/1",
+          "morningLineDecimal": 20,
+          "programRank": null,
+          "bestBet": false,
+          "scratched": false
+        },
+        {
+          "programNumber": "3",
+          "horseName": "Perfect Smile",
+          "morningLine": "5/2",
+          "morningLineDecimal": 2.5,
+          "programRank": 2,
+          "bestBet": false,
+          "scratched": false
+        },
+        {
+          "programNumber": "4",
+          "horseName": "Kiss Me Kado",
+          "morningLine": "5/1",
+          "morningLineDecimal": 5,
+          "programRank": 3,
+          "bestBet": false,
+          "scratched": false
+        },
+        {
+          "programNumber": "5",
+          "horseName": "Savel",
+          "morningLine": "8/1",
+          "morningLineDecimal": 8,
+          "programRank": null,
+          "bestBet": false,
+          "scratched": false
+        },
+        {
+          "programNumber": "6",
+          "horseName": "Pocket Venus",
+          "morningLine": "3/1",
+          "morningLineDecimal": 3,
+          "programRank": 1,
+          "bestBet": false,
+          "scratched": false
+        },
+        {
+          "programNumber": "7",
+          "horseName": "Ionian Gem",
+          "morningLine": "6/1",
+          "morningLineDecimal": 6,
+          "programRank": null,
+          "bestBet": false,
+          "scratched": false
+        },
+        {
+          "programNumber": "8",
+          "horseName": "Long Legged Babs",
+          "morningLine": "20/1",
+          "morningLineDecimal": 20,
+          "programRank": null,
+          "bestBet": false,
+          "scratched": false
+        },
+        {
+          "programNumber": "9",
+          "horseName": "Ponytail Pete",
+          "morningLine": "6/1",
+          "morningLineDecimal": 6,
+          "programRank": null,
+          "bestBet": false,
+          "scratched": false
+        }
+      ]
+    },
+    {
+      "number": 5,
+      "raceType": "CLAIMING",
+      "surface": "TURF",
+      "distance": "One Mile",
+      "postTime": "4:03PM",
+      "conditions": "1M. (Turf). Claiming. Purse $31,000. 3 yo's & up. Clm Price $25,000 to $22,500. Stretch Start. (Rail at 12 Feet)",
+      "classification": null,
+      "contrarianFlags": [],
+      "wagerMenu": "$1 Exacta / $2 Quinella / 50c Trifecta / $2 Rolling Double / 50c Rolling Pick Three / $1 Superfecta (10c min) / $2 WPS Parlay",
+      "entries": [
+        {
+          "programNumber": "1",
+          "horseName": "Mighty Kai",
+          "morningLine": "7/2",
+          "morningLineDecimal": 3.5,
+          "programRank": null,
+          "bestBet": false,
+          "scratched": false
+        },
+        {
+          "programNumber": "2",
+          "horseName": "Standard of Proof",
+          "morningLine": "20/1",
+          "morningLineDecimal": 20,
+          "programRank": null,
+          "bestBet": false,
+          "scratched": false
+        },
+        {
+          "programNumber": "3",
+          "horseName": "Hawker",
+          "morningLine": "5/1",
+          "morningLineDecimal": 5,
+          "programRank": 3,
+          "bestBet": false,
+          "scratched": false
+        },
+        {
+          "programNumber": "4",
+          "horseName": "Bid On the Prize",
+          "morningLine": "20/1",
+          "morningLineDecimal": 20,
+          "programRank": null,
+          "bestBet": false,
+          "scratched": false
+        },
+        {
+          "programNumber": "5",
+          "horseName": "Spearfish",
+          "morningLine": "4/1",
+          "morningLineDecimal": 4,
+          "programRank": null,
+          "bestBet": false,
+          "scratched": false
+        },
+        {
+          "programNumber": "6",
+          "horseName": "Guy Named Joe",
+          "morningLine": "5/2",
+          "morningLineDecimal": 2.5,
+          "programRank": 1,
+          "bestBet": false,
+          "scratched": false
+        },
+        {
+          "programNumber": "7",
+          "horseName": "Meeking",
+          "morningLine": "20/1",
+          "morningLineDecimal": 20,
+          "programRank": null,
+          "bestBet": false,
+          "scratched": false
+        },
+        {
+          "programNumber": "8",
+          "horseName": "The Shillelagh",
+          "morningLine": "8/1",
+          "morningLineDecimal": 8,
+          "programRank": null,
+          "bestBet": false,
+          "scratched": false
+        },
+        {
+          "programNumber": "9",
+          "horseName": "Mongolian Altai",
+          "morningLine": "6/1",
+          "morningLineDecimal": 6,
+          "programRank": 2,
+          "bestBet": false,
+          "scratched": false
+        }
+      ]
+    },
+    {
+      "number": 6,
+      "raceType": "MAIDEN",
+      "surface": "DIRT",
+      "distance": "Five And One Half Furlongs",
+      "postTime": "4:33PM",
+      "conditions": "5 1/2F. Maiden. Purse $100,000. F. 2 yo.",
+      "classification": null,
+      "contrarianFlags": [],
+      "wagerMenu": "$1 Exacta / $2 Quinella / 50c Trifecta / $2 Rolling Double / 50c Rolling Pick Three / $1 Superfecta (10c min) / $1 Pick 6 / $2 WPS Parlay",
+      "entries": [
+        {
+          "programNumber": "1",
+          "horseName": "Jasmine",
+          "morningLine": "6/1",
+          "morningLineDecimal": 6,
+          "programRank": null,
+          "bestBet": false,
+          "scratched": false
+        },
+        {
+          "programNumber": "2",
+          "horseName": "Grandma Mary",
+          "morningLine": "8/1",
+          "morningLineDecimal": 8,
+          "programRank": null,
+          "bestBet": false,
+          "scratched": false
+        },
+        {
+          "programNumber": "3",
+          "horseName": "Umbralle",
+          "morningLine": "4/1",
+          "morningLineDecimal": 4,
+          "programRank": 2,
+          "bestBet": false,
+          "scratched": false
+        },
+        {
+          "programNumber": "4",
+          "horseName": "Bourbon and Ginger",
+          "morningLine": "3/1",
+          "morningLineDecimal": 3,
+          "programRank": 4,
+          "bestBet": false,
+          "scratched": false
+        },
+        {
+          "programNumber": "5",
+          "horseName": "Roccabella",
+          "morningLine": "12/1",
+          "morningLineDecimal": 12,
+          "programRank": 5,
+          "bestBet": false,
+          "scratched": false
+        },
+        {
+          "programNumber": "6",
+          "horseName": "Misstrial",
+          "morningLine": "2/1",
+          "morningLineDecimal": 2,
+          "programRank": 1,
+          "bestBet": false,
+          "scratched": false
+        },
+        {
+          "programNumber": "7",
+          "horseName": "Separator",
+          "morningLine": "15/1",
+          "morningLineDecimal": 15,
+          "programRank": null,
+          "bestBet": false,
+          "scratched": false
+        },
+        {
+          "programNumber": "8",
+          "horseName": "Golden Two Step",
+          "morningLine": "12/1",
+          "morningLineDecimal": 12,
+          "programRank": 3,
+          "bestBet": false,
+          "scratched": false
+        }
+      ]
+    },
+    {
+      "number": 7,
+      "raceType": "MAIDEN",
+      "surface": "TURF",
+      "distance": "Five Furlongs",
+      "postTime": "5:03PM",
+      "conditions": "5F. (Turf). Maiden. Purse $80,000. 3 yo's & up. (CA Bred) (Rail at 12 Feet)",
+      "classification": null,
+      "contrarianFlags": [],
+      "wagerMenu": "$1 Exacta / $2 Quinella / 50c Trifecta / $2 Rolling Double / 50c Rolling Pick Three / $1 Superfecta (10c min) / 50c Late Pick 5 / $2 WPS Parlay",
+      "entries": [
+        {
+          "programNumber": "1",
+          "horseName": "Oakley's Smile",
+          "morningLine": "20/1",
+          "morningLineDecimal": 20,
+          "programRank": 4,
+          "bestBet": false,
+          "scratched": false
+        },
+        {
+          "programNumber": "2",
+          "horseName": "Nap",
+          "morningLine": "8/1",
+          "morningLineDecimal": 8,
+          "programRank": null,
+          "bestBet": false,
+          "scratched": false
+        },
+        {
+          "programNumber": "3",
+          "horseName": "Tiger Smiling",
+          "morningLine": "6/1",
+          "morningLineDecimal": 6,
+          "programRank": null,
+          "bestBet": false,
+          "scratched": false
+        },
+        {
+          "programNumber": "4",
+          "horseName": "Jack Fish",
+          "morningLine": "2/1",
+          "morningLineDecimal": 2,
+          "programRank": 2,
+          "bestBet": false,
+          "scratched": false
+        },
+        {
+          "programNumber": "5",
+          "horseName": "Uncrowned King",
+          "morningLine": "30/1",
+          "morningLineDecimal": 30,
+          "programRank": null,
+          "bestBet": false,
+          "scratched": false
+        },
+        {
+          "programNumber": "6",
+          "horseName": "Benny's Puzzle",
+          "morningLine": "20/1",
+          "morningLineDecimal": 20,
+          "programRank": null,
+          "bestBet": false,
+          "scratched": false
+        },
+        {
+          "programNumber": "7",
+          "horseName": "Little Raymond",
+          "morningLine": "5/1",
+          "morningLineDecimal": 5,
+          "programRank": 3,
+          "bestBet": false,
+          "scratched": false
+        },
+        {
+          "programNumber": "8",
+          "horseName": "Glorious Life",
+          "morningLine": "3/1",
+          "morningLineDecimal": 3,
+          "programRank": 1,
+          "bestBet": false,
+          "scratched": false
+        },
+        {
+          "programNumber": "9",
+          "horseName": "War Swift",
+          "morningLine": "20/1",
+          "morningLineDecimal": 20,
+          "programRank": null,
+          "bestBet": false,
+          "scratched": false
+        },
+        {
+          "programNumber": "10",
+          "horseName": "Light Dragoon",
+          "morningLine": "20/1",
+          "morningLineDecimal": 20,
+          "programRank": null,
+          "bestBet": false,
+          "scratched": false
+        },
+        {
+          "programNumber": "11",
+          "horseName": "Bankin On Jonathan",
+          "morningLine": "20/1",
+          "morningLineDecimal": 20,
+          "programRank": null,
+          "bestBet": false,
+          "scratched": false
+        },
+        {
+          "programNumber": "12",
+          "horseName": "Otto's Magic",
+          "morningLine": "8/1",
+          "morningLineDecimal": 8,
+          "programRank": null,
+          "bestBet": false,
+          "scratched": false
+        },
+        {
+          "programNumber": "13",
+          "horseName": "Mom Says",
+          "morningLine": "12/1",
+          "morningLineDecimal": 12,
+          "programRank": null,
+          "bestBet": false,
+          "scratched": false
+        },
+        {
+          "programNumber": "14",
+          "horseName": "Kiss for Lulu",
+          "morningLine": "8/1",
+          "morningLineDecimal": 8,
+          "programRank": null,
+          "bestBet": false,
+          "scratched": false
+        }
+      ]
+    },
+    {
+      "number": 8,
+      "raceType": "ALLOWANCE/CLAIMING",
+      "surface": "DIRT",
+      "distance": "Six Furlongs",
+      "postTime": "5:33PM",
+      "conditions": "6F. Allowance/claiming. Purse $81,000. 3 yo's & up. Clm Price $40,000",
+      "classification": null,
+      "contrarianFlags": [],
+      "wagerMenu": "$1 Exacta / $2 Quinella / 50c Trifecta / $2 Rolling Double / 50c Rolling Pick Three / $1 Superfecta (10c min) / 50c Late Pick Four / $2 WPS Parlay",
+      "entries": [
+        {
+          "programNumber": "1",
+          "horseName": "Southern Gentleman",
+          "morningLine": "2/1",
+          "morningLineDecimal": 2,
+          "programRank": 1,
+          "bestBet": false,
+          "scratched": false
+        },
+        {
+          "programNumber": "2",
+          "horseName": "Grubauer",
+          "morningLine": "9/2",
+          "morningLineDecimal": 4.5,
+          "programRank": 2,
+          "bestBet": false,
+          "scratched": false
+        },
+        {
+          "programNumber": "3",
+          "horseName": "Tapatio Leo",
+          "morningLine": "15/1",
+          "morningLineDecimal": 15,
+          "programRank": null,
+          "bestBet": false,
+          "scratched": false
+        },
+        {
+          "programNumber": "4",
+          "horseName": "Firmus",
+          "morningLine": "5/1",
+          "morningLineDecimal": 5,
+          "programRank": 3,
+          "bestBet": false,
+          "scratched": false
+        },
+        {
+          "programNumber": "5",
+          "horseName": "Awesome Rhythm",
+          "morningLine": "6/1",
+          "morningLineDecimal": 6,
+          "programRank": null,
+          "bestBet": false,
+          "scratched": false
+        },
+        {
+          "programNumber": "6",
+          "horseName": "Wayne the Brain",
+          "morningLine": "8/1",
+          "morningLineDecimal": 8,
+          "programRank": null,
+          "bestBet": false,
+          "scratched": false
+        },
+        {
+          "programNumber": "7",
+          "horseName": "Good With People",
+          "morningLine": "3/1",
+          "morningLineDecimal": 3,
+          "programRank": null,
+          "bestBet": false,
+          "scratched": false
+        }
+      ]
+    },
+    {
+      "number": 9,
+      "raceType": "STAKES",
+      "surface": "TURF",
+      "distance": "One Mile And One Sixteenth",
+      "postTime": "6:03PM",
+      "conditions": "1 1/16M. (Turf). Stakes. Purse $150,000. 3 yo's & up. (CA Bred) Chute Start. (Rail at 12 Feet)",
+      "classification": null,
+      "contrarianFlags": [],
+      "wagerMenu": "$1 Exacta / $2 Quinella / 50c Trifecta / $2 Rolling Double / $3 Late Pick Three / $1 Superfecta (10c min) / $2 WPS Parlay / $1 3x3",
+      "entries": [
+        {
+          "programNumber": "1",
+          "horseName": "Annan",
+          "morningLine": "30/1",
+          "morningLineDecimal": 30,
+          "programRank": null,
+          "bestBet": false,
+          "scratched": false
+        },
+        {
+          "programNumber": "2",
+          "horseName": "Aligato",
+          "morningLine": "4/1",
+          "morningLineDecimal": 4,
+          "programRank": 1,
+          "bestBet": false,
+          "scratched": false
+        },
+        {
+          "programNumber": "3",
+          "horseName": "Clouseau",
+          "morningLine": "12/1",
+          "morningLineDecimal": 12,
+          "programRank": null,
+          "bestBet": false,
+          "scratched": false
+        },
+        {
+          "programNumber": "4",
+          "horseName": "Miss Jo's Curlin",
+          "morningLine": "30/1",
+          "morningLineDecimal": 30,
+          "programRank": null,
+          "bestBet": false,
+          "scratched": false
+        },
+        {
+          "programNumber": "5",
+          "horseName": "Mr. Disrespectful",
+          "morningLine": "8/1",
+          "morningLineDecimal": 8,
+          "programRank": 4,
+          "bestBet": false,
+          "scratched": false
+        },
+        {
+          "programNumber": "6",
+          "horseName": "Barely Funtional",
+          "morningLine": "30/1",
+          "morningLineDecimal": 30,
+          "programRank": null,
+          "bestBet": false,
+          "scratched": false
+        },
+        {
+          "programNumber": "7",
+          "horseName": "Coalinga Road",
+          "morningLine": "8/1",
+          "morningLineDecimal": 8,
+          "programRank": null,
+          "bestBet": false,
+          "scratched": false
+        },
+        {
+          "programNumber": "8",
+          "horseName": "Takes Three",
+          "morningLine": "15/1",
+          "morningLineDecimal": 15,
+          "programRank": null,
+          "bestBet": false,
+          "scratched": false
+        },
+        {
+          "programNumber": "9",
+          "horseName": "Kings River Knight",
+          "morningLine": "1/1",
+          "morningLineDecimal": 1,
+          "programRank": 2,
+          "bestBet": false,
+          "scratched": false
+        },
+        {
+          "programNumber": "10",
+          "horseName": "Pure Madness",
+          "morningLine": "15/1",
+          "morningLineDecimal": 15,
+          "programRank": 3,
+          "bestBet": false,
+          "scratched": false
+        },
+        {
+          "programNumber": "11",
+          "horseName": "Mystic Spirit",
+          "morningLine": "15/1",
+          "morningLineDecimal": 15,
+          "programRank": null,
+          "bestBet": false,
+          "scratched": false
+        }
+      ]
+    },
+    {
+      "number": 10,
+      "raceType": "STAKES - Clement L. Hirsch Stakes",
+      "surface": "DIRT",
+      "distance": "One Mile And One Sixteenth",
+      "postTime": "6:32PM",
+      "conditions": "1 1/16M. Stakes. Purse $400,000. F & M. 3 yo's & up.",
+      "classification": null,
+      "contrarianFlags": [],
+      "wagerMenu": "$1 Exacta / $2 Quinella / 50c Trifecta / $5 Late Double / $1 Superfecta (10c min) / $2 WPS Parlay",
+      "entries": [
+        {
+          "programNumber": "1",
+          "horseName": "Seismic Beauty",
+          "morningLine": "2/1",
+          "morningLineDecimal": 2,
+          "programRank": 2,
+          "bestBet": false,
+          "scratched": false
+        },
+        {
+          "programNumber": "2",
+          "horseName": "Royal Spa",
+          "morningLine": "6/1",
+          "morningLineDecimal": 6,
+          "programRank": 4,
+          "bestBet": false,
+          "scratched": false
+        },
+        {
+          "programNumber": "3",
+          "horseName": "Mahina",
+          "morningLine": "20/1",
+          "morningLineDecimal": 20,
+          "programRank": null,
+          "bestBet": false,
+          "scratched": false
+        },
+        {
+          "programNumber": "4",
+          "horseName": "Nothing Like You",
+          "morningLine": "8/1",
+          "morningLineDecimal": 8,
+          "programRank": 6,
+          "bestBet": false,
+          "scratched": false
+        },
+        {
+          "programNumber": "5",
+          "horseName": "Richi (CHI)",
+          "morningLine": "3/1",
+          "morningLineDecimal": 3,
+          "programRank": 3,
+          "bestBet": false,
+          "scratched": false
+        },
+        {
+          "programNumber": "6",
+          "horseName": "Little Hidden Port (ARG)",
+          "morningLine": "12/1",
+          "morningLineDecimal": 12,
+          "programRank": 5,
+          "bestBet": false,
+          "scratched": false
+        },
+        {
+          "programNumber": "7",
+          "horseName": "Kopion",
+          "morningLine": "5/2",
+          "morningLineDecimal": 2.5,
+          "programRank": 1,
+          "bestBet": false,
+          "scratched": false
+        }
+      ]
+    },
+    {
+      "number": 11,
+      "raceType": "ALLOWANCE/CLAIMING",
+      "surface": "TURF",
+      "distance": "One Mile",
+      "postTime": "7:01PM",
+      "conditions": "1M. (Turf). Allowance/claiming. Purse $81,000. 3 yo's & up. Clm Price $20,000(CA Bred) Stretch Start. (Rail at 12 Feet)",
+      "classification": null,
+      "contrarianFlags": [],
+      "wagerMenu": "$1 Exacta / $2 Quinella / 50c Trifecta / $1 Superfecta (10c min.) / 50c Super High 5",
+      "entries": [
+        {
+          "programNumber": "1",
+          "horseName": "Winning Patriot",
+          "morningLine": "10/1",
+          "morningLineDecimal": 10,
+          "programRank": null,
+          "bestBet": false,
+          "scratched": false
+        },
+        {
+          "programNumber": "2",
+          "horseName": "Prince of Del Mar",
+          "morningLine": "20/1",
+          "morningLineDecimal": 20,
+          "programRank": null,
+          "bestBet": false,
+          "scratched": false
+        },
+        {
+          "programNumber": "3",
+          "horseName": "Sogno Di Vino",
+          "morningLine": "15/1",
+          "morningLineDecimal": 15,
+          "programRank": null,
+          "bestBet": false,
+          "scratched": false
+        },
+        {
+          "programNumber": "4",
+          "horseName": "Cardiff Crack",
+          "morningLine": "12/1",
+          "morningLineDecimal": 12,
+          "programRank": null,
+          "bestBet": false,
+          "scratched": false
+        },
+        {
+          "programNumber": "5",
+          "horseName": "Canani",
+          "morningLine": "12/1",
+          "morningLineDecimal": 12,
+          "programRank": null,
+          "bestBet": false,
+          "scratched": false
+        },
+        {
+          "programNumber": "6",
+          "horseName": "Prince Dolce",
+          "morningLine": "8/1",
+          "morningLineDecimal": 8,
+          "programRank": null,
+          "bestBet": false,
+          "scratched": false
+        },
+        {
+          "programNumber": "7",
+          "horseName": "It's a Factor",
+          "morningLine": "20/1",
+          "morningLineDecimal": 20,
+          "programRank": null,
+          "bestBet": false,
+          "scratched": false
+        },
+        {
+          "programNumber": "8",
+          "horseName": "Three Georges",
+          "morningLine": "15/1",
+          "morningLineDecimal": 15,
+          "programRank": null,
+          "bestBet": false,
+          "scratched": false
+        },
+        {
+          "programNumber": "9",
+          "horseName": "Mining District",
+          "morningLine": "7/2",
+          "morningLineDecimal": 3.5,
+          "programRank": null,
+          "bestBet": false,
+          "scratched": false
+        },
+        {
+          "programNumber": "10",
+          "horseName": "Uncle Chilly",
+          "morningLine": "5/1",
+          "morningLineDecimal": 5,
+          "programRank": 1,
+          "bestBet": false,
+          "scratched": false
+        },
+        {
+          "programNumber": "11",
+          "horseName": "Chromeflash",
+          "morningLine": "8/1",
+          "morningLineDecimal": 8,
+          "programRank": null,
+          "bestBet": false,
+          "scratched": false
+        },
+        {
+          "programNumber": "12",
+          "horseName": "Miles Finch",
+          "morningLine": "4/1",
+          "morningLineDecimal": 4,
+          "programRank": 2,
+          "bestBet": false,
+          "scratched": false
+        },
+        {
+          "programNumber": "13",
+          "horseName": "Brazenly",
+          "morningLine": "6/1",
+          "morningLineDecimal": 6,
+          "programRank": 3,
+          "bestBet": false,
+          "scratched": false
+        },
+        {
+          "programNumber": "14",
+          "horseName": "Jimmy Blue Jeans",
+          "morningLine": null,
+          "morningLineDecimal": null,
+          "programRank": 4,
+          "bestBet": false,
+          "scratched": true
+        }
+      ]
+    }
+  ],
+  "consensus": [],
+  "allocations": [
+    {
+      "race": 1,
+      "amountCents": 2000,
+      "confidence": "SPLIT",
+      "rule": "lean_weight_1.5",
+      "thesis": "Sources split between South Bay and Miss Donna; win the better-backed side, box the pair."
+    },
+    {
+      "race": 2,
+      "amountCents": 1800,
+      "confidence": "SPLIT",
+      "rule": "lean_weight_1.5",
+      "thesis": "Sources split between Charlie Foxtrot and Veracruz; win the better-backed side, box the pair."
+    },
+    {
+      "race": 3,
+      "amountCents": 1800,
+      "confidence": "SPLIT",
+      "rule": "lean_weight_1.5",
+      "thesis": "Sources split between Lammas (GB) and Packs a Wahlop; win the better-backed side, box the pair."
+    },
+    {
+      "race": 4,
+      "amountCents": 1800,
+      "confidence": "SPLIT",
+      "rule": "lean_weight_1.5",
+      "thesis": "Sources split between Pocket Venus and Perfect Smile; win the better-backed side, box the pair."
+    },
+    {
+      "race": 5,
+      "amountCents": 1800,
+      "confidence": "SPLIT",
+      "rule": "lean_weight_1.5",
+      "thesis": "Sources split between Guy Named Joe and Mongolian Altai; win the better-backed side, box the pair."
+    },
+    {
+      "race": 6,
+      "amountCents": 1800,
+      "confidence": "SPLIT",
+      "rule": "lean_weight_1.5",
+      "thesis": "Sources split between Misstrial and Umbralle; win the better-backed side, box the pair."
+    },
+    {
+      "race": 7,
+      "amountCents": 1800,
+      "confidence": "SPLIT",
+      "rule": "lean_weight_1.5",
+      "thesis": "Sources split between Glorious Life and Jack Fish; win the better-backed side, box the pair."
+    },
+    {
+      "race": 8,
+      "amountCents": 1800,
+      "confidence": "SPLIT",
+      "rule": "lean_weight_1.5",
+      "thesis": "Sources split between Southern Gentleman and Grubauer; win the better-backed side, box the pair."
+    },
+    {
+      "race": 9,
+      "amountCents": 1800,
+      "confidence": "SPLIT",
+      "rule": "lean_weight_1.5",
+      "thesis": "Sources split between Aligato and Kings River Knight; win the better-backed side, box the pair."
+    },
+    {
+      "race": 10,
+      "amountCents": 1800,
+      "confidence": "SPLIT",
+      "rule": "lean_weight_1.5",
+      "thesis": "Sources split between Kopion and Seismic Beauty; win the better-backed side, box the pair."
+    },
+    {
+      "race": 11,
+      "amountCents": 1800,
+      "confidence": "SPLIT",
+      "rule": "lean_weight_1.5",
+      "thesis": "Sources split between Uncle Chilly and Miles Finch; win the better-backed side, box the pair."
+    }
+  ],
+  "tickets": [
+    {
+      "sequence": 1,
+      "betType": "win",
+      "races": [
+        1
+      ],
+      "legs": [
+        [
+          "3"
+        ]
+      ],
+      "stakeCents": 1200,
+      "costCents": 1200,
+      "estPayoutMinCents": 6000,
+      "estPayoutMaxCents": 6000,
+      "estIsRange": false,
+      "tellerCall": "$12 W 3",
+      "rationale": "Better-backed side of the split",
+      "ruleTags": [
+        "split_primary_win"
+      ],
+      "grade": {
+        "outcome": "win",
+        "returnedCents": 3600,
+        "plCents": 2400,
+        "note": null
+      }
+    },
+    {
+      "sequence": 2,
+      "betType": "exacta_box",
+      "races": [
+        1
+      ],
+      "legs": [
+        [
+          "3",
+          "4"
+        ]
+      ],
+      "stakeCents": 400,
+      "costCents": 800,
+      "estPayoutMinCents": 6435,
+      "estPayoutMaxCents": 13365,
+      "estIsRange": true,
+      "tellerCall": "$4 EX BOX 3-4",
+      "rationale": "Exacta box across the split",
+      "ruleTags": [
+        "split_exacta_box"
+      ],
+      "grade": {
+        "outcome": "loss",
+        "returnedCents": 0,
+        "plCents": -800,
+        "note": null
+      }
+    },
+    {
+      "sequence": 3,
+      "betType": "win",
+      "races": [
+        2
+      ],
+      "legs": [
+        [
+          "5"
+        ]
+      ],
+      "stakeCents": 900,
+      "costCents": 900,
+      "estPayoutMinCents": 3600,
+      "estPayoutMaxCents": 3600,
+      "estIsRange": false,
+      "tellerCall": "$9 W 5",
+      "rationale": "Better-backed side of the split",
+      "ruleTags": [
+        "split_primary_win"
+      ],
+      "grade": {
+        "outcome": "win",
+        "returnedCents": 2340,
+        "plCents": 1440,
+        "note": null
+      }
+    },
+    {
+      "sequence": 4,
+      "betType": "exacta_box",
+      "races": [
+        2
+      ],
+      "legs": [
+        [
+          "5",
+          "1"
+        ]
+      ],
+      "stakeCents": 400,
+      "costCents": 800,
+      "estPayoutMinCents": 2002,
+      "estPayoutMaxCents": 4158,
+      "estIsRange": true,
+      "tellerCall": "$4 EX BOX 5-1",
+      "rationale": "Exacta box across the split",
+      "ruleTags": [
+        "split_exacta_box"
+      ],
+      "grade": {
+        "outcome": "loss",
+        "returnedCents": 0,
+        "plCents": -800,
+        "note": null
+      }
+    },
+    {
+      "sequence": 5,
+      "betType": "exacta",
+      "races": [
+        2
+      ],
+      "legs": [
+        [
+          "5"
+        ],
+        [
+          "8"
+        ]
+      ],
+      "stakeCents": 100,
+      "costCents": 100,
+      "estPayoutMinCents": 858,
+      "estPayoutMaxCents": 1782,
+      "estIsRange": true,
+      "tellerCall": "$1 EX 5 WITH 8",
+      "rationale": "Mid-priced program horse #8 under the top",
+      "ruleTags": [
+        "mid_price_coverage"
+      ],
+      "grade": {
+        "outcome": "loss",
+        "returnedCents": 0,
+        "plCents": -100,
+        "note": null
+      }
+    },
+    {
+      "sequence": 6,
+      "betType": "win",
+      "races": [
+        3
+      ],
+      "legs": [
+        [
+          "8"
+        ]
+      ],
+      "stakeCents": 1000,
+      "costCents": 1000,
+      "estPayoutMinCents": 7000,
+      "estPayoutMaxCents": 7000,
+      "estIsRange": false,
+      "tellerCall": "$10 W 8",
+      "rationale": "Better-backed side of the split",
+      "ruleTags": [
+        "split_primary_win"
+      ],
+      "grade": {
+        "outcome": "loss",
+        "returnedCents": 0,
+        "plCents": -1000,
+        "note": null
+      }
+    },
+    {
+      "sequence": 7,
+      "betType": "exacta_box",
+      "races": [
+        3
+      ],
+      "legs": [
+        [
+          "8",
+          "7"
+        ]
+      ],
+      "stakeCents": 400,
+      "costCents": 800,
+      "estPayoutMinCents": 3504,
+      "estPayoutMaxCents": 7277,
+      "estIsRange": true,
+      "tellerCall": "$4 EX BOX 8-7",
+      "rationale": "Exacta box across the split",
+      "ruleTags": [
+        "split_exacta_box"
+      ],
+      "grade": {
+        "outcome": "loss",
+        "returnedCents": 0,
+        "plCents": -800,
+        "note": null
+      }
+    },
+    {
+      "sequence": 8,
+      "betType": "win",
+      "races": [
+        4
+      ],
+      "legs": [
+        [
+          "6"
+        ]
+      ],
+      "stakeCents": 900,
+      "costCents": 900,
+      "estPayoutMinCents": 3600,
+      "estPayoutMaxCents": 3600,
+      "estIsRange": false,
+      "tellerCall": "$9 W 6",
+      "rationale": "Better-backed side of the split",
+      "ruleTags": [
+        "split_primary_win"
+      ],
+      "grade": {
+        "outcome": "win",
+        "returnedCents": 2610,
+        "plCents": 1710,
+        "note": null
+      }
+    },
+    {
+      "sequence": 9,
+      "betType": "exacta_box",
+      "races": [
+        4
+      ],
+      "legs": [
+        [
+          "6",
+          "3"
+        ]
+      ],
+      "stakeCents": 400,
+      "costCents": 800,
+      "estPayoutMinCents": 2002,
+      "estPayoutMaxCents": 4158,
+      "estIsRange": true,
+      "tellerCall": "$4 EX BOX 6-3",
+      "rationale": "Exacta box across the split",
+      "ruleTags": [
+        "split_exacta_box"
+      ],
+      "grade": {
+        "outcome": "loss",
+        "returnedCents": 0,
+        "plCents": -800,
+        "note": null
+      }
+    },
+    {
+      "sequence": 10,
+      "betType": "exacta",
+      "races": [
+        4
+      ],
+      "legs": [
+        [
+          "6"
+        ],
+        [
+          "4"
+        ]
+      ],
+      "stakeCents": 100,
+      "costCents": 100,
+      "estPayoutMinCents": 858,
+      "estPayoutMaxCents": 1782,
+      "estIsRange": true,
+      "tellerCall": "$1 EX 6 WITH 4",
+      "rationale": "Mid-priced program horse #4 under the top",
+      "ruleTags": [
+        "mid_price_coverage"
+      ],
+      "grade": {
+        "outcome": "refund",
+        "returnedCents": 100,
+        "plCents": 0,
+        "note": "all combinations scratched"
+      }
+    },
+    {
+      "sequence": 11,
+      "betType": "win",
+      "races": [
+        5
+      ],
+      "legs": [
+        [
+          "6"
+        ]
+      ],
+      "stakeCents": 900,
+      "costCents": 900,
+      "estPayoutMinCents": 3150,
+      "estPayoutMaxCents": 3150,
+      "estIsRange": false,
+      "tellerCall": "$9 W 6",
+      "rationale": "Better-backed side of the split",
+      "ruleTags": [
+        "split_primary_win"
+      ],
+      "grade": {
+        "outcome": "refund",
+        "returnedCents": 900,
+        "plCents": 0,
+        "note": "selection scratched"
+      }
+    },
+    {
+      "sequence": 12,
+      "betType": "exacta_box",
+      "races": [
+        5
+      ],
+      "legs": [
+        [
+          "6",
+          "9"
+        ]
+      ],
+      "stakeCents": 400,
+      "costCents": 800,
+      "estPayoutMinCents": 3504,
+      "estPayoutMaxCents": 7277,
+      "estIsRange": true,
+      "tellerCall": "$4 EX BOX 6-9",
+      "rationale": "Exacta box across the split",
+      "ruleTags": [
+        "split_exacta_box"
+      ],
+      "grade": {
+        "outcome": "refund",
+        "returnedCents": 800,
+        "plCents": 0,
+        "note": "all combinations scratched"
+      }
+    },
+    {
+      "sequence": 13,
+      "betType": "exacta",
+      "races": [
+        5
+      ],
+      "legs": [
+        [
+          "6"
+        ],
+        [
+          "3"
+        ]
+      ],
+      "stakeCents": 100,
+      "costCents": 100,
+      "estPayoutMinCents": 751,
+      "estPayoutMaxCents": 1559,
+      "estIsRange": true,
+      "tellerCall": "$1 EX 6 WITH 3",
+      "rationale": "Mid-priced program horse #3 under the top",
+      "ruleTags": [
+        "mid_price_coverage"
+      ],
+      "grade": {
+        "outcome": "refund",
+        "returnedCents": 100,
+        "plCents": 0,
+        "note": "all combinations scratched"
+      }
+    },
+    {
+      "sequence": 14,
+      "betType": "win",
+      "races": [
+        6
+      ],
+      "legs": [
+        [
+          "6"
+        ]
+      ],
+      "stakeCents": 1000,
+      "costCents": 1000,
+      "estPayoutMinCents": 3000,
+      "estPayoutMaxCents": 3000,
+      "estIsRange": false,
+      "tellerCall": "$10 W 6",
+      "rationale": "Better-backed side of the split",
+      "ruleTags": [
+        "split_primary_win"
+      ],
+      "grade": {
+        "outcome": "loss",
+        "returnedCents": 0,
+        "plCents": -1000,
+        "note": null
+      }
+    },
+    {
+      "sequence": 15,
+      "betType": "exacta_box",
+      "races": [
+        6
+      ],
+      "legs": [
+        [
+          "6",
+          "3"
+        ]
+      ],
+      "stakeCents": 400,
+      "costCents": 800,
+      "estPayoutMinCents": 2145,
+      "estPayoutMaxCents": 4455,
+      "estIsRange": true,
+      "tellerCall": "$4 EX BOX 6-3",
+      "rationale": "Exacta box across the split",
+      "ruleTags": [
+        "split_exacta_box"
+      ],
+      "grade": {
+        "outcome": "loss",
+        "returnedCents": 0,
+        "plCents": -800,
+        "note": null
+      }
+    },
+    {
+      "sequence": 16,
+      "betType": "win",
+      "races": [
+        7
+      ],
+      "legs": [
+        [
+          "8"
+        ]
+      ],
+      "stakeCents": 900,
+      "costCents": 900,
+      "estPayoutMinCents": 3600,
+      "estPayoutMaxCents": 3600,
+      "estIsRange": false,
+      "tellerCall": "$9 W 8",
+      "rationale": "Better-backed side of the split",
+      "ruleTags": [
+        "split_primary_win"
+      ],
+      "grade": {
+        "outcome": "win",
+        "returnedCents": 2880,
+        "plCents": 1980,
+        "note": null
+      }
+    },
+    {
+      "sequence": 17,
+      "betType": "exacta_box",
+      "races": [
+        7
+      ],
+      "legs": [
+        [
+          "8",
+          "4"
+        ]
+      ],
+      "stakeCents": 400,
+      "costCents": 800,
+      "estPayoutMinCents": 1716,
+      "estPayoutMaxCents": 3564,
+      "estIsRange": true,
+      "tellerCall": "$4 EX BOX 8-4",
+      "rationale": "Exacta box across the split",
+      "ruleTags": [
+        "split_exacta_box"
+      ],
+      "grade": {
+        "outcome": "win",
+        "returnedCents": 3640,
+        "plCents": 2840,
+        "note": null
+      }
+    },
+    {
+      "sequence": 18,
+      "betType": "exacta",
+      "races": [
+        7
+      ],
+      "legs": [
+        [
+          "8"
+        ],
+        [
+          "7"
+        ]
+      ],
+      "stakeCents": 100,
+      "costCents": 100,
+      "estPayoutMinCents": 858,
+      "estPayoutMaxCents": 1782,
+      "estIsRange": true,
+      "tellerCall": "$1 EX 8 WITH 7",
+      "rationale": "Mid-priced program horse #7 under the top",
+      "ruleTags": [
+        "mid_price_coverage"
+      ],
+      "grade": {
+        "outcome": "loss",
+        "returnedCents": 0,
+        "plCents": -100,
+        "note": null
+      }
+    },
+    {
+      "sequence": 19,
+      "betType": "win",
+      "races": [
+        8
+      ],
+      "legs": [
+        [
+          "1"
+        ]
+      ],
+      "stakeCents": 900,
+      "costCents": 900,
+      "estPayoutMinCents": 2700,
+      "estPayoutMaxCents": 2700,
+      "estIsRange": false,
+      "tellerCall": "$9 W 1",
+      "rationale": "Better-backed side of the split",
+      "ruleTags": [
+        "split_primary_win"
+      ],
+      "grade": {
+        "outcome": "loss",
+        "returnedCents": 0,
+        "plCents": -900,
+        "note": null
+      }
+    },
+    {
+      "sequence": 20,
+      "betType": "exacta_box",
+      "races": [
+        8
+      ],
+      "legs": [
+        [
+          "1",
+          "2"
+        ]
+      ],
+      "stakeCents": 400,
+      "costCents": 800,
+      "estPayoutMinCents": 2360,
+      "estPayoutMaxCents": 4901,
+      "estIsRange": true,
+      "tellerCall": "$4 EX BOX 1-2",
+      "rationale": "Exacta box across the split",
+      "ruleTags": [
+        "split_exacta_box"
+      ],
+      "grade": {
+        "outcome": "loss",
+        "returnedCents": 0,
+        "plCents": -800,
+        "note": null
+      }
+    },
+    {
+      "sequence": 21,
+      "betType": "exacta",
+      "races": [
+        8
+      ],
+      "legs": [
+        [
+          "1"
+        ],
+        [
+          "4"
+        ]
+      ],
+      "stakeCents": 100,
+      "costCents": 100,
+      "estPayoutMinCents": 644,
+      "estPayoutMaxCents": 1337,
+      "estIsRange": true,
+      "tellerCall": "$1 EX 1 WITH 4",
+      "rationale": "Mid-priced program horse #4 under the top",
+      "ruleTags": [
+        "mid_price_coverage"
+      ],
+      "grade": {
+        "outcome": "loss",
+        "returnedCents": 0,
+        "plCents": -100,
+        "note": null
+      }
+    },
+    {
+      "sequence": 22,
+      "betType": "win",
+      "races": [
+        9
+      ],
+      "legs": [
+        [
+          "2"
+        ]
+      ],
+      "stakeCents": 900,
+      "costCents": 900,
+      "estPayoutMinCents": 4500,
+      "estPayoutMaxCents": 4500,
+      "estIsRange": false,
+      "tellerCall": "$9 W 2",
+      "rationale": "Better-backed side of the split",
+      "ruleTags": [
+        "split_primary_win"
+      ],
+      "grade": {
+        "outcome": "loss",
+        "returnedCents": 0,
+        "plCents": -900,
+        "note": null
+      }
+    },
+    {
+      "sequence": 23,
+      "betType": "exacta_box",
+      "races": [
+        9
+      ],
+      "legs": [
+        [
+          "2",
+          "9"
+        ]
+      ],
+      "stakeCents": 400,
+      "costCents": 800,
+      "estPayoutMinCents": 1430,
+      "estPayoutMaxCents": 2970,
+      "estIsRange": true,
+      "tellerCall": "$4 EX BOX 2-9",
+      "rationale": "Exacta box across the split",
+      "ruleTags": [
+        "split_exacta_box"
+      ],
+      "grade": {
+        "outcome": "win",
+        "returnedCents": 2360,
+        "plCents": 1560,
+        "note": null
+      }
+    },
+    {
+      "sequence": 24,
+      "betType": "exacta",
+      "races": [
+        9
+      ],
+      "legs": [
+        [
+          "2"
+        ],
+        [
+          "5"
+        ]
+      ],
+      "stakeCents": 100,
+      "costCents": 100,
+      "estPayoutMinCents": 1609,
+      "estPayoutMaxCents": 3341,
+      "estIsRange": true,
+      "tellerCall": "$1 EX 2 WITH 5",
+      "rationale": "Mid-priced program horse #5 under the top",
+      "ruleTags": [
+        "mid_price_coverage"
+      ],
+      "grade": {
+        "outcome": "loss",
+        "returnedCents": 0,
+        "plCents": -100,
+        "note": null
+      }
+    },
+    {
+      "sequence": 25,
+      "betType": "win",
+      "races": [
+        10
+      ],
+      "legs": [
+        [
+          "7"
+        ]
+      ],
+      "stakeCents": 900,
+      "costCents": 900,
+      "estPayoutMinCents": 3150,
+      "estPayoutMaxCents": 3150,
+      "estIsRange": false,
+      "tellerCall": "$9 W 7",
+      "rationale": "Better-backed side of the split",
+      "ruleTags": [
+        "split_primary_win"
+      ],
+      "grade": {
+        "outcome": "loss",
+        "returnedCents": 0,
+        "plCents": -900,
+        "note": null
+      }
+    },
+    {
+      "sequence": 26,
+      "betType": "exacta_box",
+      "races": [
+        10
+      ],
+      "legs": [
+        [
+          "7",
+          "1"
+        ]
+      ],
+      "stakeCents": 400,
+      "costCents": 800,
+      "estPayoutMinCents": 1502,
+      "estPayoutMaxCents": 3119,
+      "estIsRange": true,
+      "tellerCall": "$4 EX BOX 7-1",
+      "rationale": "Exacta box across the split",
+      "ruleTags": [
+        "split_exacta_box"
+      ],
+      "grade": {
+        "outcome": "win",
+        "returnedCents": 2560,
+        "plCents": 1760,
+        "note": null
+      }
+    },
+    {
+      "sequence": 27,
+      "betType": "exacta",
+      "races": [
+        10
+      ],
+      "legs": [
+        [
+          "7"
+        ],
+        [
+          "2"
+        ]
+      ],
+      "stakeCents": 100,
+      "costCents": 100,
+      "estPayoutMinCents": 876,
+      "estPayoutMaxCents": 1819,
+      "estIsRange": true,
+      "tellerCall": "$1 EX 7 WITH 2",
+      "rationale": "Mid-priced program horse #2 under the top",
+      "ruleTags": [
+        "mid_price_coverage"
+      ],
+      "grade": {
+        "outcome": "loss",
+        "returnedCents": 0,
+        "plCents": -100,
+        "note": null
+      }
+    },
+    {
+      "sequence": 28,
+      "betType": "win",
+      "races": [
+        11
+      ],
+      "legs": [
+        [
+          "10"
+        ]
+      ],
+      "stakeCents": 900,
+      "costCents": 900,
+      "estPayoutMinCents": 5400,
+      "estPayoutMaxCents": 5400,
+      "estIsRange": false,
+      "tellerCall": "$9 W 10",
+      "rationale": "Better-backed side of the split",
+      "ruleTags": [
+        "split_primary_win"
+      ],
+      "grade": {
+        "outcome": "loss",
+        "returnedCents": 0,
+        "plCents": -900,
+        "note": null
+      }
+    },
+    {
+      "sequence": 29,
+      "betType": "exacta_box",
+      "races": [
+        11
+      ],
+      "legs": [
+        [
+          "10",
+          "12"
+        ]
+      ],
+      "stakeCents": 400,
+      "costCents": 800,
+      "estPayoutMinCents": 4290,
+      "estPayoutMaxCents": 8910,
+      "estIsRange": true,
+      "tellerCall": "$4 EX BOX 10-12",
+      "rationale": "Exacta box across the split",
+      "ruleTags": [
+        "split_exacta_box"
+      ],
+      "grade": {
+        "outcome": "loss",
+        "returnedCents": 0,
+        "plCents": -800,
+        "note": null
+      }
+    },
+    {
+      "sequence": 30,
+      "betType": "exacta",
+      "races": [
+        11
+      ],
+      "legs": [
+        [
+          "10"
+        ],
+        [
+          "13"
+        ]
+      ],
+      "stakeCents": 100,
+      "costCents": 100,
+      "estPayoutMinCents": 1502,
+      "estPayoutMaxCents": 3119,
+      "estIsRange": true,
+      "tellerCall": "$1 EX 10 WITH 13",
+      "rationale": "Mid-priced program horse #13 under the top",
+      "ruleTags": [
+        "mid_price_coverage"
+      ],
+      "grade": {
+        "outcome": "refund",
+        "returnedCents": 100,
+        "plCents": 0,
+        "note": "all combinations scratched"
+      }
+    }
+  ],
+  "gradeSummary": {
+    "costCents": 20000,
+    "returnedCents": 21990,
+    "plCents": 1990,
+    "outcomes": {
+      "win": 7,
+      "loss": 18,
+      "refund": 5
+    }
+  },
+  "results": {
+    "finishers": [
+      {
+        "race": 1,
+        "programNumber": "3",
+        "horseName": "South Bay",
+        "finishPosition": 1,
+        "winCents": 600,
+        "placeCents": 320,
+        "showCents": 280
+      },
+      {
+        "race": 1,
+        "programNumber": "7",
+        "horseName": "Hypergamy",
+        "finishPosition": 2,
+        "winCents": null,
+        "placeCents": 580,
+        "showCents": 360
+      },
+      {
+        "race": 1,
+        "programNumber": "4",
+        "horseName": "Miss Donna",
+        "finishPosition": 3,
+        "winCents": null,
+        "placeCents": null,
+        "showCents": 340
+      },
+      {
+        "race": 1,
+        "programNumber": "6",
+        "horseName": "Radiant View",
+        "finishPosition": 4,
+        "winCents": null,
+        "placeCents": null,
+        "showCents": null
+      },
+      {
+        "race": 1,
+        "programNumber": "5",
+        "horseName": "We Salute You",
+        "finishPosition": 5,
+        "winCents": null,
+        "placeCents": null,
+        "showCents": null
+      },
+      {
+        "race": 1,
+        "programNumber": "2",
+        "horseName": "Miss Queue",
+        "finishPosition": 6,
+        "winCents": null,
+        "placeCents": null,
+        "showCents": null
+      },
+      {
+        "race": 1,
+        "programNumber": "1",
+        "horseName": "Jewlz",
+        "finishPosition": 7,
+        "winCents": null,
+        "placeCents": null,
+        "showCents": null
+      },
+      {
+        "race": 1,
+        "programNumber": "8",
+        "horseName": "Salty Siss",
+        "finishPosition": 8,
+        "winCents": null,
+        "placeCents": null,
+        "showCents": null
+      },
+      {
+        "race": 2,
+        "programNumber": "5",
+        "horseName": "Charlie Foxtrot",
+        "finishPosition": 1,
+        "winCents": 520,
+        "placeCents": 340,
+        "showCents": 280
+      },
+      {
+        "race": 2,
+        "programNumber": "3",
+        "horseName": "Beneficial",
+        "finishPosition": 2,
+        "winCents": null,
+        "placeCents": 500,
+        "showCents": 420
+      },
+      {
+        "race": 2,
+        "programNumber": "2",
+        "horseName": "Smiling Tizzy",
+        "finishPosition": 3,
+        "winCents": null,
+        "placeCents": null,
+        "showCents": 600
+      },
+      {
+        "race": 2,
+        "programNumber": "8",
+        "horseName": "Kid Dynasty",
+        "finishPosition": 4,
+        "winCents": null,
+        "placeCents": null,
+        "showCents": null
+      },
+      {
+        "race": 2,
+        "programNumber": "6",
+        "horseName": "Magic Connection",
+        "finishPosition": 5,
+        "winCents": null,
+        "placeCents": null,
+        "showCents": null
+      },
+      {
+        "race": 2,
+        "programNumber": "7",
+        "horseName": "Mutt Dillin",
+        "finishPosition": 6,
+        "winCents": null,
+        "placeCents": null,
+        "showCents": null
+      },
+      {
+        "race": 2,
+        "programNumber": "4",
+        "horseName": "About Last Night",
+        "finishPosition": 7,
+        "winCents": null,
+        "placeCents": null,
+        "showCents": null
+      },
+      {
+        "race": 2,
+        "programNumber": "1",
+        "horseName": "Veracruz",
+        "finishPosition": 8,
+        "winCents": null,
+        "placeCents": null,
+        "showCents": null
+      },
+      {
+        "race": 3,
+        "programNumber": "5",
+        "horseName": "Mondego (GB)",
+        "finishPosition": 1,
+        "winCents": 1340,
+        "placeCents": 660,
+        "showCents": 420
+      },
+      {
+        "race": 3,
+        "programNumber": "6",
+        "horseName": "British Isles",
+        "finishPosition": 2,
+        "winCents": null,
+        "placeCents": 820,
+        "showCents": 480
+      },
+      {
+        "race": 3,
+        "programNumber": "1",
+        "horseName": "Dicey Mo Chara (GB)",
+        "finishPosition": 3,
+        "winCents": null,
+        "placeCents": null,
+        "showCents": 280
+      },
+      {
+        "race": 3,
+        "programNumber": "3",
+        "horseName": "Phosphorescence (FR)",
+        "finishPosition": 4,
+        "winCents": null,
+        "placeCents": null,
+        "showCents": 380
+      },
+      {
+        "race": 3,
+        "programNumber": "8",
+        "horseName": "Lammas (GB)",
+        "finishPosition": 5,
+        "winCents": null,
+        "placeCents": null,
+        "showCents": null
+      },
+      {
+        "race": 3,
+        "programNumber": "7",
+        "horseName": "Packs a Wahlop",
+        "finishPosition": 6,
+        "winCents": null,
+        "placeCents": null,
+        "showCents": null
+      },
+      {
+        "race": 3,
+        "programNumber": "4",
+        "horseName": "Irish Prophet",
+        "finishPosition": 7,
+        "winCents": null,
+        "placeCents": null,
+        "showCents": null
+      },
+      {
+        "race": 3,
+        "programNumber": "2",
+        "horseName": "Lahaina Flavor",
+        "finishPosition": 8,
+        "winCents": null,
+        "placeCents": null,
+        "showCents": null
+      },
+      {
+        "race": 4,
+        "programNumber": "6",
+        "horseName": "Pocket Venus",
+        "finishPosition": 1,
+        "winCents": 580,
+        "placeCents": 280,
+        "showCents": 220
+      },
+      {
+        "race": 4,
+        "programNumber": "9",
+        "horseName": "Ponytail Pete",
+        "finishPosition": 2,
+        "winCents": null,
+        "placeCents": 460,
+        "showCents": 280
+      },
+      {
+        "race": 4,
+        "programNumber": "3",
+        "horseName": "Perfect Smile",
+        "finishPosition": 3,
+        "winCents": null,
+        "placeCents": null,
+        "showCents": 220
+      },
+      {
+        "race": 4,
+        "programNumber": "1",
+        "horseName": "Lucky Nea",
+        "finishPosition": 4,
+        "winCents": null,
+        "placeCents": null,
+        "showCents": null
+      },
+      {
+        "race": 4,
+        "programNumber": "7",
+        "horseName": "Ionian Gem",
+        "finishPosition": 5,
+        "winCents": null,
+        "placeCents": null,
+        "showCents": null
+      },
+      {
+        "race": 4,
+        "programNumber": "2",
+        "horseName": "The Perfect Spice",
+        "finishPosition": 6,
+        "winCents": null,
+        "placeCents": null,
+        "showCents": null
+      },
+      {
+        "race": 4,
+        "programNumber": "5",
+        "horseName": "Savel",
+        "finishPosition": 7,
+        "winCents": null,
+        "placeCents": null,
+        "showCents": null
+      },
+      {
+        "race": 4,
+        "programNumber": "8",
+        "horseName": "Long Legged Babs",
+        "finishPosition": 8,
+        "winCents": null,
+        "placeCents": null,
+        "showCents": null
+      },
+      {
+        "race": 5,
+        "programNumber": "3",
+        "horseName": "Hawker",
+        "finishPosition": 1,
+        "winCents": 580,
+        "placeCents": 340,
+        "showCents": 240
+      },
+      {
+        "race": 5,
+        "programNumber": "5",
+        "horseName": "Spearfish",
+        "finishPosition": 2,
+        "winCents": null,
+        "placeCents": 440,
+        "showCents": 300
+      },
+      {
+        "race": 5,
+        "programNumber": "9",
+        "horseName": "Mongolian Altai",
+        "finishPosition": 3,
+        "winCents": null,
+        "placeCents": null,
+        "showCents": 300
+      },
+      {
+        "race": 5,
+        "programNumber": "8",
+        "horseName": "The Shillelagh",
+        "finishPosition": 4,
+        "winCents": null,
+        "placeCents": null,
+        "showCents": null
+      },
+      {
+        "race": 5,
+        "programNumber": "1",
+        "horseName": "Mighty Kai",
+        "finishPosition": 5,
+        "winCents": null,
+        "placeCents": null,
+        "showCents": null
+      },
+      {
+        "race": 5,
+        "programNumber": "2",
+        "horseName": "Standard of Proof",
+        "finishPosition": 6,
+        "winCents": null,
+        "placeCents": null,
+        "showCents": null
+      },
+      {
+        "race": 5,
+        "programNumber": "4",
+        "horseName": "Bid On the Prize",
+        "finishPosition": 7,
+        "winCents": null,
+        "placeCents": null,
+        "showCents": null
+      },
+      {
+        "race": 5,
+        "programNumber": "7",
+        "horseName": "Meeking",
+        "finishPosition": 8,
+        "winCents": null,
+        "placeCents": null,
+        "showCents": null
+      },
+      {
+        "race": 6,
+        "programNumber": "4",
+        "horseName": "Bourbon and Ginger",
+        "finishPosition": 1,
+        "winCents": 1280,
+        "placeCents": 640,
+        "showCents": 420
+      },
+      {
+        "race": 6,
+        "programNumber": "2",
+        "horseName": "Grandma Mary",
+        "finishPosition": 2,
+        "winCents": null,
+        "placeCents": 740,
+        "showCents": 520
+      },
+      {
+        "race": 6,
+        "programNumber": "3",
+        "horseName": "Umbralle",
+        "finishPosition": 3,
+        "winCents": null,
+        "placeCents": null,
+        "showCents": 540
+      },
+      {
+        "race": 6,
+        "programNumber": "1",
+        "horseName": "Jasmine",
+        "finishPosition": 4,
+        "winCents": null,
+        "placeCents": null,
+        "showCents": null
+      },
+      {
+        "race": 6,
+        "programNumber": "7",
+        "horseName": "Separator",
+        "finishPosition": 5,
+        "winCents": null,
+        "placeCents": null,
+        "showCents": null
+      },
+      {
+        "race": 6,
+        "programNumber": "5",
+        "horseName": "Roccabella",
+        "finishPosition": 6,
+        "winCents": null,
+        "placeCents": null,
+        "showCents": null
+      },
+      {
+        "race": 6,
+        "programNumber": "6",
+        "horseName": "Misstrial",
+        "finishPosition": 7,
+        "winCents": null,
+        "placeCents": null,
+        "showCents": null
+      },
+      {
+        "race": 6,
+        "programNumber": "8",
+        "horseName": "Golden Two Step",
+        "finishPosition": 8,
+        "winCents": null,
+        "placeCents": null,
+        "showCents": null
+      },
+      {
+        "race": 7,
+        "programNumber": "8",
+        "horseName": "Glorious Life",
+        "finishPosition": 1,
+        "winCents": 640,
+        "placeCents": 320,
+        "showCents": 240
+      },
+      {
+        "race": 7,
+        "programNumber": "4",
+        "horseName": "Jack Fish",
+        "finishPosition": 2,
+        "winCents": null,
+        "placeCents": 300,
+        "showCents": 240
+      },
+      {
+        "race": 7,
+        "programNumber": "2",
+        "horseName": "Nap",
+        "finishPosition": 3,
+        "winCents": null,
+        "placeCents": null,
+        "showCents": 480
+      },
+      {
+        "race": 7,
+        "programNumber": "7",
+        "horseName": "Little Raymond",
+        "finishPosition": 4,
+        "winCents": null,
+        "placeCents": null,
+        "showCents": null
+      },
+      {
+        "race": 7,
+        "programNumber": "9",
+        "horseName": "War Swift",
+        "finishPosition": 5,
+        "winCents": null,
+        "placeCents": null,
+        "showCents": null
+      },
+      {
+        "race": 7,
+        "programNumber": "3",
+        "horseName": "Tiger Smiling",
+        "finishPosition": 6,
+        "winCents": null,
+        "placeCents": null,
+        "showCents": null
+      },
+      {
+        "race": 7,
+        "programNumber": "6",
+        "horseName": "Benny's Puzzle",
+        "finishPosition": 7,
+        "winCents": null,
+        "placeCents": null,
+        "showCents": null
+      },
+      {
+        "race": 7,
+        "programNumber": "1",
+        "horseName": "Oakley's Smile",
+        "finishPosition": 8,
+        "winCents": null,
+        "placeCents": null,
+        "showCents": null
+      },
+      {
+        "race": 7,
+        "programNumber": "10",
+        "horseName": "Light Dragoon",
+        "finishPosition": 9,
+        "winCents": null,
+        "placeCents": null,
+        "showCents": null
+      },
+      {
+        "race": 7,
+        "programNumber": "11",
+        "horseName": "Bankin On Jonathan",
+        "finishPosition": 10,
+        "winCents": null,
+        "placeCents": null,
+        "showCents": null
+      },
+      {
+        "race": 7,
+        "programNumber": "5",
+        "horseName": "Uncrowned King",
+        "finishPosition": 11,
+        "winCents": null,
+        "placeCents": null,
+        "showCents": null
+      },
+      {
+        "race": 8,
+        "programNumber": "5",
+        "horseName": "Awesome Rhythm",
+        "finishPosition": 1,
+        "winCents": 2360,
+        "placeCents": 760,
+        "showCents": 420
+      },
+      {
+        "race": 8,
+        "programNumber": "6",
+        "horseName": "Wayne the Brain",
+        "finishPosition": 2,
+        "winCents": null,
+        "placeCents": 580,
+        "showCents": 380
+      },
+      {
+        "race": 8,
+        "programNumber": "7",
+        "horseName": "Good With People",
+        "finishPosition": 3,
+        "winCents": null,
+        "placeCents": null,
+        "showCents": 440
+      },
+      {
+        "race": 8,
+        "programNumber": "1",
+        "horseName": "Southern Gentleman",
+        "finishPosition": 4,
+        "winCents": null,
+        "placeCents": null,
+        "showCents": null
+      },
+      {
+        "race": 8,
+        "programNumber": "4",
+        "horseName": "Firmus",
+        "finishPosition": 5,
+        "winCents": null,
+        "placeCents": null,
+        "showCents": null
+      },
+      {
+        "race": 8,
+        "programNumber": "2",
+        "horseName": "Grubauer",
+        "finishPosition": 6,
+        "winCents": null,
+        "placeCents": null,
+        "showCents": null
+      },
+      {
+        "race": 8,
+        "programNumber": "3",
+        "horseName": "Tapatio Leo",
+        "finishPosition": 7,
+        "winCents": null,
+        "placeCents": null,
+        "showCents": null
+      },
+      {
+        "race": 9,
+        "programNumber": "9",
+        "horseName": "Kings River Knight",
+        "finishPosition": 1,
+        "winCents": 340,
+        "placeCents": 240,
+        "showCents": 210
+      },
+      {
+        "race": 9,
+        "programNumber": "2",
+        "horseName": "Aligato",
+        "finishPosition": 2,
+        "winCents": null,
+        "placeCents": 400,
+        "showCents": 320
+      },
+      {
+        "race": 9,
+        "programNumber": "1",
+        "horseName": "Annan",
+        "finishPosition": 3,
+        "winCents": null,
+        "placeCents": null,
+        "showCents": 1300
+      },
+      {
+        "race": 9,
+        "programNumber": "8",
+        "horseName": "Takes Three",
+        "finishPosition": 4,
+        "winCents": null,
+        "placeCents": null,
+        "showCents": null
+      },
+      {
+        "race": 9,
+        "programNumber": "5",
+        "horseName": "Mr. Disrespectful",
+        "finishPosition": 5,
+        "winCents": null,
+        "placeCents": null,
+        "showCents": null
+      },
+      {
+        "race": 9,
+        "programNumber": "3",
+        "horseName": "Clouseau",
+        "finishPosition": 6,
+        "winCents": null,
+        "placeCents": null,
+        "showCents": null
+      },
+      {
+        "race": 9,
+        "programNumber": "6",
+        "horseName": "Barely Funtional",
+        "finishPosition": 7,
+        "winCents": null,
+        "placeCents": null,
+        "showCents": null
+      },
+      {
+        "race": 9,
+        "programNumber": "7",
+        "horseName": "Coalinga Road",
+        "finishPosition": 8,
+        "winCents": null,
+        "placeCents": null,
+        "showCents": null
+      },
+      {
+        "race": 9,
+        "programNumber": "11",
+        "horseName": "Mystic Spirit",
+        "finishPosition": 9,
+        "winCents": null,
+        "placeCents": null,
+        "showCents": null
+      },
+      {
+        "race": 9,
+        "programNumber": "4",
+        "horseName": "Miss Jo's Curlin",
+        "finishPosition": 10,
+        "winCents": null,
+        "placeCents": null,
+        "showCents": null
+      },
+      {
+        "race": 10,
+        "programNumber": "1",
+        "horseName": "Seismic Beauty",
+        "finishPosition": 1,
+        "winCents": 420,
+        "placeCents": 300,
+        "showCents": 210
+      },
+      {
+        "race": 10,
+        "programNumber": "7",
+        "horseName": "Kopion",
+        "finishPosition": 2,
+        "winCents": null,
+        "placeCents": 320,
+        "showCents": 210
+      },
+      {
+        "race": 10,
+        "programNumber": "5",
+        "horseName": "Richi (CHI)",
+        "finishPosition": 3,
+        "winCents": null,
+        "placeCents": null,
+        "showCents": 210
+      },
+      {
+        "race": 10,
+        "programNumber": "2",
+        "horseName": "Royal Spa",
+        "finishPosition": 4,
+        "winCents": null,
+        "placeCents": null,
+        "showCents": null
+      },
+      {
+        "race": 10,
+        "programNumber": "4",
+        "horseName": "Nothing Like You",
+        "finishPosition": 5,
+        "winCents": null,
+        "placeCents": null,
+        "showCents": null
+      },
+      {
+        "race": 10,
+        "programNumber": "6",
+        "horseName": "Little Hidden Port (ARG)",
+        "finishPosition": 6,
+        "winCents": null,
+        "placeCents": null,
+        "showCents": null
+      },
+      {
+        "race": 11,
+        "programNumber": "5",
+        "horseName": "Canani",
+        "finishPosition": 1,
+        "winCents": 2040,
+        "placeCents": 1000,
+        "showCents": 840
+      },
+      {
+        "race": 11,
+        "programNumber": "2",
+        "horseName": "Prince of Del Mar",
+        "finishPosition": 2,
+        "winCents": null,
+        "placeCents": 860,
+        "showCents": 880
+      },
+      {
+        "race": 11,
+        "programNumber": "3",
+        "horseName": "Sogno Di Vino",
+        "finishPosition": 3,
+        "winCents": null,
+        "placeCents": null,
+        "showCents": 1860
+      },
+      {
+        "race": 11,
+        "programNumber": "9",
+        "horseName": "Mining District",
+        "finishPosition": 4,
+        "winCents": null,
+        "placeCents": null,
+        "showCents": null
+      },
+      {
+        "race": 11,
+        "programNumber": "4",
+        "horseName": "Cardiff Crack",
+        "finishPosition": 5,
+        "winCents": null,
+        "placeCents": null,
+        "showCents": null
+      },
+      {
+        "race": 11,
+        "programNumber": "6",
+        "horseName": "Prince Dolce",
+        "finishPosition": 6,
+        "winCents": null,
+        "placeCents": null,
+        "showCents": null
+      },
+      {
+        "race": 11,
+        "programNumber": "1",
+        "horseName": "Winning Patriot",
+        "finishPosition": 7,
+        "winCents": null,
+        "placeCents": null,
+        "showCents": null
+      },
+      {
+        "race": 11,
+        "programNumber": "7",
+        "horseName": "It's a Factor",
+        "finishPosition": 8,
+        "winCents": null,
+        "placeCents": null,
+        "showCents": null
+      },
+      {
+        "race": 11,
+        "programNumber": "12",
+        "horseName": "Miles Finch",
+        "finishPosition": 9,
+        "winCents": null,
+        "placeCents": null,
+        "showCents": null
+      },
+      {
+        "race": 11,
+        "programNumber": "10",
+        "horseName": "Uncle Chilly",
+        "finishPosition": 10,
+        "winCents": null,
+        "placeCents": null,
+        "showCents": null
+      },
+      {
+        "race": 11,
+        "programNumber": "11",
+        "horseName": "Chromeflash",
+        "finishPosition": 11,
+        "winCents": null,
+        "placeCents": null,
+        "showCents": null
+      },
+      {
+        "race": 11,
+        "programNumber": "8",
+        "horseName": "Three Georges",
+        "finishPosition": 12,
+        "winCents": null,
+        "placeCents": null,
+        "showCents": null
+      }
+    ],
+    "exotics": [
+      {
+        "race": 1,
+        "betType": "exacta",
+        "baseCents": 100,
+        "combination": "3-7",
+        "payoutCents": 1600
+      },
+      {
+        "race": 1,
+        "betType": "quinella",
+        "baseCents": 200,
+        "combination": "3-7",
+        "payoutCents": 1440
+      },
+      {
+        "race": 1,
+        "betType": "superfecta",
+        "baseCents": 10,
+        "combination": "3-7-4-6",
+        "payoutCents": 2390
+      },
+      {
+        "race": 1,
+        "betType": "trifecta",
+        "baseCents": 50,
+        "combination": "3-7-4",
+        "payoutCents": 3480
+      },
+      {
+        "race": 2,
+        "betType": "daily_double",
+        "baseCents": 200,
+        "combination": "3-5",
+        "payoutCents": 1720
+      },
+      {
+        "race": 2,
+        "betType": "exacta",
+        "baseCents": 100,
+        "combination": "5-3",
+        "payoutCents": 1530
+      },
+      {
+        "race": 2,
+        "betType": "quinella",
+        "baseCents": 200,
+        "combination": "3-5",
+        "payoutCents": 1400
+      },
+      {
+        "race": 2,
+        "betType": "superfecta",
+        "baseCents": 10,
+        "combination": "5-3-2-8",
+        "payoutCents": 3149
+      },
+      {
+        "race": 2,
+        "betType": "trifecta",
+        "baseCents": 50,
+        "combination": "5-3-2",
+        "payoutCents": 4995
+      },
+      {
+        "race": 3,
+        "betType": "pick3",
+        "baseCents": 50,
+        "combination": "3-5-5",
+        "payoutCents": 4375
+      },
+      {
+        "race": 3,
+        "betType": "daily_double",
+        "baseCents": 200,
+        "combination": "5-5",
+        "payoutCents": 3180
+      },
+      {
+        "race": 3,
+        "betType": "exacta",
+        "baseCents": 100,
+        "combination": "5-6",
+        "payoutCents": 6060
+      },
+      {
+        "race": 3,
+        "betType": "quinella",
+        "baseCents": 200,
+        "combination": "5-6",
+        "payoutCents": 5860
+      },
+      {
+        "race": 3,
+        "betType": "superfecta",
+        "baseCents": 10,
+        "combination": "5-6-3-1",
+        "payoutCents": 14519
+      },
+      {
+        "race": 3,
+        "betType": "trifecta",
+        "baseCents": 50,
+        "combination": "5-6-1",
+        "payoutCents": 5915
+      },
+      {
+        "race": 4,
+        "betType": "pick3",
+        "baseCents": 50,
+        "combination": "5-5-6",
+        "payoutCents": 4220
+      },
+      {
+        "race": 4,
+        "betType": "daily_double",
+        "baseCents": 200,
+        "combination": "5-6",
+        "payoutCents": 4420
+      },
+      {
+        "race": 4,
+        "betType": "exacta",
+        "baseCents": 100,
+        "combination": "6-9",
+        "payoutCents": 860
+      },
+      {
+        "race": 4,
+        "betType": "quinella",
+        "baseCents": 200,
+        "combination": "6-9",
+        "payoutCents": 1380
+      },
+      {
+        "race": 4,
+        "betType": "superfecta",
+        "baseCents": 10,
+        "combination": "6-9-3-1",
+        "payoutCents": 1299
+      },
+      {
+        "race": 4,
+        "betType": "trifecta",
+        "baseCents": 50,
+        "combination": "6-9-3",
+        "payoutCents": 1015
+      },
+      {
+        "race": 5,
+        "betType": "pick3",
+        "baseCents": 50,
+        "combination": "5-6-3",
+        "payoutCents": 3150
+      },
+      {
+        "race": 5,
+        "betType": "pick4",
+        "baseCents": 50,
+        "combination": "5-5-6-3/6",
+        "payoutCents": 5065
+      },
+      {
+        "race": 5,
+        "betType": "pick5",
+        "baseCents": 50,
+        "combination": "3/9-5-5-6-3/6",
+        "payoutCents": 20925
+      },
+      {
+        "race": 5,
+        "betType": "daily_double",
+        "baseCents": 200,
+        "combination": "6-3",
+        "payoutCents": 1560
+      },
+      {
+        "race": 5,
+        "betType": "exacta",
+        "baseCents": 100,
+        "combination": "3-5",
+        "payoutCents": 1460
+      },
+      {
+        "race": 5,
+        "betType": "consolation_pick_3",
+        "baseCents": 50,
+        "combination": "5-6-6",
+        "payoutCents": 960
+      },
+      {
+        "race": 5,
+        "betType": "quinella",
+        "baseCents": 200,
+        "combination": "3-5",
+        "payoutCents": 1460
+      },
+      {
+        "race": 5,
+        "betType": "superfecta",
+        "baseCents": 10,
+        "combination": "3-5-9-8",
+        "payoutCents": 1718
+      },
+      {
+        "race": 5,
+        "betType": "trifecta",
+        "baseCents": 50,
+        "combination": "3-5-9",
+        "payoutCents": 1940
+      },
+      {
+        "race": 5,
+        "betType": "consolation_double",
+        "baseCents": 200,
+        "combination": "6-6",
+        "payoutCents": 420
+      },
+      {
+        "race": 6,
+        "betType": "pick3",
+        "baseCents": 50,
+        "combination": "6-3-4",
+        "payoutCents": 2105
+      },
+      {
+        "race": 6,
+        "betType": "daily_double",
+        "baseCents": 200,
+        "combination": "3-4",
+        "payoutCents": 5400
+      },
+      {
+        "race": 6,
+        "betType": "exacta",
+        "baseCents": 100,
+        "combination": "4-2",
+        "payoutCents": 4380
+      },
+      {
+        "race": 6,
+        "betType": "consolation_pick_3",
+        "baseCents": 50,
+        "combination": "6-6-4",
+        "payoutCents": 535
+      },
+      {
+        "race": 6,
+        "betType": "quinella",
+        "baseCents": 200,
+        "combination": "2-4",
+        "payoutCents": 4800
+      },
+      {
+        "race": 6,
+        "betType": "superfecta",
+        "baseCents": 10,
+        "combination": "4-2-3-1",
+        "payoutCents": 7447
+      },
+      {
+        "race": 6,
+        "betType": "trifecta",
+        "baseCents": 50,
+        "combination": "4-2-3",
+        "payoutCents": 8535
+      },
+      {
+        "race": 7,
+        "betType": "pick3",
+        "baseCents": 50,
+        "combination": "3-4-8",
+        "payoutCents": 4060
+      },
+      {
+        "race": 7,
+        "betType": "pick4",
+        "baseCents": 50,
+        "combination": "6-3/6-4-8",
+        "payoutCents": 5715
+      },
+      {
+        "race": 7,
+        "betType": "daily_double",
+        "baseCents": 200,
+        "combination": "4-8",
+        "payoutCents": 6920
+      },
+      {
+        "race": 7,
+        "betType": "exacta",
+        "baseCents": 100,
+        "combination": "8-4",
+        "payoutCents": 910
+      },
+      {
+        "race": 7,
+        "betType": "quinella",
+        "baseCents": 200,
+        "combination": "4-8",
+        "payoutCents": 720
+      },
+      {
+        "race": 7,
+        "betType": "superfecta",
+        "baseCents": 10,
+        "combination": "8-4-2-7",
+        "payoutCents": 1678
+      },
+      {
+        "race": 7,
+        "betType": "trifecta",
+        "baseCents": 50,
+        "combination": "8-4-2",
+        "payoutCents": 2470
+      },
+      {
+        "race": 8,
+        "betType": "pick3",
+        "baseCents": 50,
+        "combination": "4-8-5",
+        "payoutCents": 13710
+      },
+      {
+        "race": 8,
+        "betType": "daily_double",
+        "baseCents": 200,
+        "combination": "8-5",
+        "payoutCents": 7400
+      },
+      {
+        "race": 8,
+        "betType": "exacta",
+        "baseCents": 100,
+        "combination": "5-6",
+        "payoutCents": 4120
+      },
+      {
+        "race": 8,
+        "betType": "quinella",
+        "baseCents": 200,
+        "combination": "5-6",
+        "payoutCents": 4740
+      },
+      {
+        "race": 8,
+        "betType": "superfecta",
+        "baseCents": 10,
+        "combination": "5-6-7-1",
+        "payoutCents": 4273
+      },
+      {
+        "race": 8,
+        "betType": "trifecta",
+        "baseCents": 50,
+        "combination": "5-6-7",
+        "payoutCents": 7670
+      },
+      {
+        "race": 9,
+        "betType": "pick3",
+        "baseCents": 50,
+        "combination": "8-5-9",
+        "payoutCents": 3990
+      },
+      {
+        "race": 9,
+        "betType": "daily_double",
+        "baseCents": 200,
+        "combination": "5-9",
+        "payoutCents": 4720
+      },
+      {
+        "race": 9,
+        "betType": "exacta",
+        "baseCents": 100,
+        "combination": "9-2",
+        "payoutCents": 590
+      },
+      {
+        "race": 9,
+        "betType": "quinella",
+        "baseCents": 200,
+        "combination": "2-9",
+        "payoutCents": 880
+      },
+      {
+        "race": 9,
+        "betType": "superfecta",
+        "baseCents": 10,
+        "combination": "9-2-1-8",
+        "payoutCents": 9007
+      },
+      {
+        "race": 9,
+        "betType": "trifecta",
+        "baseCents": 50,
+        "combination": "9-2-1",
+        "payoutCents": 5235
+      },
+      {
+        "race": 10,
+        "betType": "pick3",
+        "baseCents": 50,
+        "combination": "5-9-1",
+        "payoutCents": 3540
+      },
+      {
+        "race": 10,
+        "betType": "daily_double",
+        "baseCents": 200,
+        "combination": "9-1",
+        "payoutCents": 820
+      },
+      {
+        "race": 10,
+        "betType": "exacta",
+        "baseCents": 100,
+        "combination": "1-7",
+        "payoutCents": 640
+      },
+      {
+        "race": 10,
+        "betType": "quinella",
+        "baseCents": 200,
+        "combination": "1-7",
+        "payoutCents": 600
+      },
+      {
+        "race": 10,
+        "betType": "superfecta",
+        "baseCents": 10,
+        "combination": "1-7-5-2",
+        "payoutCents": 251
+      },
+      {
+        "race": 10,
+        "betType": "trifecta",
+        "baseCents": 50,
+        "combination": "1-7-5",
+        "payoutCents": 490
+      },
+      {
+        "race": 11,
+        "betType": "pick3",
+        "baseCents": 300,
+        "combination": "9-1-5",
+        "payoutCents": 23280
+      },
+      {
+        "race": 11,
+        "betType": "pick4",
+        "baseCents": 50,
+        "combination": "5-9/10-1/3-5",
+        "payoutCents": 36535
+      },
+      {
+        "race": 11,
+        "betType": "pick5",
+        "baseCents": 50,
+        "combination": "8-5-9/10-1/3-5",
+        "payoutCents": 176915
+      },
+      {
+        "race": 11,
+        "betType": "pick6",
+        "baseCents": 100,
+        "combination": "4-8-5-9/10-1/3-5",
+        "payoutCents": 1984910
+      },
+      {
+        "race": 11,
+        "betType": "pick6",
+        "baseCents": 100,
+        "combination": "4-8-5-9/10-1/3-5",
+        "payoutCents": 14460
+      },
+      {
+        "race": 11,
+        "betType": "daily_double",
+        "baseCents": 500,
+        "combination": "1-5",
+        "payoutCents": 21350
+      },
+      {
+        "race": 11,
+        "betType": "exacta",
+        "baseCents": 100,
+        "combination": "5-2",
+        "payoutCents": 13430
+      },
+      {
+        "race": 11,
+        "betType": "place_pick_all",
+        "baseCents": 100,
+        "combination": "9 OF 10",
+        "payoutCents": 480000
+      },
+      {
+        "race": 11,
+        "betType": "quinella",
+        "baseCents": 200,
+        "combination": "2-5",
+        "payoutCents": 10320
+      },
+      {
+        "race": 11,
+        "betType": "super_high_five",
+        "baseCents": 50,
+        "combination": "5-2-3-9-4",
+        "payoutCents": 0
+      },
+      {
+        "race": 11,
+        "betType": "superfecta",
+        "baseCents": 10,
+        "combination": "5-2-3-9",
+        "payoutCents": 222815
+      },
+      {
+        "race": 11,
+        "betType": "trifecta",
+        "baseCents": 50,
+        "combination": "5-2-3",
+        "payoutCents": 92875
+      },
+      {
+        "race": 11,
+        "betType": "3x3",
+        "baseCents": 100,
+        "combination": "3/4/5 OF 9",
+        "payoutCents": 105
+      }
+    ],
+    "scratches": [
+      {
+        "race": 1,
+        "programNumber": "9",
+        "horseName": "Copper Luna"
+      },
+      {
+        "race": 4,
+        "programNumber": "4",
+        "horseName": "Kiss Me Kado"
+      },
+      {
+        "race": 5,
+        "programNumber": "6",
+        "horseName": "Guy Named Joe"
+      },
+      {
+        "race": 7,
+        "programNumber": "12",
+        "horseName": "Otto's Magic"
+      },
+      {
+        "race": 7,
+        "programNumber": "13",
+        "horseName": "Mom Says"
+      },
+      {
+        "race": 7,
+        "programNumber": "14",
+        "horseName": "Kiss for Lulu"
+      },
+      {
+        "race": 9,
+        "programNumber": "10",
+        "horseName": "Pure Madness"
+      },
+      {
+        "race": 10,
+        "programNumber": "3",
+        "horseName": "Mahina"
+      },
+      {
+        "race": 11,
+        "programNumber": "13",
+        "horseName": "Brazenly"
+      },
+      {
+        "race": 11,
+        "programNumber": "14",
+        "horseName": "Jimmy Blue Jeans"
+      }
+    ]
+  },
+  "traceStatus": "complete",
+  "trace": [
+    {
+      "ts": "2026-09-02T12:42:27.971Z",
+      "level": "info",
+      "stream": "decision-trace",
+      "event": "results_saved",
+      "correlationId": "e667a1ce-d659-4f10-be53-a3d8e0ec589b",
+      "raceDayId": 37,
+      "track": "Del Mar",
+      "date": "2025-08-02",
+      "results": 94,
+      "exotics": 76,
+      "scratches": 10,
+      "unresolvedFinishers": 0
+    },
+    {
+      "ts": "2026-09-02T12:42:27.972Z",
+      "level": "info",
+      "stream": "decision-trace",
+      "event": "inputs_snapshot",
+      "correlationId": "e667a1ce-d659-4f10-be53-a3d8e0ec589b",
+      "cardId": 66,
+      "raceDayId": 37,
+      "seq": 0,
+      "engineVersion": "lean-1.1",
+      "bankrollCents": 20000,
+      "perRaceMinCents": 500,
+      "raceCount": 11,
+      "entries": [
+        {
+          "race": 1,
+          "entries": 9
+        },
+        {
+          "race": 2,
+          "entries": 8
+        },
+        {
+          "race": 3,
+          "entries": 8
+        },
+        {
+          "race": 4,
+          "entries": 9
+        },
+        {
+          "race": 5,
+          "entries": 9
+        },
+        {
+          "race": 6,
+          "entries": 8
+        },
+        {
+          "race": 7,
+          "entries": 14
+        },
+        {
+          "race": 8,
+          "entries": 7
+        },
+        {
+          "race": 9,
+          "entries": 11
+        },
+        {
+          "race": 10,
+          "entries": 7
+        },
+        {
+          "race": 11,
+          "entries": 13
+        }
+      ],
+      "sourcesUsed": [],
+      "sourcesUnavailable": [],
+      "template": "lean",
+      "rules": {
+        "placeMoneyRule": true,
+        "hedgeCut": true,
+        "fadeThePrice": true,
+        "chaosTrifectaBox": true,
+        "coverageAdds": true,
+        "midPriceCoverage": true,
+        "longshotOnTop": true,
+        "parlays": true,
+        "allocationCurve": "lean"
+      }
+    },
+    {
+      "ts": "2026-09-02T12:42:27.972Z",
+      "level": "info",
+      "stream": "decision-trace",
+      "event": "consensus_table",
+      "correlationId": "e667a1ce-d659-4f10-be53-a3d8e0ec589b",
+      "cardId": 66,
+      "raceDayId": 37,
+      "seq": 1,
+      "race": 1,
+      "table": [
+        {
+          "name": "Program analysis",
+          "kind": "program",
+          "external": false,
+          "top": {
+            "programNumber": "3",
+            "horseName": "South Bay",
+            "note": null
+          },
+          "second": {
+            "programNumber": "4",
+            "horseName": "Miss Donna",
+            "note": null
+          },
+          "third": {
+            "programNumber": "7",
+            "horseName": "Hypergamy",
+            "note": null
+          },
+          "flagged": []
+        }
+      ]
+    },
+    {
+      "ts": "2026-09-02T12:42:27.973Z",
+      "level": "info",
+      "stream": "decision-trace",
+      "event": "race_classified",
+      "correlationId": "e667a1ce-d659-4f10-be53-a3d8e0ec589b",
+      "cardId": 66,
+      "raceDayId": 37,
+      "seq": 2,
+      "race": 1,
+      "classification": "SPLIT",
+      "externalSourceCount": 0,
+      "cappedFromUnanimous": false,
+      "topVotes": [
+        {
+          "programNumber": "3",
+          "sources": [
+            "Program analysis"
+          ]
+        }
+      ],
+      "contrarianFlags": []
+    },
+    {
+      "ts": "2026-09-02T12:42:27.973Z",
+      "level": "info",
+      "stream": "decision-trace",
+      "event": "consensus_table",
+      "correlationId": "e667a1ce-d659-4f10-be53-a3d8e0ec589b",
+      "cardId": 66,
+      "raceDayId": 37,
+      "seq": 3,
+      "race": 2,
+      "table": [
+        {
+          "name": "Program analysis",
+          "kind": "program",
+          "external": false,
+          "top": {
+            "programNumber": "5",
+            "horseName": "Charlie Foxtrot",
+            "note": null
+          },
+          "second": {
+            "programNumber": "1",
+            "horseName": "Veracruz",
+            "note": null
+          },
+          "third": {
+            "programNumber": "8",
+            "horseName": "Kid Dynasty",
+            "note": null
+          },
+          "flagged": []
+        }
+      ]
+    },
+    {
+      "ts": "2026-09-02T12:42:27.974Z",
+      "level": "info",
+      "stream": "decision-trace",
+      "event": "race_classified",
+      "correlationId": "e667a1ce-d659-4f10-be53-a3d8e0ec589b",
+      "cardId": 66,
+      "raceDayId": 37,
+      "seq": 4,
+      "race": 2,
+      "classification": "SPLIT",
+      "externalSourceCount": 0,
+      "cappedFromUnanimous": false,
+      "topVotes": [
+        {
+          "programNumber": "5",
+          "sources": [
+            "Program analysis"
+          ]
+        }
+      ],
+      "contrarianFlags": []
+    },
+    {
+      "ts": "2026-09-02T12:42:27.974Z",
+      "level": "info",
+      "stream": "decision-trace",
+      "event": "consensus_table",
+      "correlationId": "e667a1ce-d659-4f10-be53-a3d8e0ec589b",
+      "cardId": 66,
+      "raceDayId": 37,
+      "seq": 5,
+      "race": 3,
+      "table": [
+        {
+          "name": "Program analysis",
+          "kind": "program",
+          "external": false,
+          "top": {
+            "programNumber": "8",
+            "horseName": "Lammas (GB)",
+            "note": null
+          },
+          "second": {
+            "programNumber": "7",
+            "horseName": "Packs a Wahlop",
+            "note": null
+          },
+          "third": {
+            "programNumber": "1",
+            "horseName": "Dicey Mo Chara (GB)",
+            "note": null
+          },
+          "flagged": []
+        }
+      ]
+    },
+    {
+      "ts": "2026-09-02T12:42:27.974Z",
+      "level": "info",
+      "stream": "decision-trace",
+      "event": "race_classified",
+      "correlationId": "e667a1ce-d659-4f10-be53-a3d8e0ec589b",
+      "cardId": 66,
+      "raceDayId": 37,
+      "seq": 6,
+      "race": 3,
+      "classification": "SPLIT",
+      "externalSourceCount": 0,
+      "cappedFromUnanimous": false,
+      "topVotes": [
+        {
+          "programNumber": "8",
+          "sources": [
+            "Program analysis"
+          ]
+        }
+      ],
+      "contrarianFlags": []
+    },
+    {
+      "ts": "2026-09-02T12:42:27.974Z",
+      "level": "info",
+      "stream": "decision-trace",
+      "event": "consensus_table",
+      "correlationId": "e667a1ce-d659-4f10-be53-a3d8e0ec589b",
+      "cardId": 66,
+      "raceDayId": 37,
+      "seq": 7,
+      "race": 4,
+      "table": [
+        {
+          "name": "Program analysis",
+          "kind": "program",
+          "external": false,
+          "top": {
+            "programNumber": "6",
+            "horseName": "Pocket Venus",
+            "note": null
+          },
+          "second": {
+            "programNumber": "3",
+            "horseName": "Perfect Smile",
+            "note": null
+          },
+          "third": {
+            "programNumber": "4",
+            "horseName": "Kiss Me Kado",
+            "note": null
+          },
+          "flagged": []
+        }
+      ]
+    },
+    {
+      "ts": "2026-09-02T12:42:27.974Z",
+      "level": "info",
+      "stream": "decision-trace",
+      "event": "race_classified",
+      "correlationId": "e667a1ce-d659-4f10-be53-a3d8e0ec589b",
+      "cardId": 66,
+      "raceDayId": 37,
+      "seq": 8,
+      "race": 4,
+      "classification": "SPLIT",
+      "externalSourceCount": 0,
+      "cappedFromUnanimous": false,
+      "topVotes": [
+        {
+          "programNumber": "6",
+          "sources": [
+            "Program analysis"
+          ]
+        }
+      ],
+      "contrarianFlags": []
+    },
+    {
+      "ts": "2026-09-02T12:42:27.975Z",
+      "level": "info",
+      "stream": "decision-trace",
+      "event": "consensus_table",
+      "correlationId": "e667a1ce-d659-4f10-be53-a3d8e0ec589b",
+      "cardId": 66,
+      "raceDayId": 37,
+      "seq": 9,
+      "race": 5,
+      "table": [
+        {
+          "name": "Program analysis",
+          "kind": "program",
+          "external": false,
+          "top": {
+            "programNumber": "6",
+            "horseName": "Guy Named Joe",
+            "note": null
+          },
+          "second": {
+            "programNumber": "9",
+            "horseName": "Mongolian Altai",
+            "note": null
+          },
+          "third": {
+            "programNumber": "3",
+            "horseName": "Hawker",
+            "note": null
+          },
+          "flagged": []
+        }
+      ]
+    },
+    {
+      "ts": "2026-09-02T12:42:27.975Z",
+      "level": "info",
+      "stream": "decision-trace",
+      "event": "race_classified",
+      "correlationId": "e667a1ce-d659-4f10-be53-a3d8e0ec589b",
+      "cardId": 66,
+      "raceDayId": 37,
+      "seq": 10,
+      "race": 5,
+      "classification": "SPLIT",
+      "externalSourceCount": 0,
+      "cappedFromUnanimous": false,
+      "topVotes": [
+        {
+          "programNumber": "6",
+          "sources": [
+            "Program analysis"
+          ]
+        }
+      ],
+      "contrarianFlags": []
+    },
+    {
+      "ts": "2026-09-02T12:42:27.975Z",
+      "level": "info",
+      "stream": "decision-trace",
+      "event": "consensus_table",
+      "correlationId": "e667a1ce-d659-4f10-be53-a3d8e0ec589b",
+      "cardId": 66,
+      "raceDayId": 37,
+      "seq": 11,
+      "race": 6,
+      "table": [
+        {
+          "name": "Program analysis",
+          "kind": "program",
+          "external": false,
+          "top": {
+            "programNumber": "6",
+            "horseName": "Misstrial",
+            "note": null
+          },
+          "second": {
+            "programNumber": "3",
+            "horseName": "Umbralle",
+            "note": null
+          },
+          "third": {
+            "programNumber": "8",
+            "horseName": "Golden Two Step",
+            "note": null
+          },
+          "flagged": []
+        }
+      ]
+    },
+    {
+      "ts": "2026-09-02T12:42:27.975Z",
+      "level": "info",
+      "stream": "decision-trace",
+      "event": "race_classified",
+      "correlationId": "e667a1ce-d659-4f10-be53-a3d8e0ec589b",
+      "cardId": 66,
+      "raceDayId": 37,
+      "seq": 12,
+      "race": 6,
+      "classification": "SPLIT",
+      "externalSourceCount": 0,
+      "cappedFromUnanimous": false,
+      "topVotes": [
+        {
+          "programNumber": "6",
+          "sources": [
+            "Program analysis"
+          ]
+        }
+      ],
+      "contrarianFlags": []
+    },
+    {
+      "ts": "2026-09-02T12:42:27.975Z",
+      "level": "info",
+      "stream": "decision-trace",
+      "event": "consensus_table",
+      "correlationId": "e667a1ce-d659-4f10-be53-a3d8e0ec589b",
+      "cardId": 66,
+      "raceDayId": 37,
+      "seq": 13,
+      "race": 7,
+      "table": [
+        {
+          "name": "Program analysis",
+          "kind": "program",
+          "external": false,
+          "top": {
+            "programNumber": "8",
+            "horseName": "Glorious Life",
+            "note": null
+          },
+          "second": {
+            "programNumber": "4",
+            "horseName": "Jack Fish",
+            "note": null
+          },
+          "third": {
+            "programNumber": "7",
+            "horseName": "Little Raymond",
+            "note": null
+          },
+          "flagged": []
+        }
+      ]
+    },
+    {
+      "ts": "2026-09-02T12:42:27.976Z",
+      "level": "info",
+      "stream": "decision-trace",
+      "event": "race_classified",
+      "correlationId": "e667a1ce-d659-4f10-be53-a3d8e0ec589b",
+      "cardId": 66,
+      "raceDayId": 37,
+      "seq": 14,
+      "race": 7,
+      "classification": "SPLIT",
+      "externalSourceCount": 0,
+      "cappedFromUnanimous": false,
+      "topVotes": [
+        {
+          "programNumber": "8",
+          "sources": [
+            "Program analysis"
+          ]
+        }
+      ],
+      "contrarianFlags": []
+    },
+    {
+      "ts": "2026-09-02T12:42:27.976Z",
+      "level": "info",
+      "stream": "decision-trace",
+      "event": "consensus_table",
+      "correlationId": "e667a1ce-d659-4f10-be53-a3d8e0ec589b",
+      "cardId": 66,
+      "raceDayId": 37,
+      "seq": 15,
+      "race": 8,
+      "table": [
+        {
+          "name": "Program analysis",
+          "kind": "program",
+          "external": false,
+          "top": {
+            "programNumber": "1",
+            "horseName": "Southern Gentleman",
+            "note": null
+          },
+          "second": {
+            "programNumber": "2",
+            "horseName": "Grubauer",
+            "note": null
+          },
+          "third": {
+            "programNumber": "4",
+            "horseName": "Firmus",
+            "note": null
+          },
+          "flagged": []
+        }
+      ]
+    },
+    {
+      "ts": "2026-09-02T12:42:27.976Z",
+      "level": "info",
+      "stream": "decision-trace",
+      "event": "race_classified",
+      "correlationId": "e667a1ce-d659-4f10-be53-a3d8e0ec589b",
+      "cardId": 66,
+      "raceDayId": 37,
+      "seq": 16,
+      "race": 8,
+      "classification": "SPLIT",
+      "externalSourceCount": 0,
+      "cappedFromUnanimous": false,
+      "topVotes": [
+        {
+          "programNumber": "1",
+          "sources": [
+            "Program analysis"
+          ]
+        }
+      ],
+      "contrarianFlags": []
+    },
+    {
+      "ts": "2026-09-02T12:42:27.976Z",
+      "level": "info",
+      "stream": "decision-trace",
+      "event": "consensus_table",
+      "correlationId": "e667a1ce-d659-4f10-be53-a3d8e0ec589b",
+      "cardId": 66,
+      "raceDayId": 37,
+      "seq": 17,
+      "race": 9,
+      "table": [
+        {
+          "name": "Program analysis",
+          "kind": "program",
+          "external": false,
+          "top": {
+            "programNumber": "2",
+            "horseName": "Aligato",
+            "note": null
+          },
+          "second": {
+            "programNumber": "9",
+            "horseName": "Kings River Knight",
+            "note": null
+          },
+          "third": {
+            "programNumber": "10",
+            "horseName": "Pure Madness",
+            "note": null
+          },
+          "flagged": []
+        }
+      ]
+    },
+    {
+      "ts": "2026-09-02T12:42:27.976Z",
+      "level": "info",
+      "stream": "decision-trace",
+      "event": "race_classified",
+      "correlationId": "e667a1ce-d659-4f10-be53-a3d8e0ec589b",
+      "cardId": 66,
+      "raceDayId": 37,
+      "seq": 18,
+      "race": 9,
+      "classification": "SPLIT",
+      "externalSourceCount": 0,
+      "cappedFromUnanimous": false,
+      "topVotes": [
+        {
+          "programNumber": "2",
+          "sources": [
+            "Program analysis"
+          ]
+        }
+      ],
+      "contrarianFlags": []
+    },
+    {
+      "ts": "2026-09-02T12:42:27.977Z",
+      "level": "info",
+      "stream": "decision-trace",
+      "event": "consensus_table",
+      "correlationId": "e667a1ce-d659-4f10-be53-a3d8e0ec589b",
+      "cardId": 66,
+      "raceDayId": 37,
+      "seq": 19,
+      "race": 10,
+      "table": [
+        {
+          "name": "Program analysis",
+          "kind": "program",
+          "external": false,
+          "top": {
+            "programNumber": "7",
+            "horseName": "Kopion",
+            "note": null
+          },
+          "second": {
+            "programNumber": "1",
+            "horseName": "Seismic Beauty",
+            "note": null
+          },
+          "third": {
+            "programNumber": "5",
+            "horseName": "Richi (CHI)",
+            "note": null
+          },
+          "flagged": []
+        }
+      ]
+    },
+    {
+      "ts": "2026-09-02T12:42:27.977Z",
+      "level": "info",
+      "stream": "decision-trace",
+      "event": "race_classified",
+      "correlationId": "e667a1ce-d659-4f10-be53-a3d8e0ec589b",
+      "cardId": 66,
+      "raceDayId": 37,
+      "seq": 20,
+      "race": 10,
+      "classification": "SPLIT",
+      "externalSourceCount": 0,
+      "cappedFromUnanimous": false,
+      "topVotes": [
+        {
+          "programNumber": "7",
+          "sources": [
+            "Program analysis"
+          ]
+        }
+      ],
+      "contrarianFlags": []
+    },
+    {
+      "ts": "2026-09-02T12:42:27.977Z",
+      "level": "info",
+      "stream": "decision-trace",
+      "event": "consensus_table",
+      "correlationId": "e667a1ce-d659-4f10-be53-a3d8e0ec589b",
+      "cardId": 66,
+      "raceDayId": 37,
+      "seq": 21,
+      "race": 11,
+      "table": [
+        {
+          "name": "Program analysis",
+          "kind": "program",
+          "external": false,
+          "top": {
+            "programNumber": "10",
+            "horseName": "Uncle Chilly",
+            "note": null
+          },
+          "second": {
+            "programNumber": "12",
+            "horseName": "Miles Finch",
+            "note": null
+          },
+          "third": {
+            "programNumber": "13",
+            "horseName": "Brazenly",
+            "note": null
+          },
+          "flagged": []
+        }
+      ]
+    },
+    {
+      "ts": "2026-09-02T12:42:27.977Z",
+      "level": "info",
+      "stream": "decision-trace",
+      "event": "race_classified",
+      "correlationId": "e667a1ce-d659-4f10-be53-a3d8e0ec589b",
+      "cardId": 66,
+      "raceDayId": 37,
+      "seq": 22,
+      "race": 11,
+      "classification": "SPLIT",
+      "externalSourceCount": 0,
+      "cappedFromUnanimous": false,
+      "topVotes": [
+        {
+          "programNumber": "10",
+          "sources": [
+            "Program analysis"
+          ]
+        }
+      ],
+      "contrarianFlags": []
+    },
+    {
+      "ts": "2026-09-02T12:42:27.977Z",
+      "level": "info",
+      "stream": "decision-trace",
+      "event": "completeness_decided",
+      "correlationId": "e667a1ce-d659-4f10-be53-a3d8e0ec589b",
+      "cardId": 66,
+      "raceDayId": 37,
+      "seq": 23,
+      "completeness": "PROGRAM_ONLY",
+      "externalSourcesPerRace": [
+        0,
+        0,
+        0,
+        0,
+        0,
+        0,
+        0,
+        0,
+        0,
+        0,
+        0
+      ],
+      "programAnalysis": true
+    },
+    {
+      "ts": "2026-09-02T12:42:27.977Z",
+      "level": "info",
+      "stream": "decision-trace",
+      "event": "allocation_decided",
+      "correlationId": "e667a1ce-d659-4f10-be53-a3d8e0ec589b",
+      "cardId": 66,
+      "raceDayId": 37,
+      "seq": 24,
+      "race": 1,
+      "amountCents": 2000,
+      "confidence": "SPLIT",
+      "rule": "lean_weight_1.5"
+    },
+    {
+      "ts": "2026-09-02T12:42:27.978Z",
+      "level": "info",
+      "stream": "decision-trace",
+      "event": "allocation_decided",
+      "correlationId": "e667a1ce-d659-4f10-be53-a3d8e0ec589b",
+      "cardId": 66,
+      "raceDayId": 37,
+      "seq": 25,
+      "race": 2,
+      "amountCents": 1800,
+      "confidence": "SPLIT",
+      "rule": "lean_weight_1.5"
+    },
+    {
+      "ts": "2026-09-02T12:42:27.978Z",
+      "level": "info",
+      "stream": "decision-trace",
+      "event": "allocation_decided",
+      "correlationId": "e667a1ce-d659-4f10-be53-a3d8e0ec589b",
+      "cardId": 66,
+      "raceDayId": 37,
+      "seq": 26,
+      "race": 3,
+      "amountCents": 1800,
+      "confidence": "SPLIT",
+      "rule": "lean_weight_1.5"
+    },
+    {
+      "ts": "2026-09-02T12:42:27.978Z",
+      "level": "info",
+      "stream": "decision-trace",
+      "event": "allocation_decided",
+      "correlationId": "e667a1ce-d659-4f10-be53-a3d8e0ec589b",
+      "cardId": 66,
+      "raceDayId": 37,
+      "seq": 27,
+      "race": 4,
+      "amountCents": 1800,
+      "confidence": "SPLIT",
+      "rule": "lean_weight_1.5"
+    },
+    {
+      "ts": "2026-09-02T12:42:27.978Z",
+      "level": "info",
+      "stream": "decision-trace",
+      "event": "allocation_decided",
+      "correlationId": "e667a1ce-d659-4f10-be53-a3d8e0ec589b",
+      "cardId": 66,
+      "raceDayId": 37,
+      "seq": 28,
+      "race": 5,
+      "amountCents": 1800,
+      "confidence": "SPLIT",
+      "rule": "lean_weight_1.5"
+    },
+    {
+      "ts": "2026-09-02T12:42:27.978Z",
+      "level": "info",
+      "stream": "decision-trace",
+      "event": "allocation_decided",
+      "correlationId": "e667a1ce-d659-4f10-be53-a3d8e0ec589b",
+      "cardId": 66,
+      "raceDayId": 37,
+      "seq": 29,
+      "race": 6,
+      "amountCents": 1800,
+      "confidence": "SPLIT",
+      "rule": "lean_weight_1.5"
+    },
+    {
+      "ts": "2026-09-02T12:42:27.978Z",
+      "level": "info",
+      "stream": "decision-trace",
+      "event": "allocation_decided",
+      "correlationId": "e667a1ce-d659-4f10-be53-a3d8e0ec589b",
+      "cardId": 66,
+      "raceDayId": 37,
+      "seq": 30,
+      "race": 7,
+      "amountCents": 1800,
+      "confidence": "SPLIT",
+      "rule": "lean_weight_1.5"
+    },
+    {
+      "ts": "2026-09-02T12:42:27.979Z",
+      "level": "info",
+      "stream": "decision-trace",
+      "event": "allocation_decided",
+      "correlationId": "e667a1ce-d659-4f10-be53-a3d8e0ec589b",
+      "cardId": 66,
+      "raceDayId": 37,
+      "seq": 31,
+      "race": 8,
+      "amountCents": 1800,
+      "confidence": "SPLIT",
+      "rule": "lean_weight_1.5"
+    },
+    {
+      "ts": "2026-09-02T12:42:27.979Z",
+      "level": "info",
+      "stream": "decision-trace",
+      "event": "allocation_decided",
+      "correlationId": "e667a1ce-d659-4f10-be53-a3d8e0ec589b",
+      "cardId": 66,
+      "raceDayId": 37,
+      "seq": 32,
+      "race": 9,
+      "amountCents": 1800,
+      "confidence": "SPLIT",
+      "rule": "lean_weight_1.5"
+    },
+    {
+      "ts": "2026-09-02T12:42:27.979Z",
+      "level": "info",
+      "stream": "decision-trace",
+      "event": "allocation_decided",
+      "correlationId": "e667a1ce-d659-4f10-be53-a3d8e0ec589b",
+      "cardId": 66,
+      "raceDayId": 37,
+      "seq": 33,
+      "race": 10,
+      "amountCents": 1800,
+      "confidence": "SPLIT",
+      "rule": "lean_weight_1.5"
+    },
+    {
+      "ts": "2026-09-02T12:42:27.979Z",
+      "level": "info",
+      "stream": "decision-trace",
+      "event": "allocation_decided",
+      "correlationId": "e667a1ce-d659-4f10-be53-a3d8e0ec589b",
+      "cardId": 66,
+      "raceDayId": 37,
+      "seq": 34,
+      "race": 11,
+      "amountCents": 1800,
+      "confidence": "SPLIT",
+      "rule": "lean_weight_1.5"
+    },
+    {
+      "ts": "2026-09-02T12:42:27.979Z",
+      "level": "info",
+      "stream": "decision-trace",
+      "event": "ticket_added",
+      "correlationId": "e667a1ce-d659-4f10-be53-a3d8e0ec589b",
+      "cardId": 66,
+      "raceDayId": 37,
+      "seq": 35,
+      "race": 1,
+      "races": [
+        1
+      ],
+      "betType": "win",
+      "selections": [
+        [
+          "3"
+        ]
+      ],
+      "stakeCents": 800,
+      "costCents": 800,
+      "rules": [
+        "split_primary_win"
+      ]
+    },
+    {
+      "ts": "2026-09-02T12:42:27.980Z",
+      "level": "info",
+      "stream": "decision-trace",
+      "event": "rule_fired",
+      "correlationId": "e667a1ce-d659-4f10-be53-a3d8e0ec589b",
+      "cardId": 66,
+      "raceDayId": 37,
+      "seq": 36,
+      "rule": "hedge_cut",
+      "race": 1,
+      "cut": "4",
+      "reason": "thin backing - cut to the best one, not dutched"
+    },
+    {
+      "ts": "2026-09-02T12:42:27.980Z",
+      "level": "info",
+      "stream": "decision-trace",
+      "event": "ticket_added",
+      "correlationId": "e667a1ce-d659-4f10-be53-a3d8e0ec589b",
+      "cardId": 66,
+      "raceDayId": 37,
+      "seq": 37,
+      "race": 1,
+      "races": [
+        1
+      ],
+      "betType": "exacta_box",
+      "selections": [
+        [
+          "3",
+          "4"
+        ]
+      ],
+      "stakeCents": 400,
+      "costCents": 800,
+      "rules": [
+        "split_exacta_box"
+      ]
+    },
+    {
+      "ts": "2026-09-02T12:42:27.980Z",
+      "level": "info",
+      "stream": "decision-trace",
+      "event": "ticket_added",
+      "correlationId": "e667a1ce-d659-4f10-be53-a3d8e0ec589b",
+      "cardId": 66,
+      "raceDayId": 37,
+      "seq": 38,
+      "race": 2,
+      "races": [
+        2
+      ],
+      "betType": "win",
+      "selections": [
+        [
+          "5"
+        ]
+      ],
+      "stakeCents": 700,
+      "costCents": 700,
+      "rules": [
+        "split_primary_win"
+      ]
+    },
+    {
+      "ts": "2026-09-02T12:42:27.980Z",
+      "level": "info",
+      "stream": "decision-trace",
+      "event": "rule_fired",
+      "correlationId": "e667a1ce-d659-4f10-be53-a3d8e0ec589b",
+      "cardId": 66,
+      "raceDayId": 37,
+      "seq": 39,
+      "rule": "hedge_cut",
+      "race": 2,
+      "cut": "1",
+      "reason": "thin backing - cut to the best one, not dutched"
+    },
+    {
+      "ts": "2026-09-02T12:42:27.980Z",
+      "level": "info",
+      "stream": "decision-trace",
+      "event": "ticket_added",
+      "correlationId": "e667a1ce-d659-4f10-be53-a3d8e0ec589b",
+      "cardId": 66,
+      "raceDayId": 37,
+      "seq": 40,
+      "race": 2,
+      "races": [
+        2
+      ],
+      "betType": "exacta_box",
+      "selections": [
+        [
+          "5",
+          "1"
+        ]
+      ],
+      "stakeCents": 400,
+      "costCents": 800,
+      "rules": [
+        "split_exacta_box"
+      ]
+    },
+    {
+      "ts": "2026-09-02T12:42:27.981Z",
+      "level": "info",
+      "stream": "decision-trace",
+      "event": "rule_fired",
+      "correlationId": "e667a1ce-d659-4f10-be53-a3d8e0ec589b",
+      "cardId": 66,
+      "raceDayId": 37,
+      "seq": 41,
+      "rule": "mid_price_coverage",
+      "race": 2,
+      "horse": "8",
+      "ml": 5,
+      "reason": "unmentioned mid-priced program horse is how moonshots die"
+    },
+    {
+      "ts": "2026-09-02T12:42:27.981Z",
+      "level": "info",
+      "stream": "decision-trace",
+      "event": "ticket_added",
+      "correlationId": "e667a1ce-d659-4f10-be53-a3d8e0ec589b",
+      "cardId": 66,
+      "raceDayId": 37,
+      "seq": 42,
+      "race": 2,
+      "races": [
+        2
+      ],
+      "betType": "exacta",
+      "selections": [
+        [
+          "5"
+        ],
+        [
+          "8"
+        ]
+      ],
+      "stakeCents": 100,
+      "costCents": 100,
+      "rules": [
+        "mid_price_coverage"
+      ]
+    },
+    {
+      "ts": "2026-09-02T12:42:27.981Z",
+      "level": "info",
+      "stream": "decision-trace",
+      "event": "ticket_added",
+      "correlationId": "e667a1ce-d659-4f10-be53-a3d8e0ec589b",
+      "cardId": 66,
+      "raceDayId": 37,
+      "seq": 43,
+      "race": 3,
+      "races": [
+        3
+      ],
+      "betType": "win",
+      "selections": [
+        [
+          "8"
+        ]
+      ],
+      "stakeCents": 700,
+      "costCents": 700,
+      "rules": [
+        "split_primary_win"
+      ]
+    },
+    {
+      "ts": "2026-09-02T12:42:27.981Z",
+      "level": "info",
+      "stream": "decision-trace",
+      "event": "rule_fired",
+      "correlationId": "e667a1ce-d659-4f10-be53-a3d8e0ec589b",
+      "cardId": 66,
+      "raceDayId": 37,
+      "seq": 44,
+      "rule": "hedge_cut",
+      "race": 3,
+      "cut": "7",
+      "reason": "thin backing - cut to the best one, not dutched"
+    },
+    {
+      "ts": "2026-09-02T12:42:27.981Z",
+      "level": "info",
+      "stream": "decision-trace",
+      "event": "ticket_added",
+      "correlationId": "e667a1ce-d659-4f10-be53-a3d8e0ec589b",
+      "cardId": 66,
+      "raceDayId": 37,
+      "seq": 45,
+      "race": 3,
+      "races": [
+        3
+      ],
+      "betType": "exacta_box",
+      "selections": [
+        [
+          "8",
+          "7"
+        ]
+      ],
+      "stakeCents": 400,
+      "costCents": 800,
+      "rules": [
+        "split_exacta_box"
+      ]
+    },
+    {
+      "ts": "2026-09-02T12:42:27.981Z",
+      "level": "info",
+      "stream": "decision-trace",
+      "event": "ticket_added",
+      "correlationId": "e667a1ce-d659-4f10-be53-a3d8e0ec589b",
+      "cardId": 66,
+      "raceDayId": 37,
+      "seq": 46,
+      "race": 4,
+      "races": [
+        4
+      ],
+      "betType": "win",
+      "selections": [
+        [
+          "6"
+        ]
+      ],
+      "stakeCents": 700,
+      "costCents": 700,
+      "rules": [
+        "split_primary_win"
+      ]
+    },
+    {
+      "ts": "2026-09-02T12:42:27.982Z",
+      "level": "info",
+      "stream": "decision-trace",
+      "event": "rule_fired",
+      "correlationId": "e667a1ce-d659-4f10-be53-a3d8e0ec589b",
+      "cardId": 66,
+      "raceDayId": 37,
+      "seq": 47,
+      "rule": "hedge_cut",
+      "race": 4,
+      "cut": "3",
+      "reason": "thin backing - cut to the best one, not dutched"
+    },
+    {
+      "ts": "2026-09-02T12:42:27.982Z",
+      "level": "info",
+      "stream": "decision-trace",
+      "event": "ticket_added",
+      "correlationId": "e667a1ce-d659-4f10-be53-a3d8e0ec589b",
+      "cardId": 66,
+      "raceDayId": 37,
+      "seq": 48,
+      "race": 4,
+      "races": [
+        4
+      ],
+      "betType": "exacta_box",
+      "selections": [
+        [
+          "6",
+          "3"
+        ]
+      ],
+      "stakeCents": 400,
+      "costCents": 800,
+      "rules": [
+        "split_exacta_box"
+      ]
+    },
+    {
+      "ts": "2026-09-02T12:42:27.982Z",
+      "level": "info",
+      "stream": "decision-trace",
+      "event": "rule_fired",
+      "correlationId": "e667a1ce-d659-4f10-be53-a3d8e0ec589b",
+      "cardId": 66,
+      "raceDayId": 37,
+      "seq": 49,
+      "rule": "mid_price_coverage",
+      "race": 4,
+      "horse": "4",
+      "ml": 5,
+      "reason": "unmentioned mid-priced program horse is how moonshots die"
+    },
+    {
+      "ts": "2026-09-02T12:42:27.982Z",
+      "level": "info",
+      "stream": "decision-trace",
+      "event": "ticket_added",
+      "correlationId": "e667a1ce-d659-4f10-be53-a3d8e0ec589b",
+      "cardId": 66,
+      "raceDayId": 37,
+      "seq": 50,
+      "race": 4,
+      "races": [
+        4
+      ],
+      "betType": "exacta",
+      "selections": [
+        [
+          "6"
+        ],
+        [
+          "4"
+        ]
+      ],
+      "stakeCents": 100,
+      "costCents": 100,
+      "rules": [
+        "mid_price_coverage"
+      ]
+    },
+    {
+      "ts": "2026-09-02T12:42:27.982Z",
+      "level": "info",
+      "stream": "decision-trace",
+      "event": "ticket_added",
+      "correlationId": "e667a1ce-d659-4f10-be53-a3d8e0ec589b",
+      "cardId": 66,
+      "raceDayId": 37,
+      "seq": 51,
+      "race": 5,
+      "races": [
+        5
+      ],
+      "betType": "win",
+      "selections": [
+        [
+          "6"
+        ]
+      ],
+      "stakeCents": 700,
+      "costCents": 700,
+      "rules": [
+        "split_primary_win"
+      ]
+    },
+    {
+      "ts": "2026-09-02T12:42:27.982Z",
+      "level": "info",
+      "stream": "decision-trace",
+      "event": "rule_fired",
+      "correlationId": "e667a1ce-d659-4f10-be53-a3d8e0ec589b",
+      "cardId": 66,
+      "raceDayId": 37,
+      "seq": 52,
+      "rule": "hedge_cut",
+      "race": 5,
+      "cut": "9",
+      "reason": "thin backing - cut to the best one, not dutched"
+    },
+    {
+      "ts": "2026-09-02T12:42:27.983Z",
+      "level": "info",
+      "stream": "decision-trace",
+      "event": "ticket_added",
+      "correlationId": "e667a1ce-d659-4f10-be53-a3d8e0ec589b",
+      "cardId": 66,
+      "raceDayId": 37,
+      "seq": 53,
+      "race": 5,
+      "races": [
+        5
+      ],
+      "betType": "exacta_box",
+      "selections": [
+        [
+          "6",
+          "9"
+        ]
+      ],
+      "stakeCents": 400,
+      "costCents": 800,
+      "rules": [
+        "split_exacta_box"
+      ]
+    },
+    {
+      "ts": "2026-09-02T12:42:27.983Z",
+      "level": "info",
+      "stream": "decision-trace",
+      "event": "rule_fired",
+      "correlationId": "e667a1ce-d659-4f10-be53-a3d8e0ec589b",
+      "cardId": 66,
+      "raceDayId": 37,
+      "seq": 54,
+      "rule": "mid_price_coverage",
+      "race": 5,
+      "horse": "3",
+      "ml": 5,
+      "reason": "unmentioned mid-priced program horse is how moonshots die"
+    },
+    {
+      "ts": "2026-09-02T12:42:27.983Z",
+      "level": "info",
+      "stream": "decision-trace",
+      "event": "ticket_added",
+      "correlationId": "e667a1ce-d659-4f10-be53-a3d8e0ec589b",
+      "cardId": 66,
+      "raceDayId": 37,
+      "seq": 55,
+      "race": 5,
+      "races": [
+        5
+      ],
+      "betType": "exacta",
+      "selections": [
+        [
+          "6"
+        ],
+        [
+          "3"
+        ]
+      ],
+      "stakeCents": 100,
+      "costCents": 100,
+      "rules": [
+        "mid_price_coverage"
+      ]
+    },
+    {
+      "ts": "2026-09-02T12:42:27.983Z",
+      "level": "info",
+      "stream": "decision-trace",
+      "event": "ticket_added",
+      "correlationId": "e667a1ce-d659-4f10-be53-a3d8e0ec589b",
+      "cardId": 66,
+      "raceDayId": 37,
+      "seq": 56,
+      "race": 6,
+      "races": [
+        6
+      ],
+      "betType": "win",
+      "selections": [
+        [
+          "6"
+        ]
+      ],
+      "stakeCents": 700,
+      "costCents": 700,
+      "rules": [
+        "split_primary_win"
+      ]
+    },
+    {
+      "ts": "2026-09-02T12:42:27.983Z",
+      "level": "info",
+      "stream": "decision-trace",
+      "event": "rule_fired",
+      "correlationId": "e667a1ce-d659-4f10-be53-a3d8e0ec589b",
+      "cardId": 66,
+      "raceDayId": 37,
+      "seq": 57,
+      "rule": "hedge_cut",
+      "race": 6,
+      "cut": "3",
+      "reason": "thin backing - cut to the best one, not dutched"
+    },
+    {
+      "ts": "2026-09-02T12:42:27.984Z",
+      "level": "info",
+      "stream": "decision-trace",
+      "event": "ticket_added",
+      "correlationId": "e667a1ce-d659-4f10-be53-a3d8e0ec589b",
+      "cardId": 66,
+      "raceDayId": 37,
+      "seq": 58,
+      "race": 6,
+      "races": [
+        6
+      ],
+      "betType": "exacta_box",
+      "selections": [
+        [
+          "6",
+          "3"
+        ]
+      ],
+      "stakeCents": 400,
+      "costCents": 800,
+      "rules": [
+        "split_exacta_box"
+      ]
+    },
+    {
+      "ts": "2026-09-02T12:42:27.984Z",
+      "level": "info",
+      "stream": "decision-trace",
+      "event": "ticket_added",
+      "correlationId": "e667a1ce-d659-4f10-be53-a3d8e0ec589b",
+      "cardId": 66,
+      "raceDayId": 37,
+      "seq": 59,
+      "race": 7,
+      "races": [
+        7
+      ],
+      "betType": "win",
+      "selections": [
+        [
+          "8"
+        ]
+      ],
+      "stakeCents": 700,
+      "costCents": 700,
+      "rules": [
+        "split_primary_win"
+      ]
+    },
+    {
+      "ts": "2026-09-02T12:42:27.984Z",
+      "level": "info",
+      "stream": "decision-trace",
+      "event": "rule_fired",
+      "correlationId": "e667a1ce-d659-4f10-be53-a3d8e0ec589b",
+      "cardId": 66,
+      "raceDayId": 37,
+      "seq": 60,
+      "rule": "hedge_cut",
+      "race": 7,
+      "cut": "4",
+      "reason": "thin backing - cut to the best one, not dutched"
+    },
+    {
+      "ts": "2026-09-02T12:42:27.984Z",
+      "level": "info",
+      "stream": "decision-trace",
+      "event": "ticket_added",
+      "correlationId": "e667a1ce-d659-4f10-be53-a3d8e0ec589b",
+      "cardId": 66,
+      "raceDayId": 37,
+      "seq": 61,
+      "race": 7,
+      "races": [
+        7
+      ],
+      "betType": "exacta_box",
+      "selections": [
+        [
+          "8",
+          "4"
+        ]
+      ],
+      "stakeCents": 400,
+      "costCents": 800,
+      "rules": [
+        "split_exacta_box"
+      ]
+    },
+    {
+      "ts": "2026-09-02T12:42:27.984Z",
+      "level": "info",
+      "stream": "decision-trace",
+      "event": "rule_fired",
+      "correlationId": "e667a1ce-d659-4f10-be53-a3d8e0ec589b",
+      "cardId": 66,
+      "raceDayId": 37,
+      "seq": 62,
+      "rule": "mid_price_coverage",
+      "race": 7,
+      "horse": "7",
+      "ml": 5,
+      "reason": "unmentioned mid-priced program horse is how moonshots die"
+    },
+    {
+      "ts": "2026-09-02T12:42:27.984Z",
+      "level": "info",
+      "stream": "decision-trace",
+      "event": "ticket_added",
+      "correlationId": "e667a1ce-d659-4f10-be53-a3d8e0ec589b",
+      "cardId": 66,
+      "raceDayId": 37,
+      "seq": 63,
+      "race": 7,
+      "races": [
+        7
+      ],
+      "betType": "exacta",
+      "selections": [
+        [
+          "8"
+        ],
+        [
+          "7"
+        ]
+      ],
+      "stakeCents": 100,
+      "costCents": 100,
+      "rules": [
+        "mid_price_coverage"
+      ]
+    },
+    {
+      "ts": "2026-09-02T12:42:27.985Z",
+      "level": "info",
+      "stream": "decision-trace",
+      "event": "ticket_added",
+      "correlationId": "e667a1ce-d659-4f10-be53-a3d8e0ec589b",
+      "cardId": 66,
+      "raceDayId": 37,
+      "seq": 64,
+      "race": 8,
+      "races": [
+        8
+      ],
+      "betType": "win",
+      "selections": [
+        [
+          "1"
+        ]
+      ],
+      "stakeCents": 700,
+      "costCents": 700,
+      "rules": [
+        "split_primary_win"
+      ]
+    },
+    {
+      "ts": "2026-09-02T12:42:27.985Z",
+      "level": "info",
+      "stream": "decision-trace",
+      "event": "rule_fired",
+      "correlationId": "e667a1ce-d659-4f10-be53-a3d8e0ec589b",
+      "cardId": 66,
+      "raceDayId": 37,
+      "seq": 65,
+      "rule": "hedge_cut",
+      "race": 8,
+      "cut": "2",
+      "reason": "thin backing - cut to the best one, not dutched"
+    },
+    {
+      "ts": "2026-09-02T12:42:27.985Z",
+      "level": "info",
+      "stream": "decision-trace",
+      "event": "ticket_added",
+      "correlationId": "e667a1ce-d659-4f10-be53-a3d8e0ec589b",
+      "cardId": 66,
+      "raceDayId": 37,
+      "seq": 66,
+      "race": 8,
+      "races": [
+        8
+      ],
+      "betType": "exacta_box",
+      "selections": [
+        [
+          "1",
+          "2"
+        ]
+      ],
+      "stakeCents": 400,
+      "costCents": 800,
+      "rules": [
+        "split_exacta_box"
+      ]
+    },
+    {
+      "ts": "2026-09-02T12:42:27.985Z",
+      "level": "info",
+      "stream": "decision-trace",
+      "event": "rule_fired",
+      "correlationId": "e667a1ce-d659-4f10-be53-a3d8e0ec589b",
+      "cardId": 66,
+      "raceDayId": 37,
+      "seq": 67,
+      "rule": "mid_price_coverage",
+      "race": 8,
+      "horse": "4",
+      "ml": 5,
+      "reason": "unmentioned mid-priced program horse is how moonshots die"
+    },
+    {
+      "ts": "2026-09-02T12:42:27.985Z",
+      "level": "info",
+      "stream": "decision-trace",
+      "event": "ticket_added",
+      "correlationId": "e667a1ce-d659-4f10-be53-a3d8e0ec589b",
+      "cardId": 66,
+      "raceDayId": 37,
+      "seq": 68,
+      "race": 8,
+      "races": [
+        8
+      ],
+      "betType": "exacta",
+      "selections": [
+        [
+          "1"
+        ],
+        [
+          "4"
+        ]
+      ],
+      "stakeCents": 100,
+      "costCents": 100,
+      "rules": [
+        "mid_price_coverage"
+      ]
+    },
+    {
+      "ts": "2026-09-02T12:42:27.985Z",
+      "level": "info",
+      "stream": "decision-trace",
+      "event": "ticket_added",
+      "correlationId": "e667a1ce-d659-4f10-be53-a3d8e0ec589b",
+      "cardId": 66,
+      "raceDayId": 37,
+      "seq": 69,
+      "race": 9,
+      "races": [
+        9
+      ],
+      "betType": "win",
+      "selections": [
+        [
+          "2"
+        ]
+      ],
+      "stakeCents": 700,
+      "costCents": 700,
+      "rules": [
+        "split_primary_win"
+      ]
+    },
+    {
+      "ts": "2026-09-02T12:42:27.986Z",
+      "level": "info",
+      "stream": "decision-trace",
+      "event": "rule_fired",
+      "correlationId": "e667a1ce-d659-4f10-be53-a3d8e0ec589b",
+      "cardId": 66,
+      "raceDayId": 37,
+      "seq": 70,
+      "rule": "hedge_cut",
+      "race": 9,
+      "cut": "9",
+      "reason": "thin backing - cut to the best one, not dutched"
+    },
+    {
+      "ts": "2026-09-02T12:42:27.986Z",
+      "level": "info",
+      "stream": "decision-trace",
+      "event": "ticket_added",
+      "correlationId": "e667a1ce-d659-4f10-be53-a3d8e0ec589b",
+      "cardId": 66,
+      "raceDayId": 37,
+      "seq": 71,
+      "race": 9,
+      "races": [
+        9
+      ],
+      "betType": "exacta_box",
+      "selections": [
+        [
+          "2",
+          "9"
+        ]
+      ],
+      "stakeCents": 400,
+      "costCents": 800,
+      "rules": [
+        "split_exacta_box"
+      ]
+    },
+    {
+      "ts": "2026-09-02T12:42:27.986Z",
+      "level": "info",
+      "stream": "decision-trace",
+      "event": "rule_fired",
+      "correlationId": "e667a1ce-d659-4f10-be53-a3d8e0ec589b",
+      "cardId": 66,
+      "raceDayId": 37,
+      "seq": 72,
+      "rule": "mid_price_coverage",
+      "race": 9,
+      "horse": "5",
+      "ml": 8,
+      "reason": "unmentioned mid-priced program horse is how moonshots die"
+    },
+    {
+      "ts": "2026-09-02T12:42:27.986Z",
+      "level": "info",
+      "stream": "decision-trace",
+      "event": "ticket_added",
+      "correlationId": "e667a1ce-d659-4f10-be53-a3d8e0ec589b",
+      "cardId": 66,
+      "raceDayId": 37,
+      "seq": 73,
+      "race": 9,
+      "races": [
+        9
+      ],
+      "betType": "exacta",
+      "selections": [
+        [
+          "2"
+        ],
+        [
+          "5"
+        ]
+      ],
+      "stakeCents": 100,
+      "costCents": 100,
+      "rules": [
+        "mid_price_coverage"
+      ]
+    },
+    {
+      "ts": "2026-09-02T12:42:27.986Z",
+      "level": "info",
+      "stream": "decision-trace",
+      "event": "ticket_added",
+      "correlationId": "e667a1ce-d659-4f10-be53-a3d8e0ec589b",
+      "cardId": 66,
+      "raceDayId": 37,
+      "seq": 74,
+      "race": 10,
+      "races": [
+        10
+      ],
+      "betType": "win",
+      "selections": [
+        [
+          "7"
+        ]
+      ],
+      "stakeCents": 700,
+      "costCents": 700,
+      "rules": [
+        "split_primary_win"
+      ]
+    },
+    {
+      "ts": "2026-09-02T12:42:27.986Z",
+      "level": "info",
+      "stream": "decision-trace",
+      "event": "rule_fired",
+      "correlationId": "e667a1ce-d659-4f10-be53-a3d8e0ec589b",
+      "cardId": 66,
+      "raceDayId": 37,
+      "seq": 75,
+      "rule": "hedge_cut",
+      "race": 10,
+      "cut": "1",
+      "reason": "thin backing - cut to the best one, not dutched"
+    },
+    {
+      "ts": "2026-09-02T12:42:27.987Z",
+      "level": "info",
+      "stream": "decision-trace",
+      "event": "ticket_added",
+      "correlationId": "e667a1ce-d659-4f10-be53-a3d8e0ec589b",
+      "cardId": 66,
+      "raceDayId": 37,
+      "seq": 76,
+      "race": 10,
+      "races": [
+        10
+      ],
+      "betType": "exacta_box",
+      "selections": [
+        [
+          "7",
+          "1"
+        ]
+      ],
+      "stakeCents": 400,
+      "costCents": 800,
+      "rules": [
+        "split_exacta_box"
+      ]
+    },
+    {
+      "ts": "2026-09-02T12:42:27.987Z",
+      "level": "info",
+      "stream": "decision-trace",
+      "event": "rule_fired",
+      "correlationId": "e667a1ce-d659-4f10-be53-a3d8e0ec589b",
+      "cardId": 66,
+      "raceDayId": 37,
+      "seq": 77,
+      "rule": "mid_price_coverage",
+      "race": 10,
+      "horse": "2",
+      "ml": 6,
+      "reason": "unmentioned mid-priced program horse is how moonshots die"
+    },
+    {
+      "ts": "2026-09-02T12:42:27.987Z",
+      "level": "info",
+      "stream": "decision-trace",
+      "event": "ticket_added",
+      "correlationId": "e667a1ce-d659-4f10-be53-a3d8e0ec589b",
+      "cardId": 66,
+      "raceDayId": 37,
+      "seq": 78,
+      "race": 10,
+      "races": [
+        10
+      ],
+      "betType": "exacta",
+      "selections": [
+        [
+          "7"
+        ],
+        [
+          "2"
+        ]
+      ],
+      "stakeCents": 100,
+      "costCents": 100,
+      "rules": [
+        "mid_price_coverage"
+      ]
+    },
+    {
+      "ts": "2026-09-02T12:42:27.987Z",
+      "level": "info",
+      "stream": "decision-trace",
+      "event": "ticket_added",
+      "correlationId": "e667a1ce-d659-4f10-be53-a3d8e0ec589b",
+      "cardId": 66,
+      "raceDayId": 37,
+      "seq": 79,
+      "race": 11,
+      "races": [
+        11
+      ],
+      "betType": "win",
+      "selections": [
+        [
+          "10"
+        ]
+      ],
+      "stakeCents": 700,
+      "costCents": 700,
+      "rules": [
+        "split_primary_win"
+      ]
+    },
+    {
+      "ts": "2026-09-02T12:42:27.987Z",
+      "level": "info",
+      "stream": "decision-trace",
+      "event": "rule_fired",
+      "correlationId": "e667a1ce-d659-4f10-be53-a3d8e0ec589b",
+      "cardId": 66,
+      "raceDayId": 37,
+      "seq": 80,
+      "rule": "hedge_cut",
+      "race": 11,
+      "cut": "12",
+      "reason": "thin backing - cut to the best one, not dutched"
+    },
+    {
+      "ts": "2026-09-02T12:42:27.988Z",
+      "level": "info",
+      "stream": "decision-trace",
+      "event": "ticket_added",
+      "correlationId": "e667a1ce-d659-4f10-be53-a3d8e0ec589b",
+      "cardId": 66,
+      "raceDayId": 37,
+      "seq": 81,
+      "race": 11,
+      "races": [
+        11
+      ],
+      "betType": "exacta_box",
+      "selections": [
+        [
+          "10",
+          "12"
+        ]
+      ],
+      "stakeCents": 400,
+      "costCents": 800,
+      "rules": [
+        "split_exacta_box"
+      ]
+    },
+    {
+      "ts": "2026-09-02T12:42:27.988Z",
+      "level": "info",
+      "stream": "decision-trace",
+      "event": "rule_fired",
+      "correlationId": "e667a1ce-d659-4f10-be53-a3d8e0ec589b",
+      "cardId": 66,
+      "raceDayId": 37,
+      "seq": 82,
+      "rule": "mid_price_coverage",
+      "race": 11,
+      "horse": "13",
+      "ml": 6,
+      "reason": "unmentioned mid-priced program horse is how moonshots die"
+    },
+    {
+      "ts": "2026-09-02T12:42:27.988Z",
+      "level": "info",
+      "stream": "decision-trace",
+      "event": "ticket_added",
+      "correlationId": "e667a1ce-d659-4f10-be53-a3d8e0ec589b",
+      "cardId": 66,
+      "raceDayId": 37,
+      "seq": 83,
+      "race": 11,
+      "races": [
+        11
+      ],
+      "betType": "exacta",
+      "selections": [
+        [
+          "10"
+        ],
+        [
+          "13"
+        ]
+      ],
+      "stakeCents": 100,
+      "costCents": 100,
+      "rules": [
+        "mid_price_coverage"
+      ]
+    },
+    {
+      "ts": "2026-09-02T12:42:27.988Z",
+      "level": "info",
+      "stream": "decision-trace",
+      "event": "remainder_distributed",
+      "correlationId": "e667a1ce-d659-4f10-be53-a3d8e0ec589b",
+      "cardId": 66,
+      "raceDayId": 37,
+      "seq": 84,
+      "remainderCents": 2600,
+      "passes": 4,
+      "races": [
+        {
+          "race": 1,
+          "amountCents": 400,
+          "steps": 4,
+          "ticket": 1,
+          "withPlace": false,
+          "allocatedCents": 2000
+        },
+        {
+          "race": 2,
+          "amountCents": 200,
+          "steps": 2,
+          "ticket": 3,
+          "withPlace": false,
+          "allocatedCents": 1800
+        },
+        {
+          "race": 3,
+          "amountCents": 300,
+          "steps": 3,
+          "ticket": 6,
+          "withPlace": false,
+          "allocatedCents": 1800
+        },
+        {
+          "race": 4,
+          "amountCents": 200,
+          "steps": 2,
+          "ticket": 8,
+          "withPlace": false,
+          "allocatedCents": 1800
+        },
+        {
+          "race": 5,
+          "amountCents": 200,
+          "steps": 2,
+          "ticket": 11,
+          "withPlace": false,
+          "allocatedCents": 1800
+        },
+        {
+          "race": 6,
+          "amountCents": 300,
+          "steps": 3,
+          "ticket": 14,
+          "withPlace": false,
+          "allocatedCents": 1800
+        },
+        {
+          "race": 7,
+          "amountCents": 200,
+          "steps": 2,
+          "ticket": 16,
+          "withPlace": false,
+          "allocatedCents": 1800
+        },
+        {
+          "race": 8,
+          "amountCents": 200,
+          "steps": 2,
+          "ticket": 19,
+          "withPlace": false,
+          "allocatedCents": 1800
+        },
+        {
+          "race": 9,
+          "amountCents": 200,
+          "steps": 2,
+          "ticket": 22,
+          "withPlace": false,
+          "allocatedCents": 1800
+        },
+        {
+          "race": 10,
+          "amountCents": 200,
+          "steps": 2,
+          "ticket": 25,
+          "withPlace": false,
+          "allocatedCents": 1800
+        },
+        {
+          "race": 11,
+          "amountCents": 200,
+          "steps": 2,
+          "ticket": 28,
+          "withPlace": false,
+          "allocatedCents": 1800
+        }
+      ],
+      "skipped": [],
+      "undistributedCents": 0
+    },
+    {
+      "ts": "2026-09-02T12:42:27.988Z",
+      "level": "info",
+      "stream": "decision-trace",
+      "event": "bankroll_balanced",
+      "correlationId": "e667a1ce-d659-4f10-be53-a3d8e0ec589b",
+      "cardId": 66,
+      "raceDayId": 37,
+      "seq": 85,
+      "adjusted": true,
+      "remainingCents": 0
+    },
+    {
+      "ts": "2026-09-02T12:42:27.988Z",
+      "level": "info",
+      "stream": "decision-trace",
+      "event": "card_finalized",
+      "correlationId": "e667a1ce-d659-4f10-be53-a3d8e0ec589b",
+      "cardId": 66,
+      "raceDayId": 37,
+      "seq": 86,
+      "engineVersion": "lean-1.1",
+      "totalCents": 20000,
+      "bankrollCents": 20000,
+      "ticketCount": 30,
+      "completeness": "PROGRAM_ONLY",
+      "perRace": [
+        {
+          "race": 1,
+          "allocatedCents": 2000,
+          "spentCents": 2000
+        },
+        {
+          "race": 2,
+          "allocatedCents": 1800,
+          "spentCents": 1800
+        },
+        {
+          "race": 3,
+          "allocatedCents": 1800,
+          "spentCents": 1800
+        },
+        {
+          "race": 4,
+          "allocatedCents": 1800,
+          "spentCents": 1800
+        },
+        {
+          "race": 5,
+          "allocatedCents": 1800,
+          "spentCents": 1800
+        },
+        {
+          "race": 6,
+          "allocatedCents": 1800,
+          "spentCents": 1800
+        },
+        {
+          "race": 7,
+          "allocatedCents": 1800,
+          "spentCents": 1800
+        },
+        {
+          "race": 8,
+          "allocatedCents": 1800,
+          "spentCents": 1800
+        },
+        {
+          "race": 9,
+          "allocatedCents": 1800,
+          "spentCents": 1800
+        },
+        {
+          "race": 10,
+          "allocatedCents": 1800,
+          "spentCents": 1800
+        },
+        {
+          "race": 11,
+          "allocatedCents": 1800,
+          "spentCents": 1800
+        }
+      ],
+      "warnings": [
+        "Unanimous consensus is not certainty: a 7/2 shot everyone agrees on still loses most of the time - and when it loses, the race often comes apart completely.",
+        "On chaos days, second-tier \"watch out for\" horses win at prices - small coverage on 2+-source horses is on this card for that reason.",
+        "Expert sources and the public draw from the same well; a card of double-digit winners beats every source simultaneously. This card promises nothing variance does not allow."
+      ]
+    },
+    {
+      "ts": "2026-09-02T12:42:27.989Z",
+      "level": "info",
+      "stream": "decision-trace",
+      "event": "ticket_graded",
+      "correlationId": "e667a1ce-d659-4f10-be53-a3d8e0ec589b",
+      "cardId": 66,
+      "ticketId": 913,
+      "engineVersion": "lean-1.1",
+      "betType": "win",
+      "races": [
+        1
+      ],
+      "legs": [
+        [
+          "3"
+        ]
+      ],
+      "outcome": "win",
+      "costCents": 1200,
+      "returnedCents": 3600,
+      "plCents": 2400,
+      "note": null
+    },
+    {
+      "ts": "2026-09-02T12:42:27.990Z",
+      "level": "info",
+      "stream": "decision-trace",
+      "event": "ticket_graded",
+      "correlationId": "e667a1ce-d659-4f10-be53-a3d8e0ec589b",
+      "cardId": 66,
+      "ticketId": 914,
+      "engineVersion": "lean-1.1",
+      "betType": "exacta_box",
+      "races": [
+        1
+      ],
+      "legs": [
+        [
+          "3",
+          "4"
+        ]
+      ],
+      "outcome": "loss",
+      "costCents": 800,
+      "returnedCents": 0,
+      "plCents": -800,
+      "note": null
+    },
+    {
+      "ts": "2026-09-02T12:42:27.990Z",
+      "level": "info",
+      "stream": "decision-trace",
+      "event": "ticket_graded",
+      "correlationId": "e667a1ce-d659-4f10-be53-a3d8e0ec589b",
+      "cardId": 66,
+      "ticketId": 915,
+      "engineVersion": "lean-1.1",
+      "betType": "win",
+      "races": [
+        2
+      ],
+      "legs": [
+        [
+          "5"
+        ]
+      ],
+      "outcome": "win",
+      "costCents": 900,
+      "returnedCents": 2340,
+      "plCents": 1440,
+      "note": null
+    },
+    {
+      "ts": "2026-09-02T12:42:27.990Z",
+      "level": "info",
+      "stream": "decision-trace",
+      "event": "ticket_graded",
+      "correlationId": "e667a1ce-d659-4f10-be53-a3d8e0ec589b",
+      "cardId": 66,
+      "ticketId": 916,
+      "engineVersion": "lean-1.1",
+      "betType": "exacta_box",
+      "races": [
+        2
+      ],
+      "legs": [
+        [
+          "5",
+          "1"
+        ]
+      ],
+      "outcome": "loss",
+      "costCents": 800,
+      "returnedCents": 0,
+      "plCents": -800,
+      "note": null
+    },
+    {
+      "ts": "2026-09-02T12:42:27.990Z",
+      "level": "info",
+      "stream": "decision-trace",
+      "event": "ticket_graded",
+      "correlationId": "e667a1ce-d659-4f10-be53-a3d8e0ec589b",
+      "cardId": 66,
+      "ticketId": 917,
+      "engineVersion": "lean-1.1",
+      "betType": "exacta",
+      "races": [
+        2
+      ],
+      "legs": [
+        [
+          "5"
+        ],
+        [
+          "8"
+        ]
+      ],
+      "outcome": "loss",
+      "costCents": 100,
+      "returnedCents": 0,
+      "plCents": -100,
+      "note": null
+    },
+    {
+      "ts": "2026-09-02T12:42:27.990Z",
+      "level": "info",
+      "stream": "decision-trace",
+      "event": "ticket_graded",
+      "correlationId": "e667a1ce-d659-4f10-be53-a3d8e0ec589b",
+      "cardId": 66,
+      "ticketId": 918,
+      "engineVersion": "lean-1.1",
+      "betType": "win",
+      "races": [
+        3
+      ],
+      "legs": [
+        [
+          "8"
+        ]
+      ],
+      "outcome": "loss",
+      "costCents": 1000,
+      "returnedCents": 0,
+      "plCents": -1000,
+      "note": null
+    },
+    {
+      "ts": "2026-09-02T12:42:27.991Z",
+      "level": "info",
+      "stream": "decision-trace",
+      "event": "ticket_graded",
+      "correlationId": "e667a1ce-d659-4f10-be53-a3d8e0ec589b",
+      "cardId": 66,
+      "ticketId": 919,
+      "engineVersion": "lean-1.1",
+      "betType": "exacta_box",
+      "races": [
+        3
+      ],
+      "legs": [
+        [
+          "8",
+          "7"
+        ]
+      ],
+      "outcome": "loss",
+      "costCents": 800,
+      "returnedCents": 0,
+      "plCents": -800,
+      "note": null
+    },
+    {
+      "ts": "2026-09-02T12:42:27.991Z",
+      "level": "info",
+      "stream": "decision-trace",
+      "event": "ticket_graded",
+      "correlationId": "e667a1ce-d659-4f10-be53-a3d8e0ec589b",
+      "cardId": 66,
+      "ticketId": 920,
+      "engineVersion": "lean-1.1",
+      "betType": "win",
+      "races": [
+        4
+      ],
+      "legs": [
+        [
+          "6"
+        ]
+      ],
+      "outcome": "win",
+      "costCents": 900,
+      "returnedCents": 2610,
+      "plCents": 1710,
+      "note": null
+    },
+    {
+      "ts": "2026-09-02T12:42:27.991Z",
+      "level": "info",
+      "stream": "decision-trace",
+      "event": "ticket_graded",
+      "correlationId": "e667a1ce-d659-4f10-be53-a3d8e0ec589b",
+      "cardId": 66,
+      "ticketId": 921,
+      "engineVersion": "lean-1.1",
+      "betType": "exacta_box",
+      "races": [
+        4
+      ],
+      "legs": [
+        [
+          "6",
+          "3"
+        ]
+      ],
+      "outcome": "loss",
+      "costCents": 800,
+      "returnedCents": 0,
+      "plCents": -800,
+      "note": null
+    },
+    {
+      "ts": "2026-09-02T12:42:27.991Z",
+      "level": "info",
+      "stream": "decision-trace",
+      "event": "ticket_graded",
+      "correlationId": "e667a1ce-d659-4f10-be53-a3d8e0ec589b",
+      "cardId": 66,
+      "ticketId": 922,
+      "engineVersion": "lean-1.1",
+      "betType": "exacta",
+      "races": [
+        4
+      ],
+      "legs": [
+        [
+          "6"
+        ],
+        [
+          "4"
+        ]
+      ],
+      "outcome": "refund",
+      "costCents": 100,
+      "returnedCents": 100,
+      "plCents": 0,
+      "note": "all combinations scratched"
+    },
+    {
+      "ts": "2026-09-02T12:42:27.991Z",
+      "level": "info",
+      "stream": "decision-trace",
+      "event": "ticket_graded",
+      "correlationId": "e667a1ce-d659-4f10-be53-a3d8e0ec589b",
+      "cardId": 66,
+      "ticketId": 923,
+      "engineVersion": "lean-1.1",
+      "betType": "win",
+      "races": [
+        5
+      ],
+      "legs": [
+        [
+          "6"
+        ]
+      ],
+      "outcome": "refund",
+      "costCents": 900,
+      "returnedCents": 900,
+      "plCents": 0,
+      "note": "selection scratched"
+    },
+    {
+      "ts": "2026-09-02T12:42:27.991Z",
+      "level": "info",
+      "stream": "decision-trace",
+      "event": "ticket_graded",
+      "correlationId": "e667a1ce-d659-4f10-be53-a3d8e0ec589b",
+      "cardId": 66,
+      "ticketId": 924,
+      "engineVersion": "lean-1.1",
+      "betType": "exacta_box",
+      "races": [
+        5
+      ],
+      "legs": [
+        [
+          "6",
+          "9"
+        ]
+      ],
+      "outcome": "refund",
+      "costCents": 800,
+      "returnedCents": 800,
+      "plCents": 0,
+      "note": "all combinations scratched"
+    },
+    {
+      "ts": "2026-09-02T12:42:27.992Z",
+      "level": "info",
+      "stream": "decision-trace",
+      "event": "ticket_graded",
+      "correlationId": "e667a1ce-d659-4f10-be53-a3d8e0ec589b",
+      "cardId": 66,
+      "ticketId": 925,
+      "engineVersion": "lean-1.1",
+      "betType": "exacta",
+      "races": [
+        5
+      ],
+      "legs": [
+        [
+          "6"
+        ],
+        [
+          "3"
+        ]
+      ],
+      "outcome": "refund",
+      "costCents": 100,
+      "returnedCents": 100,
+      "plCents": 0,
+      "note": "all combinations scratched"
+    },
+    {
+      "ts": "2026-09-02T12:42:27.992Z",
+      "level": "info",
+      "stream": "decision-trace",
+      "event": "ticket_graded",
+      "correlationId": "e667a1ce-d659-4f10-be53-a3d8e0ec589b",
+      "cardId": 66,
+      "ticketId": 926,
+      "engineVersion": "lean-1.1",
+      "betType": "win",
+      "races": [
+        6
+      ],
+      "legs": [
+        [
+          "6"
+        ]
+      ],
+      "outcome": "loss",
+      "costCents": 1000,
+      "returnedCents": 0,
+      "plCents": -1000,
+      "note": null
+    },
+    {
+      "ts": "2026-09-02T12:42:27.992Z",
+      "level": "info",
+      "stream": "decision-trace",
+      "event": "ticket_graded",
+      "correlationId": "e667a1ce-d659-4f10-be53-a3d8e0ec589b",
+      "cardId": 66,
+      "ticketId": 927,
+      "engineVersion": "lean-1.1",
+      "betType": "exacta_box",
+      "races": [
+        6
+      ],
+      "legs": [
+        [
+          "6",
+          "3"
+        ]
+      ],
+      "outcome": "loss",
+      "costCents": 800,
+      "returnedCents": 0,
+      "plCents": -800,
+      "note": null
+    },
+    {
+      "ts": "2026-09-02T12:42:27.992Z",
+      "level": "info",
+      "stream": "decision-trace",
+      "event": "ticket_graded",
+      "correlationId": "e667a1ce-d659-4f10-be53-a3d8e0ec589b",
+      "cardId": 66,
+      "ticketId": 928,
+      "engineVersion": "lean-1.1",
+      "betType": "win",
+      "races": [
+        7
+      ],
+      "legs": [
+        [
+          "8"
+        ]
+      ],
+      "outcome": "win",
+      "costCents": 900,
+      "returnedCents": 2880,
+      "plCents": 1980,
+      "note": null
+    },
+    {
+      "ts": "2026-09-02T12:42:27.992Z",
+      "level": "info",
+      "stream": "decision-trace",
+      "event": "ticket_graded",
+      "correlationId": "e667a1ce-d659-4f10-be53-a3d8e0ec589b",
+      "cardId": 66,
+      "ticketId": 929,
+      "engineVersion": "lean-1.1",
+      "betType": "exacta_box",
+      "races": [
+        7
+      ],
+      "legs": [
+        [
+          "8",
+          "4"
+        ]
+      ],
+      "outcome": "win",
+      "costCents": 800,
+      "returnedCents": 3640,
+      "plCents": 2840,
+      "note": null
+    },
+    {
+      "ts": "2026-09-02T12:42:27.993Z",
+      "level": "info",
+      "stream": "decision-trace",
+      "event": "ticket_graded",
+      "correlationId": "e667a1ce-d659-4f10-be53-a3d8e0ec589b",
+      "cardId": 66,
+      "ticketId": 930,
+      "engineVersion": "lean-1.1",
+      "betType": "exacta",
+      "races": [
+        7
+      ],
+      "legs": [
+        [
+          "8"
+        ],
+        [
+          "7"
+        ]
+      ],
+      "outcome": "loss",
+      "costCents": 100,
+      "returnedCents": 0,
+      "plCents": -100,
+      "note": null
+    },
+    {
+      "ts": "2026-09-02T12:42:27.993Z",
+      "level": "info",
+      "stream": "decision-trace",
+      "event": "ticket_graded",
+      "correlationId": "e667a1ce-d659-4f10-be53-a3d8e0ec589b",
+      "cardId": 66,
+      "ticketId": 931,
+      "engineVersion": "lean-1.1",
+      "betType": "win",
+      "races": [
+        8
+      ],
+      "legs": [
+        [
+          "1"
+        ]
+      ],
+      "outcome": "loss",
+      "costCents": 900,
+      "returnedCents": 0,
+      "plCents": -900,
+      "note": null
+    },
+    {
+      "ts": "2026-09-02T12:42:27.993Z",
+      "level": "info",
+      "stream": "decision-trace",
+      "event": "ticket_graded",
+      "correlationId": "e667a1ce-d659-4f10-be53-a3d8e0ec589b",
+      "cardId": 66,
+      "ticketId": 932,
+      "engineVersion": "lean-1.1",
+      "betType": "exacta_box",
+      "races": [
+        8
+      ],
+      "legs": [
+        [
+          "1",
+          "2"
+        ]
+      ],
+      "outcome": "loss",
+      "costCents": 800,
+      "returnedCents": 0,
+      "plCents": -800,
+      "note": null
+    },
+    {
+      "ts": "2026-09-02T12:42:27.993Z",
+      "level": "info",
+      "stream": "decision-trace",
+      "event": "ticket_graded",
+      "correlationId": "e667a1ce-d659-4f10-be53-a3d8e0ec589b",
+      "cardId": 66,
+      "ticketId": 933,
+      "engineVersion": "lean-1.1",
+      "betType": "exacta",
+      "races": [
+        8
+      ],
+      "legs": [
+        [
+          "1"
+        ],
+        [
+          "4"
+        ]
+      ],
+      "outcome": "loss",
+      "costCents": 100,
+      "returnedCents": 0,
+      "plCents": -100,
+      "note": null
+    },
+    {
+      "ts": "2026-09-02T12:42:27.993Z",
+      "level": "info",
+      "stream": "decision-trace",
+      "event": "ticket_graded",
+      "correlationId": "e667a1ce-d659-4f10-be53-a3d8e0ec589b",
+      "cardId": 66,
+      "ticketId": 934,
+      "engineVersion": "lean-1.1",
+      "betType": "win",
+      "races": [
+        9
+      ],
+      "legs": [
+        [
+          "2"
+        ]
+      ],
+      "outcome": "loss",
+      "costCents": 900,
+      "returnedCents": 0,
+      "plCents": -900,
+      "note": null
+    },
+    {
+      "ts": "2026-09-02T12:42:27.993Z",
+      "level": "info",
+      "stream": "decision-trace",
+      "event": "ticket_graded",
+      "correlationId": "e667a1ce-d659-4f10-be53-a3d8e0ec589b",
+      "cardId": 66,
+      "ticketId": 935,
+      "engineVersion": "lean-1.1",
+      "betType": "exacta_box",
+      "races": [
+        9
+      ],
+      "legs": [
+        [
+          "2",
+          "9"
+        ]
+      ],
+      "outcome": "win",
+      "costCents": 800,
+      "returnedCents": 2360,
+      "plCents": 1560,
+      "note": null
+    },
+    {
+      "ts": "2026-09-02T12:42:27.994Z",
+      "level": "info",
+      "stream": "decision-trace",
+      "event": "ticket_graded",
+      "correlationId": "e667a1ce-d659-4f10-be53-a3d8e0ec589b",
+      "cardId": 66,
+      "ticketId": 936,
+      "engineVersion": "lean-1.1",
+      "betType": "exacta",
+      "races": [
+        9
+      ],
+      "legs": [
+        [
+          "2"
+        ],
+        [
+          "5"
+        ]
+      ],
+      "outcome": "loss",
+      "costCents": 100,
+      "returnedCents": 0,
+      "plCents": -100,
+      "note": null
+    },
+    {
+      "ts": "2026-09-02T12:42:27.994Z",
+      "level": "info",
+      "stream": "decision-trace",
+      "event": "ticket_graded",
+      "correlationId": "e667a1ce-d659-4f10-be53-a3d8e0ec589b",
+      "cardId": 66,
+      "ticketId": 937,
+      "engineVersion": "lean-1.1",
+      "betType": "win",
+      "races": [
+        10
+      ],
+      "legs": [
+        [
+          "7"
+        ]
+      ],
+      "outcome": "loss",
+      "costCents": 900,
+      "returnedCents": 0,
+      "plCents": -900,
+      "note": null
+    },
+    {
+      "ts": "2026-09-02T12:42:27.994Z",
+      "level": "info",
+      "stream": "decision-trace",
+      "event": "ticket_graded",
+      "correlationId": "e667a1ce-d659-4f10-be53-a3d8e0ec589b",
+      "cardId": 66,
+      "ticketId": 938,
+      "engineVersion": "lean-1.1",
+      "betType": "exacta_box",
+      "races": [
+        10
+      ],
+      "legs": [
+        [
+          "7",
+          "1"
+        ]
+      ],
+      "outcome": "win",
+      "costCents": 800,
+      "returnedCents": 2560,
+      "plCents": 1760,
+      "note": null
+    },
+    {
+      "ts": "2026-09-02T12:42:27.994Z",
+      "level": "info",
+      "stream": "decision-trace",
+      "event": "ticket_graded",
+      "correlationId": "e667a1ce-d659-4f10-be53-a3d8e0ec589b",
+      "cardId": 66,
+      "ticketId": 939,
+      "engineVersion": "lean-1.1",
+      "betType": "exacta",
+      "races": [
+        10
+      ],
+      "legs": [
+        [
+          "7"
+        ],
+        [
+          "2"
+        ]
+      ],
+      "outcome": "loss",
+      "costCents": 100,
+      "returnedCents": 0,
+      "plCents": -100,
+      "note": null
+    },
+    {
+      "ts": "2026-09-02T12:42:27.994Z",
+      "level": "info",
+      "stream": "decision-trace",
+      "event": "ticket_graded",
+      "correlationId": "e667a1ce-d659-4f10-be53-a3d8e0ec589b",
+      "cardId": 66,
+      "ticketId": 940,
+      "engineVersion": "lean-1.1",
+      "betType": "win",
+      "races": [
+        11
+      ],
+      "legs": [
+        [
+          "10"
+        ]
+      ],
+      "outcome": "loss",
+      "costCents": 900,
+      "returnedCents": 0,
+      "plCents": -900,
+      "note": null
+    },
+    {
+      "ts": "2026-09-02T12:42:27.995Z",
+      "level": "info",
+      "stream": "decision-trace",
+      "event": "ticket_graded",
+      "correlationId": "e667a1ce-d659-4f10-be53-a3d8e0ec589b",
+      "cardId": 66,
+      "ticketId": 941,
+      "engineVersion": "lean-1.1",
+      "betType": "exacta_box",
+      "races": [
+        11
+      ],
+      "legs": [
+        [
+          "10",
+          "12"
+        ]
+      ],
+      "outcome": "loss",
+      "costCents": 800,
+      "returnedCents": 0,
+      "plCents": -800,
+      "note": null
+    },
+    {
+      "ts": "2026-09-02T12:42:27.995Z",
+      "level": "info",
+      "stream": "decision-trace",
+      "event": "ticket_graded",
+      "correlationId": "e667a1ce-d659-4f10-be53-a3d8e0ec589b",
+      "cardId": 66,
+      "ticketId": 942,
+      "engineVersion": "lean-1.1",
+      "betType": "exacta",
+      "races": [
+        11
+      ],
+      "legs": [
+        [
+          "10"
+        ],
+        [
+          "13"
+        ]
+      ],
+      "outcome": "refund",
+      "costCents": 100,
+      "returnedCents": 100,
+      "plCents": 0,
+      "note": "all combinations scratched"
+    },
+    {
+      "ts": "2026-09-02T12:42:27.995Z",
+      "level": "info",
+      "stream": "decision-trace",
+      "event": "card_graded",
+      "correlationId": "e667a1ce-d659-4f10-be53-a3d8e0ec589b",
+      "cardId": 66,
+      "gradedBy": "e667a1ce-d659-4f10-be53-a3d8e0ec589b",
+      "engineVersion": "lean-1.1",
+      "costCents": 20000,
+      "returnedCents": 21990,
+      "outcomes": {
+        "win": 7,
+        "loss": 18,
+        "refund": 5
+      },
+      "plCents": 1990,
+      "topTicketShare": 0.16552978626648476
+    },
+    {
+      "ts": "2026-09-02T12:42:28.002Z",
+      "level": "info",
+      "stream": "decision-trace",
+      "event": "backfill_day",
+      "correlationId": "e667a1ce-d659-4f10-be53-a3d8e0ec589b",
+      "runId": "9f79ef77-e3ab-4364-9647-1d85ab5bd95c",
+      "date": "2025-08-02",
+      "meet": "DMR-2025-summer",
+      "status": "saved",
+      "note": "6 non-blocking warning(s)",
+      "raceDayId": 37,
+      "cardId": 66,
+      "queueId": null,
+      "blocking": [],
+      "nonBlocking": [
+        "program_ml_disagreement",
+        "program_ml_disagreement",
+        "finish_order_conflict",
+        "unrecognized_mutuel",
+        "unrecognized_mutuel",
+        "unrecognized_mutuel"
+      ],
+      "completeness": "PROGRAM_ONLY",
+      "engineVersion": "lean-1.1",
+      "crossSource": null
+    }
+  ]
+}

@@ -10,3 +10,9 @@ tests/fixtures/** -text
 # them CRLF endings, and sh then fails on the shebang ("bad interpreter:
 # /bin/sh^M") - so the guard on main would silently stop guarding. Pin LF.
 scripts/git-hooks/* text eol=lf
+
+# The frozen pre-pivot corpus is EVIDENCE. core.autocrlf would rewrite the JSON
+# exports on checkout, so a fresh clone's bytes would differ from the ones that
+# were frozen - which defeats the point of an archive and invalidates the
+# sha256 recorded in its README. Same reasoning as tests/fixtures/**.
+archive/** -text
