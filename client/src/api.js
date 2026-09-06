@@ -26,6 +26,31 @@ export const parseEquibaseEntries = (html, { oddsCapturedAt = null, correlationI
     body: JSON.stringify({ html, oddsCapturedAt }),
   }).then(asJson);
 
+// Bulk entries zip. The FILE is posted as a raw application/zip body rather
+// than read in the browser: a day's decompressed HTML is 15-17MB against the
+// 10mb JSON limit, while the archive itself is about 2MB. Posted twice, once
+// to preview and once to save, so the server re-parses rather than trusting a
+// client-shaped payload.
+export const previewEntriesZip = (file, correlationId) =>
+  fetch('/api/parse/equibase-entries-zip', {
+    method: 'POST',
+    headers: { 'content-type': 'application/zip', ...(correlationId ? { 'x-correlation-id': correlationId } : {}) },
+    body: file,
+  }).then(asJson);
+
+export const saveEntriesZip = (file, { replace = false, bankrollCents, perRaceMinCents } = {}, correlationId) => {
+  const q = new URLSearchParams({
+    ...(replace ? { replace: '1' } : {}),
+    ...(bankrollCents != null ? { bankrollCents: String(bankrollCents) } : {}),
+    ...(perRaceMinCents != null ? { perRaceMinCents: String(perRaceMinCents) } : {}),
+  });
+  return fetch(`/api/race-days/from-zip?${q}`, {
+    method: 'POST',
+    headers: { 'content-type': 'application/zip', ...(correlationId ? { 'x-correlation-id': correlationId } : {}) },
+    body: file,
+  }).then(asJson);
+};
+
 export function parseEntriesText(text, correlationId) {
   return fetch('/api/parse/entries-text', {
     method: 'POST',
