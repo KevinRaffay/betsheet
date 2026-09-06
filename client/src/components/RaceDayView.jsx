@@ -3,11 +3,17 @@ import { deleteRaceDay, deletionPreview, getRaceDay } from '../api.js';
 import CardsPanel from './CardsPanel.jsx';
 import ResultsPanel from './ResultsPanel.jsx';
 import EquibaseOtrPanel from './EquibaseOtrPanel.jsx';
+import { entriesStaleness } from '@shared/staleness.js';
 
 // Read-only view of a stored race day - what actually landed in the
 // database, not what the parser proposed.
 export default function RaceDayView({ id, onBack, onOpenCard }) {
   const [day, setDay] = useState(null);
+  // ONE clock for the whole render, so the day banner and every per-race
+  // tag agree with each other. Re-read on each render rather than held in
+  // state: this is a page you leave and come back to, and a stale `now`
+  // reporting stale entries as fresh is the one thing it must not do.
+  const now = new Date();
   const [error, setError] = useState(null);
   const [confirm, setConfirm] = useState(null); // deletion-preview counts
   const [busy, setBusy] = useState(false);
@@ -75,6 +81,23 @@ export default function RaceDayView({ id, onBack, onOpenCard }) {
         {' '}· per-race min {day.per_race_min_cents != null ? `$${(day.per_race_min_cents / 100).toFixed(0)}` : '—'}
         {' '}· {day.races.length} races
       </p>
+      {/* D117: how old are the entries you are about to bet on? One
+          `odds_captured_at` covers the whole card - the Equibase page prints
+          no per-race time - so later races are staler than earlier ones by
+          construction, and the per-race tag below is what makes that visible
+          rather than something to reason about. A day ingested any other way
+          has no capture time at all, and this says so rather than staying
+          silent, because silence would read as "current". */}
+      {(() => {
+        const s = entriesStaleness({ capturedAt: day.odds_captured_at, raceDate: day.date, now });
+        if (!s.known) return null;
+        return (
+          <p className={`notice notice--${s.state === 'stale' ? 'warn' : 'ok'}`}>
+            {s.label}
+            {s.state === 'stale' && ' - scratches and odds may have moved since. Re-save the page to refresh.'}
+          </p>
+        );
+      })()}
       {/* D98: the hand-builder posts to D54's own endpoints, which take the
           card's bankroll. RaceDayView already holds the day, so pass it down
           rather than making CardsPanel fetch the day a second time. */}
@@ -87,6 +110,29 @@ export default function RaceDayView({ id, onBack, onOpenCard }) {
             <strong>Race {race.number}</strong>
             {' '}· {race.surface ?? '?'} · {race.distance ?? '?'} · {race.race_type ?? '?'}
             {' '}· post {race.post_time ?? '?'}
+            {(() => {
+              const s = entriesStaleness({
+                capturedAt: day.odds_captured_at, raceDate: day.date, postTime: race.post_time, now,
+              });
+              if (!s.known) return null;
+              // `ran` is null whenever saying so would need the track's
+              // timezone, which nothing stores - see shared/staleness.js. The
+              // tag simply does not appear in that case rather than guessing.
+              if (s.ran) {
+                return (
+                  <span className="dim" title={s.assumesViewerClock
+                    ? 'Compared against this device\'s clock - the track\'s timezone is not recorded.'
+                    : 'This race day is in the past.'}
+                  >{' '}· past post</span>
+                );
+              }
+              // The separating space sits OUTSIDE the tag: inside it, the
+              // tag's own padding swallows it and the summary reads
+              // "post 1:30 PMentries 180m old".
+              return s.state === 'stale'
+                ? <>{' '}<span className="tag tag--gold" title={s.label}>entries {s.minutesOld}m old</span></>
+                : null;
+            })()}
           </summary>
           {race.conditions && <p className="conditions">{race.conditions}</p>}
           <table className="grid">
