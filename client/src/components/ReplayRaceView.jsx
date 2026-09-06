@@ -1,7 +1,7 @@
 import React, { useEffect, useState } from 'react';
 import {
   blindnessLabel, closeReplayCard, getRaceDay, getReplayRace, getReplaySummary, listCards, lockHumanCard, previewHumanCard,
-  revealClassification, revealReplayRace,
+  revealReplayRace,
 } from '../api.js';
 import TicketBuilder from './TicketBuilder.jsx';
 
@@ -13,10 +13,14 @@ const pct = (x) => (x == null ? '—' : `${x >= 0 ? '+' : ''}${(100 * x).toFixed
 
 // Replay (D55) blind race view: paste/preview/lock/PASS call D54's own
 // endpoints directly - this component adds nothing to how a human ticket
-// gets built, only the blind-then-reveal session around it. Consensus
-// shown is raw per-source picks only (shared/classification.js's
-// buildConsensusTable) - the engine's own UNANIMOUS/SPLIT/CHAOS read and
-// contrarian flags stay hidden unless this card opts in.
+// gets built, only the blind-then-reveal session around it.
+//
+// It used to show a Consensus panel here - raw per-source picks, with the
+// engine's own UNANIMOUS/SPLIT/CHAOS read behind a one-way opt-in reveal.
+// D112 removed consensus and D111 removed the engine, so both are gone: no
+// source writes a pick, and there is no engine whose read could be revealed.
+// What a race shows blind is now the entries, the wager menu and the
+// program's Bottom Line.
 export default function ReplayRaceView({ dayId, initialRace = 1, onBack, onOpenStanding }) {
   const [raceNumber, setRaceNumber] = useState(initialRace);
   const [totalRaces, setTotalRaces] = useState(null);
@@ -88,11 +92,6 @@ export default function ReplayRaceView({ dayId, initialRace = 1, onBack, onOpenS
     await revealReplayRace(cardId, raceNumber);
     await reload();
     refreshSummary(); // revealing the last remaining race can make the card closed without ever clicking Close
-  });
-
-  const handleRevealClassification = withBusy(async () => {
-    await revealClassification(cardId);
-    await reload();
   });
 
   const handleClose = withBusy(async () => {
@@ -167,40 +166,6 @@ export default function ReplayRaceView({ dayId, initialRace = 1, onBack, onOpenS
             <p>{blind.bottomLineText}</p>
           </details>
         )}
-
-        <details className="race-entries" open>
-          <summary>Consensus ({blind.consensus.table.length} source{blind.consensus.table.length === 1 ? '' : 's'})</summary>
-          {blind.consensus.table.length === 0
-            ? <p className="dim">Program only - no consensus on file.</p>
-            : (
-              <table className="grid">
-                <thead><tr><th>Source</th><th>Top</th><th>2nd</th><th>3rd</th><th>Watch/contrarian</th></tr></thead>
-                <tbody>
-                  {blind.consensus.table.map((s) => (
-                    <tr key={s.name}>
-                      <td>{s.name}</td>
-                      <td>{s.top ? `#${s.top.programNumber} ${s.top.horseName}` : '—'}</td>
-                      <td>{s.second ? `#${s.second.programNumber} ${s.second.horseName}` : '—'}</td>
-                      <td>{s.third ? `#${s.third.programNumber} ${s.third.horseName}` : '—'}</td>
-                      <td className="dim">{s.flagged.map((f) => `#${f.programNumber} ${f.horseName}`).join(', ') || '—'}</td>
-                    </tr>
-                  ))}
-                </tbody>
-              </table>
-            )}
-          {'classification' in blind.consensus ? (
-            <p className="dim">
-              Engine's read revealed: <span className={`chip chip--${blind.consensus.classification.toLowerCase()}`}>{blind.consensus.classification}</span>
-              {blind.consensus.contrarianFlags?.length > 0 && <> · {blind.consensus.contrarianFlags.map((f) => f.detail).join('; ')}</>}
-            </p>
-          ) : cardId && (
-            <p className="dim">
-              <button className="btn btn--sm" disabled={busy} onClick={handleRevealClassification}>
-                Reveal the engine's read of this race (one-way, applies to the whole card)
-              </button>
-            </p>
-          )}
-        </details>
 
         {(!blind.locked || editing) && (
           <div className="formrow">

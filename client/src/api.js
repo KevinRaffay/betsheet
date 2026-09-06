@@ -117,12 +117,6 @@ export const resetAppApi = () =>
     body: JSON.stringify({ confirm: 'RESET' }),
   }).then(asJson);
 
-export const fetchConsensus = (id) =>
-  fetch(`/api/race-days/${id}/fetch-consensus`, { method: 'POST' }).then(asJson);
-
-export const getConsensus = (id) =>
-  fetch(`/api/race-days/${id}/consensus`).then(asJson);
-
 export const manualPicksPreview = (id, sourceName, text) =>
   fetch(`/api/race-days/${id}/consensus/manual-preview`, {
     method: 'POST',
@@ -266,8 +260,6 @@ export const getReplayDayRaces = (dayId, cardId) =>
   fetch(`/api/replay/days/${dayId}/races${cardId ? `?cardId=${cardId}` : ''}`).then(asJson);
 export const getReplayRace = (dayId, race, cardId) =>
   fetch(`/api/replay/days/${dayId}/races/${race}${cardId ? `?cardId=${cardId}` : ''}`).then(asJson);
-export const revealClassification = (cardId) =>
-  fetch(`/api/replay/cards/${cardId}/reveal-classification`, { method: 'POST' }).then(asJson);
 export const revealReplayRace = (cardId, race) =>
   fetch(`/api/replay/cards/${cardId}/races/${race}/reveal`, { method: 'POST' }).then(asJson);
 export const closeReplayCard = (cardId) =>

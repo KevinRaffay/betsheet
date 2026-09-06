@@ -1,17 +1,20 @@
 // Standing cautions printed at the foot of every card sheet (D109).
 //
-// Moved out of shared/card-engine.js, which the pivot deletes, because
-// CardView.jsx renders them on EVERY card - human, LLM and OTR included - not
-// just engine-generated ones.
+// Moved out of shared/card-engine.js because CardView.jsx renders them on
+// EVERY card - human, LLM and OTR included - not just engine-generated ones.
+// The engine itself is gone (D111); these outlived it because they are about
+// betting, not about generation.
 //
-// RELOCATED VERBATIM. Two of the three are consensus-era copy and speak of
-// unanimous agreement, chaos days and multiple sources, none of which will
-// exist after the consensus engine is removed - and which are already wrong on
-// the three non-engine buckets today. Pruning them is P-1.4's job, when
-// consensus actually goes; doing it here would mix a copy change into a pure
-// move and make both harder to review.
+// D112 pruned the two consensus-era lines the D109 relocation deliberately
+// carried over unchanged. They spoke of unanimous agreement, chaos days and
+// "2+-source horses" - a vocabulary that described the deleted engine's own
+// D09 classification, was already wrong on the three non-engine buckets, and
+// after the consensus removal named nothing that exists. The third line said
+// something true of every card whoever built it, so it stayed; the two that
+// replace the pruned pair are in the same register and are true of what the
+// system actually produces now.
 export const FAILURE_MODE_WARNINGS = [
-  'Unanimous consensus is not certainty: a 7/2 shot everyone agrees on still loses most of the time - and when it loses, the race often comes apart completely.',
-  'On chaos days, second-tier "watch out for" horses win at prices - small coverage on 2+-source horses is on this card for that reason.',
+  'A pick you agree with is not a pick that wins: a short-priced horse everyone likes still loses most of the time, and the race it loses often comes apart completely.',
+  'Every card here is one sample. A day\'s result - good or bad - is not evidence about the source that produced it until there are enough days to say so.',
   'Expert sources and the public draw from the same well; a card of double-digit winners beats every source simultaneously. This card promises nothing variance does not allow.',
 ];

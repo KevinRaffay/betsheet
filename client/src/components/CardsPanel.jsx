@@ -47,7 +47,7 @@ export default function CardsPanel({ dayId, bankrollCents, onOpenCard }) {
           <thead>
             <tr>
               <th>#</th><th>Template</th><th>Variant</th><th>Engine</th><th>Bankroll</th><th>Per-race min</th>
-              <th>Consensus</th><th>Tickets</th><th>Day total</th><th>Generated</th>
+              <th>Bucket</th><th>Tickets</th><th>Day total</th><th>Generated</th>
             </tr>
           </thead>
           <tbody>

@@ -1,6 +1,5 @@
 import React, { useEffect, useState } from 'react';
 import { deleteRaceDay, deletionPreview, getRaceDay } from '../api.js';
-import ConsensusPanel from './ConsensusPanel.jsx';
 import CardsPanel from './CardsPanel.jsx';
 import ResultsPanel from './ResultsPanel.jsx';
 import EquibaseOtrPanel from './EquibaseOtrPanel.jsx';
@@ -81,7 +80,6 @@ export default function RaceDayView({ id, onBack, onOpenCard }) {
           rather than making CardsPanel fetch the day a second time. */}
       <CardsPanel dayId={day.id} bankrollCents={day.bankroll_cents} onOpenCard={onOpenCard} />
       <ResultsPanel dayId={day.id} />
-      <ConsensusPanel dayId={day.id} />
       <EquibaseOtrPanel dayId={day.id} />
       {day.races.map((race) => (
         <details className="race" key={race.id} open>

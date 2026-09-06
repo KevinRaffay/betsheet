@@ -130,7 +130,7 @@ export default function CardView({ cardId, onBack, onDeleted, embedded = false }
         <span className={`chip chip--${card.consensus_completeness === 'FULL' ? 'unanimous' : card.consensus_completeness === 'PARTIAL' ? 'split' : card.consensus_completeness === 'HUMAN' ? 'human' : card.consensus_completeness === 'LLM_GENERATED' ? 'llm' : 'chaos'}`}>
           {card.consensus_completeness}
         </span>
-        {' '}consensus · template {card.template ?? '—'} · engine <code>{card.engine_version ?? 'lean-0'}</code>
+        {' '}· template {card.template ?? '—'} · engine <code>{card.engine_version ?? 'lean-0'}</code>
         {card.llm_model && <> · model <code>{modelLabel(card.llm_model)}</code></>}{card.notes_present ? <> · <span className="tag tag--gold">analyst notes</span></> : null} · bankroll {money(card.bankroll_cents)}
         {' '}· per-race min {money(card.per_race_min_cents)} · generated {card.created_at}
       </p>
@@ -222,7 +222,14 @@ export default function CardView({ cardId, onBack, onDeleted, embedded = false }
             <summary>
               <span className="race-sheet-head">
                 <strong>Race {a.race_number}</strong>
-                <span className={`chip chip--${(a.classification ?? 'chaos').toLowerCase()}`}>{a.classification ?? '—'}</span>
+                {/* The D09 classification chip. Nothing writes races.classification
+                    since D112 removed consensus, so this renders for HISTORICAL
+                    races only - a stored value stays visible on the card it was
+                    computed for, and a race that never had one shows no chip
+                    rather than an em dash styled as if it were a CHAOS call. */}
+                {a.classification && (
+                  <span className={`chip chip--${a.classification.toLowerCase()}`}>{a.classification}</span>
+                )}
                 <span className="dim">
                   post {a.post_time ?? '?'} · {a.surface ?? '?'} · {a.distance ?? '?'} · {a.race_type ?? '?'}
                 </span>

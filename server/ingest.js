@@ -19,7 +19,7 @@ import { DEFAULT_RAW_DIR, dayDir, meetForDay, readManifest } from './dmtc-crawle
 import fs from 'node:fs';
 import path from 'node:path';
 import { listFetchers, loadExtraFetchers } from './fetchers/index.js';
-import { fetchWithTimeout, recordAttempt, robotsDisallows, upsertSource } from './consensus.js';
+import { fetchWithTimeout, recordAttempt, robotsDisallows, upsertSource } from './polite-fetch.js';
 import { extractPdfLines } from './pdf-text.js';
 import { getDb } from './db.js';
 import { getLogger, newCorrelationId } from './logging.js';

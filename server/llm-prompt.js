@@ -198,12 +198,18 @@ const dollars = (cents) => (cents / 100).toFixed(2);
  * Builds the per-race user prompt. `race`: {number, surface, distance,
  * raceType, postTime, wagerMenu, bottomLineText}. `entries`:
  * [{programNumber, horseName, morningLine, programRank, bestBet,
- * scratched}]. `consensusTable`: shared/classification.js's
- * buildConsensusTable output ([{name, top, second, third, flagged}]).
- * `bankroll`: {perRaceCents, remainingCents, racesRemaining}.
+ * scratched}]. `bankroll`: {perRaceCents, remainingCents, racesRemaining}.
+ *
+ * D112 removed the CONSENSUS section along with consensus itself. This is a
+ * REAL prompt change with no version axis to carry it - every LLM card is
+ * `engine_version: 'llm'` - so a card generated from here on is not
+ * prompt-comparable with one generated before, and docs/prompts/llm-card-v1.md
+ * records that boundary. It was unavoidable rather than chosen: with nothing
+ * writing consensus_picks, the section could only ever have printed its own
+ * "no external consensus on file" line, forever.
  */
 export function buildLlmRaceUserPrompt({
-  raceNumber, totalRaces, track, date, race, entries, bottomLineText, consensusTable, bankroll, notes,
+  raceNumber, totalRaces, track, date, race, entries, bottomLineText, bankroll, notes,
 }) {
   const lines = [];
   lines.push(`RACE ${raceNumber} of ${totalRaces} - ${track}, ${date}`);
@@ -222,38 +228,6 @@ export function buildLlmRaceUserPrompt({
     lines.push('');
     lines.push('PROGRAM BOTTOM LINE');
     lines.push(bottomLineText);
-  }
-  lines.push('');
-  lines.push('CONSENSUS');
-  // D74: Equibase Off to the Races prints a show pick, a win pick and two
-  // unranked box mentions - not a top/2nd/3rd order, so it gets its own
-  // sentence in its own vocabulary rather than being forced through the
-  // generic ranked line below (which would misrepresent an unranked box
-  // mention as a "3rd" pick it never claimed to be).
-  const OTR_SOURCE_NAME = 'Equibase Off to the Races';
-  const otr = consensusTable?.find((s) => s.name === OTR_SOURCE_NAME);
-  const others = (consensusTable ?? []).filter((s) => s.name !== OTR_SOURCE_NAME);
-  if (!others.length && !otr) {
-    lines.push('No external consensus on file for this race - program analysis and morning line only.');
-  } else {
-    for (const s of others) {
-      const top = s.top ? `#${s.top.programNumber} ${s.top.horseName}` : '—';
-      const second = s.second ? `#${s.second.programNumber} ${s.second.horseName}` : '—';
-      const third = s.third ? `#${s.third.programNumber} ${s.third.horseName}` : '—';
-      const flagged = s.flagged?.length ? `, watch/contrarian: ${s.flagged.map((f) => `#${f.programNumber} ${f.horseName}`).join(', ')}` : '';
-      lines.push(`${s.name}: top ${top}, 2nd ${second}, 3rd ${third}${flagged}`);
-    }
-    if (otr) {
-      const box = [otr.top, otr.second, ...(otr.flagged ?? [])].filter(Boolean);
-      const boxText = box.map((p) => `#${p.programNumber}${p.horseName ? ` ${p.horseName}` : ''}`).join(', ');
-      const show = otr.top ? `#${otr.top.programNumber} ${otr.top.horseName}` : '—';
-      const win = otr.second ? `#${otr.second.programNumber} ${otr.second.horseName}` : '—';
-      lines.push(
-        `${OTR_SOURCE_NAME} (the free at-track sheet, algorithmic): `
-        + `show pick ${show}; win pick ${win} (higher-reward tier); `
-        + `${box.length}-horse exacta box ${boxText}.`,
-      );
-    }
   }
   // Analyst notes go LAST (D92): after ENTRIES so the roster is already in
   // context for the "names beat numbers" rule, and at the boundary of the
