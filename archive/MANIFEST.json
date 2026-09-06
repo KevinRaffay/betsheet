@@ -1,0 +1,1839 @@
+{
+  "frozenAt": "2026-09-06T04:53:19Z",
+  "database": {
+    "file": "betsheet-pre-pivot-2026-09-06.db",
+    "bytes": 25088000,
+    "sha256": "90204a10875a78c0a4a548b0cee389ee6a945326b22de676ff99d2bc398af7b7",
+    "rowCounts": {
+      "race_days": 75,
+      "races": 699,
+      "entries": 6784,
+      "cards": 108,
+      "tickets": 2811,
+      "graded_tickets": 2811,
+      "allocations": 946,
+      "race_results": 5960,
+      "exotic_payoffs": 4794,
+      "consensus_picks": 92,
+      "llm_card_requests": 130,
+      "llm_notes": 11,
+      "human_race_state": 28,
+      "simulation_runs": 50,
+      "result_charts": 75
+    }
+  },
+  "cards": {
+    "total": 108,
+    "exported": 106,
+    "refused": 2
+  },
+  "refused": [
+    {
+      "id": 100,
+      "card_number": 1,
+      "engine_version": "lean-1.1",
+      "llm_model": null,
+      "date": "2025-10-31",
+      "track": "Del Mar",
+      "deleted_at": "2026-09-02T13:27:59Z",
+      "reason": "This card belongs to a deleted race day; deleted days are excluded from exports."
+    },
+    {
+      "id": 101,
+      "card_number": 1,
+      "engine_version": "lean-1.1",
+      "llm_model": null,
+      "date": "2025-11-01",
+      "track": "Del Mar",
+      "deleted_at": "2026-09-02T13:28:00Z",
+      "reason": "This card belongs to a deleted race day; deleted days are excluded from exports."
+    }
+  ],
+  "exports": [
+    {
+      "cardId": 57,
+      "file": "card-057.json",
+      "date": "2025-07-18",
+      "track": "Del Mar",
+      "engineVersion": "lean-1.1",
+      "llmModel": null,
+      "tickets": 28,
+      "graded": true,
+      "plCents": -10360,
+      "outcomes": {
+        "win": 2,
+        "loss": 21,
+        "refund": 5
+      },
+      "traceStatus": "complete"
+    },
+    {
+      "cardId": 120,
+      "file": "card-120.json",
+      "date": "2025-07-18",
+      "track": "Del Mar",
+      "engineVersion": "llm",
+      "llmModel": "claude-sonnet-5",
+      "tickets": 27,
+      "graded": true,
+      "plCents": -9740,
+      "outcomes": {
+        "loss": 24,
+        "win": 3
+      },
+      "traceStatus": "missing"
+    },
+    {
+      "cardId": 121,
+      "file": "card-121.json",
+      "date": "2025-07-18",
+      "track": "Del Mar",
+      "engineVersion": "llm",
+      "llmModel": "claude-opus-5",
+      "tickets": 45,
+      "graded": true,
+      "plCents": -12660,
+      "outcomes": {
+        "loss": 44,
+        "win": 1
+      },
+      "traceStatus": "missing"
+    },
+    {
+      "cardId": 122,
+      "file": "card-122.json",
+      "date": "2025-07-18",
+      "track": "Del Mar",
+      "engineVersion": "llm",
+      "llmModel": "claude-fable-5-1",
+      "tickets": 37,
+      "graded": true,
+      "plCents": -9820,
+      "outcomes": {
+        "win": 2,
+        "loss": 35
+      },
+      "traceStatus": "missing"
+    },
+    {
+      "cardId": 134,
+      "file": "card-134.json",
+      "date": "2025-07-18",
+      "track": "Del Mar",
+      "engineVersion": "human",
+      "llmModel": null,
+      "tickets": 0,
+      "graded": false,
+      "plCents": null,
+      "outcomes": null,
+      "traceStatus": "missing"
+    },
+    {
+      "cardId": 58,
+      "file": "card-058.json",
+      "date": "2025-07-19",
+      "track": "Del Mar",
+      "engineVersion": "lean-1.1",
+      "llmModel": null,
+      "tickets": 32,
+      "graded": true,
+      "plCents": -12510,
+      "outcomes": {
+        "loss": 27,
+        "win": 4,
+        "refund": 1
+      },
+      "traceStatus": "complete"
+    },
+    {
+      "cardId": 59,
+      "file": "card-059.json",
+      "date": "2025-07-20",
+      "track": "Del Mar",
+      "engineVersion": "lean-1.1",
+      "llmModel": null,
+      "tickets": 29,
+      "graded": true,
+      "plCents": -11290,
+      "outcomes": {
+        "win": 3,
+        "loss": 23,
+        "refund": 3
+      },
+      "traceStatus": "complete"
+    },
+    {
+      "cardId": 60,
+      "file": "card-060.json",
+      "date": "2025-07-24",
+      "track": "Del Mar",
+      "engineVersion": "lean-1.1",
+      "llmModel": null,
+      "tickets": 21,
+      "graded": true,
+      "plCents": 690,
+      "outcomes": {
+        "win": 5,
+        "loss": 15,
+        "refund": 1
+      },
+      "traceStatus": "complete"
+    },
+    {
+      "cardId": 61,
+      "file": "card-061.json",
+      "date": "2025-07-25",
+      "track": "Del Mar",
+      "engineVersion": "lean-1.1",
+      "llmModel": null,
+      "tickets": 20,
+      "graded": true,
+      "plCents": 11070,
+      "outcomes": {
+        "loss": 15,
+        "refund": 1,
+        "win": 4
+      },
+      "traceStatus": "complete"
+    },
+    {
+      "cardId": 62,
+      "file": "card-062.json",
+      "date": "2025-07-26",
+      "track": "Del Mar",
+      "engineVersion": "lean-1.1",
+      "llmModel": null,
+      "tickets": 31,
+      "graded": true,
+      "plCents": -8160,
+      "outcomes": {
+        "win": 7,
+        "loss": 24
+      },
+      "traceStatus": "complete"
+    },
+    {
+      "cardId": 63,
+      "file": "card-063.json",
+      "date": "2025-07-27",
+      "track": "Del Mar",
+      "engineVersion": "lean-1.1",
+      "llmModel": null,
+      "tickets": 27,
+      "graded": true,
+      "plCents": 500,
+      "outcomes": {
+        "refund": 3,
+        "win": 6,
+        "loss": 18
+      },
+      "traceStatus": "complete"
+    },
+    {
+      "cardId": 64,
+      "file": "card-064.json",
+      "date": "2025-07-31",
+      "track": "Del Mar",
+      "engineVersion": "lean-1.1",
+      "llmModel": null,
+      "tickets": 23,
+      "graded": true,
+      "plCents": -5720,
+      "outcomes": {
+        "win": 2,
+        "loss": 21
+      },
+      "traceStatus": "complete"
+    },
+    {
+      "cardId": 65,
+      "file": "card-065.json",
+      "date": "2025-08-01",
+      "track": "Del Mar",
+      "engineVersion": "lean-1.1",
+      "llmModel": null,
+      "tickets": 20,
+      "graded": true,
+      "plCents": -3560,
+      "outcomes": {
+        "loss": 15,
+        "refund": 1,
+        "win": 4
+      },
+      "traceStatus": "complete"
+    },
+    {
+      "cardId": 66,
+      "file": "card-066.json",
+      "date": "2025-08-02",
+      "track": "Del Mar",
+      "engineVersion": "lean-1.1",
+      "llmModel": null,
+      "tickets": 30,
+      "graded": true,
+      "plCents": 1990,
+      "outcomes": {
+        "win": 7,
+        "loss": 18,
+        "refund": 5
+      },
+      "traceStatus": "complete"
+    },
+    {
+      "cardId": 67,
+      "file": "card-067.json",
+      "date": "2025-08-03",
+      "track": "Del Mar",
+      "engineVersion": "lean-1.1",
+      "llmModel": null,
+      "tickets": 30,
+      "graded": true,
+      "plCents": -2730,
+      "outcomes": {
+        "win": 6,
+        "loss": 19,
+        "refund": 5
+      },
+      "traceStatus": "complete"
+    },
+    {
+      "cardId": 68,
+      "file": "card-068.json",
+      "date": "2025-08-07",
+      "track": "Del Mar",
+      "engineVersion": "lean-1.1",
+      "llmModel": null,
+      "tickets": 20,
+      "graded": true,
+      "plCents": -1460,
+      "outcomes": {
+        "win": 3,
+        "loss": 14,
+        "refund": 3
+      },
+      "traceStatus": "complete"
+    },
+    {
+      "cardId": 69,
+      "file": "card-069.json",
+      "date": "2025-08-08",
+      "track": "Del Mar",
+      "engineVersion": "lean-1.1",
+      "llmModel": null,
+      "tickets": 21,
+      "graded": true,
+      "plCents": -6650,
+      "outcomes": {
+        "loss": 16,
+        "win": 4,
+        "refund": 1
+      },
+      "traceStatus": "complete"
+    },
+    {
+      "cardId": 70,
+      "file": "card-070.json",
+      "date": "2025-08-09",
+      "track": "Del Mar",
+      "engineVersion": "lean-1.1",
+      "llmModel": null,
+      "tickets": 26,
+      "graded": true,
+      "plCents": 19000,
+      "outcomes": {
+        "loss": 15,
+        "win": 10,
+        "refund": 1
+      },
+      "traceStatus": "complete"
+    },
+    {
+      "cardId": 71,
+      "file": "card-071.json",
+      "date": "2025-08-10",
+      "track": "Del Mar",
+      "engineVersion": "lean-1.1",
+      "llmModel": null,
+      "tickets": 22,
+      "graded": true,
+      "plCents": -5260,
+      "outcomes": {
+        "win": 4,
+        "loss": 15,
+        "refund": 3
+      },
+      "traceStatus": "complete"
+    },
+    {
+      "cardId": 72,
+      "file": "card-072.json",
+      "date": "2025-08-14",
+      "track": "Del Mar",
+      "engineVersion": "lean-1.1",
+      "llmModel": null,
+      "tickets": 22,
+      "graded": true,
+      "plCents": 720,
+      "outcomes": {
+        "loss": 14,
+        "win": 3,
+        "refund": 5
+      },
+      "traceStatus": "complete"
+    },
+    {
+      "cardId": 73,
+      "file": "card-073.json",
+      "date": "2025-08-15",
+      "track": "Del Mar",
+      "engineVersion": "lean-1.1",
+      "llmModel": null,
+      "tickets": 25,
+      "graded": true,
+      "plCents": -8430,
+      "outcomes": {
+        "win": 3,
+        "loss": 21,
+        "refund": 1
+      },
+      "traceStatus": "complete"
+    },
+    {
+      "cardId": 74,
+      "file": "card-074.json",
+      "date": "2025-08-16",
+      "track": "Del Mar",
+      "engineVersion": "lean-1.1",
+      "llmModel": null,
+      "tickets": 25,
+      "graded": true,
+      "plCents": -4720,
+      "outcomes": {
+        "loss": 19,
+        "win": 2,
+        "refund": 4
+      },
+      "traceStatus": "complete"
+    },
+    {
+      "cardId": 75,
+      "file": "card-075.json",
+      "date": "2025-08-17",
+      "track": "Del Mar",
+      "engineVersion": "lean-1.1",
+      "llmModel": null,
+      "tickets": 24,
+      "graded": true,
+      "plCents": -6850,
+      "outcomes": {
+        "loss": 17,
+        "win": 6,
+        "refund": 1
+      },
+      "traceStatus": "complete"
+    },
+    {
+      "cardId": 76,
+      "file": "card-076.json",
+      "date": "2025-08-21",
+      "track": "Del Mar",
+      "engineVersion": "lean-1.1",
+      "llmModel": null,
+      "tickets": 20,
+      "graded": true,
+      "plCents": 2380,
+      "outcomes": {
+        "win": 7,
+        "loss": 13
+      },
+      "traceStatus": "complete"
+    },
+    {
+      "cardId": 77,
+      "file": "card-077.json",
+      "date": "2025-08-22",
+      "track": "Del Mar",
+      "engineVersion": "lean-1.1",
+      "llmModel": null,
+      "tickets": 20,
+      "graded": true,
+      "plCents": -10150,
+      "outcomes": {
+        "win": 3,
+        "loss": 14,
+        "refund": 3
+      },
+      "traceStatus": "complete"
+    },
+    {
+      "cardId": 78,
+      "file": "card-078.json",
+      "date": "2025-08-23",
+      "track": "Del Mar",
+      "engineVersion": "lean-1.1",
+      "llmModel": null,
+      "tickets": 29,
+      "graded": true,
+      "plCents": -15920,
+      "outcomes": {
+        "loss": 25,
+        "refund": 2,
+        "win": 2
+      },
+      "traceStatus": "complete"
+    },
+    {
+      "cardId": 79,
+      "file": "card-079.json",
+      "date": "2025-08-24",
+      "track": "Del Mar",
+      "engineVersion": "lean-1.1",
+      "llmModel": null,
+      "tickets": 23,
+      "graded": true,
+      "plCents": -8800,
+      "outcomes": {
+        "loss": 16,
+        "win": 4,
+        "refund": 3
+      },
+      "traceStatus": "complete"
+    },
+    {
+      "cardId": 80,
+      "file": "card-080.json",
+      "date": "2025-08-28",
+      "track": "Del Mar",
+      "engineVersion": "lean-1.1",
+      "llmModel": null,
+      "tickets": 21,
+      "graded": true,
+      "plCents": -1310,
+      "outcomes": {
+        "win": 5,
+        "loss": 15,
+        "refund": 1
+      },
+      "traceStatus": "complete"
+    },
+    {
+      "cardId": 81,
+      "file": "card-081.json",
+      "date": "2025-08-29",
+      "track": "Del Mar",
+      "engineVersion": "lean-1.1",
+      "llmModel": null,
+      "tickets": 25,
+      "graded": true,
+      "plCents": -5610,
+      "outcomes": {
+        "loss": 21,
+        "win": 3,
+        "refund": 1
+      },
+      "traceStatus": "complete"
+    },
+    {
+      "cardId": 82,
+      "file": "card-082.json",
+      "date": "2025-08-30",
+      "track": "Del Mar",
+      "engineVersion": "lean-1.1",
+      "llmModel": null,
+      "tickets": 28,
+      "graded": true,
+      "plCents": 1450,
+      "outcomes": {
+        "win": 6,
+        "loss": 20,
+        "refund": 2
+      },
+      "traceStatus": "complete"
+    },
+    {
+      "cardId": 83,
+      "file": "card-083.json",
+      "date": "2025-08-31",
+      "track": "Del Mar",
+      "engineVersion": "lean-1.1",
+      "llmModel": null,
+      "tickets": 31,
+      "graded": true,
+      "plCents": -4650,
+      "outcomes": {
+        "win": 6,
+        "loss": 22,
+        "refund": 3
+      },
+      "traceStatus": "complete"
+    },
+    {
+      "cardId": 84,
+      "file": "card-084.json",
+      "date": "2025-09-01",
+      "track": "Del Mar",
+      "engineVersion": "lean-1.1",
+      "llmModel": null,
+      "tickets": 31,
+      "graded": true,
+      "plCents": 4820,
+      "outcomes": {
+        "loss": 23,
+        "win": 7,
+        "refund": 1
+      },
+      "traceStatus": "complete"
+    },
+    {
+      "cardId": 85,
+      "file": "card-085.json",
+      "date": "2025-09-05",
+      "track": "Del Mar",
+      "engineVersion": "lean-1.1",
+      "llmModel": null,
+      "tickets": 19,
+      "graded": true,
+      "plCents": -12550,
+      "outcomes": {
+        "loss": 15,
+        "win": 3,
+        "refund": 1
+      },
+      "traceStatus": "complete"
+    },
+    {
+      "cardId": 86,
+      "file": "card-086.json",
+      "date": "2025-09-06",
+      "track": "Del Mar",
+      "engineVersion": "lean-1.1",
+      "llmModel": null,
+      "tickets": 30,
+      "graded": true,
+      "plCents": -7090,
+      "outcomes": {
+        "loss": 25,
+        "win": 5
+      },
+      "traceStatus": "complete"
+    },
+    {
+      "cardId": 87,
+      "file": "card-087.json",
+      "date": "2025-09-07",
+      "track": "Del Mar",
+      "engineVersion": "lean-1.1",
+      "llmModel": null,
+      "tickets": 31,
+      "graded": true,
+      "plCents": -13610,
+      "outcomes": {
+        "loss": 24,
+        "refund": 5,
+        "win": 2
+      },
+      "traceStatus": "complete"
+    },
+    {
+      "cardId": 88,
+      "file": "card-088.json",
+      "date": "2025-11-02",
+      "track": "Del Mar",
+      "engineVersion": "lean-1.1",
+      "llmModel": null,
+      "tickets": 23,
+      "graded": true,
+      "plCents": 1170,
+      "outcomes": {
+        "loss": 16,
+        "win": 6,
+        "refund": 1
+      },
+      "traceStatus": "complete"
+    },
+    {
+      "cardId": 89,
+      "file": "card-089.json",
+      "date": "2025-11-07",
+      "track": "Del Mar",
+      "engineVersion": "lean-1.1",
+      "llmModel": null,
+      "tickets": 20,
+      "graded": true,
+      "plCents": -190,
+      "outcomes": {
+        "loss": 14,
+        "refund": 2,
+        "win": 4
+      },
+      "traceStatus": "complete"
+    },
+    {
+      "cardId": 90,
+      "file": "card-090.json",
+      "date": "2025-11-08",
+      "track": "Del Mar",
+      "engineVersion": "lean-1.1",
+      "llmModel": null,
+      "tickets": 23,
+      "graded": true,
+      "plCents": 3290,
+      "outcomes": {
+        "loss": 17,
+        "win": 6
+      },
+      "traceStatus": "complete"
+    },
+    {
+      "cardId": 91,
+      "file": "card-091.json",
+      "date": "2025-11-09",
+      "track": "Del Mar",
+      "engineVersion": "lean-1.1",
+      "llmModel": null,
+      "tickets": 24,
+      "graded": true,
+      "plCents": -9480,
+      "outcomes": {
+        "loss": 16,
+        "refund": 5,
+        "win": 3
+      },
+      "traceStatus": "complete"
+    },
+    {
+      "cardId": 92,
+      "file": "card-092.json",
+      "date": "2025-11-14",
+      "track": "Del Mar",
+      "engineVersion": "lean-1.1",
+      "llmModel": null,
+      "tickets": 21,
+      "graded": true,
+      "plCents": -6350,
+      "outcomes": {
+        "loss": 19,
+        "win": 1,
+        "refund": 1
+      },
+      "traceStatus": "complete"
+    },
+    {
+      "cardId": 93,
+      "file": "card-093.json",
+      "date": "2025-11-16",
+      "track": "Del Mar",
+      "engineVersion": "lean-1.1",
+      "llmModel": null,
+      "tickets": 27,
+      "graded": true,
+      "plCents": 16370,
+      "outcomes": {
+        "loss": 19,
+        "win": 6,
+        "refund": 2
+      },
+      "traceStatus": "complete"
+    },
+    {
+      "cardId": 94,
+      "file": "card-094.json",
+      "date": "2025-11-22",
+      "track": "Del Mar",
+      "engineVersion": "lean-1.1",
+      "llmModel": null,
+      "tickets": 25,
+      "graded": true,
+      "plCents": -11360,
+      "outcomes": {
+        "loss": 20,
+        "win": 5
+      },
+      "traceStatus": "complete"
+    },
+    {
+      "cardId": 95,
+      "file": "card-095.json",
+      "date": "2025-11-23",
+      "track": "Del Mar",
+      "engineVersion": "lean-1.1",
+      "llmModel": null,
+      "tickets": 23,
+      "graded": true,
+      "plCents": -5530,
+      "outcomes": {
+        "loss": 17,
+        "refund": 2,
+        "win": 4
+      },
+      "traceStatus": "complete"
+    },
+    {
+      "cardId": 96,
+      "file": "card-096.json",
+      "date": "2025-11-24",
+      "track": "Del Mar",
+      "engineVersion": "lean-1.1",
+      "llmModel": null,
+      "tickets": 25,
+      "graded": true,
+      "plCents": -10270,
+      "outcomes": {
+        "win": 2,
+        "loss": 19,
+        "refund": 4
+      },
+      "traceStatus": "complete"
+    },
+    {
+      "cardId": 97,
+      "file": "card-097.json",
+      "date": "2025-11-28",
+      "track": "Del Mar",
+      "engineVersion": "lean-1.1",
+      "llmModel": null,
+      "tickets": 21,
+      "graded": true,
+      "plCents": -15800,
+      "outcomes": {
+        "loss": 20,
+        "win": 1
+      },
+      "traceStatus": "complete"
+    },
+    {
+      "cardId": 98,
+      "file": "card-098.json",
+      "date": "2025-11-29",
+      "track": "Del Mar",
+      "engineVersion": "lean-1.1",
+      "llmModel": null,
+      "tickets": 32,
+      "graded": true,
+      "plCents": -3040,
+      "outcomes": {
+        "loss": 24,
+        "win": 5,
+        "refund": 3
+      },
+      "traceStatus": "complete"
+    },
+    {
+      "cardId": 99,
+      "file": "card-099.json",
+      "date": "2025-11-30",
+      "track": "Del Mar",
+      "engineVersion": "lean-1.1",
+      "llmModel": null,
+      "tickets": 26,
+      "graded": true,
+      "plCents": -7880,
+      "outcomes": {
+        "loss": 21,
+        "win": 5
+      },
+      "traceStatus": "complete"
+    },
+    {
+      "cardId": 30,
+      "file": "card-030.json",
+      "date": "2026-07-17",
+      "track": "Del Mar",
+      "engineVersion": "lean-1.1",
+      "llmModel": null,
+      "tickets": 29,
+      "graded": true,
+      "plCents": -6470,
+      "outcomes": {
+        "loss": 26,
+        "win": 3
+      },
+      "traceStatus": "complete"
+    },
+    {
+      "cardId": 31,
+      "file": "card-031.json",
+      "date": "2026-07-18",
+      "track": "Del Mar",
+      "engineVersion": "lean-1.1",
+      "llmModel": null,
+      "tickets": 31,
+      "graded": true,
+      "plCents": 3370,
+      "outcomes": {
+        "loss": 18,
+        "refund": 6,
+        "win": 7
+      },
+      "traceStatus": "complete"
+    },
+    {
+      "cardId": 32,
+      "file": "card-032.json",
+      "date": "2026-07-19",
+      "track": "Del Mar",
+      "engineVersion": "lean-1.1",
+      "llmModel": null,
+      "tickets": 31,
+      "graded": true,
+      "plCents": 10190,
+      "outcomes": {
+        "loss": 23,
+        "win": 8
+      },
+      "traceStatus": "complete"
+    },
+    {
+      "cardId": 33,
+      "file": "card-033.json",
+      "date": "2026-07-23",
+      "track": "Del Mar",
+      "engineVersion": "lean-1.1",
+      "llmModel": null,
+      "tickets": 20,
+      "graded": true,
+      "plCents": -8700,
+      "outcomes": {
+        "win": 2,
+        "loss": 13,
+        "refund": 5
+      },
+      "traceStatus": "complete"
+    },
+    {
+      "cardId": 34,
+      "file": "card-034.json",
+      "date": "2026-07-24",
+      "track": "Del Mar",
+      "engineVersion": "lean-1.1",
+      "llmModel": null,
+      "tickets": 22,
+      "graded": true,
+      "plCents": -6200,
+      "outcomes": {
+        "loss": 19,
+        "refund": 1,
+        "win": 2
+      },
+      "traceStatus": "complete"
+    },
+    {
+      "cardId": 35,
+      "file": "card-035.json",
+      "date": "2026-07-25",
+      "track": "Del Mar",
+      "engineVersion": "lean-1.1",
+      "llmModel": null,
+      "tickets": 27,
+      "graded": true,
+      "plCents": -1430,
+      "outcomes": {
+        "win": 3,
+        "loss": 21,
+        "refund": 3
+      },
+      "traceStatus": "complete"
+    },
+    {
+      "cardId": 36,
+      "file": "card-036.json",
+      "date": "2026-07-26",
+      "track": "Del Mar",
+      "engineVersion": "lean-1.1",
+      "llmModel": null,
+      "tickets": 31,
+      "graded": true,
+      "plCents": 1300,
+      "outcomes": {
+        "win": 7,
+        "loss": 23,
+        "refund": 1
+      },
+      "traceStatus": "complete"
+    },
+    {
+      "cardId": 37,
+      "file": "card-037.json",
+      "date": "2026-07-30",
+      "track": "Del Mar",
+      "engineVersion": "lean-1.1",
+      "llmModel": null,
+      "tickets": 23,
+      "graded": true,
+      "plCents": 6160,
+      "outcomes": {
+        "loss": 18,
+        "refund": 1,
+        "win": 4
+      },
+      "traceStatus": "complete"
+    },
+    {
+      "cardId": 38,
+      "file": "card-038.json",
+      "date": "2026-07-31",
+      "track": "Del Mar",
+      "engineVersion": "lean-1.1",
+      "llmModel": null,
+      "tickets": 24,
+      "graded": true,
+      "plCents": 9040,
+      "outcomes": {
+        "loss": 21,
+        "refund": 1,
+        "win": 2
+      },
+      "traceStatus": "complete"
+    },
+    {
+      "cardId": 39,
+      "file": "card-039.json",
+      "date": "2026-08-01",
+      "track": "Del Mar",
+      "engineVersion": "lean-1.1",
+      "llmModel": null,
+      "tickets": 27,
+      "graded": true,
+      "plCents": -11540,
+      "outcomes": {
+        "loss": 23,
+        "win": 3,
+        "refund": 1
+      },
+      "traceStatus": "complete"
+    },
+    {
+      "cardId": 40,
+      "file": "card-040.json",
+      "date": "2026-08-02",
+      "track": "Del Mar",
+      "engineVersion": "lean-1.1",
+      "llmModel": null,
+      "tickets": 29,
+      "graded": true,
+      "plCents": -6270,
+      "outcomes": {
+        "loss": 22,
+        "win": 4,
+        "refund": 3
+      },
+      "traceStatus": "complete"
+    },
+    {
+      "cardId": 41,
+      "file": "card-041.json",
+      "date": "2026-08-06",
+      "track": "Del Mar",
+      "engineVersion": "lean-1.1",
+      "llmModel": null,
+      "tickets": 21,
+      "graded": true,
+      "plCents": -7290,
+      "outcomes": {
+        "win": 3,
+        "loss": 15,
+        "refund": 3
+      },
+      "traceStatus": "complete"
+    },
+    {
+      "cardId": 42,
+      "file": "card-042.json",
+      "date": "2026-08-07",
+      "track": "Del Mar",
+      "engineVersion": "lean-1.1",
+      "llmModel": null,
+      "tickets": 20,
+      "graded": true,
+      "plCents": -6570,
+      "outcomes": {
+        "refund": 6,
+        "win": 3,
+        "loss": 11
+      },
+      "traceStatus": "complete"
+    },
+    {
+      "cardId": 43,
+      "file": "card-043.json",
+      "date": "2026-08-08",
+      "track": "Del Mar",
+      "engineVersion": "lean-1.1",
+      "llmModel": null,
+      "tickets": 29,
+      "graded": true,
+      "plCents": -7270,
+      "outcomes": {
+        "refund": 4,
+        "win": 4,
+        "loss": 21
+      },
+      "traceStatus": "complete"
+    },
+    {
+      "cardId": 44,
+      "file": "card-044.json",
+      "date": "2026-08-09",
+      "track": "Del Mar",
+      "engineVersion": "lean-1.1",
+      "llmModel": null,
+      "tickets": 19,
+      "graded": true,
+      "plCents": -8700,
+      "outcomes": {
+        "loss": 15,
+        "win": 2,
+        "refund": 2
+      },
+      "traceStatus": "complete"
+    },
+    {
+      "cardId": 45,
+      "file": "card-045.json",
+      "date": "2026-08-13",
+      "track": "Del Mar",
+      "engineVersion": "lean-1.1",
+      "llmModel": null,
+      "tickets": 18,
+      "graded": true,
+      "plCents": 5300,
+      "outcomes": {
+        "win": 6,
+        "loss": 12
+      },
+      "traceStatus": "complete"
+    },
+    {
+      "cardId": 46,
+      "file": "card-046.json",
+      "date": "2026-08-14",
+      "track": "Del Mar",
+      "engineVersion": "lean-1.1",
+      "llmModel": null,
+      "tickets": 23,
+      "graded": true,
+      "plCents": 2380,
+      "outcomes": {
+        "loss": 16,
+        "refund": 4,
+        "win": 3
+      },
+      "traceStatus": "complete"
+    },
+    {
+      "cardId": 47,
+      "file": "card-047.json",
+      "date": "2026-08-15",
+      "track": "Del Mar",
+      "engineVersion": "lean-1.1",
+      "llmModel": null,
+      "tickets": 26,
+      "graded": true,
+      "plCents": -10260,
+      "outcomes": {
+        "loss": 18,
+        "refund": 6,
+        "win": 2
+      },
+      "traceStatus": "complete"
+    },
+    {
+      "cardId": 48,
+      "file": "card-048.json",
+      "date": "2026-08-16",
+      "track": "Del Mar",
+      "engineVersion": "lean-1.1",
+      "llmModel": null,
+      "tickets": 28,
+      "graded": true,
+      "plCents": -14000,
+      "outcomes": {
+        "win": 3,
+        "loss": 22,
+        "refund": 3
+      },
+      "traceStatus": "complete"
+    },
+    {
+      "cardId": 49,
+      "file": "card-049.json",
+      "date": "2026-08-20",
+      "track": "Del Mar",
+      "engineVersion": "lean-1.1",
+      "llmModel": null,
+      "tickets": 23,
+      "graded": true,
+      "plCents": 18150,
+      "outcomes": {
+        "win": 7,
+        "loss": 14,
+        "refund": 2
+      },
+      "traceStatus": "complete"
+    },
+    {
+      "cardId": 50,
+      "file": "card-050.json",
+      "date": "2026-08-21",
+      "track": "Del Mar",
+      "engineVersion": "lean-1.1",
+      "llmModel": null,
+      "tickets": 21,
+      "graded": true,
+      "plCents": -1140,
+      "outcomes": {
+        "loss": 13,
+        "win": 3,
+        "refund": 5
+      },
+      "traceStatus": "complete"
+    },
+    {
+      "cardId": 51,
+      "file": "card-051.json",
+      "date": "2026-08-22",
+      "track": "Del Mar",
+      "engineVersion": "lean-1.1",
+      "llmModel": null,
+      "tickets": 31,
+      "graded": true,
+      "plCents": 19660,
+      "outcomes": {
+        "loss": 18,
+        "win": 6,
+        "refund": 7
+      },
+      "traceStatus": "complete"
+    },
+    {
+      "cardId": 52,
+      "file": "card-052.json",
+      "date": "2026-08-23",
+      "track": "Del Mar",
+      "engineVersion": "lean-1.1",
+      "llmModel": null,
+      "tickets": 27,
+      "graded": true,
+      "plCents": 3500,
+      "outcomes": {
+        "loss": 20,
+        "win": 6,
+        "refund": 1
+      },
+      "traceStatus": "complete"
+    },
+    {
+      "cardId": 53,
+      "file": "card-053.json",
+      "date": "2026-08-27",
+      "track": "Del Mar",
+      "engineVersion": "lean-1.1",
+      "llmModel": null,
+      "tickets": 23,
+      "graded": true,
+      "plCents": 15850,
+      "outcomes": {
+        "win": 7,
+        "loss": 15,
+        "refund": 1
+      },
+      "traceStatus": "complete"
+    },
+    {
+      "cardId": 104,
+      "file": "card-104.json",
+      "date": "2026-08-27",
+      "track": "Del Mar",
+      "engineVersion": "human",
+      "llmModel": null,
+      "tickets": 3,
+      "graded": true,
+      "plCents": 4000,
+      "outcomes": {
+        "win": 1,
+        "loss": 2
+      },
+      "traceStatus": "missing"
+    },
+    {
+      "cardId": 54,
+      "file": "card-054.json",
+      "date": "2026-08-28",
+      "track": "Del Mar",
+      "engineVersion": "lean-1.1",
+      "llmModel": null,
+      "tickets": 21,
+      "graded": true,
+      "plCents": 10760,
+      "outcomes": {
+        "refund": 3,
+        "win": 5,
+        "loss": 13
+      },
+      "traceStatus": "complete"
+    },
+    {
+      "cardId": 55,
+      "file": "card-055.json",
+      "date": "2026-08-29",
+      "track": "Del Mar",
+      "engineVersion": "lean-1.1",
+      "llmModel": null,
+      "tickets": 29,
+      "graded": true,
+      "plCents": -19200,
+      "outcomes": {
+        "loss": 28,
+        "refund": 1
+      },
+      "traceStatus": "complete"
+    },
+    {
+      "cardId": 56,
+      "file": "card-056.json",
+      "date": "2026-08-30",
+      "track": "Del Mar",
+      "engineVersion": "lean-1.1",
+      "llmModel": null,
+      "tickets": 28,
+      "graded": true,
+      "plCents": -9130,
+      "outcomes": {
+        "win": 4,
+        "loss": 23,
+        "refund": 1
+      },
+      "traceStatus": "complete"
+    },
+    {
+      "cardId": 102,
+      "file": "card-102.json",
+      "date": "2026-08-30",
+      "track": "Del Mar",
+      "engineVersion": "human",
+      "llmModel": null,
+      "tickets": 7,
+      "graded": true,
+      "plCents": -3770,
+      "outcomes": {
+        "loss": 5,
+        "win": 2
+      },
+      "traceStatus": "missing"
+    },
+    {
+      "cardId": 103,
+      "file": "card-103.json",
+      "date": "2026-08-30",
+      "track": "Del Mar",
+      "engineVersion": "human",
+      "llmModel": null,
+      "tickets": 24,
+      "graded": true,
+      "plCents": 51240,
+      "outcomes": {
+        "loss": 17,
+        "win": 7
+      },
+      "traceStatus": "missing"
+    },
+    {
+      "cardId": 118,
+      "file": "card-118.json",
+      "date": "2026-08-30",
+      "track": "Del Mar",
+      "engineVersion": "llm",
+      "llmModel": null,
+      "tickets": 4,
+      "graded": true,
+      "plCents": 1650,
+      "outcomes": {
+        "win": 2,
+        "loss": 2
+      },
+      "traceStatus": "missing"
+    },
+    {
+      "cardId": 105,
+      "file": "card-105.json",
+      "date": "2026-09-03",
+      "track": "Del Mar",
+      "engineVersion": "lean-1.1",
+      "llmModel": null,
+      "tickets": 21,
+      "graded": true,
+      "plCents": 15020,
+      "outcomes": {
+        "loss": 15,
+        "win": 6
+      },
+      "traceStatus": "complete"
+    },
+    {
+      "cardId": 110,
+      "file": "card-110.json",
+      "date": "2026-09-03",
+      "track": "Del Mar",
+      "engineVersion": "llm",
+      "llmModel": null,
+      "tickets": 43,
+      "graded": true,
+      "plCents": -9450,
+      "outcomes": {
+        "loss": 30,
+        "win": 10,
+        "refund": 3
+      },
+      "traceStatus": "missing"
+    },
+    {
+      "cardId": 111,
+      "file": "card-111.json",
+      "date": "2026-09-03",
+      "track": "Del Mar",
+      "engineVersion": "lean-1.1",
+      "llmModel": null,
+      "tickets": 21,
+      "graded": true,
+      "plCents": 15020,
+      "outcomes": {
+        "loss": 15,
+        "win": 6
+      },
+      "traceStatus": "complete"
+    },
+    {
+      "cardId": 112,
+      "file": "card-112.json",
+      "date": "2026-09-03",
+      "track": "Del Mar",
+      "engineVersion": "lean-1.1",
+      "llmModel": null,
+      "tickets": 22,
+      "graded": true,
+      "plCents": 12640,
+      "outcomes": {
+        "loss": 16,
+        "win": 6
+      },
+      "traceStatus": "complete"
+    },
+    {
+      "cardId": 119,
+      "file": "card-119.json",
+      "date": "2026-09-03",
+      "track": "Del Mar",
+      "engineVersion": "llm",
+      "llmModel": "claude-haiku-4-5-20251001",
+      "tickets": 3,
+      "graded": true,
+      "plCents": -5000,
+      "outcomes": {
+        "loss": 3
+      },
+      "traceStatus": "missing"
+    },
+    {
+      "cardId": 123,
+      "file": "card-123.json",
+      "date": "2026-09-04",
+      "track": "Del Mar",
+      "engineVersion": "equibase-otr",
+      "llmModel": null,
+      "tickets": 16,
+      "graded": true,
+      "plCents": -5670,
+      "outcomes": {
+        "win": 6,
+        "partial": 1,
+        "loss": 9
+      },
+      "traceStatus": "missing"
+    },
+    {
+      "cardId": 124,
+      "file": "card-124.json",
+      "date": "2026-09-04",
+      "track": "Del Mar",
+      "engineVersion": "equibase-otr",
+      "llmModel": null,
+      "tickets": 16,
+      "graded": true,
+      "plCents": -3840,
+      "outcomes": {
+        "refund": 1,
+        "partial": 1,
+        "loss": 12,
+        "win": 2
+      },
+      "traceStatus": "missing"
+    },
+    {
+      "cardId": 125,
+      "file": "card-125.json",
+      "date": "2026-09-04",
+      "track": "Del Mar",
+      "engineVersion": "equibase-otr",
+      "llmModel": null,
+      "tickets": 32,
+      "graded": true,
+      "plCents": -9510,
+      "outcomes": {
+        "win": 8,
+        "partial": 2,
+        "refund": 1,
+        "loss": 21
+      },
+      "traceStatus": "missing"
+    },
+    {
+      "cardId": 126,
+      "file": "card-126.json",
+      "date": "2026-09-04",
+      "track": "Del Mar",
+      "engineVersion": "lean-1.1",
+      "llmModel": null,
+      "tickets": 22,
+      "graded": true,
+      "plCents": 26340,
+      "outcomes": {
+        "refund": 3,
+        "win": 7,
+        "loss": 12
+      },
+      "traceStatus": "complete"
+    },
+    {
+      "cardId": 127,
+      "file": "card-127.json",
+      "date": "2026-09-04",
+      "track": "Del Mar",
+      "engineVersion": "lean-1.1",
+      "llmModel": null,
+      "tickets": 22,
+      "graded": true,
+      "plCents": 26340,
+      "outcomes": {
+        "refund": 3,
+        "win": 7,
+        "loss": 12
+      },
+      "traceStatus": "complete"
+    },
+    {
+      "cardId": 128,
+      "file": "card-128.json",
+      "date": "2026-09-04",
+      "track": "Del Mar",
+      "engineVersion": "lean-1.1",
+      "llmModel": null,
+      "tickets": 22,
+      "graded": true,
+      "plCents": 26340,
+      "outcomes": {
+        "refund": 3,
+        "win": 7,
+        "loss": 12
+      },
+      "traceStatus": "complete"
+    },
+    {
+      "cardId": 129,
+      "file": "card-129.json",
+      "date": "2026-09-04",
+      "track": "Del Mar",
+      "engineVersion": "lean-1.1",
+      "llmModel": null,
+      "tickets": 22,
+      "graded": true,
+      "plCents": 26340,
+      "outcomes": {
+        "refund": 3,
+        "win": 7,
+        "loss": 12
+      },
+      "traceStatus": "complete"
+    },
+    {
+      "cardId": 130,
+      "file": "card-130.json",
+      "date": "2026-09-04",
+      "track": "Del Mar",
+      "engineVersion": "lean-1.1",
+      "llmModel": null,
+      "tickets": 22,
+      "graded": true,
+      "plCents": 26340,
+      "outcomes": {
+        "refund": 3,
+        "win": 7,
+        "loss": 12
+      },
+      "traceStatus": "complete"
+    },
+    {
+      "cardId": 131,
+      "file": "card-131.json",
+      "date": "2026-09-04",
+      "track": "Del Mar",
+      "engineVersion": "llm",
+      "llmModel": "claude-sonnet-5",
+      "tickets": 31,
+      "graded": true,
+      "plCents": 4320,
+      "outcomes": {
+        "refund": 1,
+        "win": 11,
+        "partial": 1,
+        "loss": 18
+      },
+      "traceStatus": "missing"
+    },
+    {
+      "cardId": 132,
+      "file": "card-132.json",
+      "date": "2026-09-04",
+      "track": "Del Mar",
+      "engineVersion": "llm",
+      "llmModel": "claude-opus-5",
+      "tickets": 20,
+      "graded": true,
+      "plCents": -770,
+      "outcomes": {
+        "loss": 13,
+        "partial": 1,
+        "refund": 4,
+        "win": 2
+      },
+      "traceStatus": "missing"
+    },
+    {
+      "cardId": 133,
+      "file": "card-133.json",
+      "date": "2026-09-04",
+      "track": "Del Mar",
+      "engineVersion": "llm",
+      "llmModel": "claude-fable-5-1",
+      "tickets": 40,
+      "graded": true,
+      "plCents": 2940,
+      "outcomes": {
+        "loss": 27,
+        "refund": 6,
+        "win": 5,
+        "partial": 2
+      },
+      "traceStatus": "missing"
+    },
+    {
+      "cardId": 135,
+      "file": "card-135.json",
+      "date": "2026-09-05",
+      "track": "Del Mar",
+      "engineVersion": "equibase-otr",
+      "llmModel": null,
+      "tickets": 22,
+      "graded": true,
+      "plCents": -1020,
+      "outcomes": {
+        "loss": 7,
+        "win": 10,
+        "partial": 4,
+        "refund": 1
+      },
+      "traceStatus": "missing"
+    },
+    {
+      "cardId": 136,
+      "file": "card-136.json",
+      "date": "2026-09-05",
+      "track": "Del Mar",
+      "engineVersion": "equibase-otr",
+      "llmModel": null,
+      "tickets": 22,
+      "graded": true,
+      "plCents": 2820,
+      "outcomes": {
+        "win": 5,
+        "loss": 14,
+        "partial": 2,
+        "refund": 1
+      },
+      "traceStatus": "missing"
+    },
+    {
+      "cardId": 137,
+      "file": "card-137.json",
+      "date": "2026-09-05",
+      "track": "Del Mar",
+      "engineVersion": "equibase-otr",
+      "llmModel": null,
+      "tickets": 44,
+      "graded": true,
+      "plCents": 1800,
+      "outcomes": {
+        "loss": 21,
+        "win": 15,
+        "partial": 6,
+        "refund": 2
+      },
+      "traceStatus": "missing"
+    },
+    {
+      "cardId": 138,
+      "file": "card-138.json",
+      "date": "2026-09-05",
+      "track": "Del Mar",
+      "engineVersion": "lean-1.1",
+      "llmModel": null,
+      "tickets": 32,
+      "graded": true,
+      "plCents": 19710,
+      "outcomes": {
+        "loss": 23,
+        "win": 7,
+        "refund": 2
+      },
+      "traceStatus": "complete"
+    },
+    {
+      "cardId": 139,
+      "file": "card-139.json",
+      "date": "2026-09-05",
+      "track": "Del Mar",
+      "engineVersion": "llm",
+      "llmModel": "claude-sonnet-5",
+      "tickets": 66,
+      "graded": true,
+      "plCents": -5045,
+      "outcomes": {
+        "loss": 45,
+        "win": 15,
+        "refund": 4,
+        "partial": 2
+      },
+      "traceStatus": "missing"
+    },
+    {
+      "cardId": 140,
+      "file": "card-140.json",
+      "date": "2026-09-05",
+      "track": "Del Mar",
+      "engineVersion": "lean-1.1",
+      "llmModel": null,
+      "tickets": 32,
+      "graded": true,
+      "plCents": 19710,
+      "outcomes": {
+        "loss": 23,
+        "win": 7,
+        "refund": 2
+      },
+      "traceStatus": "complete"
+    },
+    {
+      "cardId": 141,
+      "file": "card-141.json",
+      "date": "2026-09-05",
+      "track": "Del Mar",
+      "engineVersion": "lean-1.1",
+      "llmModel": null,
+      "tickets": 32,
+      "graded": true,
+      "plCents": 19710,
+      "outcomes": {
+        "loss": 23,
+        "win": 7,
+        "refund": 2
+      },
+      "traceStatus": "complete"
+    },
+    {
+      "cardId": 142,
+      "file": "card-142.json",
+      "date": "2026-09-05",
+      "track": "Del Mar",
+      "engineVersion": "lean-1.1",
+      "llmModel": null,
+      "tickets": 32,
+      "graded": true,
+      "plCents": 19710,
+      "outcomes": {
+        "loss": 23,
+        "win": 7,
+        "refund": 2
+      },
+      "traceStatus": "complete"
+    },
+    {
+      "cardId": 143,
+      "file": "card-143.json",
+      "date": "2026-09-05",
+      "track": "Del Mar",
+      "engineVersion": "lean-1.1",
+      "llmModel": null,
+      "tickets": 32,
+      "graded": true,
+      "plCents": 19710,
+      "outcomes": {
+        "loss": 23,
+        "win": 7,
+        "refund": 2
+      },
+      "traceStatus": "complete"
+    },
+    {
+      "cardId": 144,
+      "file": "card-144.json",
+      "date": "2026-09-05",
+      "track": "Del Mar",
+      "engineVersion": "llm",
+      "llmModel": "claude-fable-5-1",
+      "tickets": 89,
+      "graded": true,
+      "plCents": 7015,
+      "outcomes": {
+        "loss": 65,
+        "win": 14,
+        "refund": 5,
+        "partial": 5
+      },
+      "traceStatus": "missing"
+    },
+    {
+      "cardId": 146,
+      "file": "card-146.json",
+      "date": "2026-09-05",
+      "track": "Del Mar",
+      "engineVersion": "llm",
+      "llmModel": "claude-opus-5",
+      "tickets": 70,
+      "graded": true,
+      "plCents": -9778,
+      "outcomes": {
+        "loss": 53,
+        "win": 9,
+        "partial": 6,
+        "refund": 2
+      },
+      "traceStatus": "missing"
+    },
+    {
+      "cardId": 148,
+      "file": "card-148.json",
+      "date": "2026-09-05",
+      "track": "Del Mar",
+      "engineVersion": "human",
+      "llmModel": null,
+      "tickets": 17,
+      "graded": true,
+      "plCents": 31170,
+      "outcomes": {
+        "loss": 14,
+        "refund": 1,
+        "win": 2
+      },
+      "traceStatus": "missing"
+    }
+  ]
+}
