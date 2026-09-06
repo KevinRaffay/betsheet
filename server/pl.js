@@ -8,11 +8,14 @@
 
 import express from 'express';
 import { getDb } from './db.js';
-import { SELECTABLE_MODELS } from './anthropic-client.js';
+import { KNOWN_MODELS } from './anthropic-client.js';
 
 export const plRouter = express.Router();
 
-const MODEL_LABEL = Object.fromEntries(SELECTABLE_MODELS.map((m) => [m.id, m.label]));
+// KNOWN_MODELS, not SELECTABLE_MODELS: a retired model's existing cards are
+// still graded and still shown, and must keep their label rather than
+// degrading to a raw id the moment the picker stops offering them.
+const MODEL_LABEL = Object.fromEntries(KNOWN_MODELS.map((m) => [m.id, m.label]));
 
 const BUCKET_ORDER = ['FULL', 'PARTIAL', 'PROGRAM_ONLY', 'ODDS_ONLY', 'HUMAN', 'LLM_GENERATED', 'EQB_OTR'];
 

@@ -386,6 +386,24 @@ Place | #1 | $20 | Safe.
       && typeof modelsResp.default === 'string',
     JSON.stringify(modelsResp));
 
+  // D105: a RETIRED model is unselectable but still labelled. Dropping it from
+  // SELECTABLE_MODELS outright would have degraded every card already
+  // generated under it to a raw id in P/L, because server/pl.js built its
+  // labels from that same list - hence the KNOWN_MODELS / SELECTABLE_MODELS
+  // split. Both halves are asserted, because either alone is a silent bug.
+  const { KNOWN_MODELS, SELECTABLE_MODELS } = await import('../server/anthropic-client.js');
+  const HAIKU = 'claude-haiku-4-5-20251001';
+  check('D105: Haiku is retired - the picker does not offer it',
+    !modelsResp.models.some((m) => m.id === HAIKU) && !SELECTABLE_MODELS.some((m) => m.id === HAIKU),
+    JSON.stringify(modelsResp.models.map((m) => m.id)));
+  check('D105: ...but it is still KNOWN, so an existing Haiku card keeps its label',
+    KNOWN_MODELS.find((m) => m.id === HAIKU)?.label === 'Haiku 4.5');
+  const retiredPreview = await jpost(`/api/race-days/${dayId}/llm-cards/preview`, {
+    race: 1, __stubResponse: wellFormedResponse(1, 20, 'irrelevant'), model: HAIKU,
+  });
+  check('D105: generating a NEW card with a retired model is refused 400',
+    retiredPreview.status === 400, String(retiredPreview.status));
+
   const badModelPreview = await jpost(`/api/race-days/${dayId}/llm-cards/preview`, {
     race: 1, __stubResponse: wellFormedResponse(1, 20, 'irrelevant'), model: 'gpt-not-a-claude-model',
   });
