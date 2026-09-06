@@ -327,12 +327,24 @@ added by their PRs and listed here as they land.
   status, notes) in the same PR.
 - `REQUIREMENTS.md` maps requirements → deliverable IDs.
 - Feature branches off `main`, short kebab-case names, PR into `main`.
-  **The user reviews; Claude merges only when explicitly told to, per PR**
-  (user decision 2026-09-05, D101 - this replaced "Claude never merges"
-  when `npm run gh` gained the ability). Review is still the user's: Claude
-  never merges unprompted, never merges a PR the user has not seen, and
-  never merges to get around a failing check. A direct push to `main` is
-  refused by the tracked pre-push hook (`npm run install-hooks`).
+  **Claude opens AND merges its own PRs into `main`, without asking each
+  time** - a standing authorization for the duration of this project (user
+  decision 2026-09-05, D106). It supersedes the per-PR rule D101 introduced,
+  which itself replaced "Claude never merges". The reason for the change is
+  that the ceremony was not buying review, it was buying AMBIGUITY: the
+  session had to infer from a "merged" in chat what had actually landed, and
+  got it wrong repeatedly - resolving conflicts on the wrong branch, stacking
+  on an unmerged base, writing a ledger row against an ID that was already
+  taken. Being the one who merges removes the guessing entirely.
+  **Nothing else about the discipline relaxes, and one thing tightens: with
+  no second pair of eyes before `main`, the check suite is the only gate, so
+  it runs BEFORE every merge, not after.** Claude still never merges a red
+  branch, never merges to get around a failing check, and still reports what
+  landed. Every deliverable is still its own PR with its own ledger row, so
+  the history stays reviewable after the fact and any one change stays
+  revertable. A direct push to `main` is still refused by the tracked
+  pre-push hook (`npm run install-hooks`) - `main` moves by merge, never by
+  push, even now.
 - A PR description states what it delivers, how it was tested (with
   evidence), and any deviations from plan.
 - Too big to review = split it and add rows to DELIVERABLES.md.
@@ -533,6 +545,14 @@ is the first (D52: engine `lean-1.1`, bucket PROGRAM_ONLY, the 70-day DMR
   so staying up is safe), and `extractPdfLines` races extraction against a
   45s timeout so a wedged pdfjs promise returns an honest error instead of
   hanging the request forever.
+- **Deleting a base branch CLOSES its stacked PRs; it does not retarget
+  them.** Learned 2026-09-05: after merging D104 (#141), deleting
+  `equibase-entries-parser` to make the stacked D105 PR (#142) retarget to
+  `main` instead closed #142 outright. GitHub retargets children only when
+  the base PR is merged through it, not when the branch is removed
+  underneath. The work was safe on its own branch and a replacement PR
+  (#143) merged clean, but the tidy-up cost a PR number. **Merge the stack
+  bottom-up and leave the base branch alone until every child is merged.**
 - **The GitHub API IS reachable from here - via the credential git already
   has** (D101). `gh` is NOT installed and the repo is private, so a bare
   `curl https://api.github.com/...` returns `Not Found` and looks like a dead
