@@ -232,3 +232,21 @@ Specified but NOT scheduled - deliverable IDs get claimed when the work is picke
 | Several HUMAN cards coexist on one race day, each an independent bankroll grading and reporting separately - the database already allows this (day 27 has two); the constraint is a UI resume rule | - (not scheduled) |
 | Blindness is `null` for a card that is not the operator's own picks, and for one that is it derives from the DAY's reveals rather than from card ordering - the current "not the first human card of the day" rule reads three side-by-side labelled cards as NON_BLIND, which is false | - (not scheduled) |
 | `llm_model` recorded for every LLM card; 2 of 12 stored cards predate the column, one exactly recoverable from its request rows and one only by inference | - (not scheduled) |
+
+## A day's entries as one zip upload (requested 2026-09-06)
+
+Full specification, with the blocker it must not be built on top of:
+[docs/requirements/zip-entries-upload.md](docs/requirements/zip-entries-upload.md).
+Specified but NOT scheduled - deliverable IDs get claimed when the work is picked up.
+
+| Requirement | Deliverables |
+| --- | --- |
+| One upload creates every race day for a date, from a zip of saved Equibase entries pages - so a full board is ready without ~20 manual uploads | - (not scheduled) |
+| **Prerequisite**: re-ingesting a race day that already carries cards must not silently destroy them. Replace today hard-deletes the day, and cards/tickets/human_race_state/llm_card_requests cascade with it - proven on a scratch database | - (not scheduled) |
+| The zip is read server-side from a raw `application/zip` body: a day's raw HTML is 15-17MB against a 10mb JSON body limit, while the zip is ~2MB - the same raw-body convention D69/D71 chose over multipart | - (not scheduled) |
+| The zip reader is bounded against decompression bombs (entry count, per-entry and total decompressed bytes, enforced during inflation) and refuses what it cannot support - encrypted, zip64, unknown method - rather than importing part of an archive | - (not scheduled) |
+| Nothing from the archive is ever written to disk, so path traversal ("zip slip") stays structurally impossible rather than guarded against | - (not scheduled) |
+| Warnings-first read-only preview of every day in the zip before anything is written (invariant 9), then batch save under D43's policy A - zero blocking warnings saves, anything blocking is left for review | - (not scheduled) |
+| A capture that is not an entries page - the race-card index, or an Equibase bot-challenge or error page an automated collector will sometimes catch - is named as such, never reported as "no races" (the D121 pattern) | - (not scheduled) |
+| Invariant 6 is untouched: BetSheet still receives only a file it was handed and has no HTTP client: how the zip was produced is outside it | - (not scheduled) |
+| Each day keeps its own `odds_captured_at` from its zip entry's timestamp, rather than one time for the whole upload, since D117's staleness indicator reads that field | - (not scheduled) |
