@@ -1,6 +1,7 @@
 import React, { useState } from 'react';
 import { parseEntriesText, parseEquibaseEntries, saveRaceDay } from '../api.js';
 import ParsePreview from './ParsePreview.jsx';
+import BulkEntriesUpload from './BulkEntriesUpload.jsx';
 
 // The ingest screen: paste entries text, review the parse, then save. The
 // preview is READ-ONLY - it shows exactly what Save will write, warnings
@@ -30,6 +31,10 @@ export default function NewRaceDay({ onSaved, onCancel }) {
   // The capture time travels with the parse rather than the form: it is a fact
   // about the FILE, so a later re-parse of different text must not inherit it.
   const [oddsCapturedAt, setOddsCapturedAt] = useState(null);
+  // Two shapes of the same ingest: one track, or a whole day's board. The
+  // single path is the default because it is the one that needs a track, a
+  // date and a bankroll typed in; bulk reads all three per file.
+  const [mode, setMode] = useState('single');
 
   const applyParse = (result) => {
     setParsed(result);
@@ -129,6 +134,31 @@ export default function NewRaceDay({ onSaved, onCancel }) {
         </label>
       </div>
 
+      <div className="formrow formrow--tight">
+        <button
+          className={`btn ${mode === 'single' ? 'btn--primary' : ''}`}
+          onClick={() => setMode('single')}
+        >
+          One track
+        </button>
+        <button
+          className={`btn ${mode === 'bulk' ? 'btn--primary' : ''}`}
+          onClick={() => setMode('bulk')}
+        >
+          A day&rsquo;s board (zip)
+        </button>
+        <span className="dim">
+          {mode === 'single'
+            ? 'One saved Equibase entries page becomes one race day.'
+            : 'One zip of saved entries pages becomes every race day it holds.'}
+        </span>
+      </div>
+
+      {mode === 'bulk' && (
+        <BulkEntriesUpload onSaved={onSaved} bankroll={bankroll} perRaceMin={perRaceMin} />
+      )}
+
+      {mode === 'single' && (
       <div className="ingest-inputs">
         <label className="pastebox">
           Paste entries text (fallback - the Equibase upload is the main path)
@@ -155,6 +185,7 @@ export default function NewRaceDay({ onSaved, onCancel }) {
           </button>
         </div>
       </div>
+      )}
 
       {error && <p className="notice notice--error">{error}</p>}
 

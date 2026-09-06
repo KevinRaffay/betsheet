@@ -16,12 +16,17 @@ pages and 39 tracks. This is the ergonomics layer on top of it.
 
 ---
 
-## Read this first: the feature is a foot-gun until re-upload is fixed
+## Re-upload replaces the day, cards and all — decided, not a blocker
 
-**Replacing a race day hard-deletes every card on it.** Not soft-deleted — destroyed.
-`server/ingest.js`'s save route does `DELETE FROM race_days WHERE id = ?` before re-inserting,
-and `cards.race_day_id` is `ON DELETE CASCADE`. Proven on a scratch database rather than read
-off the schema:
+**User decision 2026-09-06.** Re-ingesting a race day deletes it and everything on it, cards
+included, and that is the intended behaviour: entries are the record, and a card built on
+entries that have since changed is not worth carrying forward.
+
+This section previously called that a blocker and made fixing it a prerequisite (Z-0). It was
+wrong about the intent, not about the mechanics — those are worth keeping, because anyone
+reading this should know exactly what a re-upload costs. `server/ingest.js` does
+`DELETE FROM race_days` before re-inserting, and `cards` cascades. Measured on a scratch
+database:
 
 | | before replace | after |
 | --- | --- | --- |
@@ -29,36 +34,12 @@ off the schema:
 | tickets | 1 | **0** |
 | human_race_state | 1 | **0** |
 
-`llm_card_requests` (paid model responses) and `llm_notes` cascade the same way.
+`llm_card_requests` (paid model responses) and `llm_notes` go the same way. None of it is
+soft-deleted.
 
-That matters here more than anywhere else, because **the whole point of running the agent on
-race day is to upload again as post approaches** — fresher scratches, fresher odds. The
-natural rhythm is: upload in the morning → build cards → re-upload at noon → *every card you
-built is gone*. Today that costs one manual upload's worth of work; with a zip it would take
-out a whole board's cards in one click.
-
-Today's single-day path warns about none of this: the 409 says only *"A race day for X
-already exists"*, and the UI offers "replace" with no mention of cards.
-
-**So the first deliverable is not the zip.** It is deciding and implementing what re-ingesting
-a day with cards on it should do. Options, with the trade-off each carries:
-
-1. **Refuse when cards exist**, and require an explicit deletion first. Safest, and the D103
-   precedent (a graded card refuses ticket deletion outright). Cheapest to build. Costs the
-   convenience of a mid-afternoon refresh, which is the feature's main use.
-2. **Update entries in place** — keep the `race_days` row and its id, replace `races` and
-   `entries` beneath it. Cards keep pointing at a live day. But tickets reference `race_id`,
-   so those FKs must be re-pointed or preserved, and a horse a card bet on may no longer be
-   in the field. **This is the only option that actually supports the intended workflow**, and
-   it is the most work.
-3. **Supersede, and carry cards forward** — new day row, cards re-parented. Blindness
-   timestamps (invariant 15) and `race_days.replayed_at` would need care, and a card would
-   then span two entry snapshots.
-
-**Recommendation: (1) first, (2) as its own deliverable.** Shipping the zip on top of today's
-silent-destroy behaviour is the one sequencing mistake this plan should not make.
-
----
+So the bulk path makes replacement **opt-in per upload** (`?replace=1`, a checkbox in the
+preview that says what goes) rather than refusing it. A guard was built and then removed on
+2026-09-06 when the decision was clarified; it is not coming back unless the decision changes.
 
 ## What was verified
 
@@ -150,17 +131,7 @@ these are not entries pages" rather than "4 days had no races".
 
 ## The deliverable shape
 
-Four, sequenced. The first is a prerequisite, not part of the zip work.
-
-### Z-0 — Decide and implement what re-ingesting a day with cards does
-
-The blocker above. Nothing else here should land first. Minimum: the save route refuses a
-replace when cards exist, with a message naming how many and what to do; the 409 body carries
-the card count so a client can say it. Better: entries update in place (option 2), which is
-what the race-day workflow actually wants.
-
-**Done when:** re-ingesting a day carrying a card cannot silently destroy it, and a check
-script proves that on a day with a card, a ticket and a `human_race_state` row.
+Three. **Delivered as D127** (2026-09-06); the sequencing note that used to head this section is gone with the Z-0 prerequisite it described.
 
 ### Z-1 — `server/zip-read.js`: a bounded, refusing zip reader
 

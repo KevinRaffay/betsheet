@@ -41,7 +41,9 @@
     "archive-corpus": "node scripts/archive-corpus.js",
     "backfill-payout-estimates": "node scripts/backfill-payout-estimates.js",
     "batch-equibase": "node scripts/batch-import-equibase-entries.js",
-    "check-track-codes": "node scripts/check-track-codes.js"
+    "check-track-codes": "node scripts/check-track-codes.js",
+    "check-zip-read": "node scripts/check-zip-read.js",
+    "check-entries-zip": "node scripts/check-entries-zip.js"
   },
   "dependencies": {
     "@radix-ui/colors": "^3.0.0",
