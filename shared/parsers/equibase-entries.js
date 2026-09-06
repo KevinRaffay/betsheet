@@ -153,7 +153,7 @@ function parseEntryRow(cells, fields, raceNumber, warnings) {
     return {
       programNumber: null, postPosition: null, horseName, ageSex: null, medication: null,
       claimPrice: null, jockey: null, trainer: null, weight: null,
-      morningLine: null, morningLineDecimal: null, liveOdds: null,
+      morningLine: null, morningLineDecimal: null, liveOdds: null, liveOddsDecimal: null,
       effectiveOdds: null, effectiveOddsDecimal: null,
       scratched: true,
     };
@@ -162,7 +162,7 @@ function parseEntryRow(cells, fields, raceNumber, warnings) {
   const entry = {
     programNumber: null, postPosition: null, horseName: null, ageSex: null, medication: null,
     claimPrice: null, jockey: null, trainer: null, weight: null,
-    morningLine: null, morningLineDecimal: null, liveOdds: null,
+    morningLine: null, morningLineDecimal: null, liveOdds: null, liveOddsDecimal: null,
     effectiveOdds: null, effectiveOddsDecimal: null,
     scratched: isScratch,
   };
@@ -175,6 +175,12 @@ function parseEntryRow(cells, fields, raceNumber, warnings) {
   if (blank(entry.morningLine)) entry.morningLine = null;
   entry.morningLineDecimal = morningLineToDecimal(entry.morningLine);
   entry.effectiveOdds = effectiveOdds(entry);
+  // D116: the live price gets its own decimal alongside its own text, the
+  // same pairing morning_line / morning_line_decimal has had since D04, so
+  // the DB column has a real source rather than being derived at the call
+  // site. `morningLineToDecimal` is a fractional-odds reader, not a
+  // morning-line-specific one - the tote prints the same 6/1 grammar.
+  entry.liveOddsDecimal = morningLineToDecimal(entry.liveOdds);
   entry.effectiveOddsDecimal = morningLineToDecimal(entry.effectiveOdds);
 
   if (!entry.horseName) {
@@ -187,15 +193,82 @@ function parseEntryRow(cells, fields, raceNumber, warnings) {
   return entry;
 }
 
-/** Race metadata lives in the block of markup immediately before its table. */
-function parseHeaderBlock(block, raceNumber, warnings) {
+/**
+ * Race metadata lives in the block of markup immediately before its table.
+ *
+ * The block has a stable printed grammar, and D116 anchors on it rather than
+ * taking a fixed slice off the end. The old version returned the last 1400
+ * characters verbatim as `conditions`, which on race 1 meant the page's own
+ * "Jump to Race" navigation strip and a block of inline JavaScript - text that
+ * would have gone into `races.conditions` and from there into every LLM prompt
+ * built for the day. It also read no race type and no wager menu at all, and
+ * the wager menu is load-bearing: `TicketBuilder` and `shared/parsers/
+ * human-picks.js` both read `races.wager_menu` for minimums and combo costing,
+ * and without it every race silently falls back to `BET.minimums`.
+ *
+ *   ... Jump to Race: 1 | 3 | ... | Top
+ *   Race N
+ *   POST Time - 1:30 PM PT
+ *   PPs & Selections  PP (Race N)  Scratches / Changes / Weather
+ *   Free Tools:                          <- wager menu starts after this
+ *   $1 Exacta / $2 Quinella / 50c Trifecta $2 Rolling Double / ...
+ *   Del Mar CLAIMING $25,000 - $22,500   <- track name ends the menu,
+ *   Purse $43,000.                          race type sits between them
+ *   One And One Eighth Miles. (Turf)
+ *   For Three Year Olds And Upward. ...  <- conditions, to the end
+ *
+ * `track` is the page's own header track, already parsed. Passing it in is
+ * what makes the menu/type boundary findable: the track name is the only
+ * reliable marker between them, and it is not knowable from the block alone.
+ */
+function parseHeaderBlock(block, raceNumber, warnings, track) {
   const text = clean(block);
-  const tail = text.slice(-1400); // the race's own header, not the whole page
+  const tail = text.slice(-1800); // the race's own header, not the whole page
 
   const post = tail.match(/POST\s+Time\s*-\s*(\d{1,2}:\d{2}\s*[AP]M)(?:\s*([A-Z]{2,3}))?/i);
   const purse = tail.match(/Purse\s+\$([\d,]+)/i);
   const distance = tail.match(/\.\s*([A-Z][a-z]+(?:\s+[A-Za-z]+){0,4}?\s+(?:Furlongs?|Miles?|Yards?)[^.]*)\./);
   const surface = tail.match(/\((Turf|Dirt|All Weather|Synthetic)\)/i);
+
+  // ---- wager menu and race type, between "Free Tools:" and "Purse $" ----
+  // Anchored on the TRACK NAME, which separates them. A track the header did
+  // not yield, or a block that prints neither marker, yields nulls and a
+  // non-blocking warning - never a guessed split.
+  let wagerMenu = null;
+  let raceType = null;
+  // Offsets are computed in `tail` itself rather than in a re-sliced copy:
+  // "Free Tools:" is a REGEX match whose printed length varies with the
+  // page's whitespace, so subtracting a hardcoded literal length leaves the
+  // span one character long and the race type carrying a stray "P" off
+  // "Purse". Found exactly that way.
+  const toolsMatch = tail.match(/Free\s+Tools\s*:/i);
+  const purseAt = purse ? tail.indexOf(purse[0]) : -1;
+  if (toolsMatch && purseAt > toolsMatch.index) {
+    const span = tail.slice(toolsMatch.index + toolsMatch[0].length, purseAt);
+    const at = track ? span.toUpperCase().lastIndexOf(String(track).toUpperCase()) : -1;
+    if (at > 0) {
+      wagerMenu = span.slice(0, at).trim() || null;
+      raceType = span.slice(at + String(track).length).trim() || null;
+    } else {
+      // No track marker inside the span: the whole thing is more likely the
+      // race type than a wager menu, so claim neither rather than mislabel.
+      warnings.push({
+        type: 'no_wager_menu', race: raceNumber, blocking: false,
+        message: `Race ${raceNumber}: could not separate the wager menu from the race `
+          + `type (the track name was not found between them). Minimums fall back to defaults.`,
+      });
+    }
+  }
+
+  // ---- conditions: everything after the distance/surface, to the end ----
+  // The trailing "See More See Less" UI artifact is already gone - clean()
+  // strips it before any of this runs.
+  let conditions = null;
+  if (distance) {
+    const after = tail.slice(tail.indexOf(distance[0]) + distance[0].length);
+    const surfAt = surface ? after.indexOf(surface[0]) : -1;
+    conditions = (surfAt >= 0 ? after.slice(surfAt + surface[0].length) : after).trim() || null;
+  }
 
   if (!post) {
     warnings.push({
@@ -209,7 +282,9 @@ function parseHeaderBlock(block, raceNumber, warnings) {
     purseCents: purse ? Math.round(Number(purse[1].replace(/,/g, '')) * 100) : null,
     distance: distance ? distance[1].trim() : null,
     surface: surface ? surface[1] : null,
-    conditions: tail,
+    raceType,
+    wagerMenu,
+    conditions,
   };
 }
 
@@ -279,7 +354,7 @@ export function parseEquibaseEntriesHtml(rawHtml, { track = null, date = null } 
 
     races.push({
       number: raceNumber,
-      ...parseHeaderBlock(chunks[i - 1], raceNumber, warnings),
+      ...parseHeaderBlock(chunks[i - 1], raceNumber, warnings, pageTrack),
       columnCount: headerCells.length,
       entries,
       activeEntries: entries.filter((e) => !e.scratched).length,
