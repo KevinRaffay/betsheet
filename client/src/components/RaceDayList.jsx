@@ -10,7 +10,19 @@ export default function RaceDayList({ onOpen, onNew, onPL, onDistribution, onRep
   const reload = (deleted = showDeleted) =>
     listRaceDays(deleted).then(setDays).catch((e) => setError(String(e.message)));
 
-  useEffect(() => { reload(); }, [refreshKey, showDeleted]);
+  // Guarded against a superseded response landing last: toggling twice quickly
+  // fires two fetches, and without this the FIRST one's answer can arrive after
+  // the second's and overwrite it - which reads as "No deleted race days" on a
+  // list of 75. Latent until the active list could be empty, because a stale
+  // active response used to still render a plausible table. The cleanup returns
+  // a function, never a promise (see the useEffect rule in CLAUDE.md's Gotchas).
+  useEffect(() => {
+    let cancelled = false;
+    listRaceDays(showDeleted)
+      .then((d) => { if (!cancelled) setDays(d); })
+      .catch((e) => { if (!cancelled) setError(String(e.message)); });
+    return () => { cancelled = true; };
+  }, [refreshKey, showDeleted]);
 
   const handleRestore = async (id) => {
     setBusy(true);
@@ -60,7 +72,7 @@ export default function RaceDayList({ onOpen, onNew, onPL, onDistribution, onRep
         <p className="placeholder">
           {showDeleted
             ? 'No deleted race days.'
-            : "Nothing stored yet. Ingest a program to get started — paste the track's entries page or upload the program PDF."}
+            : 'Nothing stored yet. Upload a saved Equibase entries page to create a race day, or paste the entries text.'}
         </p>
       )}
       {days && days.length > 0 && (

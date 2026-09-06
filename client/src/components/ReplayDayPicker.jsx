@@ -35,7 +35,7 @@ export default function ReplayDayPicker({ onBack, onOpenDay, onOpenStanding }) {
         </div>
       </div>
       <p className="dim">
-        Play a stored day blind, race by race, then compare against lean on the same day.
+        Play a stored day blind, race by race, then compare against the other cards on the same day.
       </p>
       {error && <p className="notice notice--error">{error}</p>}
       <div className="formrow formrow--tight">

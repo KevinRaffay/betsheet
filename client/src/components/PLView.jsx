@@ -83,7 +83,7 @@ export default function PLView({ onBack, onOpenCard, onOpenDay }) {
 
       {data.cards.length === 0 && (
         <p className="placeholder">
-          No graded cards yet. Generate a card, ingest the day's chart, and the grades land here.
+          No graded cards yet. Build a card by hand, generate one from the LLM, or upload an Equibase OTR sheet, then ingest the day's chart and the grades land here.
         </p>
       )}
 

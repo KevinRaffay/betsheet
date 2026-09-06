@@ -77,7 +77,8 @@ export default function DistributionView({ onBack, onOpenDay }) {
       )}
       <p className="dim">
         Buckets never pool. One card per day per bucket (the latest card number in the selection).
-        {data.selectedVersion === 'all' ? ' Showing ALL engine versions pooled - you chose this.' : ` Engine ${data.selectedVersion} only.`}
+        {data.selectedVersion === 'all' ? ' Showing ALL engine versions pooled - you chose this.'
+          : data.selectedVersion ? ` Engine ${data.selectedVersion} only.` : ''}
         {' '}Dependence: gross = top ticket ÷ total returned (refunds included); net = the ticket with the largest net ÷ the day&apos;s net profit, winning days only (a refund can top the gross list but never the net one). The flag is net.
       </p>
 
