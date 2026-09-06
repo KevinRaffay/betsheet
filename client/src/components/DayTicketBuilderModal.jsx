@@ -2,6 +2,7 @@ import React, { useEffect, useState } from 'react';
 import { deleteHumanTicket, getReplayDayRaces, lockHumanCard, previewHumanCard } from '../api.js';
 import { clearDraft, loadDayDrafts, saveDraft } from '../drafts.js';
 import TicketBuilder from './TicketBuilder.jsx';
+import EntriesTable from './EntriesTable.jsx';
 
 const money = (cents) => (cents == null ? '—' : cents % 100 === 0 ? `$${cents / 100}` : `$${(cents / 100).toFixed(2)}`);
 
@@ -284,6 +285,8 @@ export default function DayTicketBuilderModal({
                         </button>
                       )}
                     </div>
+
+                    <EntriesTable entries={r.entries ?? []} />
 
                     {r.locked && Array.isArray(r.tickets) && r.tickets.length > 0 && (
                       <>
