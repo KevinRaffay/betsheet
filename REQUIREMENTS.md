@@ -130,6 +130,23 @@ map in the same PR.
 | No later meet starts until the earlier meet's report is reviewed (D44 -> D45 -> D46) | D44, D45, D46 |
 | Index source, in order: the track calendar when it carries race counts; else a committed meet-dates table built once by a bounded, audited probe of the publicly published meet window. Blind enumeration outside a published window is prohibited. Without a calendar count, sheet + program + results must agree on the race count (blocking) | D47 (D41 + D43 rule) |
 
+## The pivot to simulator + analyzer (2026-09-05)
+
+BetSheet's direction changed on 2026-09-05: it becomes a betting simulator and strategy
+analyzer rather than a consensus card generator. The decision, what was verified before
+taking it, and the sequencing it requires are recorded in
+[docs/decisions/2026-09-05-simulator-pivot.md](docs/decisions/2026-09-05-simulator-pivot.md).
+**Requirements above that describe consensus fetching, classification or engine card
+generation are superseded by it** and will be marked retired as each removal lands.
+
+| Requirement | Deliverables |
+| --- | --- |
+| Ingest a race day cheaply for any track from Equibase entries HTML | D104 (parser); wiring not scheduled |
+| Capture cards from OTR / LLM / HUMAN with clean labels and grade them against uploaded results | - (not scheduled) |
+| Analyze graded cards by source, model, human source label, track, bet type, race type, field size and cross-card agreement, never printing a P&L figure without its `n` | - (not scheduled) |
+| Archive the corpus and prove the grader reproduces archived summaries BEFORE any removal or reset | - (not scheduled) |
+| A retired LLM model stops being offered but keeps its label, so cards already generated under it stay correctly displayed | D105 |
+
 ## Manual entries ingest, no automated feed (addendum 5, 2026-09-05)
 
 Full specification, with the verified page structure and the rejected PDF route:

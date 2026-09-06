@@ -15,12 +15,29 @@ export const MODEL = process.env.BETSHEET_LLM_MODEL || 'claude-sonnet-5';
 // Selectable in the LLM card modal (D75) - the current Claude model family,
 // newest first. `MODEL` above stays the server-configured default when a
 // call doesn't name one.
-export const SELECTABLE_MODELS = [
+/**
+ * Every model this app has EVER offered, retired ones included.
+ *
+ * Labels must outlive selectability: a card generated under a retired model is
+ * still graded, still in P/L, and still has to render as "Haiku 4.5" rather
+ * than a raw id. server/pl.js builds its byModel labels from this list for
+ * exactly that reason, so dropping an entry outright would silently degrade
+ * the display of cards already in the corpus.
+ */
+export const KNOWN_MODELS = [
   { id: 'claude-opus-5', label: 'Opus 5' },
   { id: 'claude-sonnet-5', label: 'Sonnet 5' },
-  { id: 'claude-haiku-4-5-20251001', label: 'Haiku 4.5' },
+  // Retired 2026-09-05 by user decision - a product choice about which models
+  // are worth spending generations on, NOT a finding. The corpus holds exactly
+  // 1 Haiku card / 3 graded tickets, which is far too little to conclude
+  // anything about the model; Opus is worse over a larger (still tiny) sample.
+  // The existing card stays graded, visible and correctly labelled.
+  { id: 'claude-haiku-4-5-20251001', label: 'Haiku 4.5', retired: true },
   { id: 'claude-fable-5-1', label: 'Fable 5.1' },
 ];
+
+/** What the picker offers today. A retired model can no longer be generated. */
+export const SELECTABLE_MODELS = KNOWN_MODELS.filter((m) => !m.retired);
 
 export const hasKey = () => Boolean(process.env.ANTHROPIC_API_KEY);
 
