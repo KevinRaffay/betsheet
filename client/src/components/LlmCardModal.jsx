@@ -2,6 +2,7 @@ import React, { useEffect, useState } from 'react';
 import {
   getLlmModels, getLlmNotes, getLlmRequests, getRaceDay, listCards, lockLlmCard, previewLlmCard, saveLlmNote,
 } from '../api.js';
+import EntriesTable from './EntriesTable.jsx';
 
 const money = (cents) => (cents == null ? '—' : cents % 100 === 0 ? `$${cents / 100}` : `$${(cents / 100).toFixed(2)}`);
 
@@ -44,31 +45,6 @@ function TicketsTable({ tickets, totalCents }) {
         <tr className="row--subtotal"><td colSpan={4}>Race total</td><td>{money(totalCents)}</td></tr>
       </tbody>
     </table>
-  );
-}
-
-function EntriesTable({ entries }) {
-  return (
-    <details className="race-entries">
-      <summary>Entries ({entries.length})</summary>
-      <table className="grid grid--entries">
-        <thead>
-          <tr><th>#</th><th>Horse</th><th>Jockey</th><th>Trainer</th><th>M/L</th><th>Rank</th></tr>
-        </thead>
-        <tbody>
-          {entries.map((entry) => (
-            <tr key={entry.id} className={entry.scratched ? 'row--scratched' : ''}>
-              <td>{entry.program_number ?? '—'}</td>
-              <td>{entry.horse_name}</td>
-              <td>{entry.jockey ?? '—'}</td>
-              <td>{entry.trainer ?? '—'}</td>
-              <td>{entry.morning_line ?? '—'}</td>
-              <td>{entry.program_rank ?? '—'}</td>
-            </tr>
-          ))}
-        </tbody>
-      </table>
-    </details>
   );
 }
 
