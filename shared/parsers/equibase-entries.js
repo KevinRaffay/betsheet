@@ -362,10 +362,31 @@ export function parseEquibaseEntriesHtml(rawHtml, { track = null, date = null } 
   }
 
   if (races.length === 0) {
-    warnings.push({
-      type: 'no_races', blocking: true,
-      message: 'No race tables found. Is this an Equibase entries page?',
-    });
+    // D121: tell the difference between "this isn't an Equibase page at all"
+    // and the mistake a person actually makes, which is saving the RACE-CARD
+    // INDEX instead of the entries page. The two look identical in a browser
+    // tab and have nearly identical titles; the index lists one row per race
+    // with purse, type, distance, surface, starter count and post time, and
+    // not a single horse. Diagnosed from `id="entryRaces"`, the index's own
+    // table, so the message can say what to do instead of "no race tables
+    // found" - which is true, unhelpful, and reads like a parser bug.
+    //
+    // Found live 2026-09-06: 93 saved pages across ~40 tracks, every one of
+    // them the index. The parser was right about all 93 and could not say so.
+    if (/id="entryRaces"/i.test(html)) {
+      warnings.push({
+        type: 'index_page_not_entries', blocking: true,
+        message: 'This is the race-card INDEX page (one row per race: purse, type, '
+          + 'distance, surface, starters, post time) - it contains no horses. Save the '
+          + 'per-track entries page instead: equibase.com/static/entry/<TRACK><MMDDYY><COUNTRY>-EQB.html '
+          + '(for example KD090626USA-EQB.html; CAN for Canadian tracks, PUR for Puerto Rico).',
+      });
+    } else {
+      warnings.push({
+        type: 'no_races', blocking: true,
+        message: 'No race tables found. Is this an Equibase entries page?',
+      });
+    }
   }
   return { track: pageTrack, date: pageDate, printedDate, races, warnings };
 }
