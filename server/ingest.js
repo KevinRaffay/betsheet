@@ -10,6 +10,7 @@
 import express from 'express';
 import { canonicalizeTrack, meetForDay } from '../shared/track-codes.js';
 import { parseEntries } from '../shared/entries-parser.js';
+import { parseEquibaseEntriesHtml } from '../shared/parsers/equibase-entries.js';
 import { parseChart } from '../shared/chart-parser.js';
 import { parseDmtcResults } from '../shared/dmtc-results-parser.js';
 import { extractPdfLines } from './pdf-text.js';
@@ -51,6 +52,49 @@ ingestRouter.post('/parse/entries-text', (req, res) => {
     warnings: parsed.warnings.length,
   });
   res.json({ correlationId, ...parsed });
+});
+
+// D116: a race day from a manually saved Equibase entries page - the ingest
+// path for any track with no automated feed, and the reason a Kentucky Downs
+// card is possible at all now that Del Mar program ingestion is gone.
+//
+// **Invariant 6 is not bent and this is not a fetcher.** The route takes the
+// page's markup as a STRING that a person saved and uploaded; nothing here
+// makes an outbound request, and there is no HTTP client left in the codebase
+// to make one with. Same posture as the Equibase OTR sheet (D71).
+//
+// Preview only (invariant 9): this never writes. The client shows the parse
+// with its warnings and the user confirms through POST /api/race-days, which
+// re-reads whatever they confirmed rather than trusting this response.
+//
+// The body is JSON `{ html }` rather than a raw text/html body, so the same
+// endpoint serves both capture routes the parser accepts - a saved file read
+// client-side, and markup pasted into a textarea - without the client having
+// to know which it has.
+ingestRouter.post('/parse/equibase-entries', (req, res) => {
+  const correlationId = req.get('x-correlation-id') || newCorrelationId();
+  const html = String(req.body?.html ?? '');
+  if (!html.trim()) return res.status(400).json({ error: 'html (the saved entries page) is required.' });
+
+  const parsed = parseEquibaseEntriesHtml(html);
+  // The capture time is the ONE staleness fact this page can supply, and the
+  // page does not print it - the file's own mtime is the best available
+  // answer and only the client knows it. An absent value is honest: it reads
+  // as "staleness unknown", never as "fresh".
+  const oddsCapturedAt = typeof req.body?.oddsCapturedAt === 'string' ? req.body.oddsCapturedAt : null;
+
+  log.info('parse_completed', {
+    correlationId,
+    kind: 'equibase_entries_html',
+    bytes: html.length,
+    track: parsed.track,
+    date: parsed.date,
+    races: parsed.races.length,
+    entries: parsed.races.reduce((a, r) => a + r.entries.length, 0),
+    warnings: parsed.warnings.length,
+    blockingWarnings: parsed.warnings.filter((w) => w.blocking).length,
+  });
+  res.json({ correlationId, ...parsed, entriesSource: 'equibase_html', oddsCapturedAt });
 });
 
 // The PDF arrives as a raw application/pdf body (no multipart dependency).
@@ -123,10 +167,15 @@ export function insertRaceDay(db, payload, correlationId) {
     .map((chunk) => [chunk.race, String(chunk.text)]));
   const { code: trackCode, display: track } = canonicalizeTrack(payload.track);
   const dayInfo = db.prepare(`INSERT INTO race_days
-      (track, track_code, date, bankroll_cents, per_race_min_cents, correlation_id, entries_source, meet)
-      VALUES (?, ?, ?, ?, ?, ?, ?, ?)`)
+      (track, track_code, date, bankroll_cents, per_race_min_cents, correlation_id,
+       entries_source, meet, odds_captured_at)
+      VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)`)
     .run(track, trackCode, payload.date, toInt(payload.bankrollCents), toInt(payload.perRaceMinCents), correlationId, entriesSource,
-      meetForDay(track, payload.date));
+      meetForDay(track, payload.date),
+      // D115: ONE timestamp for the whole card - when the entries page was
+      // captured. Only the Equibase path supplies it; every other path leaves
+      // it null, which reads as "staleness unknown" rather than "fresh".
+      payload.oddsCapturedAt ?? null);
   const dayId = dayInfo.lastInsertRowid;
 
   const insertRace = db.prepare(`INSERT INTO races
@@ -136,8 +185,9 @@ export function insertRaceDay(db, payload, correlationId) {
   const insertEntry = db.prepare(`INSERT INTO entries
       (race_id, program_number, post_position, horse_name, morning_line,
        morning_line_decimal, jockey, trainer, weight, equipment, scratched,
-       not_to_be_claimed, program_rank, best_bet)
-      VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`);
+       not_to_be_claimed, program_rank, best_bet,
+       live_odds, live_odds_decimal, medication, age_sex, claim_price, also_eligible)
+      VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`);
 
   for (const race of payload.races) {
     const raceInfo = insertRace.run(
@@ -158,6 +208,14 @@ export function insertRaceDay(db, payload, correlationId) {
         e.jockey ?? null, e.trainer ?? null, toInt(e.weight), equipment,
         e.scratched ? 1 : 0, e.notToBeClaimed ? 1 : 0,
         toInt(e.programRank), e.bestBet ? 1 : 0,
+        // D115/D116: the Equibase page's own fields. Every other ingest path
+        // leaves them null, which is why they are read off the entry with a
+        // fallback rather than required. Live odds sit BESIDE the morning
+        // line and never replace it - see the migration for why feeding them
+        // to generation would be an ENGINE_VERSION-class change.
+        e.liveOdds ?? null, e.liveOddsDecimal ?? null,
+        e.medication ?? null, e.ageSex ?? null, e.claimPrice ?? null,
+        e.alsoEligible ? 1 : 0,
       );
     }
   }

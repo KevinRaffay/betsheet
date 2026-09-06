@@ -1,6 +1,6 @@
 # Equibase entries ingest, from a manually saved page
 
-**Status: parser built (D104); schema landed (D115); ingest route + UI in progress.** No deliverable IDs assigned — they get claimed when
+**Status: parser (D104), schema (D115) and ingest route + UI (D116) all landed. Only the staleness indicator remains.** No deliverable IDs assigned — they get claimed when
 the work is picked up, not before. Written 2026-09-05 from a real sample; every structural
 claim below was verified against that file rather than read off the rendered page.
 
@@ -157,9 +157,13 @@ HTML as given — so nobody has to remember which way a file was captured.
    `shared/track-codes.js`, both as specified.
    Track/source tagging then falls out of columns every card view already reads — no
    report-code special-casing, which was the original spec's stated goal.
-3. **Ingest UI.** A control in `NewRaceDay.jsx` beside the program-PDF upload, accepting the
-   saved `.html` or pasted markup, rendering the existing warnings-first read-only preview
-   before anything is written (invariant 9). Additive; Del Mar's automated flow untouched.
+3. **Ingest UI.** *Delivered as D116*, along with the route itself. "Upload Equibase entries
+   page" is the PRIMARY control in `NewRaceDay.jsx` now - the program-PDF upload it was to sit
+   beside is gone (D113), and the pasted-text path is the labelled fallback. Warnings-first
+   read-only preview before anything is written (invariant 9), as specified. Wiring the parser
+   also found two defects in it: `conditions` was capturing the page's navigation strip and
+   inline JavaScript, and neither the race type nor the **load-bearing** wager menu was being
+   read at all - see the D116 ledger row.
 4. **Staleness indicator.** Per race, "Entries as of {odds_captured_at}, post {post_time}",
    with fresh / aging / past-post states from one exported threshold constant (default
    75 minutes, configurable). Non-blocking — visible, not obstructive.

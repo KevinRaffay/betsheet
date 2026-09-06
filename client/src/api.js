@@ -13,6 +13,19 @@ async function asJson(res) {
   return body;
 }
 
+// Equibase entries page (D116). The FILE is read client-side and its markup
+// posted as JSON, so one endpoint serves both capture routes the parser
+// accepts - a saved .html file and pasted markup - and the client never has
+// to know which it is holding. `oddsCapturedAt` is the file's own
+// last-modified time, which is when the person saved the page; it is the only
+// staleness fact available, because the page does not print one.
+export const parseEquibaseEntries = (html, { oddsCapturedAt = null, correlationId } = {}) =>
+  fetch('/api/parse/equibase-entries', {
+    method: 'POST',
+    headers: { 'content-type': 'application/json', ...(correlationId ? { 'x-correlation-id': correlationId } : {}) },
+    body: JSON.stringify({ html, oddsCapturedAt }),
+  }).then(asJson);
+
 export function parseEntriesText(text, correlationId) {
   return fetch('/api/parse/entries-text', {
     method: 'POST',

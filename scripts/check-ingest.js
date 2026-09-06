@@ -384,6 +384,84 @@ try {
   }).then((r) => r.json());
   check('a recognized track never warns',
     !knownTrack.warnings.some((w) => w.type === 'unrecognized_track'));
+  // ---- Equibase entries page: preview -> save -> read back (D116) ----
+  //
+  // LAST in the file, deliberately: it saves a day and soft-deletes it, and a
+  // tombstone is exactly what the deleted-list and factory-reset assertions
+  // above count. Running here means it starts from the reset's empty database
+  // and cannot move anyone else's numbers.
+  //
+  // The ingest path for any track with no automated feed. Asserted through the
+  // REAL route rather than the pure parser, because what is under test here is
+  // the wiring: that the parser's fields survive insertRaceDay and come back
+  // off GET /race-days/:id, which is where a widened INSERT silently drops a
+  // column if its value list and its column list disagree.
+  {
+    const eqHtml = fs.readFileSync(
+      path.join(ROOT, 'tests', 'fixtures', 'equibase-entries', 'DMR090626USA-EQB.view-source.html'), 'utf8');
+    const capturedAt = '2026-09-06T18:15:00Z';
+    const prev = await (await fetch(`${BASE}/api/parse/equibase-entries`, {
+      method: 'POST', headers: { 'content-type': 'application/json' },
+      body: JSON.stringify({ html: eqHtml, oddsCapturedAt: capturedAt }),
+    })).json();
+    check('equibase-entries preview: 11 races, 113 entries, no warnings, labelled as its own source',
+      prev.races?.length === 11
+      && prev.races.reduce((a, r) => a + r.entries.length, 0) === 113
+      && prev.warnings.length === 0
+      && prev.entriesSource === 'equibase_html',
+      JSON.stringify({ r: prev.races?.length, w: prev.warnings?.length, src: prev.entriesSource }));
+    check('equibase-entries preview writes NOTHING (invariant 9)',
+      (await fetch(`${BASE}/api/race-days`).then((r) => r.json())).every((d) => d.date !== '2026-09-06'));
+    check('an empty body is refused 400, not parsed into an empty day',
+      (await fetch(`${BASE}/api/parse/equibase-entries`, {
+        method: 'POST', headers: { 'content-type': 'application/json' }, body: JSON.stringify({ html: '' }),
+      })).status === 400);
+
+    // Saved under a date of its own so it cannot collide with the other days
+    // this script creates.
+    const eqSave = await fetch(`${BASE}/api/race-days`, {
+      method: 'POST', headers: { 'content-type': 'application/json' },
+      body: JSON.stringify({
+        track: prev.track, date: '2026-09-20', bankrollCents: 20000, perRaceMinCents: 500,
+        entriesSource: prev.entriesSource, oddsCapturedAt: prev.oddsCapturedAt, races: prev.races,
+      }),
+    });
+    const eqBody = await eqSave.json();
+    check('equibase day saves', eqSave.status === 201, JSON.stringify(eqBody).slice(0, 160));
+    const eqDay = await fetch(`${BASE}/api/race-days/${eqBody.id}`).then((r) => r.json());
+    const eqEntries = eqDay.races.flatMap((r) => r.entries);
+    check('the day records where it came from, and when the page was captured',
+      eqDay.entries_source === 'equibase_html' && eqDay.odds_captured_at === capturedAt,
+      JSON.stringify({ src: eqDay.entries_source, at: eqDay.odds_captured_at }));
+    check('all 11 races and 113 entries survive the round trip',
+      eqDay.races.length === 11 && eqEntries.length === 113,
+      JSON.stringify({ r: eqDay.races.length, e: eqEntries.length }));
+    // The wager menu is the load-bearing one: TicketBuilder and human-picks.js
+    // read races.wager_menu for minimums, and a null there is a silent fallback
+    // to BET.minimums rather than a visible failure.
+    check('every race stored a wager menu and a race type',
+      eqDay.races.every((r) => r.wager_menu && r.race_type),
+      JSON.stringify(eqDay.races.map((r) => [r.race_type, (r.wager_menu ?? '').slice(0, 14)])));
+    check('conditions stored as prose, not the page navigation or inline script',
+      eqDay.races.every((r) => r.conditions && !/Jump to Race|var httpHost/.test(r.conditions)));
+    check('the Equibase-only entry fields survive insertRaceDay', (() => {
+      const r3 = eqDay.races.find((r) => r.number === 3);
+      return eqEntries.filter((e) => e.medication).length === 65
+        && eqEntries.filter((e) => e.age_sex).length === 110
+        && r3.entries.filter((e) => e.claim_price).length === 13
+        && eqEntries.filter((e) => e.also_eligible).length === 6
+        && eqEntries.filter((e) => e.scratched).length === 3;
+    })(), JSON.stringify({
+      med: eqEntries.filter((e) => e.medication).length,
+      age: eqEntries.filter((e) => e.age_sex).length,
+      ae: eqEntries.filter((e) => e.also_eligible).length,
+      scr: eqEntries.filter((e) => e.scratched).length,
+    }));
+    check('live odds are null across the card and the morning line is untouched - this capture predates wagering',
+      eqEntries.every((e) => e.live_odds === null && e.live_odds_decimal === null)
+      && eqEntries.filter((e) => !e.scratched).every((e) => e.morning_line));
+    await fetch(`${BASE}/api/race-days/${eqBody.id}`, { method: 'DELETE' });
+  }
 } finally {
   server.kill();
   await new Promise((r) => setTimeout(r, 300));

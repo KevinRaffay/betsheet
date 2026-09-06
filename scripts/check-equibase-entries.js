@@ -17,6 +17,7 @@ import fs from 'node:fs';
 import path from 'node:path';
 import { fileURLToPath, URL } from 'node:url';
 import { parseEquibaseEntriesHtml, unwrapViewSource } from '../shared/parsers/equibase-entries.js';
+import { parseWagerMenu } from '../shared/betmath.js';
 
 const ROOT = fileURLToPath(new URL('../', import.meta.url));
 const DIR = path.join(ROOT, 'tests', 'fixtures', 'equibase-entries');
@@ -137,6 +138,42 @@ check('purse, distance and surface come off the header block',
   out.races[0].purseCents === 4100000 && /Five Furlongs/.test(out.races[0].distance ?? '')
   && out.races[0].surface === 'Turf',
   JSON.stringify({ p: out.races[0].purseCents, d: out.races[0].distance, s: out.races[0].surface }));
+
+// D116 added race type, wager menu and a real conditions paragraph. Before it,
+// `conditions` was a fixed 1400-character slice off the end of the header
+// block, which on race 1 was the page's own navigation strip and a block of
+// inline JavaScript - text that would have gone into races.conditions and from
+// there into every LLM prompt built for the day. These are the assertions that
+// would have caught that, so they are hand-written rather than golden-diffed.
+check('every race carries a race type, and none of them swallowed "Purse"',
+  out.races.every((r) => r.raceType && !/\bP$/.test(r.raceType)),
+  JSON.stringify(out.races.map((r) => r.raceType)));
+check('the race types are the ones printed on the page',
+  out.races[0].raceType === 'STARTER OPTIONAL CLAIMING $50,000'
+  && out.races[1].raceType === 'MAIDEN SPECIAL WEIGHT'
+  && out.races[2].raceType === 'CLAIMING $25,000 - $22,500'
+  && out.races[3].raceType === 'STAKES',
+  JSON.stringify(out.races.slice(0, 4).map((r) => r.raceType)));
+check('every race carries a wager menu - it is load-bearing, not decoration',
+  out.races.every((r) => r.wagerMenu && /Exacta/i.test(r.wagerMenu)),
+  JSON.stringify(out.races.map((r) => (r.wagerMenu ?? '').slice(0, 24))));
+// The menu is what TicketBuilder and human-picks.js read for minimums, so a
+// menu that parses to nothing is the same bug as no menu at all.
+check('the wager menu parses to REAL minimums, not BET.minimums fallbacks', (() => {
+  const m = parseWagerMenu(out.races[0].wagerMenu);
+  return m.exacta === 100 && m.trifecta === 50 && m.superfecta === 10;
+})(), JSON.stringify(parseWagerMenu(out.races[0].wagerMenu)));
+check('the wager menu never bleeds the race type into itself',
+  out.races.every((r) => !/CLAIMING|MAIDEN|STAKES|ALLOWANCE/i.test(r.wagerMenu ?? '')),
+  JSON.stringify(out.races.map((r) => r.wagerMenu).filter((w) => /CLAIMING|MAIDEN/i.test(w ?? ''))));
+check('conditions read as conditions - every race starts on real prose',
+  out.races.every((r) => r.conditions && /^[(A-Z]/.test(r.conditions)),
+  JSON.stringify(out.races.map((r) => (r.conditions ?? '').slice(0, 30))));
+check('no race\'s conditions carry the page navigation or inline script',
+  out.races.every((r) => !/Jump to Race|var httpHost|purchaseLinkURL|function\s*\(/.test(r.conditions ?? '')),
+  JSON.stringify(out.races.map((r) => (r.conditions ?? '').slice(0, 40)).filter((c) => /Jump|var /.test(c))));
+check('conditions never swallow the post time or the wager menu of their own race',
+  out.races.every((r) => !/POST Time|Free Tools/i.test(r.conditions ?? '')));
 
 console.log('\n-- never throws --');
 for (const junk of ['', '<html></html>', 'not html at all', '<table class="fullwidth"></table>']) {
