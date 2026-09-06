@@ -1,21 +1,34 @@
-// P-0.2: the graded-card regression fixtures (D108).
+// The graded-card regression fixtures (P-0.2, D108) AND the grading regression
+// itself (P-6.1, D120).
 //
-// This is the PLACEHOLDER the pivot's P-0.2 asks for. It proves the fixtures
-// are present, well-formed and internally consistent - it does NOT yet re-run
-// the grader against them. That assertion is P-6.1's, and it is the one that
-// matters: load each fixture's card and results, grade them, and require the
-// summary to match to the cent. A mismatch there means grading BEHAVIOUR
-// changed, which is a finding to investigate before the factory reset
-// proceeds, not a rounding error to absorb.
+// Two phases, and the second is the one that matters.
 //
-// Until then this guards the thing that would quietly break first: a fixture
-// being edited, truncated, or copied over with a different card's export.
+// PHASE 1 (D108) guards what would quietly break first: a fixture being
+// edited, truncated, or copied over with a different card's export. It never
+// takes gradeSummary's word for anything - every fixture's tickets are re-added
+// independently, so a doctored summary fails against its own rows.
+//
+// PHASE 2 (D120) is the assertion the pivot's P-6.1 asks for and the gate its
+// sequencing puts in front of the factory reset: load each fixture's tickets
+// and the day's results, run the REAL grader, and require the summary to match
+// the archived value TO THE CENT and every per-ticket outcome to match too. A
+// mismatch is a finding - grading behaviour changed - and must be investigated
+// before a reset proceeds, never absorbed as a rounding error.
+//
+// Phase 2 also carries a NEGATIVE CONTROL, because a regression test that
+// cannot fail is worse than no test: perturb one winning payoff by a cent and
+// the grader must notice. Without it, a harness bug that fed the grader an
+// empty ticket list would report nine green cards.
+//
+// Pure: no server, no database. The fixtures ARE the corpus here, which is why
+// they were frozen (D107) before any removal began.
 //
 // Run: npm run check-graded-card-fixtures
 
 import fs from 'node:fs';
 import path from 'node:path';
 import { fileURLToPath, URL } from 'node:url';
+import { buildDayResults, gradeCard } from '../shared/grading.js';
 
 const ROOT = fileURLToPath(new URL('../', import.meta.url));
 const DIR = path.join(ROOT, 'tests', 'fixtures', 'graded-cards');
@@ -93,8 +106,133 @@ console.log('\n-- the gap this set cannot cover, recorded rather than implied --
 check('the sidecar states that no multi-race ticket exists in the whole corpus',
   /multi-race/i.test(sidecar.knownGap ?? ''), sidecar.knownGap);
 
+// ---------------------------------------------------------------------------
+// PHASE 2 (P-6.1): the grader still reproduces every archived summary.
+// ---------------------------------------------------------------------------
+
+const load = (file) => JSON.parse(fs.readFileSync(path.join(DIR, file), 'utf8'));
+
+/**
+ * A fixture's `results` block -> the map `gradeCard` grades against.
+ * Deliberately regrouped here rather than imported from `server/grading.js`'s
+ * `loadDayResultsFor`: that one reads a live database, and the whole point of
+ * this check is that it needs neither a server nor a corpus. Both funnel into
+ * the same `buildDayResults`, which is the shared part that matters.
+ */
+function dayResultsFrom(doc) {
+  const byRace = new Map();
+  const raceFor = (n) => {
+    if (!byRace.has(n)) byRace.set(n, { number: n, results: [], exotics: [], scratchedPgms: [] });
+    return byRace.get(n);
+  };
+  for (const f of doc.results.finishers) {
+    raceFor(f.race).results.push({
+      programNumber: f.programNumber, finishPosition: f.finishPosition,
+      winCents: f.winCents, placeCents: f.placeCents, showCents: f.showCents,
+    });
+  }
+  for (const x of doc.results.exotics) {
+    raceFor(x.race).exotics.push({
+      betType: x.betType, baseCents: x.baseCents,
+      combination: x.combination, payoutCents: x.payoutCents,
+    });
+  }
+  for (const sc of doc.results.scratches) {
+    if (sc.programNumber != null) raceFor(sc.race).scratchedPgms.push(sc.programNumber);
+  }
+  return buildDayResults([...byRace.values()]);
+}
+
+// Only the fields the grader is allowed to see. Notably NOT the stored grade -
+// feeding that back in would make the comparison circular.
+const ticketsFrom = (doc) => doc.tickets.map((t) => ({
+  betType: t.betType, races: t.races, legs: t.legs,
+  stakeCents: t.stakeCents, costCents: t.costCents,
+}));
+
+console.log('\n-- P-6.1: the grader reproduces the archived summaries, to the cent --');
+let regradedTickets = 0;
+for (const c of sidecar.cards) {
+  const doc = load(c.file);
+  const { grades, summary } = gradeCard(ticketsFrom(doc), dayResultsFrom(doc));
+  const e = c.expected;
+
+  check(`card ${c.cardId} (${c.engineVersion}): summary matches the archive`,
+    summary.costCents === e.costCents
+    && summary.returnedCents === e.returnedCents
+    && summary.plCents === e.plCents
+    && JSON.stringify(summary.outcomes) === JSON.stringify(e.outcomes),
+    JSON.stringify({
+      expected: e,
+      got: {
+        costCents: summary.costCents,
+        returnedCents: summary.returnedCents,
+        plCents: summary.plCents,
+        outcomes: summary.outcomes,
+      },
+    }));
+
+  // The summary can match while individual tickets disagree - two errors that
+  // cancel. Per-ticket is the assertion the spec actually asks for.
+  const differing = [];
+  doc.tickets.forEach((t, i) => {
+    if (!t.grade) return;
+    regradedTickets += 1;
+    const g = grades[i];
+    if (g.outcome !== t.grade.outcome
+      || g.returnedCents !== t.grade.returnedCents
+      || g.plCents !== t.grade.plCents) {
+      differing.push({
+        seq: t.sequence, betType: t.betType, tellerCall: t.tellerCall,
+        archived: { outcome: t.grade.outcome, returnedCents: t.grade.returnedCents },
+        regraded: { outcome: g.outcome, returnedCents: g.returnedCents },
+      });
+    }
+  });
+  check(`card ${c.cardId}: every one of ${doc.tickets.length} tickets regrades identically`,
+    differing.length === 0, JSON.stringify(differing.slice(0, 4)));
+}
+check(`${regradedTickets} tickets regraded across ${sidecar.cards.length} cards`,
+  regradedTickets >= 386, String(regradedTickets));
+
+console.log('\n-- negative control: this check is capable of failing --');
+{
+  // Take the card whose numbers the pivot doc quotes, move ONE payoff the card
+  // ACTUALLY COLLECTED ON by a single cent, and require the grader to disagree
+  // with the archive. If this passes silently, the phase above proves nothing.
+  //
+  // The target is derived from the card's own biggest winning WIN ticket rather
+  // than picked by hand: the first draft perturbed "the first finisher with a
+  // win price", which sat in a race this card never had a win bet in, so the
+  // total did not move and the control reported a false pass. A control has to
+  // be aimed at something the subject actually reads.
+  const doc = load('card-139.json');
+  const perturbed = JSON.parse(JSON.stringify(doc));
+  const collected = doc.tickets
+    .filter((t) => t.betType === 'win' && t.grade?.outcome === 'win')
+    .sort((a, b) => b.grade.returnedCents - a.grade.returnedCents)[0];
+  check('the control has a win ticket to aim at', Boolean(collected));
+  const winner = perturbed.results.finishers.find(
+    (f) => f.race === collected.races[0] && f.programNumber === collected.legs[0][0],
+  );
+  check('the control found the horse that ticket collected on', Boolean(winner?.winCents));
+  winner.winCents += 1;
+  const { summary } = gradeCard(ticketsFrom(perturbed), dayResultsFrom(perturbed));
+  const archived = sidecar.cards.find((c) => c.cardId === 139).expected;
+  check('a one-cent change to a winning payoff makes the regrade disagree',
+    summary.returnedCents !== archived.returnedCents,
+    `perturbed=${summary.returnedCents} archived=${archived.returnedCents}`);
+
+  // And the harness is genuinely feeding the grader tickets - an empty list
+  // would sail through every equality above on a card that lost everything.
+  check('the harness feeds the grader real tickets, not an empty list',
+    ticketsFrom(doc).length === doc.tickets.length && doc.tickets.length > 0);
+}
+
 if (failures) {
   console.error(`\ncheck-graded-card-fixtures: ${failures} failure(s)`);
+  console.error('A PHASE 2 failure means GRADING BEHAVIOUR CHANGED. Investigate before');
+  console.error('any factory reset proceeds - the archive is the only other copy.');
   process.exit(1);
 }
 console.log('\ncheck-graded-card-fixtures: all checks passed');
