@@ -383,6 +383,7 @@ row words differently.
 
 | feature | state | notes |
 | --- | --- | --- |
+| ReplayRaceView checked for the same backdrop issue; the fix made a house rule (D133) | merged | branch `modal-backdrop-house-rule` - `ReplayRaceView.jsx` renders no modal at all (confirmed by grep), so nothing there needed D131/D132's fix. Documentation only: a new Gotchas entry states the rule - a `.modal-backdrop` never closes its dialog on click, only ×/Close (and Escape, where offered) may - so the next modal in this codebase is built right the first time. Full record: DELIVERABLES.md D133. |
 | Day builder modal: clicking the backdrop no longer closes (and locks) it either (D132) | merged | branch `day-builder-no-backdrop-close` - follow-up to D131. `DayTicketBuilderModal.jsx`'s backdrop click routed through `handleClose`, which LOCKS every cleanly-previewed race (D103) - an accidental click outside the dialog was writing to the database, not just closing a view. Backdrop `onClick` removed; Close/X and Escape (still via `closeRef`) unaffected. Full record: DELIVERABLES.md D132. |
 | LLM card modal: clicking the backdrop no longer closes the dialog (D131) | merged | branch `llm-modal-no-backdrop-close` - user request 2026-09-06: an accidental click outside "Generate Card from LLM" closed it, discarding an in-progress generation. Both `.modal-backdrop` divs in `LlmCardModal.jsx` dropped their `onClick={onClose}`; Close/X and Escape still work. `DayTicketBuilderModal.jsx` keeps backdrop-close deliberately - its close path locks previewed races (D103) rather than discarding them. Full record: DELIVERABLES.md D131. |
 | Day builder: footer buttons moved to the right edge with more spacing (D130) | merged | branch `day-builder-footer-buttons` - user request 2026-09-06. `.modal__footer` had no `display` rule, so "Lock all previewed races" and "Close" simply flowed as inline content next to the status text. Now `display: flex; justify-content: space-between` with the two buttons grouped in a `.modal__footer-actions` div (`gap: 12px; margin-left: auto`), pushing them flush right as a spaced-out pair. Presentation-only. Full record: DELIVERABLES.md D130. |
@@ -613,6 +614,22 @@ it. Rules still in force:
   and `npm run build` compiles it fine. When browser-verifying a dialog, assert
   the PAGE still rendered (`#root` still has children) - "the modal is gone" is
   also true when the app has crashed.
+- **A `.modal-backdrop` never closes its dialog on click - HOUSE RULE.** Only
+  the header's × / Close button (and Escape, where a dialog offers it) may
+  dismiss a modal. Found live 2026-09-06 on both of this app's modals: an
+  accidental click outside `LlmCardModal` (D131) silently discarded an
+  in-progress, possibly paid, LLM generation with no confirmation, and
+  outside `DayTicketBuilderModal` (D132) it was worse - that modal's close
+  path auto-LOCKS every cleanly-previewed race (D103), so the same stray
+  click was a database write, not just a dismissed view. Neither modal had
+  ever been asked to lose work or write data on an accidental click; the
+  backdrop's `onClick={onClose}` (or equivalent) was just how the
+  `modal-backdrop`/`modal` pattern in `styles.css` had always been wired.
+  **Any new modal in this codebase must render `<div className="modal-backdrop">`
+  with no click handler at all** - not `onClick={onClose}` with an inner
+  `onClick={(e) => e.stopPropagation()}` to half-guard it, which is the
+  pattern that was actually removed from both fixes. Escape-to-close, where
+  present, is a deliberate keyboard affordance and is unaffected by this rule.
 - **`resetApp(db)` takes a database; the log half of it does not.** `resetLogs()`
   reads the log directory the LOGGER was configured with, so running a reset
   against some other database - a copy, a probe, a fixture - still deletes the
