@@ -14,8 +14,7 @@ import { wagerLimitsFor, comboCountFor } from '@shared/parsers/human-picks.js';
 // builder about what a ticket costs or whether a stake is legal.
 //
 // Deliberately NOT bidirectional in v1: it starts empty and never parses
-// existing text back into rows. The escape hatch to a plain textarea stays,
-// because the column grammar and spreadsheet paste are still supported.
+// existing text back into rows.
 
 const BET_TYPES = [
   { value: 'win', label: 'Win', positions: 1, menuKey: 'win' },

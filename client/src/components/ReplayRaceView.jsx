@@ -33,7 +33,6 @@ export default function ReplayRaceView({ dayId, initialRace = 1, onBack, onOpenS
   const [summary, setSummary] = useState(null);
   const [error, setError] = useState(null);
   const [busy, setBusy] = useState(false);
-  const [typing, setTyping] = useState(false);   // D86: the escape hatch back to raw text
   const [editing, setEditing] = useState(false); // re-open a locked, unrevealed race
 
   useEffect(() => {
@@ -175,31 +174,13 @@ export default function ReplayRaceView({ dayId, initialRace = 1, onBack, onOpenS
                 so the card stays Pre-commit.
               </p>
             )}
-            {typing ? (
-              <>
-                <textarea className="in" rows={6} value={text} onChange={(e) => setText(e.target.value)}
-                  placeholder={'$10 W 5 / $2 EX BOX 2-4-5 / $1 TRI 5 WITH 2-4 WITH 2-4\n\nor the spreadsheet grammar:\nWin | #2 | $25'} />
-                <p className="dim">
-                  Teller format, tickets separated by " / " - the money first and per combo,
-                  WITH between finishing positions, "-" within one. A trailing "(9/2 big overlay)"
-                  records odds and a rationale. The spreadsheet grammar
-                  (bet type | selections | total stake) still works, tabs included.
-                </p>
-              </>
-            ) : (
-              <TicketBuilder
-                raceNumber={raceNumber}
-                entries={blind.entries}
-                wagerMenu={blind.wagerMenu}
-                disabled={busy}
-                onChange={setText}
-              />
-            )}
-            <p className="dim">
-              <button type="button" className="linkish" onClick={() => setTyping((v) => !v)}>
-                {typing ? 'Use the ticket builder' : 'Type it instead'}
-              </button>
-            </p>
+            <TicketBuilder
+              raceNumber={raceNumber}
+              entries={blind.entries}
+              wagerMenu={blind.wagerMenu}
+              disabled={busy}
+              onChange={setText}
+            />
             <div className="formrow formrow--tight">
               <button className="btn" disabled={busy || !text.trim()} onClick={handlePreview}>Preview</button>
               <button className="btn btn--primary" disabled={busy || !preview || preview.warnings.some((w) => w.blocking)} onClick={handleLock}>
