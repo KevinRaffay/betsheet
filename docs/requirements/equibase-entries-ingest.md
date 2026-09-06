@@ -1,6 +1,6 @@
 # Equibase entries ingest, from a manually saved page
 
-**Status: parser built (D104); ingest wiring not scheduled.** No deliverable IDs assigned — they get claimed when
+**Status: parser built (D104); schema landed (D115); ingest route + UI in progress.** No deliverable IDs assigned — they get claimed when
 the work is picked up, not before. Written 2026-09-05 from a real sample; every structural
 claim below was verified against that file rather than read off the rendered page.
 
@@ -145,9 +145,16 @@ HTML as given — so nobody has to remember which way a file was captured.
    `check-parsers.js`'s rule of golden diff **plus** independent hand-counted assertions, so
    regenerating a golden cannot bless a regression. **`data/raw/` is gitignored**, so the
    sample must be copied to `tests/fixtures/` to be committed.
-2. **Schema.** CHECK-rebuild migration admitting `EQB_MANUAL_UPLOAD`; ordinary ALTERs for
-   `race_days.odds_captured_at`, `entries.live_odds`, `entries.medication`; the
-   `server/ingest.js` allowlist; a Kentucky Downs entry in `shared/track-codes.js`.
+2. **Schema.** *Delivered as D115.* CHECK-rebuild migration admitting the new
+   `entries_source` value - named **`equibase_html`**, not `EQB_MANUAL_UPLOAD`: that
+   column's vocabulary is lowercase and names the document (`program`, `ml_sheet`),
+   and `program` was a manual upload too, so "manual upload" distinguishes nothing.
+   Ordinary ALTERs for `race_days.odds_captured_at` and, on `entries`, `live_odds` /
+   `live_odds_decimal`, `medication`, `age_sex`, `claim_price` and `also_eligible` -
+   the last three beyond what this doc originally listed, because the parser already
+   extracts them and a field dropped at ingest cannot be recovered without re-saving
+   the page. Plus the `server/ingest.js` allowlist and the Kentucky Downs entry in
+   `shared/track-codes.js`, both as specified.
    Track/source tagging then falls out of columns every card view already reads — no
    report-code special-casing, which was the original spec's stated goal.
 3. **Ingest UI.** A control in `NewRaceDay.jsx` beside the program-PDF upload, accepting the

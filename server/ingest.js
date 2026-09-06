@@ -112,7 +112,12 @@ const toInt = (v) => (v === null || v === undefined || v === '' ? null : Math.ro
 // (program panel letters, Bottom Line fallback, ML sheet header, ...) it
 // arrived with.
 export function insertRaceDay(db, payload, correlationId) {
-  const entriesSource = ['program', 'ml_sheet', 'both'].includes(payload.entriesSource) ? payload.entriesSource : 'program';
+  // This allowlist is the SECOND gate, and both are load-bearing: the column
+  // carries its own CHECK, and a value missing from this line is silently
+  // coerced to 'program' rather than refused - so adding a source means
+  // editing a migration AND this array, never one of them.
+  const ENTRIES_SOURCES = ['program', 'ml_sheet', 'both', 'equibase_html'];
+  const entriesSource = ENTRIES_SOURCES.includes(payload.entriesSource) ? payload.entriesSource : 'program';
   const bottomLineByRace = new Map((payload.analysis ?? [])
     .filter((chunk) => chunk && Number.isInteger(chunk.race) && chunk.text)
     .map((chunk) => [chunk.race, String(chunk.text)]));

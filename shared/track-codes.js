@@ -8,11 +8,21 @@
 // block - invariant 3's "missing detail warns, never blocks" spirit) so it
 // can still be saved and compared consistently.
 //
-// Pure - browser + Node, no I/O. The registry is Del Mar-only today; a new
-// track gets a new entry here, not a special case at a call site.
+// Pure - browser + Node, no I/O. A new track gets a new entry here, not a
+// special case at a call site.
+//
+// An UNRECOGNIZED track is not an error and never has been - it gets a derived
+// code and saves fine. A registry entry buys two things: one canonical display
+// spelling however the source wrote it, and a stable code that survives a
+// source changing its mind about capitalisation.
 
 const REGISTRY = [
   { code: 'DMR', display: 'Del Mar', aliases: ['DELMARRACINGCOM'] },
+  // D115: the first target for the Equibase entries ingest, and the first
+  // non-Del-Mar track in this registry. Equibase's own page header prints
+  // "Kentucky Downs"; the aliases cover its report code and the spaceless form
+  // a saved filename tends to carry.
+  { code: 'KD', display: 'Kentucky Downs', aliases: ['KD', 'KDOWNS'] },
 ];
 
 const lettersOnly = (s) => String(s ?? '').toUpperCase().replace(/[^A-Z]/g, '');
