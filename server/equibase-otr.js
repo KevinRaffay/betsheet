@@ -41,7 +41,7 @@ import { loadRace } from './human-cards.js';
 import { gradeAndPersist } from './grading.js';
 import { templateIdFor } from './templates.js';
 import { getLogger, newCorrelationId } from './logging.js';
-import { upsertSource, recordAttempt } from './polite-fetch.js';
+import { upsertSource, recordAttempt } from './source-audit.js';
 
 const ROOT = fileURLToPath(new URL('../', import.meta.url));
 // Overridable the same way BETSHEET_DB/BETSHEET_LOG_DIR are, so check

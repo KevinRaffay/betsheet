@@ -8,18 +8,10 @@
 // ingest session reads as one trace (invariant 8).
 
 import express from 'express';
-import { canonicalizeTrack } from '../shared/track-codes.js';
+import { canonicalizeTrack, meetForDay } from '../shared/track-codes.js';
 import { parseEntries } from '../shared/entries-parser.js';
 import { parseChart } from '../shared/chart-parser.js';
-import { parseProgramPdf } from './program-parser.js';
-import { parseMlSheetPdf } from './ml-sheet-parser.js';
-import { mergeMlAndProgram } from '../shared/entries-merge.js';
 import { parseDmtcResults } from '../shared/dmtc-results-parser.js';
-import { DEFAULT_RAW_DIR, dayDir, meetForDay, readManifest } from './dmtc-crawler.js';
-import fs from 'node:fs';
-import path from 'node:path';
-import { listFetchers, loadExtraFetchers } from './fetchers/index.js';
-import { fetchWithTimeout, recordAttempt, robotsDisallows, upsertSource } from './polite-fetch.js';
 import { extractPdfLines } from './pdf-text.js';
 import { getDb } from './db.js';
 import { getLogger, newCorrelationId } from './logging.js';
@@ -62,39 +54,6 @@ ingestRouter.post('/parse/entries-text', (req, res) => {
 });
 
 // The PDF arrives as a raw application/pdf body (no multipart dependency).
-ingestRouter.post(
-  '/parse/program-pdf',
-  express.raw({ type: 'application/pdf', limit: '30mb' }),
-  async (req, res) => {
-    const correlationId = req.get('x-correlation-id') || newCorrelationId();
-    if (!Buffer.isBuffer(req.body) || req.body.length === 0) {
-      return res.status(400).json({ error: 'Send the PDF as a raw application/pdf body.' });
-    }
-    try {
-      const expected = {
-        track: req.query.track || undefined,
-        date: req.query.date || undefined,
-      };
-      const parsed = addTrackWarning(await parseProgramPdf(new Uint8Array(req.body), expected));
-      log.info('parse_completed', {
-        correlationId,
-        kind: 'program_pdf',
-        bytes: req.body.length,
-        races: parsed.races.length,
-        entries: parsed.races.reduce((a, r) => a + r.entries.length, 0),
-        warnings: parsed.warnings.length,
-      });
-      res.json({ correlationId, ...parsed });
-    } catch (err) {
-      // A corrupt/non-PDF upload is a user-facing message, not a crash.
-      log.warn('parse_failed', { correlationId, kind: 'program_pdf', error: String(err?.message ?? err) });
-      res.status(422).json({ error: `Could not read that PDF: ${err?.message ?? err}` });
-    }
-  },
-);
-
-// ---------- results-chart parsing (preview only; D14 persists) ----------
-
 ingestRouter.post('/parse/results-text', (req, res) => {
   const text = String(req.body?.text ?? '');
   const correlationId = req.get('x-correlation-id') || newCorrelationId();
@@ -203,104 +162,14 @@ export function insertRaceDay(db, payload, correlationId) {
 // ---------- ML sheet (D40): the entries source of record ----------
 
 // Parse an uploaded ML/changes PDF. Preview only - never writes.
-ingestRouter.post(
-  '/parse/ml-pdf',
-  express.raw({ type: 'application/pdf', limit: '30mb' }),
-  async (req, res) => {
-    const correlationId = req.get('x-correlation-id') || newCorrelationId();
-    if (!Buffer.isBuffer(req.body) || req.body.length === 0) {
-      return res.status(400).json({ error: 'Send the PDF as a raw application/pdf body.' });
-    }
-    try {
-      const expected = { track: req.query.track || undefined, date: req.query.date || undefined };
-      const parsed = addTrackWarning(await parseMlSheetPdf(new Uint8Array(req.body), expected));
-      log.info('parse_completed', {
-        correlationId, kind: 'ml_sheet', bytes: req.body.length, races: parsed.races.length,
-        entries: parsed.races.reduce((a, r) => a + r.entries.length, 0), warnings: parsed.warnings.length,
-      });
-      res.json({ correlationId, entriesSource: 'ml_sheet', ...parsed });
-    } catch (err) {
-      log.warn('parse_failed', { correlationId, kind: 'ml_sheet', error: String(err?.message ?? err) });
-      res.status(422).json({ error: `Could not read that PDF: ${err?.message ?? err}` });
-    }
-  },
-);
+// D113 removed three parse routes and one fetch route from here with the
+// parsers behind them: /parse/program-pdf, /parse/ml-pdf, /parse/merge and
+// /fetch/ml-sheet, plus /race-days/:id/results/from-archive, which read the
+// dmtc raw archive the crawler built. What is left is the pasted-entries
+// preview (which the Equibase HTML ingest replaces when it is wired, and
+// which stays until then so a race day can still be created) and the three
+// results previews, all of which the pivot keeps.
 
-// Merge an ML sheet parse with a program parse: the sheet is the record,
-// the program contributes analysis; every disagreement is a warning.
-ingestRouter.post('/parse/merge', (req, res) => {
-  const correlationId = req.get('x-correlation-id') || newCorrelationId();
-  const { ml, program } = req.body ?? {};
-  if (!ml || !Array.isArray(ml.races)) return res.status(400).json({ error: 'ml (an ML sheet parse) is required.' });
-  if (program != null && !Array.isArray(program.races)) return res.status(400).json({ error: 'program must be a program parse or null.' });
-  const merged = addTrackWarning(mergeMlAndProgram(ml, program ?? null));
-  log.info('merge_completed', {
-    correlationId, entriesSource: merged.entriesSource, races: merged.races.length,
-    disagreements: merged.warnings.filter((w) => w.type === 'program_ml_disagreement').length,
-    warnings: merged.warnings.length,
-  });
-  res.json({ correlationId, ...merged });
-});
-
-// Fetch the ML sheet from the track for a track/date and return its parse
-// (preview only). Audited like every fetch (invariant 11): always to the
-// fetch-audit stream, and to fetch_attempts too when the day already
-// exists (the table keys on a race day).
-ingestRouter.post('/fetch/ml-sheet', async (req, res) => {
-  const correlationId = req.get('x-correlation-id') || newCorrelationId();
-  const track = String(req.body?.track ?? '').trim();
-  const date = String(req.body?.date ?? '').trim();
-  if (!track || !/^\d{4}-\d{2}-\d{2}$/.test(date)) return res.status(400).json({ error: 'track and date (yyyy-mm-dd) are required.' });
-  await loadExtraFetchers();
-  const fetcher = listFetchers().find((f) => f.produces === 'entries' && f.supports({ track, date }));
-  if (!fetcher) return res.status(404).json({ error: `No ML-sheet source is registered for ${track}. Upload the PDF instead.` });
-  const db = getDb();
-  const day = db.prepare('SELECT id FROM race_days WHERE track_code = ? AND date = ? AND deleted_at IS NULL')
-    .get(canonicalizeTrack(track).code, date);
-  const sourceId = upsertSource(db, fetcher);
-  const audit = (outcome, extra = {}) => {
-    fetchLog.info('fetch_attempt', { correlationId, source: fetcher.name, track, date, outcome, ...extra });
-    if (day) recordAttempt(db, { raceDayId: day.id, sourceId, correlationId, outcome, ...extra });
-  };
-  const url = fetcher.buildUrl({ track, date });
-  if (!url) { audit('http_error', { fallbackReason: 'no URL for this date' }); return res.status(400).json({ error: 'No URL for that date.' }); }
-  try {
-    if (await robotsDisallows(url)) {
-      audit('blocked', { url, fallbackReason: 'disallowed by robots.txt - upload the PDF manually' });
-      return res.status(403).json({ error: 'robots.txt disallows fetching the ML sheet; upload the PDF instead.', url });
-    }
-    const r = await fetchWithTimeout(url);
-    if (!r.ok) {
-      audit('http_error', { url, httpStatus: r.status, fallbackReason: `HTTP ${r.status}` });
-      return res.status(r.status === 404 ? 404 : 502).json({ error: `The track answered HTTP ${r.status} for ${url}.`, url });
-    }
-    const bytes = new Uint8Array(await r.arrayBuffer());
-    // pdfjs detaches the buffer while parsing: take the size first or the
-    // audit line says 0 bytes.
-    const byteLength = bytes.length;
-    let parsed;
-    try {
-      parsed = await parseMlSheetPdf(bytes, { track, date });
-    } catch (err) {
-      audit('parse_error', { url, httpStatus: r.status, bytes: byteLength, parseOk: 0, fallbackReason: String(err?.message ?? err) });
-      return res.status(422).json({ error: `Fetched the sheet but could not read it: ${err?.message ?? err}`, url });
-    }
-    const mismatch = parsed.warnings.find((w) => w.type === 'wrong_date' || w.type === 'wrong_track');
-    if (mismatch) {
-      audit('track_date_mismatch', { url, httpStatus: r.status, bytes: byteLength, parseOk: 1, fallbackReason: mismatch.message });
-      return res.status(422).json({ error: mismatch.message, url });
-    }
-    audit('ok', { url, httpStatus: r.status, bytes: byteLength, parseOk: 1, picksExtracted: parsed.races.reduce((a, x) => a + x.entries.length, 0) });
-    res.json({ correlationId, entriesSource: 'ml_sheet', fetchedFrom: url, ...parsed });
-  } catch (err) {
-    audit('network_error', { url, fallbackReason: String(err?.message ?? err) });
-    res.status(502).json({ error: `Could not reach the track: ${err?.message ?? err}`, url });
-  }
-});
-
-// ---------- dmtc results page (D42): the second results source ----------
-
-// Parse an uploaded / pasted dmtc.com results page. Preview only.
 ingestRouter.post('/parse/results-html', (req, res) => {
   const correlationId = req.get('x-correlation-id') || newCorrelationId();
   const html = String(req.body?.html ?? '');
@@ -317,27 +186,6 @@ ingestRouter.post('/parse/results-html', (req, res) => {
 // Preview a race day's results from the D41 raw archive (never the network).
 // The calendar's race count must equal the parsed count - a mismatch is a
 // hard error for the day (422), per the D42 rule.
-ingestRouter.post('/race-days/:id/results/from-archive', (req, res) => {
-  const correlationId = req.get('x-correlation-id') || newCorrelationId();
-  const db = getDb();
-  const day = db.prepare('SELECT id, track, date, deleted_at FROM race_days WHERE id = ?').get(Number(req.params.id));
-  if (!day) return res.status(404).json({ error: 'No such race day.' });
-  if (day.deleted_at) return res.status(410).json({ error: 'This race day is deleted.' });
-  const rawDir = process.env.BETSHEET_RAW_DIR || DEFAULT_RAW_DIR;
-  const file = path.join(dayDir(rawDir, day.date), 'results.html');
-  if (!fs.existsSync(file)) return res.status(404).json({ error: `No archived results page for ${day.date}. Run: npm run dmtc-fetch -- --from ${day.date} --to ${day.date} --what results` });
-  const manifest = readManifest(rawDir, day.date);
-  const expected = { races: manifest?.calendar?.races ?? null };
-  const parsed = parseDmtcResults(fs.readFileSync(file, 'utf8'), expected);
-  const mismatch = parsed.warnings.find((w) => w.type === 'race_count_mismatch');
-  log.info('parse_completed', {
-    correlationId, kind: 'results_archive', raceDayId: day.id, races: parsed.races.length,
-    expectedRaces: expected.races, warnings: parsed.warnings.length, mismatch: Boolean(mismatch),
-  });
-  if (mismatch) return res.status(422).json({ error: `${mismatch.message} Nothing to preview - the archived page is incomplete or the calendar is wrong.`, warnings: parsed.warnings });
-  res.json({ correlationId, sourceKind: 'dmtc_html', archivedAt: manifest?.artifacts?.results?.fetched_at ?? null, ...parsed });
-});
-
 ingestRouter.post('/race-days', (req, res) => {
   const correlationId = req.get('x-correlation-id') || newCorrelationId();
   const p = req.body ?? {};

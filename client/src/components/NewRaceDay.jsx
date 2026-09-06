@@ -1,11 +1,18 @@
 import React, { useState } from 'react';
-import { fetchMlSheet, mergeParses, parseEntriesText, parseMlPdf, parseProgramPdf, saveRaceDay } from '../api.js';
+import { parseEntriesText, saveRaceDay } from '../api.js';
 import ParsePreview from './ParsePreview.jsx';
 
-// The ingest screen: paste entries text or upload a program PDF, review the
-// parse, then save. The preview is READ-ONLY - it shows exactly what Save
-// will write, warnings first. To correct something, fix the pasted text and
-// re-parse; the parser's output is never hand-edited in place.
+// The ingest screen: paste entries text, review the parse, then save. The
+// preview is READ-ONLY - it shows exactly what Save will write, warnings
+// first. To correct something, fix the pasted text and re-parse; the parser's
+// output is never hand-edited in place.
+//
+// D113 removed the ML-sheet upload, the ML fetch and the program-PDF upload
+// with the Del Mar parsers behind them. **The pasted-entries path is kept
+// deliberately, and is currently the only way to create a race day** - the
+// Equibase entries HTML parser (D104) is built and verified but not yet wired
+// to a route, so removing this too would leave the app unable to create a day
+// at all. It goes when that wiring lands, not before.
 export default function NewRaceDay({ onSaved, onCancel }) {
   const [track, setTrack] = useState('');
   const [date, setDate] = useState('');
@@ -17,11 +24,6 @@ export default function NewRaceDay({ onSaved, onCancel }) {
   const [conflict, setConflict] = useState(false);
   const [parsed, setParsed] = useState(null);
   const [correlationId, setCorrelationId] = useState(null);
-  // D40: the ML sheet is the entries source of record; the program is
-  // analysis-only. Both parses are kept so either upload can come first;
-  // the preview always shows the MERGED result when both are present.
-  const [mlParse, setMlParse] = useState(null);
-  const [programParse, setProgramParse] = useState(null);
 
   const applyParse = (result) => {
     setParsed(result);
@@ -43,56 +45,6 @@ export default function NewRaceDay({ onSaved, onCancel }) {
     }
   };
 
-  // Combine whatever is on hand: ML + program -> merged (server-side,
-  // logged); ML alone -> the sheet; program alone -> the program.
-  const combine = async (ml, program) => {
-    if (ml && program) return { ...(await mergeParses(ml, program, correlationId)), entriesSource: 'both' };
-    if (ml) return { ...ml, entriesSource: 'ml_sheet' };
-    return { ...program, entriesSource: 'program' };
-  };
-
-  const handlePdf = async (file) => {
-    if (!file) return;
-    setBusy(true);
-    try {
-      const program = await parseProgramPdf(file, { track, date, correlationId });
-      setProgramParse(program);
-      applyParse(await combine(mlParse, program));
-    } catch (e) {
-      setError(String(e.message));
-    } finally {
-      setBusy(false);
-    }
-  };
-
-  const handleMlPdf = async (file) => {
-    if (!file) return;
-    setBusy(true);
-    try {
-      const ml = await parseMlPdf(file, { track, date, correlationId });
-      setMlParse(ml);
-      applyParse(await combine(ml, programParse));
-    } catch (e) {
-      setError(String(e.message));
-    } finally {
-      setBusy(false);
-    }
-  };
-
-  const handleFetchMl = async () => {
-    setBusy(true);
-    setError(null);
-    try {
-      const ml = await fetchMlSheet(track.trim(), date, correlationId);
-      setMlParse(ml);
-      applyParse(await combine(ml, programParse));
-    } catch (e) {
-      setError(String(e.message));
-    } finally {
-      setBusy(false);
-    }
-  };
-
   const handleSave = async (replace = false) => {
     setBusy(true);
     setError(null);
@@ -103,6 +55,9 @@ export default function NewRaceDay({ onSaved, onCancel }) {
         bankrollCents: Math.round(Number(bankroll || 0) * 100),
         perRaceMinCents: Math.round(Number(perRaceMin || 0) * 100),
         replace,
+        // Pasted text is the only surviving source, and 'program' is the
+        // schema's default value for it (the CHECK admits program /
+        // ml_sheet / both; the Equibase wiring adds its own).
         entriesSource: parsed.entriesSource ?? 'program',
         races: parsed.races,
         analysis: parsed.analysis,
@@ -157,30 +112,6 @@ export default function NewRaceDay({ onSaved, onCancel }) {
           <button className="btn btn--primary" disabled={busy || !text.trim()} onClick={handleParseText}>
             {busy ? 'Parsing…' : 'Parse pasted text'}
           </button>
-          <label className="btn btn--primary">
-            {busy ? 'Parsing…' : 'Upload ML sheet PDF'}
-            <input
-              type="file"
-              accept="application/pdf"
-              style={{ display: 'none' }}
-              disabled={busy}
-              onChange={(e) => handleMlPdf(e.target.files?.[0])}
-            />
-          </label>
-          <button className="btn" disabled={busy || !track.trim() || !date} onClick={handleFetchMl}
-            title="Fetch the track's morning-line sheet for this track and date">
-            {busy ? 'Fetching…' : 'Fetch ML sheet'}
-          </button>
-          <label className="btn">
-            {busy ? 'Parsing…' : 'Upload program PDF (analysis)'}
-            <input
-              type="file"
-              accept="application/pdf"
-              style={{ display: 'none' }}
-              disabled={busy}
-              onChange={(e) => handlePdf(e.target.files?.[0])}
-            />
-          </label>
         </div>
       </div>
 

@@ -1,5 +1,5 @@
 import React, { useEffect, useState } from 'react';
-import { getResults, parseResultsHtml, parseResultsPdf, parseResultsText, resultsFromArchive, saveResults } from '../api.js';
+import { getResults, parseResultsHtml, parseResultsPdf, parseResultsText, saveResults } from '../api.js';
 
 const money = (cents) => (cents == null ? '' : `$${(cents / 100).toFixed(2)}`);
 
@@ -43,13 +43,6 @@ export default function ResultsPanel({ dayId }) {
     setBusy(true);
     try {
       applyParse({ ...(await parseResultsHtml(await file.text(), correlationId)), sourceKind: 'dmtc_html' });
-    } catch (e) { setError(String(e.message)); } finally { setBusy(false); }
-  };
-  const handleArchive = async () => {
-    setBusy(true);
-    setError(null);
-    try {
-      applyParse({ ...(await resultsFromArchive(dayId, correlationId)), sourceKind: 'dmtc_html' });
     } catch (e) { setError(String(e.message)); } finally { setBusy(false); }
   };
   const handleSave = async () => {
@@ -113,9 +106,6 @@ export default function ResultsPanel({ dayId }) {
             <input type="file" accept="application/pdf" style={{ display: 'none' }}
               disabled={busy} onChange={(e) => handlePdf(e.target.files?.[0])} />
           </label>
-          <button className="btn" disabled={busy} onClick={handleArchive} title="Preview the dmtc.com results page archived by dmtc-fetch for this day">
-            {busy ? 'Loading…' : 'Load dmtc results from archive'}
-          </button>
           <label className="btn">
             {busy ? 'Parsing…' : 'Upload dmtc results page (HTML)'}
             <input type="file" accept=".html,.htm,text/html" style={{ display: 'none' }}
