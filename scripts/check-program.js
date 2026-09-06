@@ -337,13 +337,15 @@ check('wrong expected date -> wrong_date warning',
 check('wrong expected track -> wrong_track warning',
   wrong.warnings.some((w) => w.type === 'wrong_track'));
 
-// --- third fixture: the 2025 print run (tests/fixtures/backfill/DMR-2025-summer, the D45 golden) ---
+// --- third fixture: the 2025 print run (the D45 golden's program, relocated
+// to tests/fixtures/programs/ by D111 when the backfill runner was deleted -
+// this is a PARSER proof, not a backfill one) ---
 // One 1/3-page advertisement per card brings its print-proof slug into the
 // text layer, OVERPRINTED (every item twice at the same coordinates). Before
 // the fix its "Round 1" moved race 9's left edge (the race parsed EMPTY on 22
 // of 31 days of the meet) and its "OK" became a horse's name.
 console.log('-- 2025 print run: advertisement slug on the race-9 spread --');
-const PDF3 = path.join(ROOT, 'tests', 'fixtures', 'backfill', 'DMR-2025-summer', 'program.pdf');
+const PDF3 = path.join(ROOT, 'tests', 'fixtures', 'programs', 'delmar-2025-07-18.pdf');
 const out3 = await parseProgramPdf(PDF3, { track: 'Del Mar', date: '2025-07-18' });
 const r9 = out3.races.find((r) => r.number === 9);
 check('2025-07-18: 10 races, 110 entries, no empty race, no index mismatch (the ad slug is dropped)',
@@ -355,15 +357,16 @@ check('2025-07-18 R9: eleven entries in program order, #3 is Runkerry (not the a
   r9.distance === 'Six Furlongs' && r9.surface === 'DIRT' && r9.raceType === 'ALLOWANCE/CLAIMING' && r9.postTime === '6:00PM',
   r9 ? JSON.stringify(r9.entries.map((e) => [e.programNumber, e.horseName, e.programRank, e.scratched])) : 'no race 9');
 
-// --- fourth fixture: a FOREIGN document (tests/fixtures/backfill/DMR-2025-fall, the D46 golden) ---
+// --- fourth fixture: a FOREIGN document (the D46 golden's digest, likewise
+// relocated to tests/fixtures/programs/ by D111) ---
 // On Breeders' Cup days the Del Mar program URL serves the Breeders' Cup
 // official program: per-race footers but no Bottom Line, no horse index,
 // panels that parse to duplicates and empties. The parser must say so and
 // hand back NO races - the ML sheet is the only entries source that day.
 console.log('-- foreign document: the Breeders Cup official program (2025-10-31) --');
-// The 42MB BC program is committed by DIGEST only (tests/fixtures/backfill/DMR-2025-fall/program.digest.json);
+// The 42MB BC program is committed by DIGEST only (tests/fixtures/programs/breeders-cup-2025-10-31.digest.json);
 // the archived copy under data/raw is parsed when present, else this assertion is noted as skipped.
-const DIGEST4 = JSON.parse(fs.readFileSync(path.join(ROOT, 'tests', 'fixtures', 'backfill', 'DMR-2025-fall', 'program.digest.json'), 'utf8'));
+const DIGEST4 = JSON.parse(fs.readFileSync(path.join(ROOT, 'tests', 'fixtures', 'programs', 'breeders-cup-2025-10-31.digest.json'), 'utf8'));
 const PDF4 = path.join(ROOT, 'data', 'raw', 'DMR', '20251031', 'program.pdf');
 if (fs.existsSync(PDF4)) {
   const bytes4 = fs.readFileSync(PDF4);
@@ -373,7 +376,7 @@ if (fs.existsSync(PDF4)) {
     out4.foreign === true && out4.races.length === 0 && out4.warnings.some((w) => w.type === 'foreign_program' && /no Bottom Line, no horse index/.test(w.message) && /duplicate race numbers/.test(w.message)) &&
     out4.warnings.some((w) => w.type === 'no_analysis') && out4.warnings.some((w) => w.type === 'no_index'), JSON.stringify(out4.warnings.map((w) => w.type)));
 } else {
-  console.log('  note  2025-10-31 Breeders Cup program: digest-only fixture and data/raw archive not present - foreign-document parse skipped here (the backfill runner re-verifies it against the archive)');
+  console.log('  note  2025-10-31 Breeders Cup program: digest-only fixture and data/raw archive not present - foreign-document parse skipped here');
 }
 check('a real Del Mar program is never flagged foreign (2026-08-30, 2025-07-18)', out.foreign === undefined && out3.foreign === undefined);
 

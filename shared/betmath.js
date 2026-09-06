@@ -211,7 +211,9 @@ export const parlayPayout = (stakeCents, mls) =>
  * a multiplier beside BET.estimates' tuned constants would be guessing with
  * money math. Leave them null; the sheet prints an honest dash.
  *
- * NOT to be unified with shared/card-engine.js's own inline estimates. Those
+ * NOT to be unified with shared/card-engine.js's inline estimates - which are
+ * gone with the engine (D111); this note stays because the estimates they
+ * wrote are still on every stored lean card and must not be recomputed. Those
  * are computed mid-construction with context this dispatcher does not have
  * (mlForPlaceRule, the box's own est list, straight exactas priced off the
  * LONGEST-priced under, and the rebalancer rewriting est after a stake moves).

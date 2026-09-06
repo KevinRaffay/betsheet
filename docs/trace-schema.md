@@ -7,7 +7,8 @@ decided X because Y — and it earned Z" for every dollar on the card
 (invariant 7).
 
 Versioning: the export document carries `export.schemaVersion` (currently
-**1**, `SCHEMA_VERSION` in `server/trace-export.js`). Bump it whenever the
+**2**, `SCHEMA_VERSION` in `server/trace-export.js`; D111 bumped it from 1
+when `traceStatus` changed meaning - see below). Bump it whenever the
 shape of the export or the meaning of an event changes; adding a new event
 type is backward-compatible and does not bump it.
 
@@ -24,28 +25,33 @@ Every line in every stream is one JSON object:
 | `correlationId` | the card-session id (invariant 8) — one per card, stamped on every event that belongs to it |
 | ...fields | event-specific, listed below |
 
-Engine events also carry `seq` — a 0-based, gap-free counter within one
-generation run. A gap in `seq` for one correlationId means trace loss,
-which is a bug. Server-side wrapping adds `cardId` and `raceDayId` to every
-engine event.
+The lean engine's events also carried `seq` — a 0-based, gap-free counter
+within one generation run, whose gaps meant trace loss. **D111 deleted that
+engine and no event carries `seq` any more.** None of the three producers that
+remain could carry one honestly: a human, LLM or OTR card is appended to race
+by race across separate requests, so a per-call counter would restart and read
+as a gap on a perfectly intact trace. Completeness is now cross-referenced
+against the database instead — see `traceStatus` below. Server-side wrapping
+still adds `cardId` and `raceDayId` to every event.
 
 ## Event catalog
 
-### Card generation (emitted by `shared/card-engine.js`, streamed by `server/cards.js`)
+### Card generation by the lean engine — REMOVED (D111)
 
-| event | fields | meaning |
-| --- | --- | --- |
-| `inputs_snapshot` | `engineVersion`, `bankrollCents`, `perRaceMinCents`, `raceCount`, `entries[{race, entries}]`, `sourcesUsed`, `sourcesUnavailable`, `template`, `rules` | everything the run saw, first event (`seq` 0). `template` is the strategy-template name (D18, null for direct engine calls); `rules` is the full resolved rule set after template + explicit overrides. |
-| `consensus_table` | `race`, `table` | the per-horse vote table the classification was computed from |
-| `race_classified` | `race`, `classification` (UNANIMOUS/SPLIT/CHAOS/GUESS), `externalSourceCount`, `agreement` (D74: how many sources share the plurality top pick, e.g. 2-of-3 - stored regardless of the classification call, so a majority view exists without reclassifying anything), `cappedFromUnanimous`, `topVotes`, `contrarianFlags` | the signal-layer call and the votes behind it |
-| `completeness_decided` | `completeness` (FULL/PARTIAL/PROGRAM_ONLY/ODDS_ONLY), `externalSourcesPerRace`, `programAnalysis` (any program rank on the day) | the card's consensus-completeness bucket (invariant 13) |
-| `rule_fired` | `rule`, `reason?`, rule-specific fields (`race`, `horse`, `stakeCents`, `reserveCents`, ...) | a structure-layer rule acted. Rules: `multi_race_reserve`, `guesswork_minimum`, `fade_favorite_price`, `win_bet`, `longshot_on_top`, `hedge_cut`, `two_source_coverage`, `mid_price_coverage`, `place_money_rule`, `place_money_carve_out`, `best_bet_weight` (D48: the best-bet allocation curve put the heavy weight on the program Best Bet race; `weight`) (D36: an 8-1+ win and its place money sized INSIDE the allocation - `fromCents`, `toCents`, `allocatedCents`, `exoticCents`), `ml_order_fallback` (a race with no program analysis and no external picks ranks by morning line, D40) |
-| `rule_suppressed` | `rule`, `reason`, `race?`, rule-specific fields (`horse`, `ml`, `second`, `backers`, `horses`, `strongRaces`) | a rule was evaluated and DECLINED (D48) - so "never fired" and "never evaluated" are distinguishable in the corpus. Machine-readable reasons: `disabled_by_template` (any rule); `fade_favorite_price`: `no_algo_order` (no external source on the day - PROGRAM_ONLY / ODDS_ONLY), `not_unanimous`, `above_odds_on`, `no_morning_line`, `no_exotic_tickets`; `chaos_trifecta_box`: `not_chaos_classification` (per race), `no_chaos_race` (once per card, no race field), `insufficient_horses`, `no_exotic_tickets`; `hedge_cut`: `not_split_classification`, `no_second_choice`, `sufficient_backing` (the second win bet was placed); `split_exacta_box` / `unanimous_exacta`: `no_exotic_tickets`, `no_third_pick` (box-depth-3 with only two ranks), `disabled_by_template` on `split_exacta_box` alone when `hedgeBoxDepth` is 0 (D49 straight-only: the box is off, the mid-price straight exacta still fires); `mid_price_coverage`: `no_mid_priced_horse`, `no_exotic_tickets`; `two_source_coverage`: `no_multi_source_horse`, `no_exotic_tickets`; `longshot_on_top`: `no_live_longshot`, `no_exotic_tickets`; `place_money_rule`: `below_odds_threshold` (per win ticket, with `ml`), `no_morning_line`; `multi_race_reserve`: `fewer_than_two_strong_races`; `best_bet_weight`: `no_best_bet` (best-bet curve on a day without a Best Bet); `win_bet`: the fade's free-text reason (pre-D48) |
-| `allocation_decided` | `race`, `amountCents`, `confidence`, `rule` | the per-race allocation and which weighting produced it |
-| `ticket_added` | `race` (null for multi-race), `races`, `betType`, `selections` (legs), `stakeCents`, `costCents`, `rules` (provenance tags) | one ticket landed on the card |
-| `remainder_distributed` | `remainderCents`, `passes`, `races[{race, amountCents, steps, ticket, withPlace, allocatedCents}]`, `skipped[{race, reason}]` (`no_win_ticket` / `guesswork_floor` / `stake_held_by_template` - D48: a race whose win stakes a template holds at the minimum steps its exacta box instead (one base unit a step), and its straight exacta for the last odd dollar; `ticket` then names that ticket; a held race with neither is skipped), `undistributedCents` | how the gap between the bankroll and the constructed tickets was spread: deficits toward each race's own allocation first (D36), then round-robin $1 steps onto each race's primary win ticket (`withPlace` = the place-money pair moved with it, $2 a step), larger allocations first, at most one step per race per pass; guesswork races only when nothing else can take the money. Emitted only when there was a remainder. `undistributedCents` is non-zero only when minimums made an exact match impossible |
-| `bankroll_balanced` | `adjusted`, `remainingCents` | the exact-bankroll balancing pass (invariant 2); follows `remainder_distributed` |
-| `card_finalized` | `engineVersion`, `totalCents`, `bankrollCents`, `ticketCount`, `completeness`, `perRace[{race, allocatedCents, spentCents}]`, `warnings` | last generation event; totals as persisted |
+`shared/card-engine.js` and `server/cards.js`'s generate route are gone, and
+with them every event they emitted: `inputs_snapshot`, `consensus_table`,
+`race_classified`, `completeness_decided`, `rule_fired`, `rule_suppressed`,
+`allocation_decided`, `remainder_distributed`, `bankroll_balanced` and
+`card_finalized`. **Nothing emits them now.**
+
+They are still present in the logs and exports of every card generated before
+the pivot, and in the frozen archive, so a consumer reading historical exports
+must still handle them. Their full field catalog is preserved verbatim in
+`docs/feature-notes.md`'s snapshot rather than repeated here, because this file
+documents what the system emits, not what it once did.
+
+The three surviving producers each emit `card_generated` and one
+`ticket_added` per ticket, catalogued in their own sections below.
 
 ### Grading (emitted by `server/grading.js`, under the CARD's correlationId)
 
@@ -123,7 +129,7 @@ One self-contained JSON object per card:
 | `tickets` | the card as persisted, each with its `grade` (`outcome`, `returnedCents`, `plCents`, `note`, from the LATEST grade set - invariant 14 keeps older versions' sets in graded_tickets) or `grade: null` when the day has no results yet |
 | `gradeSummary` | costCents, returnedCents, plCents, outcomes — or null when ungraded |
 | `results` | the day's stored chart: `finishers` (with W/P/S prices in cents), `exotics` (per printed base), `scratches` |
-| `traceStatus` | `complete` (the generation run's `seq` counter is present and gap-free through `card_finalized`), `partial` (some generation events lost — rotated past retention or a foreign log dir), or `missing` (no generation events found — e.g. the card predates a factory reset of a different instance's logs). Consumers should weigh `partial`/`missing` exports accordingly; the DB-backed sections (tickets, grades, results) are always current. |
+| `traceStatus` | `complete` (the card's `card_generated` event is present AND the log holds at least one `ticket_added` for every ticket on file), `partial` (some events lost — rotated past retention, or a foreign log dir), or `missing` (no generation events found at all — e.g. the card predates a factory reset of a different instance's logs). **D111 changed how this is computed** (schemaVersion 2): it used to read the lean engine's self-reported gap-free `seq` counter, and now cross-references the log against the DATABASE, which is both the stronger test and the only one still possible once the engine is gone. Consumers should weigh `partial`/`missing` exports accordingly; the DB-backed sections (tickets, grades, results) are always current. |
 | `trace` | every decision-trace event whose correlationId matches the card's or that carries this cardId, oldest first — generation, every grading pass, and any day events in the same session |
 
 Deleted race days answer 410 (invariant 12: excluded from every reporting

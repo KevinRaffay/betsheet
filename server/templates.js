@@ -1,42 +1,42 @@
-// Strategy-template persistence: seed the code-defined templates
-// (shared/templates.js, the source of truth) into the strategy_templates
-// table so cards can reference them by FK, and serve the list to the UI.
-// Seeding is an upsert by name - editing a template in code updates the
-// row on the next boot, and existing cards keep pointing at the same id.
+// Strategy-template persistence: seed the three surviving templates into the
+// strategy_templates table so cards can reference them by FK.
+//
+// This file used to seed shared/templates.js's 12 lean rule bundles as well,
+// with the three below appended as FK-only rows that were deliberately kept
+// OUT of that map so they could never appear in the live-generate dropdown or
+// a simulation run. D111 deleted the engine, the templates and the simulator,
+// so the exception is now the whole list: the three producers that remain -
+// Equibase OTR uploads, LLM generation and human entry - are exactly these
+// rows, and each writes its own tickets through its own module.
+//
+// They are NOT renamed (the pivot's own correction: OTR never used the lean
+// engine, so there is no `otr-lean` to rename anything to, and renaming would
+// churn live rows on every stored card for nothing). Seeding stays an upsert
+// by name, so existing cards keep pointing at the same id.
+//
+// `rules` is '{}' for all three: none of them is rule-driven. There is no
+// rule set left to describe.
 
 import express from 'express';
-import { listTemplates } from '../shared/templates.js';
 import { getDb } from './db.js';
 
 export const templatesRouter = express.Router();
 
+/** The three card producers, as rows. Name -> description. */
+const TEMPLATE_ROWS = [
+  ['human', 'Human-entered picks, typed or built race by race (D54/D55).'],
+  ['llm', 'LLM-generated picks, one race at a time from entries and any notes (D63).'],
+  ['equibase-otr', "Equibase's Off to the Races sheet, tickets taken verbatim (D71)."],
+];
+
 export function seedTemplates(db) {
   const upsert = db.prepare(`
     INSERT INTO strategy_templates (name, description, rules)
-    VALUES (?, ?, ?)
+    VALUES (?, ?, '{}')
     ON CONFLICT(name) DO UPDATE SET description = excluded.description, rules = excluded.rules
   `);
   const seed = db.transaction(() => {
-    for (const t of listTemplates()) {
-      upsert.run(t.name, t.description, JSON.stringify(t.rules));
-    }
-    // D54: 'human' is a real strategy_templates row purely for FK integrity
-    // (every LEFT JOIN strategy_templates then resolves template:'human'
-    // with zero query changes) - deliberately NOT in shared/templates.js's
-    // TEMPLATES map, so it never appears in the live-generate dropdown,
-    // resolveTemplate(), or POST /api/simulations' "run every template."
-    upsert.run('human', 'Human-entered picks, replayed blind race by race (D54/D55). Not engine-generated or simulated.', '{}');
-    // D63: same reasoning as 'human' above - real row for FK integrity,
-    // deliberately outside shared/templates.js's TEMPLATES map so it never
-    // appears in the live-generate dropdown, resolveTemplate(), or a
-    // simulation run (an LLM card is manually generated race by race, not
-    // something the simulator could ever replay).
-    upsert.run('llm', 'LLM-generated picks, one race at a time from entries and already-fetched consensus (D63). Not engine-generated or simulated.', '{}');
-    // D71: same reasoning as 'human'/'llm' above - real row for FK integrity,
-    // deliberately outside shared/templates.js's TEMPLATES map so it never
-    // appears in the live-generate dropdown, resolveTemplate(), or a
-    // simulation run (Equibase's printed sheet is uploaded, not generated).
-    upsert.run('equibase-otr', "Equibase's Off to the Races sheet, tickets taken verbatim (D71). Not engine-generated or simulated.", '{}');
+    for (const [name, description] of TEMPLATE_ROWS) upsert.run(name, description);
   });
   seed();
 }
@@ -47,7 +47,11 @@ export function templateIdFor(db, name) {
 }
 
 templatesRouter.get('/templates', (_req, res) => {
-  // Serve from code, not the table - the table is for FK integrity; the
-  // code carries the layer map the UI and simulator need.
-  res.json(listTemplates());
+  // Served from the table now, not from code: with the rule bundles gone
+  // there is no layer map to carry, and the rows themselves are the list.
+  // Stored cards may still reference retired lean-* templates, so this
+  // returns whatever is on file rather than only the three seeded above.
+  res.json(getDb().prepare(
+    'SELECT name, description FROM strategy_templates ORDER BY name',
+  ).all());
 });

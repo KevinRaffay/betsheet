@@ -5,8 +5,6 @@ export function parseRoute(pathname) {
   if (parts.length === 0) return { name: 'list' };
   if (parts.length === 1 && parts[0] === 'new') return { name: 'new' };
   if (parts.length === 1 && parts[0] === 'pl') return { name: 'pl' };
-  if (parts.length === 1 && parts[0] === 'simulate') return { name: 'sim' };
-  if (parts.length === 1 && parts[0] === 'backfill') return { name: 'backfill' };
   if (parts.length === 1 && parts[0] === 'distribution') return { name: 'distribution' };
   if (parts.length === 1 && parts[0] === 'replay') return { name: 'replay' };
   if (parts.length === 2 && parts[0] === 'replay' && parts[1] === 'standing') return { name: 'replayStanding' };
@@ -28,8 +26,6 @@ export function parseRoute(pathname) {
 export function pathForView(view) {
   if (view.name === 'new') return '/new';
   if (view.name === 'pl') return '/pl';
-  if (view.name === 'sim') return '/simulate';
-  if (view.name === 'backfill') return '/backfill';
   if (view.name === 'distribution') return '/distribution';
   if (view.name === 'replay') return '/replay';
   if (view.name === 'replayStanding') return '/replay/standing';

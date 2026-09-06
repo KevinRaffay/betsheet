@@ -16,7 +16,7 @@ import { getLogger, readRecent } from './logging.js';
 
 const log = getLogger('app');
 
-export const SCHEMA_VERSION = 1;
+export const SCHEMA_VERSION = 2;
 
 export const exportRouter = express.Router();
 
@@ -157,14 +157,25 @@ export function buildCardExport(db, cardId) {
   }).reverse();
 
   // Honesty marker: log files can be younger than the card (factory reset,
-  // pruned retention, a different BETSHEET_LOG_DIR). The engine's gap-free
-  // seq counter proves completeness; anything else is flagged, never
-  // silently exported as if it were the whole story.
-  const seqs = traceEvents.filter((e) => typeof e.seq === 'number')
-    .map((e) => e.seq).sort((a, b) => a - b);
-  const traceStatus = seqs.length === 0 ? 'missing'
-    : seqs[0] === 0 && seqs.every((v, i) => v === i) &&
-      traceEvents.some((e) => e.event === 'card_finalized') ? 'complete'
+  // pruned retention, a different BETSHEET_LOG_DIR), so a thin trace must be
+  // FLAGGED rather than silently exported as if it were the whole story.
+  //
+  // This used to be proven by the lean engine's gap-free `seq` counter, which
+  // it stamped on every event of the one call that built a whole card. D111
+  // deleted that engine, and none of the three producers that remain can
+  // carry such a counter honestly: a human, LLM or OTR card is appended to
+  // race by race across separate requests, so any per-call counter would
+  // restart and read as a gap on a perfectly intact trace.
+  //
+  // Completeness is therefore checked against the DATABASE instead of against
+  // a number the writer reported about itself - which is the stronger test,
+  // and the one that actually answers the question the marker exists for:
+  // is every ticket that is on file also in the log? `card_generated` is the
+  // card's own opening event, so its absence means the trace is gone entirely.
+  const added = traceEvents.filter((e) => e.event === 'ticket_added').length;
+  const opened = traceEvents.some((e) => e.event === 'card_generated');
+  const traceStatus = (!opened && added === 0) ? 'missing'
+    : (opened && added >= tickets.length) ? 'complete'
       : 'partial';
 
   return {

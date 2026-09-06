@@ -96,7 +96,6 @@ export const saveResults = (dayId, payload, correlationId) =>
 export const getResults = (dayId) =>
   fetch(`/api/race-days/${dayId}/results`).then(asJson);
 
-export const getTemplates = () => fetch('/api/templates').then(asJson);
 export const getPL = (engineVersion, meet) => {
   const q = new URLSearchParams();
   if (engineVersion) q.set('engineVersion', engineVersion);
@@ -131,13 +130,6 @@ export const manualPicksPreview = (id, sourceName, text) =>
     body: JSON.stringify({ sourceName, text }),
   }).then(asJson);
 
-export const generateCardApi = (dayId, body = {}) =>
-  fetch(`/api/race-days/${dayId}/cards`, {
-    method: 'POST',
-    headers: { 'content-type': 'application/json' },
-    body: JSON.stringify(body),
-  }).then(asJson);
-
 export const listCards = (dayId) => fetch(`/api/race-days/${dayId}/cards`).then(asJson);
 export const getCard = (id) => fetch(`/api/cards/${id}`).then(asJson);
 export const deleteCard = (id) => fetch(`/api/cards/${id}`, {
@@ -153,20 +145,6 @@ export const manualPicksSave = (id, sourceName, races) =>
     body: JSON.stringify({ sourceName, races }),
   }).then(asJson);
 
-
-// Simulation (D19).
-export const runSimulation = (body = {}) =>
-  fetch('/api/simulations', {
-    method: 'POST',
-    headers: { 'content-type': 'application/json' },
-    body: JSON.stringify(body),
-  }).then(asJson);
-export const listSimulations = () => fetch('/api/simulations').then(asJson);
-export const getSimulationCompare = (meet) =>
-  fetch(`/api/simulations/compare${meet && meet !== 'all' ? `?meet=${encodeURIComponent(meet)}` : ''}`).then(asJson);
-export const getSimulation = (runId) => fetch(`/api/simulations/${runId}`).then(asJson);
-export const getSimulationDay = (runId, dayId) =>
-  fetch(`/api/simulations/${runId}/days/${dayId}`).then(asJson);
 
 // ML sheet ingest (D40).
 export function parseMlPdf(file, { track, date, correlationId } = {}) {
@@ -205,14 +183,6 @@ export const resultsFromArchive = (dayId, correlationId) =>
     method: 'POST',
     headers: { ...(correlationId ? { 'x-correlation-id': correlationId } : {}) },
   }).then(asJson);
-
-// Backfill queue (D43): the review queue for batch-ingested days.
-export const getBackfillQueue = () => fetch('/api/backfill/queue').then(asJson);
-export const getBackfillItem = (id) => fetch(`/api/backfill/queue/${id}`).then(asJson);
-export const confirmBackfillItem = (id, note) =>
-  fetch(`/api/backfill/queue/${id}/confirm`, { method: 'POST', headers: { 'content-type': 'application/json' }, body: JSON.stringify({ note }) }).then(asJson);
-export const rejectBackfillItem = (id, note) =>
-  fetch(`/api/backfill/queue/${id}/reject`, { method: 'POST', headers: { 'content-type': 'application/json' }, body: JSON.stringify({ note }) }).then(asJson);
 
 // Human cards (D54): paste parser preview/lock/pass for one race.
 export const previewHumanCard = (dayId, race, text, cardId, correlationId) =>

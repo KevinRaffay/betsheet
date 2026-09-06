@@ -2,7 +2,7 @@
 // same tables, same grader as every engine card, template 'human',
 // consensus_completeness 'HUMAN' (never pools with an engine bucket,
 // invariant 13). No PR here changes card generation or grading: the
-// engine (shared/card-engine.js) is never called, and human tickets are
+// engine (deleted in D111; it was never called from here anyway) and human tickets are
 // graded by the existing shared/grading.js grader exactly like any other
 // ticket.
 //
