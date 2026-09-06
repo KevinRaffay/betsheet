@@ -161,8 +161,22 @@ try {
     day.races[5].entries.filter((e) => e.scratched).length === 2 && day.races[0].entries.find((e) => e.program_number === '4').morning_line === '7/5',
     JSON.stringify({ src: day.entries_source, races: day.races?.length }));
   const refetch = await jpost('/api/fetch/ml-sheet', { track: 'Del Mar', date: '2026-08-16' });
-  const attempts = await jget(`/api/race-days/${saved.id}/consensus`);
-  check('fetch after the day exists: audited in fetch_attempts as well', refetch.status === 200 && JSON.stringify(attempts).includes('Stub ML sheet'));
+  // The fetch_attempts rows were read back through GET /race-days/:id/consensus,
+  // a route D112 removed with the consensus panel it served. The rows
+  // themselves are unchanged - invariant 11 still requires every attempt to
+  // land - so this reads them straight from the database instead.
+  {
+    const { openDb } = await import('../server/db.js');
+    const vdb = openDb(path.join(tmp, 'check.sqlite'));
+    const rows = vdb.prepare(`
+      SELECT s.name FROM fetch_attempts fa JOIN sources s ON s.id = fa.source_id
+      WHERE fa.race_day_id = ?
+    `).all(saved.id);
+    vdb.close();
+    check('fetch after the day exists: audited in fetch_attempts as well',
+      refetch.status === 200 && rows.some((r) => /Stub ML sheet/.test(r.name)),
+      JSON.stringify(rows));
+  }
   // This used to assert that a card on an ML-only day landed in the
   // ODDS_ONLY tier under the current ENGINE_VERSION, with the engine's
   // `ml_order_fallback` rule traced. **ODDS_ONLY is unreachable after D111**:

@@ -1,7 +1,5 @@
-// Batch ingest CLI for the Equibase Off to the Races archive (D71 follow-up;
-// --consensus-only added D74).
-// Run: npm run ingest-otr -- [dir]                    (default data/archive/equibase-otr/DMR)
-//      npm run ingest-otr -- --consensus-only [dir]
+// Batch ingest CLI for the Equibase Off to the Races archive (D71 follow-up).
+// Run: npm run ingest-otr -- [dir]   (default data/archive/equibase-otr/DMR)
 //
 // Walks the folder, matches each file to an existing race day by its own
 // printed track/date header, and runs the SAME archive -> parse -> confirm
@@ -10,11 +8,8 @@
 // review through the upload panel. Idempotent by sha256 - a file already
 // confirmed for its date is skipped, never re-appended.
 //
-// --consensus-only (D74): skips card creation and writes ONLY the OTR
-// consensus rows for a day that already has EQB_OTR cards from an earlier
-// run - the way the archived days (D45/D46/D71/D72's corpus) gain the
-// third source without a duplicate pile of picker cards. A file not yet
-// confirmed is left alone in this mode - run the plain batch first.
+// D74's `--consensus-only` mode is gone (D112, with consensus itself): the
+// sheet is a PICKER, and its printed tickets are the whole contract.
 
 import 'dotenv/config';
 import path from 'node:path';
@@ -22,18 +17,15 @@ import { batchIngestEquibaseOtr } from '../server/equibase-otr.js';
 import { getDb } from '../server/db.js';
 import { newCorrelationId } from '../server/logging.js';
 
-const args = process.argv.slice(2);
-const consensusOnly = args.includes('--consensus-only');
-const dirArg = args.find((a) => a !== '--consensus-only');
+const dirArg = process.argv.slice(2)[0];
 const dir = dirArg ? path.resolve(dirArg) : undefined;
 
 const report = batchIngestEquibaseOtr(getDb(), {
-  dir, consensusOnly, correlationId: newCorrelationId(),
+  dir,
+  correlationId: newCorrelationId(),
   log: (r) => {
     if (r.status === 'ingested') {
       console.log(`  INGESTED  ${r.file}  raceDayId=${r.raceDayId}  ${r.cards.length} cards`);
-    } else if (r.status === 'consensus_written') {
-      console.log(`  CONSENSUS ${r.file}  raceDayId=${r.raceDayId}  ${r.picksStored} pick(s) stored`);
     } else if (r.status === 'queued') {
       console.log(`  QUEUED    ${r.file}  raceDayId=${r.raceDayId}  ${r.reason}`);
       for (const w of r.blocking) console.log(`              ${w.type}: ${w.message}`);
@@ -44,6 +36,5 @@ const report = batchIngestEquibaseOtr(getDb(), {
 });
 
 console.log('');
-console.log(consensusOnly
-  ? `${report.seen} file(s) seen: ${report.consensusWritten} consensus-written, ${report.skipped} skipped`
-  : `${report.seen} file(s) seen: ${report.ingested} ingested, ${report.queued} queued, ${report.skipped} skipped, ${report.cardsWritten} card(s) written`);
+console.log(`${report.seen} file(s) seen: ${report.ingested} ingested, `
+  + `${report.queued} queued, ${report.skipped} skipped, ${report.cardsWritten} card(s) written`);

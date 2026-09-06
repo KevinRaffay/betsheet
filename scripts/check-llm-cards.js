@@ -44,19 +44,23 @@ console.log('-- pure: buildLlmRaceUserPrompt --');
       { programNumber: '2', horseName: 'Two Runner', morningLine: '4/1', programRank: null, bestBet: false, scratched: true },
     ],
     bottomLineText: 'One Runner drops in class and adds blinkers.',
-    consensusTable: [{ name: 'Sports from the Basement', top: { programNumber: '1', horseName: 'One Runner' }, second: null, third: null, flagged: [] }],
     bankroll: { perRaceCents: 2500, remainingCents: 5000, racesRemaining: 2 },
   });
   check('carries race header, wager menu and bankroll', prompt.includes('RACE 1 of 2') && prompt.includes('$1 Exacta') && prompt.includes('$25.00'));
   check('carries every entry with scratch/best-bet/rank annotations', prompt.includes('#1 One Runner') && prompt.includes('BEST BET') && prompt.includes('#2 Two Runner (SCRATCHED)'));
   check('carries the Bottom Line text', prompt.includes('One Runner drops in class'));
-  check('carries the consensus table', prompt.includes('Sports from the Basement: top #1 One Runner'));
+  // D112: the CONSENSUS section is gone with consensus. The prompt must carry
+  // no trace of it - not the header, and not the "no external consensus on
+  // file" fallback that would otherwise print on every single card forever.
+  check('carries no CONSENSUS section and no consensus fallback line',
+    !prompt.includes('CONSENSUS') && !prompt.includes('No external consensus on file'), prompt);
 
   const empty = buildLlmRaceUserPrompt({
     raceNumber: 1, totalRaces: 1, track: 'X', date: '2026-01-01',
-    race: {}, entries: [], bottomLineText: null, consensusTable: [], bankroll: { perRaceCents: 100, remainingCents: 100, racesRemaining: 1 },
+    race: {}, entries: [], bottomLineText: null, bankroll: { perRaceCents: 100, remainingCents: 100, racesRemaining: 1 },
   });
-  check('no consensus on file -> the honest fallback line, not an empty section', empty.includes('No external consensus on file'));
+  check('a bare prompt still carries its race header and bankroll line',
+    empty.includes('RACE 1 of 1') && empty.includes('$1.00'), empty);
 
   check('system prompt names the ticket-block markers', SYSTEM_PROMPT.includes('<<<TICKETS>>>') && SYSTEM_PROMPT.includes('<<<END TICKETS>>>'));
   check('system prompt gives the box combination-count formulas and the divisibility rule (2026-09-03 fix)',
@@ -338,33 +342,13 @@ Place | #1 | $20 | Safe.
     check('save refuses (422), no card/tickets created for the bad box', boxSave.status === 422);
   }
 
-  console.log('-- regression: consensus picks actually reach the LLM prompt --');
-  {
-    // shared/classification.js's buildConsensusTable returns the table
-    // ARRAY directly, not {table: [...]}. server/llm-cards.js used to call
-    // it as `buildConsensusTable(entries, picks).table`, so consensusTable
-    // was silently always undefined and every prompt said "No external
-    // consensus on file for this race" even when real picks existed on
-    // the day. Seeds a REAL pick through the same manual-paste path a
-    // live day would use (not a hand-built table object) and inspects
-    // the actual prompt_text that was sent, not just the parsed reply.
-    const consensusDay = {
-      track: 'Consensus Fixture Downs', date: '2026-09-03', bankrollCents: 20000, perRaceMinCents: 500,
-      races: [{ number: 1, wagerMenu: '$1 Exacta', entries: [entry('1', 'One Runner', '5/2', 2.5), entry('2', 'Two Runner', '4/1', 4)] }],
-    };
-    const consensusCreated = await (await jpost('/api/race-days', consensusDay)).json();
-    const picksPreview = await (await jpost(`/api/race-days/${consensusCreated.id}/consensus/manual-preview`, { sourceName: 'Test Source', text: 'Race 1: 1, 2' })).json();
-    check('manual picks preview parses cleanly (top #1, second #2)', picksPreview.races.length === 1 && picksPreview.warnings.length === 0, JSON.stringify(picksPreview));
-    const picksStored = await (await jpost(`/api/race-days/${consensusCreated.id}/consensus/manual`, { sourceName: 'Test Source', races: picksPreview.races })).json();
-    check('manual picks stored (2: top #1 + second #2)', picksStored.picksStored === 2, JSON.stringify(picksStored));
-
-    const consensusResponse = 'Reasoning that references the consensus.\n\n<<<TICKETS>>>\nWin | #1 | $20 | Consensus favorite.\n<<<END TICKETS>>>\n';
-    await jpost(`/api/race-days/${consensusCreated.id}/llm-cards/preview`, { race: 1, __stubResponse: consensusResponse });
-    const loggedConsensus = dbCheck.prepare('SELECT prompt_text FROM llm_card_requests WHERE race_day_id = ? ORDER BY id DESC').get(consensusCreated.id);
-    check('the actual prompt sent to the model names the real consensus source and its pick, not the "no consensus" fallback',
-      loggedConsensus?.prompt_text.includes('Test Source: top #1 One Runner') && !loggedConsensus?.prompt_text.includes('No external consensus on file'),
-      loggedConsensus?.prompt_text);
-  }
+  // D68's regression guard lived here: it seeded a real pick through the
+  // manual-paste path and asserted the logged prompt_text named the source,
+  // because a `.table` typo had made every prompt silently claim "no external
+  // consensus on file". D112 removed consensus and the whole section it
+  // guarded, so the guard has no subject. It is retired rather than rewritten
+  // - the inverse assertion (no CONSENSUS section in the prompt) is made in
+  // the pure phase above, where it costs no server round trip.
 
   console.log('-- reasoning + raw response retrievable per race --');
   const requests = await jget(`/api/cards/${cardId}/llm-requests`);

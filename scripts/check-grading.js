@@ -21,7 +21,6 @@ const tmp = fs.mkdtempSync(path.join(os.tmpdir(), 'betsheet-gradecheck-'));
 process.env.BETSHEET_LOG_DIR = path.join(tmp, 'unit-logs');
 
 const { gradeTicket, buildDayResults, gradeCard } = await import('../shared/grading.js');
-const { classifyDay } = await import('../shared/classification.js');
 
 let failures = 0;
 function check(name, ok, detail = '') {
@@ -150,24 +149,13 @@ const toDbEntry = (e) => ({
   scratched: e.scratched ? 1 : 0,
 });
 const entriesByRace = Object.fromEntries(prog.races.map((x) => [x.number, x.entries.map(toDbEntry)]));
-const picksByRace = {};
-for (const x of sftb.races) {
-  picksByRace[x.race] = x.picks.map((p) => ({
-    source_name: 'SFTB', source_kind: 'algorithmic', pick_type: p.pickType,
-    program_number: p.programNumber, horse_name: p.horseName, note: p.note,
-  }));
-  picksByRace[x.race].push({
-    source_name: 'Digest', source_kind: 'manual', pick_type: 'top',
-    program_number: x.picks[0].programNumber, horse_name: x.picks[0].horseName, note: null,
-  });
-}
-const cls = classifyDay(prog.races.map((x) => x.number), entriesByRace, picksByRace);
-// The card this grades used to be generated here by shared/card-engine.js.
-// D111 deleted that engine, so the card is now a FROZEN FIXTURE - the exact
-// 30-ticket, $200 set the engine last produced from the program and pick
-// goldens above, which are still parsed and classified for real either side
-// of it. Nothing about this proof weakened: the grader is what is under test,
-// and it is being handed the identical tickets it was handed before.
+// The card this grades used to be generated here by the lean engine from a
+// pick set and its D09 classification. D111 deleted the engine and D112 the
+// classification, so the card is a FROZEN FIXTURE - the exact 30-ticket, $200
+// set the engine last produced from this same program golden, which is still
+// parsed for real above and supplies the entries the chart's scratches
+// resolve against. Nothing about this proof weakened: the grader is what is
+// under test, and it is handed the identical tickets it was handed before.
 const card = JSON.parse(fs.readFileSync(
   path.join(ROOT, 'tests/fixtures/engine-cards/delmar-2026-08-30.lean-1.1.json'), 'utf8'));
 
@@ -272,11 +260,6 @@ try {
     track: 'Del Mar', date: '2026-08-30', bankrollCents: 20000, perRaceMinCents: 500,
     races: prog.races,
   })).json();
-  for (const name of ['Digest One', 'Digest Two']) {
-    const text = sftb.races.map((x) => `Race ${x.race}: ${x.picks.map((p) => p.programNumber).join(', ')}`).join('\n');
-    const preview = await (await jpost(`/api/race-days/${saved.id}/consensus/manual-preview`, { sourceName: name, text })).json();
-    await jpost(`/api/race-days/${saved.id}/consensus/manual`, { sourceName: name, races: preview.races });
-  }
 
   // Was the engine's generate route until D111 removed it. A human card
   // locked race by race is the cheapest surviving producer, and nothing in
@@ -298,7 +281,7 @@ try {
   // key, empty - the sheet renders a per-race panel only where a finisher
   // exists, so "no results yet" has to be an empty list, never a missing key
   // the client would have to guard against.
-  const preDoc = await (await fetch(`${BASE}/api/cards/${genCard.id}`)).json();
+  const preDoc = await (await fetch(`${BASE}/api/cards/${genCardId}`)).json();
   check('before results: card carries an EMPTY results set, not a missing key', (() => {
     const r = preDoc.results;
     return r && r.finishers.length === 0 && r.exotics.length === 0 && r.scratches.length === 0;

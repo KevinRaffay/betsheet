@@ -49,6 +49,33 @@ project (2026-08-30 origin):
    multi-race wagers (Daily Double, Pick N) are out of scope, the same
    limitation the human parser already has (`MULTI_RACE_RE`).
 
+## The CONSENSUS section was removed (D112) — a prompt-comparability boundary
+
+The template below used to carry a CONSENSUS section between PROGRAM BOTTOM LINE
+and the analyst notes: one line per ranked source, D74's own Equibase Off to the
+Races sentence in its show-pick/win-pick/box vocabulary, and a "No external
+consensus on file for this race" fallback. **The simulator pivot removed
+consensus, so the section is gone.**
+
+This matters more than a template edit usually would, and it is recorded here
+rather than only in the ledger:
+
+- **LLM cards have no version axis.** `engine_version` is the literal `'llm'`
+  for every one of them, so invariant 14's bump rule never reaches a prompt
+  change. Nothing in the data marks the boundary.
+- **Therefore: a card generated after D112 is not prompt-comparable with one
+  generated before it.** Any comparison that pools across that line is pooling
+  two different prompts. This is exactly the silent pooling D92's *conditional*
+  analyst-notes clauses were designed to avoid, and the same discipline applies
+  here — the difference is that D92 could avoid the change and this could not.
+- **It was unavoidable rather than chosen.** With nothing writing
+  `consensus_picks`, the section could only ever have printed its own "no
+  external consensus on file" line, on every card, forever.
+
+Cards generated before 2026-09-06 carry a CONSENSUS section; cards after it do
+not. `llm_card_requests.prompt_text` stores what was actually sent for every
+call ever made, so the boundary is checkable per card rather than inferred.
+
 ## Per-race prompt template
 
 The server builds this by plain string interpolation (`server/llm-prompt.js`),
@@ -179,17 +206,6 @@ ENTRIES
 PROGRAM BOTTOM LINE
 {{bottomLineText, only if present}}
 
-CONSENSUS
-{{sourceName}}: top {{top}}, 2nd {{second}}, 3rd {{third}}{{", watch/contrarian: " + flagged if any}}
-... one line per RANKED source, then, only if the day has an Equibase Off
-to the Races upload (D74) ...
-Equibase Off to the Races (the free at-track sheet, algorithmic): show
-pick {{showPick}}; win pick {{winPick}} (higher-reward tier);
-{{N}}-horse exacta box {{box}}.
-... or, if there is no consensus of any kind ...
-No external consensus on file for this race - program analysis and
-morning line only.
-
 <analyst_notes scope="card" source="{{label}}">
 {{the day-level note, sanitized and capped - only if present}}
 </analyst_notes>
@@ -274,7 +290,8 @@ fix for `extractTicketBlock`'s `indexOf` scan - the scan itself must NOT be made
 cleverer, because `persistLlmRace` re-parses STORED responses and a scan change
 would be retroactive.
 
-**Placement.** The blocks go LAST in the user prompt, after CONSENSUS: the
+**Placement.** The blocks go LAST in the user prompt (they followed the
+CONSENSUS section until D112 removed it): the
 entries roster is then already in context for the "names beat numbers" rule, and
 untrusted content sits at the boundary adjacent to nothing it can impersonate. A
 closing anchor line restates the race bankroll, because the `Race bankroll` line

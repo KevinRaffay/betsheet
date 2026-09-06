@@ -108,11 +108,6 @@ try {
     track: 'Del Mar', date: '2026-08-30', bankrollCents: 20000, perRaceMinCents: 500,
     races: prog.races,
   })).json();
-  for (const name of ['Digest One', 'Digest Two']) {
-    const text = sftb.races.map((x) => `Race ${x.race}: ${x.picks.map((p) => p.programNumber).join(', ')}`).join('\n');
-    const preview = await (await jpost(`/api/race-days/${dayA.id}/consensus/manual-preview`, { sourceName: name, text })).json();
-    await jpost(`/api/race-days/${dayA.id}/consensus/manual`, { sourceName: name, races: preview.races });
-  }
   // D111: the two cards on day A were engine variants (default / nofade).
   // With the engine gone the pair that matters is two different PRODUCERS on
   // one day - a HUMAN card and an LLM card - which is what invariant 13 has

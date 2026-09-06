@@ -93,6 +93,16 @@ const server = spawn(process.execPath, [path.join(ROOT, 'server', 'index.js')], 
     BETSHEET_DB: dbPath,
     BETSHEET_LOG_DIR: path.join(tmp, 'server-logs'),
     BETSHEET_DISABLE_BUILTIN_FETCHERS: '1',
+    // This file grew LLM calls in D111, when the engine cards it used to
+    // compare HUMAN against were deleted and an LLM card took their place.
+    // Without these two the `__stubResponse` in each request body is IGNORED
+    // and the server calls the real, paid Anthropic API with the key from
+    // .env - which it did, and which passed only because a real model
+    // happened to pick a winner. The empty key is the second half of the
+    // guard: the stub path must never need one, so a regression that reaches
+    // the network fails loudly instead of quietly spending money.
+    BETSHEET_LLM_TEST_MODE: '1',
+    ANTHROPIC_API_KEY: '',
   },
   stdio: ['ignore', 'pipe', 'pipe'],
 });
@@ -504,7 +514,12 @@ try {
   // string (never bumped, unlike lean's), so invariant 14's default (latest
   // version only) isolates them exactly like any two engine versions would;
   // ?engineVersion=all is the documented way to see every bucket at once.
-  const llmStub = 'Reasoning: stub.\n\n<<<TICKETS>>>\nWin | #1 | $20 | Test.\n<<<END TICKETS>>>\n';
+  // #4 is a real, unscratched runner in race 1 of this fixture day. A stub
+  // naming a program number that is scratched (or absent) parses to a
+  // BLOCKING warning, the save 422s, and no LLM card exists for the bucket
+  // comparison below to find - which is what it looks like when this line is
+  // wrong: the assertion fails on a missing bucket, not on a shared total.
+  const llmStub = 'Reasoning: stub.\n\n<<<TICKETS>>>\nWin | #4 | $20 | Test.\n<<<END TICKETS>>>\n';
   const llmPrev = await (await jpost(`/api/race-days/${dayId}/llm-cards/preview`, { race: 1, __stubResponse: llmStub })).json();
   const otherCard = await (await jpost(`/api/race-days/${dayId}/llm-cards`, { race: 1, requestId: llmPrev.requestId, bankrollCents: 2000 })).json();
   const pl = await jget('/api/pl?engineVersion=all');

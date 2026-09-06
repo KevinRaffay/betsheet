@@ -34,7 +34,6 @@ function firstDiff(a, b, at = '$') {
 }
 const { parseDmtcResults, parseHeader, parsePayoffs, distanceWords, dmtcNameKey } = await import('../shared/dmtc-results-parser.js');
 const { buildDayResults, gradeCard } = await import('../shared/grading.js');
-const { classifyDay } = await import('../shared/classification.js');
 
 const DAYS = ['2026-08-28', '2026-08-29', '2026-08-30'];
 const load = (d) => ({
@@ -134,7 +133,10 @@ const toDb = (e) => ({ program_number: e.programNumber, horse_name: e.horseName,
 const entriesByRace = Object.fromEntries(prog.races.map((r) => [r.number, r.entries.map(toDb)]));
 const picks = {};
 for (const r of sftb.races) { picks[r.race] = r.picks.map((p) => ({ source_name: 'SFTB', source_kind: 'algorithmic', pick_type: p.pickType, program_number: p.programNumber, horse_name: p.horseName, note: p.note })); picks[r.race].push({ source_name: 'Digest', source_kind: 'manual', pick_type: 'top', program_number: r.picks[0].programNumber, horse_name: r.picks[0].horseName, note: null }); }
-const cls = classifyDay(prog.races.map((r) => r.number), entriesByRace, picks); const byN = Object.fromEntries(cls.map((c) => [c.number, c]));
+// The D09 classification built here fed the engine; D111 froze the card it
+// produced and D112 removed classification. The pick set above is left in
+// place because the golden's entries are what the chart's scratches resolve
+// against.
 // Frozen engine output since D111 deleted shared/card-engine.js - the same
 // 30-ticket lean-1.1 card this used to generate inline. The cross-source
 // proof is unchanged: identical tickets, graded from both sources.
@@ -170,11 +172,6 @@ try {
   check('POST /parse/results-html == the pure parser, sourceKind dmtc_html', parsedApi.sourceKind === 'dmtc_html' && firstDiff({ ...parsedApi, correlationId: undefined, sourceKind: undefined }, d30) === null);
   check('POST /parse/results-html: empty body -> 400', (await jpost('/api/parse/results-html', { html: '' })).status === 400);
   const day = await (await jpost('/api/race-days', { track: 'Del Mar', date: '2026-08-30', bankrollCents: 20000, perRaceMinCents: 500, races: prog.races })).json();
-  for (const name of ['Digest One', 'Digest Two']) {
-    const text = sftb.races.map((x) => `Race ${x.race}: ${x.picks.map((p) => p.programNumber).join(', ')}`).join('\n');
-    const preview = await (await jpost(`/api/race-days/${day.id}/consensus/manual-preview`, { sourceName: name, text })).json();
-    await jpost(`/api/race-days/${day.id}/consensus/manual`, { sourceName: name, races: preview.races });
-  }
   // Was an engine-generated card until D111. The cross-source proof below is
   // about the GRADER returning identical cents from two different result
   // sources, so any card with real tickets on this day serves; a human card

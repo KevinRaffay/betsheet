@@ -18,7 +18,6 @@
 
 import express from 'express';
 import { estimateTicketPayouts } from '../shared/betmath.js';
-import { buildConsensusTable } from '../shared/classification.js';
 import { parseHumanPicksText } from '../shared/parsers/human-picks.js';
 import { complete, hasKey, MODEL, SELECTABLE_MODELS } from './anthropic-client.js';
 import { getDb } from './db.js';
@@ -108,13 +107,6 @@ export async function previewLlmRace(db, day, raceNumber, cardId, { stubResponse
   const remaining = racesRemaining(db, card?.id, day.id, race.id);
   const perRaceCents = Math.round(remainingCents / remaining);
 
-  const picks = db.prepare(`
-    SELECT cp.*, s.name AS source_name, s.kind AS source_kind
-    FROM consensus_picks cp JOIN sources s ON s.id = cp.source_id
-    WHERE cp.race_id = ?
-  `).all(race.id);
-  const consensusTable = buildConsensusTable(entries, picks);
-
   // Analyst notes (D92). A POSITIVE `interactive` gate, so a future batch
   // runner that forgets the flag gets a notes-free prompt by default rather
   // than silently attaching them - fail closed. When notes DO exist and the
@@ -137,7 +129,6 @@ export async function previewLlmRace(db, day, raceNumber, cardId, { stubResponse
       programRank: e.program_rank, bestBet: Boolean(e.best_bet), scratched: Boolean(e.scratched),
     })),
     bottomLineText: race.bottom_line ?? null,
-    consensusTable,
     bankroll: { perRaceCents, remainingCents, racesRemaining: remaining },
     notes: notes.prompt,
   });
@@ -399,6 +390,14 @@ llmCardsRouter.post('/race-days/:id/llm-cards/preview', async (req, res) => {
   const db = getDb();
   const day = loadDay(db, Number(req.params.id));
   if (!day) return res.status(404).json({ error: 'No such race day.' });
+  // D112 found this guard missing here while every neighbouring route had it
+  // (both notes routes and the save below). A preview on a deleted day
+  // persists no card, but it DOES write an llm_card_requests row - invariant
+  // 11 logs every attempt - and it spends a real, paid model call on a day
+  // invariant 12 says is excluded everywhere. Pre-existing, surfaced by a
+  // check-ingest assertion that had to find a second mutating route once the
+  // consensus manual-paste route it used was removed.
+  if (day.deleted_at) return res.status(410).json({ error: 'This race day is deleted. Restore it before generating an LLM card.' });
   const race = Number(req.body?.race);
   if (!Number.isInteger(race) || race <= 0) return res.status(400).json({ error: 'race is required.' });
   const requestedModel = req.body?.model;

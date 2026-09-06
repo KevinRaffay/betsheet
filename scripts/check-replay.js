@@ -124,8 +124,13 @@ try {
   const humanCardCreate = await (await jpost(`/api/race-days/${dayId}/human-cards`, { race: 1, text: 'Win\t#1\t$25', bankrollCents: 20000 })).json();
   const humanCardId = humanCardCreate.cardId;
   const blind1 = await jget(`/api/replay/days/${dayId}/races/1?cardId=${humanCardId}`);
-  const forbidden = ['results', 'finishOrder', 'payoffs', 'leanTickets', 'leanGraded', 'classification', 'topVotes', 'contrarianFlags'];
-  check('no results/lean/classification keys before reveal or opt-in', forbidden.every((k) => !(k in blind1)), JSON.stringify(Object.keys(blind1)));
+  // D112 removed the `consensus` block from the blind view entirely, so it
+  // joins the forbidden list rather than being inspected for what it hides:
+  // the strongest form of "the engine's read stays hidden" is that there is
+  // no engine and no read.
+  const forbidden = ['results', 'finishOrder', 'payoffs', 'leanTickets', 'leanGraded',
+    'classification', 'topVotes', 'contrarianFlags', 'consensus'];
+  check('no results/lean/consensus keys before reveal', forbidden.every((k) => !(k in blind1)), JSON.stringify(Object.keys(blind1)));
   check('locked true, tickets present, humanCardId echoed', blind1.locked === true && blind1.tickets.length === 1 && blind1.humanCardId === humanCardId);
   // D86: the builder's edit affordance keys on anyRevealed - editing a locked
   // race after any reveal would re-stamp picks_locked_at and silently flip the
@@ -185,12 +190,14 @@ try {
     return unplayed && unplayed.tickets === null;
   })());
 
-  console.log('-- classification toggle: default hidden, one-way once set --');
-  const blind2 = await jget(`/api/replay/days/${dayId}/races/2?cardId=${humanCardId}`);
-  check('race 2 (unrevealed) still hides classification by default', !('classification' in blind2.consensus));
-  await jpost(`/api/replay/cards/${humanCardId}/reveal-classification`);
-  const blind2After = await jget(`/api/replay/days/${dayId}/races/2?cardId=${humanCardId}`);
-  check('classification now present after opting in', 'classification' in blind2After.consensus && Array.isArray(blind2After.consensus.topVotes));
+  // The classification toggle and its one-way reveal lived here: a card could
+  // opt into seeing the engine's D09 read of a race before locking it, and
+  // the assertions checked that it stayed hidden by default and could never
+  // be un-seen. D111 deleted the engine and D112 the classification, so there
+  // is no read to reveal and POST .../reveal-classification is gone. The
+  // `cards.saw_classification` column stays (shipped migrations are
+  // immutable) and every card that set it keeps its recorded fact - the
+  // standing table still groups by it, which is asserted further down.
 
   console.log('-- close(): PASSes the unlocked race, is idempotent, preserves PRE_COMMIT --');
   const summaryBeforeClose = await jget(`/api/replay/cards/${humanCardId}/summary`);

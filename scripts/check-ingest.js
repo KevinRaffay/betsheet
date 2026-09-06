@@ -262,11 +262,16 @@ try {
     body: JSON.stringify({ race: 1, text: '$20 W 1' }),
   });
   check('mutations against a deleted day -> 410', lockOnDeleted.status === 410, String(lockOnDeleted.status));
-  const pasteOnDeleted = await fetch(`${BASE}/api/race-days/${pdfDay.id}/consensus/manual`, {
+  // The second mutation here was the consensus manual-paste route, removed
+  // with consensus in D112. The LLM preview route is the surviving second
+  // writer that guards on the same day-level check, and it must refuse a
+  // deleted day for the same reason.
+  const llmOnDeleted = await fetch(`${BASE}/api/race-days/${pdfDay.id}/llm-cards/preview`, {
     method: 'POST', headers: { 'content-type': 'application/json' },
-    body: JSON.stringify({ sourceName: 'X', races: [] }),
+    body: JSON.stringify({ race: 1 }),
   });
-  check('manual paste against a deleted day -> 410', pasteOnDeleted.status === 410);
+  check('a second mutation against a deleted day -> 410', llmOnDeleted.status === 410,
+    String(llmOnDeleted.status));
   check('results save against a deleted day -> 410',
     (await jpost2(`/api/race-days/${pdfDay.id}/results`, resultsPayload)).status === 410);
 

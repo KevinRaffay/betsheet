@@ -178,7 +178,7 @@ export default function PLView({ onBack, onOpenCard, onOpenDay }) {
           <table className="grid grid--click">
             <thead>
               <tr>
-                <th>Card</th><th>Template</th><th>Variant</th><th>Engine</th><th>Consensus</th><th>Bankroll</th>
+                <th>Card</th><th>Template</th><th>Variant</th><th>Engine</th><th>Bucket</th><th>Bankroll</th>
                 <th>Wagered</th><th>Returned</th><th>P/L</th><th>ROI (wagered)</th><th>ROI (bankroll)</th><th>Hits</th>
               </tr>
             </thead>
@@ -214,7 +214,7 @@ export default function PLView({ onBack, onOpenCard, onOpenDay }) {
           </div>
           <table className="grid grid--click">
             <thead>
-              <tr><th>Day</th><th>Card</th><th>Variant</th><th>Consensus</th><th>Wagered</th></tr>
+              <tr><th>Day</th><th>Card</th><th>Variant</th><th>Bucket</th><th>Wagered</th></tr>
             </thead>
             <tbody>
               {data.ungraded.map((c) => (

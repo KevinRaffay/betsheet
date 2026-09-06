@@ -30,8 +30,8 @@ export const DEFAULT_RAW_DIR = path.join(ROOT, 'data', 'raw');
 export const TRACK_CODE = 'DMR';
 export const KINDS = ['program', 'ml', 'results'];
 
-export { userAgent } from './consensus.js';
-import { userAgent } from './consensus.js';
+export { userAgent } from './polite-fetch.js';
+import { userAgent } from './polite-fetch.js';
 
 /** DMR-<year>-summer (Jul-Sep) / DMR-<year>-fall (Oct-Dec); null otherwise. */
 export function meetFor(date) {
@@ -124,7 +124,7 @@ export const artifactFile = { program: 'program.pdf', ml: 'ml.pdf', results: 're
 
 // ---------- the index: calendar first, then the committed meet-dates table ----------
 
-import { recordAttempt, robotsDisallows, upsertSource } from './consensus.js';
+import { recordAttempt, robotsDisallows, upsertSource } from './polite-fetch.js';
 import { getLogger } from './logging.js';
 import { parseDmtcResults } from '../shared/dmtc-results-parser.js';
 

@@ -7,7 +7,6 @@
 // POST /human-cards/preview and POST /human-cards directly.
 
 import express from 'express';
-import { buildConsensusTable, classifyRace, contrarianFlags } from '../shared/classification.js';
 import { gradeCard } from '../shared/grading.js';
 import { computeBlindness, isCardClosed, maxDrawdown, pickerAgreement } from '../shared/replay.js';
 import { getDb } from './db.js';
@@ -253,22 +252,18 @@ replayRouter.get('/replay/days/:id/races/:number', (req, res) => {
   if (!race) return res.status(404).json({ error: 'No such race.' });
 
   const { rows: entries, payload: entriesOut } = entriesPayload(db, day, race);
-  const picks = db.prepare(`
-    SELECT cp.*, s.name AS source_name, s.kind AS source_kind
-    FROM consensus_picks cp JOIN sources s ON s.id = cp.source_id
-    WHERE cp.race_id = ?
-  `).all(race.id);
-  // Raw per-source picks only - NEVER classifyRace's derived call/flags,
-  // which is the engine's own D09 read of the race and most of what lean
-  // allocates on (unless this card opted into seeing it, below).
-  const table = buildConsensusTable(entries, picks);
-
+  // The blind view used to carry a `consensus` block: raw per-source picks,
+  // plus (only if this card opted in) the engine's own D09 read of the race.
+  // D112 removed consensus and D111 removed the engine, so neither half has
+  // anything left to show - no source writes a pick, and there is no engine
+  // whose read could be revealed. The stored picks for past days remain in
+  // the database and still feed the standing table's picker-agreement
+  // measurement; they are simply no longer rendered here.
   const out = {
     raceNumber,
     entries: entriesOut,
     wagerMenu: race.wager_menu, postTime: race.post_time, distance: race.distance, surface: race.surface,
     raceType: race.race_type, conditions: race.conditions, bottomLineText: race.bottom_line ?? null,
-    consensus: { table },
     bankrollCents: day.bankroll_cents, perRaceMinCents: day.per_race_min_cents,
     humanCardId: null, locked: false,
   };
@@ -294,23 +289,9 @@ replayRouter.get('/replay/days/:id/races/:number', (req, res) => {
     // Once revealed, re-navigating to this race must not hide what reveal
     // showed - the same payload, recomputed live (never stored/stale).
     if (state?.results_revealed_at) Object.assign(out, revealedPayload(db, card, race, raceNumber));
-    if (card.saw_classification) {
-      const cls = classifyRace(table);
-      out.consensus.classification = cls.classification;
-      out.consensus.topVotes = cls.topVotes;
-      out.consensus.contrarianFlags = contrarianFlags(entries, picks);
-    }
   }
 
   res.json(out);
-});
-
-replayRouter.post('/replay/cards/:cardId/reveal-classification', (req, res) => {
-  const db = getDb();
-  const card = db.prepare('SELECT * FROM cards WHERE id = ?').get(Number(req.params.cardId));
-  if (!card) return res.status(404).json({ error: 'No such card.' });
-  db.prepare('UPDATE cards SET saw_classification = 1 WHERE id = ?').run(card.id);
-  res.json({ ok: true, sawClassification: true });
 });
 
 // ---------- reveal ----------
@@ -427,9 +408,13 @@ replayRouter.get('/replay/standing', (req, res) => {
         .all(r.card.id, race.id).map((t) => ({ programNumber: JSON.parse(t.selections).legs[0][0], stakeCents: t.stake_cents }));
       const rank1 = db.prepare('SELECT program_number FROM entries WHERE race_id = ? AND program_rank = 1 AND scratched = 0').get(race.id);
       // The external consensus the human is measured against. Was pinned to
-      // one source by name (SFTB, removed in D82); now it is whichever
-      // EXTERNAL source the day actually has a top pick from - At The Races,
-      // Equibase OTR, or a manual paste. Program-kind sources are excluded:
+      // one source by name (SFTB, removed in D82), then whichever EXTERNAL
+      // source the day had a top pick from. **D112 removed consensus, so
+      // nothing writes consensus_picks any more** - this reads STORED rows
+      // and is therefore null for every day played from here on, while the
+      // historical days it already measured keep their figures unchanged.
+      // Deleting the query would have silently moved a number already
+      // reported for those days. Program-kind sources are excluded:
       // the program is already the other side of this comparison, via
       // program_rank 1, and counting it twice would inflate agreement.
       // Lowest source id wins when a race has several, so the answer is
