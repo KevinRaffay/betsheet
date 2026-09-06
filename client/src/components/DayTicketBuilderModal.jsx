@@ -41,11 +41,10 @@ const money = (cents) => (cents == null ? '—' : cents % 100 === 0 ? `$${cents 
 //
 // D102: a race BUILT but not LOCKED is kept as a draft (client/src/drafts.js)
 // and restored the next time the modal opens on this day, so closing it no
-// longer throws the work away. A restored draft comes back in the TEXT box,
-// never the builder: TicketBuilder is a one-way text producer that starts
-// empty and emits '' on mount, so seeding it is impossible and OPENING a
-// drafted race into it would wipe the draft on the spot. That is also why the
-// typing toggle (ReplayRaceView's own, D86) had to come with this.
+// longer throws the work away. A restored draft shows as read-only text on
+// the collapsed race card; TicketBuilder is a one-way text producer that
+// starts empty and emits '' on mount, so opening the race to build again
+// starts fresh rather than reloading the draft into it.
 export default function DayTicketBuilderModal({
   dayId, cardId: initialCardId, bankrollCents, onClose, onCardChanged, context = 'replay',
 }) {
@@ -55,9 +54,6 @@ export default function DayTicketBuilderModal({
   const [open, setOpen] = useState(() => new Set());
   const [textByRace, setTextByRace] = useState(() => new Map());
   const [draftAt, setDraftAt] = useState(() => new Map());
-  // Races showing the raw text box rather than the builder. A restored draft
-  // starts here by necessity; anyone can switch either way per race.
-  const [typing, setTyping] = useState(() => new Set());
   const [previewByRace, setPreviewByRace] = useState(() => new Map());
   const [correlationId, setCorrelationId] = useState(null);
   const [busy, setBusy] = useState(false);
@@ -90,7 +86,6 @@ export default function DayTicketBuilderModal({
     if (stored.size === 0) return;
     setTextByRace(new Map(Array.from(stored, ([n, d]) => [n, d.text])));
     setDraftAt(new Map(Array.from(stored, ([n, d]) => [n, d.savedAt])));
-    setTyping(new Set(stored.keys()));
   }, [dayId]);
 
   const setText = (n, t) => {
@@ -276,7 +271,6 @@ export default function DayTicketBuilderModal({
                 const status = r.revealed ? 'Revealed' : r.pass ? 'Passed' : r.locked ? 'Locked' : 'Not played';
                 const draftText = (textByRace.get(r.raceNumber) ?? '').trim();
                 const hasDraft = !r.locked && draftText.length > 0;
-                const isTyping = typing.has(r.raceNumber);
                 return (
                   <article className="race-card" key={r.raceNumber}>
                     <div className="race-card__header">
@@ -335,39 +329,13 @@ export default function DayTicketBuilderModal({
 
                     {!r.locked && open.has(r.raceNumber) && (
                       <>
-                        {isTyping ? (
-                          <textarea
-                            className="in" rows={4} disabled={busy}
-                            value={textByRace.get(r.raceNumber) ?? ''}
-                            onChange={(e) => setText(r.raceNumber, e.target.value)}
-                            placeholder={'$10 W 5 / $2 EX BOX 2-4-5'}
-                          />
-                        ) : (
-                          <TicketBuilder
-                            raceNumber={r.raceNumber}
-                            entries={r.entries ?? []}
-                            wagerMenu={r.wagerMenu}
-                            disabled={busy}
-                            onChange={(t) => setText(r.raceNumber, t)}
-                          />
-                        )}
-                        <p className="dim">
-                          <button type="button" className="linkish" disabled={busy}
-                            onClick={() => setTyping((sx) => {
-                              const next = new Set(sx);
-                              if (next.has(r.raceNumber)) next.delete(r.raceNumber);
-                              else next.add(r.raceNumber);
-                              return next;
-                            })}>
-                            {isTyping ? 'Use the ticket builder' : 'Type it instead'}
-                          </button>
-                          {/* The builder emits '' on mount, so switching INTO it
-                              replaces whatever is in the box. Said plainly here
-                              rather than discovered by losing a draft. */}
-                          {isTyping && draftText
-                            ? <span> — switching back starts the builder empty and clears this text.</span>
-                            : null}
-                        </p>
+                        <TicketBuilder
+                          raceNumber={r.raceNumber}
+                          entries={r.entries ?? []}
+                          wagerMenu={r.wagerMenu}
+                          disabled={busy}
+                          onChange={(t) => setText(r.raceNumber, t)}
+                        />
                         <div className="formrow formrow--tight">
                           <button className="btn btn--sm" disabled={busy || !(textByRace.get(r.raceNumber) ?? '').trim()}
                             onClick={() => handlePreview(r.raceNumber)}>Preview</button>
