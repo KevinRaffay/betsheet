@@ -201,8 +201,8 @@ export default function DayTicketBuilderModal({
     onClose();
   };
 
-  // The Escape / backdrop handlers are registered once but must call the
-  // CURRENT close, which closes over `pending` - hence the ref.
+  // The Escape handler is registered once but must call the CURRENT close,
+  // which closes over `pending` - hence the ref.
   const closeRef = React.useRef(handleClose);
   closeRef.current = handleClose;
 
@@ -225,8 +225,8 @@ export default function DayTicketBuilderModal({
   const anyRevealed = (races ?? []).some((r) => r.revealed);
 
   return (
-    <div className="modal-backdrop" onClick={() => closeRef.current()}>
-      <div className="modal" role="dialog" aria-modal="true" aria-label={live ? 'Build the card by hand' : 'Build tickets for the day'} onClick={(e) => e.stopPropagation()}>
+    <div className="modal-backdrop">
+      <div className="modal" role="dialog" aria-modal="true" aria-label={live ? 'Build the card by hand' : 'Build tickets for the day'}>
         <div className="modal__header">
           <h3>{live ? 'Build the card by hand' : 'Build tickets for the day'}</h3>
           <button className="modal__close" disabled={busy} onClick={handleClose} aria-label="Close">×</button>
