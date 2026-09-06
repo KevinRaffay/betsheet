@@ -389,8 +389,8 @@ export default function LlmCardModal({ dayId, onCardChanged, onClose }) {
 
   if (error && !dayInfo) {
     return (
-      <div className="modal-backdrop" onClick={onClose}>
-        <div className="modal" role="dialog" aria-modal="true" onClick={(e) => e.stopPropagation()}>
+      <div className="modal-backdrop">
+        <div className="modal" role="dialog" aria-modal="true">
           <p className="notice notice--error">{error}</p>
           <button className="btn" onClick={onClose}>Close</button>
         </div>
@@ -399,8 +399,8 @@ export default function LlmCardModal({ dayId, onCardChanged, onClose }) {
   }
 
   return (
-    <div className="modal-backdrop" onClick={onClose}>
-      <div className="modal" role="dialog" aria-modal="true" aria-label="Generate Card from LLM" onClick={(e) => e.stopPropagation()}>
+    <div className="modal-backdrop">
+      <div className="modal" role="dialog" aria-modal="true" aria-label="Generate Card from LLM">
         <div className="modal__header">
           <h3>Generate Card from LLM</h3>
           <button className="modal__close" onClick={onClose} aria-label="Close">×</button>
