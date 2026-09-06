@@ -5,7 +5,7 @@
 
 import express from 'express';
 import { buildDayResults, gradeCard } from '../shared/grading.js';
-import { ENGINE_VERSION } from '../shared/card-engine.js';
+import { ENGINE_VERSION } from '../shared/version.js';
 import { getDb } from './db.js';
 import { getLogger, newCorrelationId } from './logging.js';
 
