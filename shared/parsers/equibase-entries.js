@@ -19,7 +19,9 @@
 // carrying its own `blocking` boolean - the per-item severity convention
 // shared/parsers/human-picks.js and shared/parsers/equibase-otr.js use.
 
-import { morningLineToDecimal } from '../entries-parser.js';
+// From betmath, not entries-parser: the helper moved there in D109 precisely
+// so this parser does not depend on a file the pivot deletes (P-2.5).
+import { morningLineToDecimal } from '../betmath.js';
 
 // Web-UI text that bleeds into the saved page. Appendable on purpose: more
 // will turn up on other tracks' pages, and each is only visible AFTER tags are

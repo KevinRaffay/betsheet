@@ -141,6 +141,21 @@ export function wagerMenuOffered(text) {
 // ---------- payout estimates ----------
 
 /** Win pays exact math at the morning line. */
+// A printed morning line ("6/1", "7/2", "4") as the DECIMAL every payout
+// function here takes. Moved from shared/entries-parser.js (D109), which the
+// pivot deletes: this is odds math, it belongs beside the payout formulas
+// that consume it, and shared/parsers/equibase-entries.js needs it to
+// outlive its old home.
+export function morningLineToDecimal(ml) {
+  if (!ml || ml === '-') return null;
+  const m = ml.match(/^(\d+(?:\.\d+)?)(?:\/(\d+(?:\.\d+)?))?$/);
+  if (!m) return null;
+  const num = Number(m[1]);
+  const den = m[2] ? Number(m[2]) : 1;
+  if (!den) return null;
+  return num / den;
+}
+
 export const winPayout = (stakeCents, ml) => Math.round(stakeCents * (ml + 1));
 
 /** Place is an estimate band - live places at $6.20/$18.60 taught that. */

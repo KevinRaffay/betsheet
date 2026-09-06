@@ -31,15 +31,10 @@ const MONTHS = {
 };
 
 /** "5/2" -> 2.5, "15/1" -> 15, "8/5" -> 1.6; "-"/empty -> null. */
-export function morningLineToDecimal(ml) {
-  if (!ml || ml === '-') return null;
-  const m = ml.match(/^(\d+(?:\.\d+)?)(?:\/(\d+(?:\.\d+)?))?$/);
-  if (!m) return null;
-  const num = Number(m[1]);
-  const den = m[2] ? Number(m[2]) : 1;
-  if (!den) return null;
-  return num / den;
-}
+// Re-exported so this file's own consumers keep working until it is deleted
+// (P-2.5). The implementation now lives in shared/betmath.js (D109).
+import { morningLineToDecimal } from './betmath.js';
+export { morningLineToDecimal };
 
 const moneyToCents = (s) => Math.round(Number(String(s).replace(/[$,]/g, '')) * 100);
 

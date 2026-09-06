@@ -35,13 +35,14 @@ import {
   comboCost, boxCost, dollars,
 } from './betmath.js';
 
-// The engine version (D34, invariant 14). ONE place in code; bump it in
-// every PR that changes generation, allocation, ticket construction or
-// grading behavior. Every card and every grade records the version it was
-// produced under, so "the algorithm improved" and "I regraded under
-// different rules" are distinguishable and never overwrite each other.
-// 'lean-0' is reserved for cards that predate versioning.
-export const ENGINE_VERSION = 'lean-1.1';
+// Both re-exported from their new homes (D109) so this file's own consumers
+// keep working until it is deleted. They moved because KEPT code imports
+// them: server/grading.js needs the version, CardView.jsx the notices.
+// Imported AND re-exported: `export { X } from` alone re-exports without
+// binding X in this module's scope, and both are used below.
+import { ENGINE_VERSION } from './version.js';
+import { FAILURE_MODE_WARNINGS } from './card-notices.js';
+export { ENGINE_VERSION };
 
 export const DEFAULT_RULES = {
   placeMoneyRule: true,
@@ -63,11 +64,7 @@ export const DEFAULT_RULES = {
   hedgeBoxDepth: 2,
 };
 
-export const FAILURE_MODE_WARNINGS = [
-  'Unanimous consensus is not certainty: a 7/2 shot everyone agrees on still loses most of the time - and when it loses, the race often comes apart completely.',
-  'On chaos days, second-tier "watch out for" horses win at prices - small coverage on 2+-source horses is on this card for that reason.',
-  'Expert sources and the public draw from the same well; a card of double-digit winners beats every source simultaneously. This card promises nothing variance does not allow.',
-];
+export { FAILURE_MODE_WARNINGS } from './card-notices.js';
 
 const ml = (e) => e?.morning_line_decimal ?? null;
 const isGuessRace = (race) => {

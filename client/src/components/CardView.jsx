@@ -1,5 +1,5 @@
 import React, { useEffect, useState } from 'react';
-import { FAILURE_MODE_WARNINGS } from '@shared/card-engine.js';
+import { FAILURE_MODE_WARNINGS } from '@shared/card-notices.js';
 import { deleteCard, getCard, getGrades, gradeCardApi, modelLabel } from '../api.js';
 
 const RESPONSIBLE_LINE =
