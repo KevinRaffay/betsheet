@@ -1,26 +1,24 @@
 import React, { useEffect, useState } from 'react';
-import { generateCardApi, getTemplates, listCards, modelLabel } from '../api.js';
+import { listCards, modelLabel } from '../api.js';
 import LlmCardModal from './LlmCardModal.jsx';
 import DayTicketBuilderModal from './DayTicketBuilderModal.jsx';
 
-// The cards section of a stored race day: existing cards and the generate
-// action - append-only, every run is a new numbered card carrying its
-// full recipe (template, variant, bankroll, per-race min, completeness).
+// The cards section of a stored race day: the cards on file, and the two
+// ways left to make one. D111 removed the engine's "Generate card" button
+// along with the engine, the template picker and the variant field - a card
+// now comes from the LLM generator, the hand builder, or the Equibase OTR
+// upload panel next door, and each of those writes its own tickets. The table
+// still shows Template and Variant because stored cards carry them, retired
+// lean-* rows included.
 export default function CardsPanel({ dayId, bankrollCents, onOpenCard }) {
   const [cards, setCards] = useState(null);
-  const [templates, setTemplates] = useState([]);
-  const [template, setTemplate] = useState('lean');
-  const [variant, setVariant] = useState('default');
-  const [busy, setBusy] = useState(false);
   const [error, setError] = useState(null);
   const [showLlmModal, setShowLlmModal] = useState(false);
   const [showHandModal, setShowHandModal] = useState(false);
 
   const reload = () => listCards(dayId).then(setCards).catch((e) => setError(String(e.message)));
   useEffect(() => { reload(); }, [dayId]);
-  useEffect(() => { getTemplates().then(setTemplates).catch(() => setTemplates([])); }, []);
 
-  const selected = templates.find((t) => t.name === template);
   // D98: resume the day's own latest human card rather than minting a second
   // one every time the builder is opened - the same rule ReplayDayLanding and
   // ReplayRaceView follow (D60). Read off the cards already fetched here, so
@@ -30,41 +28,12 @@ export default function CardsPanel({ dayId, bankrollCents, onOpenCard }) {
     .filter((c) => c.template === 'human')
     .sort((a, b) => b.card_number - a.card_number)[0]?.id ?? null;
 
-  const handleGenerate = async () => {
-    setBusy(true);
-    setError(null);
-    try {
-      const out = await generateCardApi(dayId, { variant: variant.trim() || 'default', template });
-      await reload();
-      onOpenCard(out.id);
-    } catch (e) {
-      setError(String(e.message));
-    } finally {
-      setBusy(false);
-    }
-  };
-
   return (
     <section className="consensus">
       <div className="pagehead">
         <h3>Betting cards</h3>
         <div className="formrow formrow--tight">
-          <label>Template
-            <select className="in in--sm" value={template} onChange={(e) => setTemplate(e.target.value)}>
-              {(templates.length ? templates : [{ name: 'lean', simulationOnly: false }]).map((t) => (
-                <option key={t.name} value={t.name} disabled={t.simulationOnly}>
-                  {t.name}{t.simulationOnly ? ' (simulation only)' : ''}
-                </option>
-              ))}
-            </select>
-          </label>
-          <label>Variant
-            <input className="in in--sm" value={variant} onChange={(e) => setVariant(e.target.value)} />
-          </label>
-          <button className="btn btn--primary" disabled={busy} onClick={handleGenerate}>
-            {busy ? 'Generating…' : 'Generate card'}
-          </button>
-          <button className="btn" onClick={() => setShowLlmModal(true)}>
+          <button className="btn btn--primary" onClick={() => setShowLlmModal(true)}>
             Generate Card from LLM
           </button>
           <button className="btn" onClick={() => setShowHandModal(true)}>
@@ -72,7 +41,6 @@ export default function CardsPanel({ dayId, bankrollCents, onOpenCard }) {
           </button>
         </div>
       </div>
-      {selected?.description && <p className="dim">{selected.description}</p>}
       {error && <p className="notice notice--error">{error}</p>}
       {cards && cards.length > 0 && (
         <table className="grid grid--click">

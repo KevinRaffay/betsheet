@@ -15,6 +15,7 @@ import fs from 'node:fs';
 import os from 'node:os';
 import path from 'node:path';
 import { fileURLToPath, URL } from 'node:url';
+import { livePgms, makeHumanCard, winAndBoxText } from './lib/test-cards.js';
 
 const ROOT = fileURLToPath(new URL('../', import.meta.url));
 const tmp = fs.mkdtempSync(path.join(os.tmpdir(), 'betsheet-dmtcres-'));
@@ -34,7 +35,6 @@ function firstDiff(a, b, at = '$') {
 const { parseDmtcResults, parseHeader, parsePayoffs, distanceWords, dmtcNameKey } = await import('../shared/dmtc-results-parser.js');
 const { buildDayResults, gradeCard } = await import('../shared/grading.js');
 const { classifyDay } = await import('../shared/classification.js');
-const { generateCard } = await import('../shared/card-engine.js');
 
 const DAYS = ['2026-08-28', '2026-08-29', '2026-08-30'];
 const load = (d) => ({
@@ -135,7 +135,10 @@ const entriesByRace = Object.fromEntries(prog.races.map((r) => [r.number, r.entr
 const picks = {};
 for (const r of sftb.races) { picks[r.race] = r.picks.map((p) => ({ source_name: 'SFTB', source_kind: 'algorithmic', pick_type: p.pickType, program_number: p.programNumber, horse_name: p.horseName, note: p.note })); picks[r.race].push({ source_name: 'Digest', source_kind: 'manual', pick_type: 'top', program_number: r.picks[0].programNumber, horse_name: r.picks[0].horseName, note: null }); }
 const cls = classifyDay(prog.races.map((r) => r.number), entriesByRace, picks); const byN = Object.fromEntries(cls.map((c) => [c.number, c]));
-const card = generateCard({ bankrollCents: 20000, perRaceMinCents: 500, races: prog.races.map((r) => ({ number: r.number, race_type: r.raceType, conditions: r.conditions, wager_menu: r.wagerMenu, entries: entriesByRace[r.number], classification: byN[r.number] })) });
+// Frozen engine output since D111 deleted shared/card-engine.js - the same
+// 30-ticket lean-1.1 card this used to generate inline. The cross-source
+// proof is unchanged: identical tickets, graded from both sources.
+const card = JSON.parse(fs.readFileSync(path.join(ROOT, 'tests/fixtures/engine-cards/delmar-2026-08-30.lean-1.1.json'), 'utf8'));
 const realTickets = card.tickets.map((t) => ({ id: t.sequence, betType: t.betType, races: t.raceNumbers, legs: t.legs, stakeCents: t.stakeCents, costCents: t.costCents }));
 {
   const a = gradeCard(realTickets, view(pages['2026-08-30'].chart)); const b = gradeCard(realTickets, view(d30));
@@ -172,7 +175,16 @@ try {
     const preview = await (await jpost(`/api/race-days/${day.id}/consensus/manual-preview`, { sourceName: name, text })).json();
     await jpost(`/api/race-days/${day.id}/consensus/manual`, { sourceName: name, races: preview.races });
   }
-  const liveCard = await (await jpost(`/api/race-days/${day.id}/cards`, { variant: 'default' })).json();
+  // Was an engine-generated card until D111. The cross-source proof below is
+  // about the GRADER returning identical cents from two different result
+  // sources, so any card with real tickets on this day serves; a human card
+  // needs no engine, no PDF and no model call.
+  const storedDay = await jget(`/api/race-days/${day.id}`);
+  const dayPgms = livePgms(storedDay);
+  const liveCardId = await makeHumanCard(jpost, day.id, storedDay.races
+    .map((r) => ({ race: r.number, text: winAndBoxText(dayPgms[r.number] ?? []) }))
+    .filter((r) => (dayPgms[r.race] ?? []).length >= 3));
+  const liveCard = { id: liveCardId };
   const chart = pages['2026-08-30'].chart;
   const saveChart = await jpost(`/api/race-days/${day.id}/results`, { track: chart.track, date: chart.date, sourceKind: 'pdf', races: chart.races });
   const gradesChart = await jget(`/api/cards/${liveCard.id}/grades`);

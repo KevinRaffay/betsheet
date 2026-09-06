@@ -5,9 +5,7 @@ import NewRaceDay from './components/NewRaceDay.jsx';
 import RaceDayView from './components/RaceDayView.jsx';
 import CardView from './components/CardView.jsx';
 import PLView from './components/PLView.jsx';
-import SimView from './components/SimView.jsx';
 import { parseRoute, pathForView } from './routes.js';
-import BackfillQueue from './components/BackfillQueue.jsx';
 import DistributionView from './components/DistributionView.jsx';
 import ReplayDayPicker from './components/ReplayDayPicker.jsx';
 import ReplayDayLanding from './components/ReplayDayLanding.jsx';
@@ -68,8 +66,6 @@ export default function App() {
             onNew={() => navigate({ name: 'new' })}
             onOpen={(id) => navigate({ name: 'day', id })}
             onPL={() => navigate({ name: 'pl' })}
-            onSim={() => navigate({ name: 'sim' })}
-            onBackfill={() => navigate({ name: 'backfill' })}
             onDistribution={() => navigate({ name: 'distribution' })}
             onReplay={() => navigate({ name: 'replay' })}
           />
@@ -98,22 +94,10 @@ export default function App() {
             onOpenCard={(cardId, dayId) => navigate({ name: 'card', id: cardId, dayId })}
           />
         )}
-        {view.name === 'sim' && (
-          <SimView
-            onBack={() => navigate({ name: 'list' })}
-            onOpenDay={(id) => navigate({ name: 'day', id })}
-          />
-        )}
         {view.name === 'distribution' && (
           <DistributionView
             onBack={() => navigate({ name: 'list' })}
             onOpenDay={(id) => navigate({ name: 'day', id })}
-          />
-        )}
-        {view.name === 'backfill' && (
-          <BackfillQueue
-            onBack={() => navigate({ name: 'list' })}
-            onOpenDay={(id) => { setRefreshKey((k) => k + 1); navigate({ name: 'day', id }); }}
           />
         )}
         {view.name === 'new' && (

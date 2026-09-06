@@ -497,21 +497,26 @@ try {
     newCardAfterRevealRes.status === 201 && newCardAfterReveal.cardId !== humanCardId);
 
   console.log('-- bucket isolation (invariant 13) --');
-  const engineCard = await (await jpost(`/api/race-days/${dayId}/cards`, {})).json();
-  // engine_version 'human' is its own version string (never bumped, unlike
-  // lean's), so invariant 14's default (latest version only) isolates it
-  // from lean-1.1 exactly like any two engine versions would - ?engineVersion=all
-  // is the explicit, documented way to see every bucket side by side.
+  // The other side of this comparison used to be an engine-generated card.
+  // D111 deleted the engine, so it is an LLM card instead - which is the
+  // comparison that now matters anyway, HUMAN against one of the two other
+  // producers. engine_version 'human' and 'llm' are each their own version
+  // string (never bumped, unlike lean's), so invariant 14's default (latest
+  // version only) isolates them exactly like any two engine versions would;
+  // ?engineVersion=all is the documented way to see every bucket at once.
+  const llmStub = 'Reasoning: stub.\n\n<<<TICKETS>>>\nWin | #1 | $20 | Test.\n<<<END TICKETS>>>\n';
+  const llmPrev = await (await jpost(`/api/race-days/${dayId}/llm-cards/preview`, { race: 1, __stubResponse: llmStub })).json();
+  const otherCard = await (await jpost(`/api/race-days/${dayId}/llm-cards`, { race: 1, requestId: llmPrev.requestId, bankrollCents: 2000 })).json();
   const pl = await jget('/api/pl?engineVersion=all');
-  check('HUMAN and the engine bucket never share a total', (() => {
+  check('HUMAN and LLM_GENERATED never share a total', (() => {
     const human = pl.buckets.find((b) => b.completeness === 'HUMAN');
-    const engineBucket = pl.buckets.find((b) => b.completeness === engineCard.completeness);
-    if (!human || !engineBucket) return false;
+    const other = pl.buckets.find((b) => b.completeness === 'LLM_GENERATED');
+    if (!human || !other) return false;
     const humanCards = pl.cards.filter((c) => c.completeness === 'HUMAN');
-    const engineCards = pl.cards.filter((c) => c.completeness === engineCard.completeness);
-    return humanCards.every((c) => c.raceDayId === dayId) && engineCards.some((c) => c.cardId === engineCard.id) &&
+    const otherCards = pl.cards.filter((c) => c.completeness === 'LLM_GENERATED');
+    return humanCards.every((c) => c.raceDayId === dayId) && otherCards.some((c) => c.cardId === otherCard.cardId) &&
       humanCards.reduce((a, c) => a + c.costCents, 0) === human.costCents &&
-      engineCards.reduce((a, c) => a + c.costCents, 0) === engineBucket.costCents;
+      otherCards.reduce((a, c) => a + c.costCents, 0) === other.costCents;
   })(), JSON.stringify(pl.buckets));
 
   // ---------- D98: the LIVE race-day path - lock before any results ----------
@@ -629,9 +634,14 @@ try {
   })());
   check('D103: an unknown ticket is 404, and a non-human card is refused', await (async () => {
     const a = await jdel(`/api/cards/${delCardId}/human-tickets/99999`);
-    const engine = await (await jpost(`/api/race-days/${liveDayId}/cards`, { variant: 'd102-engine' })).json();
-    const engineTicket = (await jget(`/api/cards/${engine.id}`)).tickets[0];
-    const b = await jdel(`/api/cards/${engine.id}/human-tickets/${engineTicket.id}`);
+    // The non-human card was an engine card until D111 deleted the engine.
+    // An LLM card serves identically: the guard keys on template = 'human',
+    // never on lean.
+    const stub = 'Reasoning: stub.\n\n<<<TICKETS>>>\nWin | #2 | $20 | Test.\n<<<END TICKETS>>>\n';
+    const prev = await (await jpost(`/api/race-days/${liveDayId}/llm-cards/preview`, { race: 1, __stubResponse: stub })).json();
+    const nonHuman = await (await jpost(`/api/race-days/${liveDayId}/llm-cards`, { race: 1, requestId: prev.requestId, bankrollCents: 2000 })).json();
+    const nonHumanTicket = (await jget(`/api/cards/${nonHuman.cardId}`)).tickets[0];
+    const b = await jdel(`/api/cards/${nonHuman.cardId}/human-tickets/${nonHumanTicket.id}`);
     return a.status === 404 && b.status === 404;
   })());
 
@@ -666,14 +676,19 @@ try {
     const g = await jget(`/api/cards/${liveCardId}/grades`);
     return g.grades.every((x) => x.engine_version === 'human');
   })());
-  // ...and an ENGINE card must be unaffected: it keeps a real version axis, so
-  // it still grades under the CURRENT ENGINE_VERSION (invariant 14's
-  // append-a-newer-set rule depends on exactly that).
-  check('D99: an engine card on the same day still grades under ENGINE_VERSION', await (async () => {
-    const { ENGINE_VERSION } = await import('../shared/card-engine.js');
-    const gen = await (await jpost(`/api/race-days/${liveDayId}/cards`, { variant: 'd99-engine' })).json();
-    const g = await jget(`/api/cards/${gen.id}/grades`);
-    return g.grades.length > 0 && g.grades.every((x) => x.engine_version === ENGINE_VERSION);
+  // D99's other half was an ENGINE card, which had a real version axis and
+  // therefore had to grade under the CURRENT ENGINE_VERSION. D111 deleted the
+  // engine, so no card with a version axis can be created any more and that
+  // half has no subject left. What remains testable - and is what D99
+  // actually fixed - is that a non-engine card grades under its OWN version
+  // label rather than being stamped with ENGINE_VERSION.
+  check('D99: a non-engine card grades under its own label, never ENGINE_VERSION', await (async () => {
+    const { ENGINE_VERSION } = await import('../shared/version.js');
+    const stub = 'Reasoning: stub.\n\n<<<TICKETS>>>\nWin | #2 | $20 | Test.\n<<<END TICKETS>>>\n';
+    const prev = await (await jpost(`/api/race-days/${liveDayId}/llm-cards/preview`, { race: 2, __stubResponse: stub })).json();
+    const gen = await (await jpost(`/api/race-days/${liveDayId}/llm-cards`, { race: 2, requestId: prev.requestId, bankrollCents: 2000 })).json();
+    const g = await jget(`/api/cards/${gen.cardId}/grades`);
+    return g.grades.length > 0 && g.grades.every((x) => x.engine_version === 'llm' && x.engine_version !== ENGINE_VERSION);
   })());
 
   // Once a card is graded, a delete would move a P/L figure that has already
@@ -695,10 +710,11 @@ try {
   })());
 
   console.log('-- no-version-bump identity --');
-  const { ENGINE_VERSION } = await import('../shared/card-engine.js');
+  const { ENGINE_VERSION } = await import('../shared/version.js');
   check('ENGINE_VERSION unchanged at lean-1.1', ENGINE_VERSION === 'lean-1.1', ENGINE_VERSION);
-  check('a live engine card on this branch still generates under lean-1.1',
-    engineCard.engineVersion === 'lean-1.1', engineCard.engineVersion);
+  check('nothing on this branch can mint a lean-1.1 card any more',
+    (await jget(`/api/race-days/${dayId}/cards`)).every((c) => c.engine_version !== 'lean-1.1'),
+    JSON.stringify((await jget(`/api/race-days/${dayId}/cards`)).map((c) => c.engine_version)));
 } finally {
   server.kill();
   await new Promise((rr) => setTimeout(rr, 300));

@@ -67,7 +67,13 @@ console.log('-- server: /api/distribution --');
 const dbPath = path.join(tmp, 'check.sqlite');
 const db = openDb(dbPath);
 seedTemplates(db);
-const tmplId = db.prepare("SELECT id FROM strategy_templates WHERE name = 'lean'").get().id;
+// Any seeded row serves: this is an FK target, not the subject. It was
+// 'lean' until D111 retired the engine's templates. The seeded CARDS below
+// deliberately still carry PROGRAM_ONLY / FULL / lean-* - those are
+// HISTORICAL values that no producer writes any more but that the stored
+// corpus is full of, and this file's job is proving they still report
+// correctly rather than quietly dropping out of the aggregates.
+const tmplId = db.prepare("SELECT id FROM strategy_templates WHERE name = 'human'").get().id;
 let ticketSeq = 0;
 function seedDay(date, meet, cards, { deleted = false } = {}) {
   const dayId = db.prepare("INSERT INTO race_days (track, date, bankroll_cents, per_race_min_cents, correlation_id, meet, deleted_at) VALUES ('Del Mar', ?, 20000, 500, ?, ?, ?)").run(date, `cid-${date}`, meet, deleted ? '2026-09-01T00:00:00Z' : null).lastInsertRowid;

@@ -289,15 +289,22 @@ try {
   }
 
   console.log('-- bucket isolation + no-version-bump identity (defense in depth) --');
-  const leanCard = await (await jpost(`/api/race-days/${dayId}/cards`, {})).json();
+  // The engine bucket this used to be held apart from is gone with the engine
+  // (D111). What the HUMAN bucket must still never do is absorb a card from
+  // another day or another producer, which is what is asserted here.
   const pl = await jget('/api/pl?engineVersion=all');
-  check('HUMAN bucket present and isolated from the engine bucket', (() => {
+  check('HUMAN bucket present and holds only this day\'s human cards', (() => {
     const human = pl.buckets.find((b) => b.completeness === 'HUMAN');
-    const engineBucket = pl.buckets.find((b) => b.completeness === leanCard.completeness);
-    return human && engineBucket && pl.cards.filter((c) => c.completeness === 'HUMAN').every((c) => c.raceDayId === dayId);
-  })());
-  const { ENGINE_VERSION } = await import('../shared/card-engine.js');
-  check('ENGINE_VERSION unchanged at lean-1.1', ENGINE_VERSION === 'lean-1.1' && leanCard.engineVersion === 'lean-1.1');
+    const humanCards = pl.cards.filter((c) => c.completeness === 'HUMAN');
+    return Boolean(human) && humanCards.length > 0 &&
+      humanCards.every((c) => c.raceDayId === dayId) &&
+      humanCards.reduce((a, c) => a + c.costCents, 0) === human.costCents;
+  })(), JSON.stringify(pl.buckets));
+  check('no engine bucket exists any more - nothing generates one',
+    !pl.buckets.some((b) => ['FULL', 'PARTIAL', 'PROGRAM_ONLY', 'ODDS_ONLY'].includes(b.completeness)),
+    JSON.stringify(pl.buckets.map((b) => b.completeness)));
+  const { ENGINE_VERSION } = await import('../shared/version.js');
+  check('ENGINE_VERSION unchanged at lean-1.1', ENGINE_VERSION === 'lean-1.1', ENGINE_VERSION);
 } finally {
   server.kill();
   await new Promise((rr) => setTimeout(rr, 300));

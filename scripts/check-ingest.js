@@ -254,10 +254,14 @@ try {
     deletedList.length === 1 && deletedList[0].id === pdfDay.id &&
     deletedList[0].deleted_at != null && deletedList[0].entries === 98);
 
-  const genOnDeleted = await fetch(`${BASE}/api/race-days/${pdfDay.id}/cards`, {
-    method: 'POST', headers: { 'content-type': 'application/json' }, body: '{}',
+  // Was the engine's generate route until D111 removed it. Human entry is
+  // now the cheapest card-writing mutation, and the 410 guard is what is
+  // under test here, not which producer trips it.
+  const lockOnDeleted = await fetch(`${BASE}/api/race-days/${pdfDay.id}/human-cards`, {
+    method: 'POST', headers: { 'content-type': 'application/json' },
+    body: JSON.stringify({ race: 1, text: '$20 W 1' }),
   });
-  check('mutations against a deleted day -> 410', genOnDeleted.status === 410);
+  check('mutations against a deleted day -> 410', lockOnDeleted.status === 410, String(lockOnDeleted.status));
   const pasteOnDeleted = await fetch(`${BASE}/api/race-days/${pdfDay.id}/consensus/manual`, {
     method: 'POST', headers: { 'content-type': 'application/json' },
     body: JSON.stringify({ sourceName: 'X', races: [] }),

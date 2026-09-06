@@ -14,6 +14,7 @@ import fs from 'node:fs';
 import os from 'node:os';
 import path from 'node:path';
 import { fileURLToPath, URL } from 'node:url';
+import { livePgms, makeHumanCard, winAndBoxText } from './lib/test-cards.js';
 
 const ROOT = fileURLToPath(new URL('../', import.meta.url));
 const tmp = fs.mkdtempSync(path.join(os.tmpdir(), 'betsheet-gradecheck-'));
@@ -21,7 +22,6 @@ process.env.BETSHEET_LOG_DIR = path.join(tmp, 'unit-logs');
 
 const { gradeTicket, buildDayResults, gradeCard } = await import('../shared/grading.js');
 const { classifyDay } = await import('../shared/classification.js');
-const { generateCard } = await import('../shared/card-engine.js');
 
 let failures = 0;
 function check(name, ok, detail = '') {
@@ -162,15 +162,14 @@ for (const x of sftb.races) {
   });
 }
 const cls = classifyDay(prog.races.map((x) => x.number), entriesByRace, picksByRace);
-const byN = Object.fromEntries(cls.map((c) => [c.number, c]));
-const card = generateCard({
-  bankrollCents: 20000, perRaceMinCents: 500,
-  races: prog.races.map((x) => ({
-    number: x.number, race_type: x.raceType, conditions: x.conditions,
-    wager_menu: x.wagerMenu, entries: entriesByRace[x.number], classification: byN[x.number],
-  })),
-  sourcesUsed: ['SFTB', 'Digest'], sourcesUnavailable: [],
-});
+// The card this grades used to be generated here by shared/card-engine.js.
+// D111 deleted that engine, so the card is now a FROZEN FIXTURE - the exact
+// 30-ticket, $200 set the engine last produced from the program and pick
+// goldens above, which are still parsed and classified for real either side
+// of it. Nothing about this proof weakened: the grader is what is under test,
+// and it is being handed the identical tickets it was handed before.
+const card = JSON.parse(fs.readFileSync(
+  path.join(ROOT, 'tests/fixtures/engine-cards/delmar-2026-08-30.lean-1.1.json'), 'utf8'));
 
 // The chart's grading view; scratches resolve to program numbers by name
 // against the program entries - same policy the server applies at save.
@@ -279,10 +278,21 @@ try {
     await jpost(`/api/race-days/${saved.id}/consensus/manual`, { sourceName: name, races: preview.races });
   }
 
-  const genRes = await jpost(`/api/race-days/${saved.id}/cards`, { variant: 'default' });
-  const genCard = await genRes.json();
-  check('card generated before results: no grade yet (gradeSummary null)',
-    genRes.status === 201 && genCard.gradeSummary === null);
+  // Was the engine's generate route until D111 removed it. A human card
+  // locked race by race is the cheapest surviving producer, and nothing in
+  // this file's subject - the GRADER - cares which one wrote the tickets.
+  const storedDay = await (await fetch(`${BASE}/api/race-days/${saved.id}`)).json();
+  const dayPgms = livePgms(storedDay);
+  const lockRaces = storedDay.races
+    .map((r) => ({ race: r.number, text: winAndBoxText(dayPgms[r.number] ?? []) }))
+    .filter((r) => (dayPgms[r.race] ?? []).length >= 3);
+  const genCardId = await makeHumanCard(jpost, saved.id, lockRaces);
+  const genCard = await (await fetch(`${BASE}/api/cards/${genCardId}`)).json();
+  genCard.correlationId = genCard.correlation_id;
+  const preGrades = await (await fetch(`${BASE}/api/cards/${genCardId}/grades`)).json();
+  check('card created before results: no grade yet',
+    !preGrades.summary || preGrades.grades.length === 0,
+    JSON.stringify(preGrades.summary ?? null));
 
   // Before any results land, the card document must still carry the results
   // key, empty - the sheet renders a per-race panel only where a finisher
@@ -377,9 +387,14 @@ try {
   check('after regrade still one row per ticket, same P/L',
     grades2.grades.length === genCard.tickets.length && grades2.summary.plCents === grades.summary.plCents);
 
-  const gen2 = await (await jpost(`/api/race-days/${saved.id}/cards`, { variant: 'late' })).json();
-  check('a card generated AFTER results grades immediately (gradeSummary in the response)',
-    gen2.gradeSummary && Number.isInteger(gen2.gradeSummary.plCents), JSON.stringify(gen2.gradeSummary ?? null));
+  // A brand-new card created AFTER the chart has landed must grade in the
+  // same call (omitting cardId always starts a new card, D28). The producer
+  // changed with D111; the auto-grade-on-create behaviour under test did not.
+  const gen2 = await (await jpost(`/api/race-days/${saved.id}/human-cards`,
+    { race: lockRaces[0].race, text: lockRaces[0].text })).json();
+  check('a card created AFTER results grades immediately (graded summary in the response)',
+    gen2.graded && Number.isInteger(gen2.graded.summary?.plCents ?? gen2.graded.plCents),
+    JSON.stringify(gen2.graded ?? null));
 
   await new Promise((rr) => setTimeout(rr, 300));
   const traceFile = path.join(logDir, 'decision-trace.jsonl');

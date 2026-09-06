@@ -21,8 +21,6 @@ import { gradingRouter } from './grading.js';
 import { plRouter } from './pl.js';
 import { exportRouter } from './trace-export.js';
 import { seedTemplates, templatesRouter } from './templates.js';
-import { simulateRouter } from './simulate.js';
-import { backfillRouter } from './backfill.js';
 import { distributionRouter } from './distribution.js';
 import { getDb } from './db.js';
 
@@ -51,7 +49,7 @@ const app = express();
 app.use(express.json({ limit: '10mb' }));
 
 // The code-defined strategy templates land in their table at boot so
-// cards can reference them by FK (shared/templates.js stays the truth).
+// cards can reference them by FK (the three surviving producers, D111).
 seedTemplates(getDb());
 
 // Request log for /api only (static assets would be noise). A request that
@@ -87,8 +85,6 @@ app.use('/api', gradingRouter);
 app.use('/api', plRouter);
 app.use('/api', exportRouter);
 app.use('/api', templatesRouter);
-app.use('/api', simulateRouter);
-app.use('/api', backfillRouter);
 app.use('/api', distributionRouter);
 
 // JSON errors for the API, never Express's HTML error page. Registered

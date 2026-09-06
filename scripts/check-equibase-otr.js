@@ -386,7 +386,6 @@ try {
   // A card with zero graded tickets never appears in a P/L bucket (the
   // query inner-joins graded_tickets_latest), so HUMAN/LLM_GENERATED each
   // need one real, gradeable ticket on program #2 (Tahini, real R1 entry).
-  await jpost(`/api/race-days/${day.id}/cards`, { bankrollCents: 20000, perRaceMinCents: 500 }); // engine-generated lean card
   await jpost(`/api/race-days/${day.id}/human-cards`, { race: 1, text: 'Win | #2 | $20 | test pick' }); // HUMAN card
   const llmResponse = 'Reasoning: consensus favorite.\n\n<<<TICKETS>>>\nWin | #2 | $20 | Test.\n<<<END TICKETS>>>\n';
   const llmPreview = await (await jpost(`/api/race-days/${day.id}/llm-cards/preview`, { race: 1, __stubResponse: llmResponse })).json();
@@ -412,13 +411,17 @@ try {
 
   const pl = await jget('/api/pl?engineVersion=all');
   const bucketNames = pl.buckets.map((b) => b.completeness);
-  const leanBucket = bucketNames.find((k) => k !== 'EQB_OTR' && k !== 'HUMAN' && k !== 'LLM_GENERATED');
-  check('P/L: EQB_OTR is its own bucket, distinct from the lean engine bucket/HUMAN/LLM_GENERATED',
-    bucketNames.includes('EQB_OTR') && Boolean(leanBucket) && bucketNames.includes('HUMAN') && bucketNames.includes('LLM_GENERATED'), JSON.stringify(bucketNames));
+  // D111: the lean engine bucket used to be the fourth party here. With the
+  // engine deleted these three ARE the buckets, so invariant 13 is now tested
+  // by holding them apart from each other rather than from a lean card.
+  check('P/L: EQB_OTR is its own bucket, distinct from HUMAN and LLM_GENERATED',
+    ['EQB_OTR', 'HUMAN', 'LLM_GENERATED'].every((k) => bucketNames.includes(k)), JSON.stringify(bucketNames));
+  check('P/L: no engine bucket exists any more - nothing generates one',
+    !bucketNames.some((k) => ['FULL', 'PARTIAL', 'PROGRAM_ONLY', 'ODDS_ONLY'].includes(k)), JSON.stringify(bucketNames));
   const eqbBucket = pl.buckets.find((b) => b.completeness === 'EQB_OTR');
   check('P/L: EQB_OTR bucket carries exactly the 6 equibase-otr cards (3 originals + 3 re-upload)', eqbBucket?.cards === 6, JSON.stringify(eqbBucket));
-  check('P/L: the lean/HUMAN/LLM_GENERATED buckets each carry exactly their own 1 card, no bleed from EQB_OTR',
-    [leanBucket, 'HUMAN', 'LLM_GENERATED'].every((k) => pl.buckets.find((b) => b.completeness === k)?.cards === 1),
+  check('P/L: the HUMAN and LLM_GENERATED buckets each carry exactly their own 1 card, no bleed from EQB_OTR',
+    ['HUMAN', 'LLM_GENERATED'].every((k) => pl.buckets.find((b) => b.completeness === k)?.cards === 1),
     JSON.stringify(pl.buckets));
 
   // D74: a race day with NO OTR rows omits the block from the LLM prompt
@@ -557,11 +560,17 @@ try {
     verifyDb4.close();
   }
 
-  // -------- 10. no engine-version bump; lean identity unchanged --------
-  const { ENGINE_VERSION } = await import('../shared/card-engine.js');
-  check('shared/card-engine.js ENGINE_VERSION unchanged at lean-1.1', ENGINE_VERSION === 'lean-1.1');
-  const leanCards = await jget(`/api/race-days/${day.id}/cards`);
-  check('a live lean card still generates fine on this day', leanCards.some((c) => c.engine_version === 'lean-1.1'), JSON.stringify(leanCards.map((c) => c.engine_version)));
+  // -------- 10. no engine-version bump --------
+  // ENGINE_VERSION is a legacy label post-pivot (D109): nothing mints a new
+  // lean-* card any more, and the value survives only so the stored corpus
+  // stays readable. Asserting it is unchanged is still the guard against an
+  // accidental bump silently re-bucketing every historical card.
+  const { ENGINE_VERSION } = await import('../shared/version.js');
+  check('shared/version.js ENGINE_VERSION unchanged at lean-1.1', ENGINE_VERSION === 'lean-1.1');
+  const dayCards = await jget(`/api/race-days/${day.id}/cards`);
+  check('every card on this day comes from a surviving producer, none from the engine',
+    dayCards.every((c) => ['equibase-otr', 'human', 'llm'].includes(c.engine_version)),
+    JSON.stringify(dayCards.map((c) => c.engine_version)));
 
   // Missing/deleted day guards.
   check('upload to a nonexistent race day -> 404', (await jpostPdf('/api/race-days/999999/equibase-otr', pdfBytes)).status === 404);

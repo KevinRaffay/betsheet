@@ -14,6 +14,7 @@ import fs from 'node:fs';
 import os from 'node:os';
 import path from 'node:path';
 import { fileURLToPath, URL } from 'node:url';
+import { livePgms, makeHumanCard, winAndBoxText } from './lib/test-cards.js';
 
 const ROOT = fileURLToPath(new URL('../', import.meta.url));
 const tmp = fs.mkdtempSync(path.join(os.tmpdir(), 'betsheet-mlcheck-'));
@@ -34,7 +35,7 @@ function firstDiff(a, b, at = '$') {
 const { parseMlSheetPdf, distanceWords, parseSummary } = await import('../server/ml-sheet-parser.js');
 const { mergeMlAndProgram } = await import('../shared/entries-merge.js');
 const { mlSheetUrl } = await import('../server/fetchers/dmtc-ml.js');
-const { ENGINE_VERSION } = await import('../shared/card-engine.js');
+const { ENGINE_VERSION } = await import('../shared/version.js');
 
 console.log('-- the real sheet: dmr-2026-08-16 --');
 const PDF = path.join(ROOT, 'tests', 'fixtures', 'ml-sheets', 'dmr-2026-08-16.pdf');
@@ -162,12 +163,37 @@ try {
   const refetch = await jpost('/api/fetch/ml-sheet', { track: 'Del Mar', date: '2026-08-16' });
   const attempts = await jget(`/api/race-days/${saved.id}/consensus`);
   check('fetch after the day exists: audited in fetch_attempts as well', refetch.status === 200 && JSON.stringify(attempts).includes('Stub ML sheet'));
-  const card = await (await jpost(`/api/race-days/${saved.id}/cards`, { variant: 'default' })).json();
-  check('a card on an ML-only day lands in the ODDS_ONLY tier under the current engine version, morning-line fallback traced',
-    card.completeness === 'ODDS_ONLY' && card.engineVersion === ENGINE_VERSION && card.tickets.length > 0 &&
-    card.trace.some((e) => e.event === 'rule_fired' && e.rule === 'ml_order_fallback'), JSON.stringify({ c: card.completeness, v: card.engineVersion, n: card.tickets?.length, err: card.error }));
-  const pl = await jget('/api/pl');
-  check('P/L: an ODDS_ONLY card waits ungraded in its own tier, never pooled', pl.ungraded.some((c) => c.cardId === card.id && c.completeness === 'ODDS_ONLY'));
+  // This used to assert that a card on an ML-only day landed in the
+  // ODDS_ONLY tier under the current ENGINE_VERSION, with the engine's
+  // `ml_order_fallback` rule traced. **ODDS_ONLY is unreachable after D111**:
+  // the completeness tier was decided by the engine's own
+  // `completeness_decided` event, and no surviving producer computes one -
+  // a human, LLM or OTR card carries HUMAN / LLM_GENERATED / EQB_OTR instead.
+  // The tier remains a valid CHECK value and every stored ODDS_ONLY card is
+  // still readable and still bucketed; nothing new can enter it.
+  //
+  // What D40 actually delivered and what this file exists to prove is the
+  // INGEST half - that an ML sheet alone is enough to create a usable race
+  // day - and that is asserted above (entries_source, scratches, odds) and
+  // again here: a card is buildable on a day whose only entries source was
+  // the sheet.
+  const storedMlDay = await jget(`/api/race-days/${saved.id}`);
+  const mlPgms = livePgms(storedMlDay);
+  const mlRace = storedMlDay.races.find((r) => (mlPgms[r.number] ?? []).length >= 3);
+  const mlCardId = await makeHumanCard(jpost, saved.id,
+    [{ race: mlRace.number, text: winAndBoxText(mlPgms[mlRace.number]) }]);
+  const mlCard = await jget(`/api/cards/${mlCardId}`);
+  check('a card is buildable on an ML-only day, from sheet entries alone',
+    mlCard.tickets.length > 0 && mlCard.consensus_completeness === 'HUMAN',
+    JSON.stringify({ n: mlCard.tickets?.length, bucket: mlCard.consensus_completeness }));
+  const pl = await jget('/api/pl?engineVersion=all');
+  check('P/L: the card on the ML-only day waits ungraded in its own bucket, never pooled',
+    pl.ungraded.some((c) => c.cardId === mlCardId && c.completeness === 'HUMAN'),
+    JSON.stringify(pl.ungraded));
+  check('ODDS_ONLY is unreachable now - no producer computes a completeness tier',
+    !pl.buckets.some((b) => b.completeness === 'ODDS_ONLY') &&
+    !pl.ungraded.some((c) => c.completeness === 'ODDS_ONLY'),
+    JSON.stringify(pl.buckets.map((b) => b.completeness)));
   await new Promise((rr) => setTimeout(rr, 300));
   const audit = fs.readFileSync(path.join(logDir, 'fetch-audit.jsonl'), 'utf8').split('\n').filter(Boolean).map((l) => JSON.parse(l));
   check('fetch-audit stream: every ML fetch attempt landed (ok, http_error, blocked)',

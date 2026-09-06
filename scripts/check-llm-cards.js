@@ -679,10 +679,15 @@ Place | #1 | $20 | Safe.
       pl.cards.filter((c) => c.completeness === 'LLM_GENERATED').every((c) => typeof c.notesPresent === 'boolean'));
   }
 
-  console.log('-- no engine-version bump / lean fixture identity unchanged --');
-  const leanCard = await (await jpost(`/api/race-days/${dayId}/cards`, {})).json();
-  const { ENGINE_VERSION } = await import('../shared/card-engine.js');
-  check('ENGINE_VERSION unchanged, a live lean card still generates under it', ENGINE_VERSION === 'lean-1.1' && leanCard.engineVersion === 'lean-1.1');
+  console.log('-- no engine-version bump --');
+  // ENGINE_VERSION is a legacy label post-pivot (D109/D111): nothing mints a
+  // lean-* card any more, and it survives so the stored corpus stays readable.
+  // Asserting it is unchanged still guards against an accidental bump
+  // silently re-bucketing every historical card.
+  const { ENGINE_VERSION } = await import('../shared/version.js');
+  check('ENGINE_VERSION unchanged at lean-1.1', ENGINE_VERSION === 'lean-1.1', ENGINE_VERSION);
+  check('every card on this day carries a producer label, never lean-1.1',
+    (await jget(`/api/race-days/${dayId}/cards`)).every((c) => c.engine_version !== 'lean-1.1'));
 
   dbCheck.close();
 } finally {
