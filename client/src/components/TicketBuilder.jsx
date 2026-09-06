@@ -83,6 +83,7 @@ function HorseStrip({ entries, selected, onToggle, onAll, onClear, single }) {
 
 export default function TicketBuilder({ raceNumber, entries = [], wagerMenu = null, disabled = false, onChange }) {
   const [drafts, setDrafts] = useState([emptyDraft()]);
+  const [saved, setSaved] = useState([]);
 
   const live = useMemo(() => entries.filter((e) => !e.scratched), [entries]);
   const menu = useMemo(() => parseWagerMenu(wagerMenu), [wagerMenu]);
@@ -125,9 +126,12 @@ export default function TicketBuilder({ raceNumber, entries = [], wagerMenu = nu
     return { combos, costCents, call, problems, ready, minCents, stepCents, dropped, raw };
   }), [drafts, menu, raceNumber]);
 
-  const readyCalls = derived.filter((x) => x.ready).map((x) => x.call);
-  const text = readyCalls.join(' / ');
-  const totalCents = derived.filter((x) => x.ready).reduce((a, x) => a + x.costCents, 0);
+  const draftCalls = derived.filter((x) => x.ready).map((x) => x.call);
+  const savedCalls = saved.map((s) => s.call);
+  const allCalls = [...savedCalls, ...draftCalls];
+  const text = allCalls.join(' / ');
+  const totalCents = derived.filter((x) => x.ready).reduce((a, x) => a + x.costCents, 0) +
+    saved.reduce((a, s) => a + s.costCents, 0);
 
   // Push the composed string up whenever it changes. The parent owns it.
   const lastSent = React.useRef(null);
@@ -148,6 +152,17 @@ export default function TicketBuilder({ raceNumber, entries = [], wagerMenu = nu
   const setPosition = (id, posIndex, next) => setDrafts((ds) => ds.map((d) => (
     d.id === id ? { ...d, positions: d.positions.map((p, i) => (i === posIndex ? next : p)) } : d
   )));
+
+  const handleSaveTicket = (id) => {
+    const draftIndex = drafts.findIndex((d) => d.id === id);
+    if (draftIndex === -1) return;
+    const draft = drafts[draftIndex];
+    const x = derived[draftIndex];
+    if (!x.ready) return;
+
+    setSaved((ss) => [...ss, { ...draft, call: x.call, costCents: x.costCents }]);
+    setDrafts((ds) => [emptyDraft()]);
+  };
 
   return (
     <div className="tb">
@@ -185,6 +200,8 @@ export default function TicketBuilder({ raceNumber, entries = [], wagerMenu = nu
                 <input className="in in--sm" value={d.rationale} disabled={disabled} placeholder="optional"
                   onChange={(e) => update(d.id, { rationale: e.target.value })} />
               </label>
+              <button type="button" className="btn btn--sm btn--primary" disabled={disabled || !x.ready}
+                onClick={() => handleSaveTicket(d.id)}>Save</button>
               <button type="button" className="btn btn--sm btn--danger" disabled={disabled || drafts.length === 1}
                 onClick={() => setDrafts((ds) => ds.filter((y) => y.id !== d.id))}>Remove</button>
             </div>
@@ -229,14 +246,21 @@ export default function TicketBuilder({ raceNumber, entries = [], wagerMenu = nu
         <button type="button" className="btn btn--sm" disabled={disabled}
           onClick={() => setDrafts((ds) => [...ds, emptyDraft()])}>+ Add ticket</button>
         <span className="dim">
-          {readyCalls.length} ticket{readyCalls.length === 1 ? '' : 's'} · race total <strong>{money(totalCents)}</strong>
+          {allCalls.length} ticket{allCalls.length === 1 ? '' : 's'} · race total <strong>{money(totalCents)}</strong>
         </span>
       </div>
 
-      {readyCalls.length > 0 && (
-        <div className="tb-out">
-          <div className="dim">What you'd say at the window — this exact text is what gets saved:</div>
-          <code className="teller tb-out__text">{text}</code>
+      {saved.length > 0 && (
+        <div className="tb-saved">
+          <div className="dim">Saved tickets:</div>
+          {saved.map((s, i) => (
+            <div key={i} className="tb-saved-item">
+              <code className="teller">{s.call}</code>
+              <span className="dim"> · {money(s.costCents)}</span>
+              <button type="button" className="linkish" disabled={disabled}
+                onClick={() => setSaved((ss) => ss.filter((_, j) => j !== i))}>remove</button>
+            </div>
+          ))}
         </div>
       )}
     </div>
