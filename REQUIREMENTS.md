@@ -141,7 +141,8 @@ Specified but NOT scheduled - deliverable IDs get claimed when the work is picke
 | Generate a live card at a track with no automated entries feed (first target Kentucky Downs) from a manually saved copy of Equibase's entries page | - (not scheduled) |
 | The parser takes an HTML STRING and never fetches - invariant 6 stands, Equibase is never scraped; the same manual-upload posture as D69 (ATR racecard) and D71 (OTR sheet) | - (not scheduled) |
 | Parsed against Equibase's page template rather than one track, so a new track on the same template needs no code - untested until a second track's page is parsed | - (not scheduled) |
-| Live odds preferred over morning line when present, M/L as fallback; both stored, neither overwriting the other; one `odds_captured_at` for the whole card | - (not scheduled) |
+| Live odds preferred over morning line when present, M/L as fallback; both stored, neither overwriting the other; one `odds_captured_at` for the whole card. NOTE the reference capture has live odds empty in all 116 rows, so only the fallback path is exercised by it | - (not scheduled) |
+| Entry columns are mapped from each race's own header row, never a fixed index - a claiming race carries an extra `Claim $` column (12 columns, not 11) | - (not scheduled) |
 | Scratched horses retained and flagged, excluded from the active count, detected by row SHAPE (a scratch row carries 6 cells, not 11) | - (not scheduled) |
 | Entries land through the day-creation path, so one upload populates every race for the LLM modal, ticket builder, card sheet and Replay alike | - (not scheduled) |
 | Warnings-first read-only preview before anything is written (invariant 9), as every other ingest path does | - (not scheduled) |

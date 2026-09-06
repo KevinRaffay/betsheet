@@ -49,7 +49,8 @@ Recorded so nobody re-opens the PDF route without knowing it was measured.
 
 ## What the HTML contains — verified against the sample
 
-Sample: Equibase entries page, **Del Mar, 6 September 2026, 11 races**.
+Sample, committed at `tests/fixtures/equibase-entries/DMR090626USA-EQB.view-source.html`:
+Equibase entries page, **Del Mar, 6 September 2026, 11 races, 116 entry rows**.
 
 | needed | present as |
 | --- | --- |
@@ -59,22 +60,33 @@ Sample: Equibase entries page, **Del Mar, 6 September 2026, 11 races**.
 | class, purse, distance, surface | header block before each table: `Del Mar STARTER OPTIONAL CLAIMING $50,000`, `Purse $41,000.`, `Five Furlongs.`, `(Turf)` |
 | wager menu | same block: `Rolling Pick 3 / $1 Superfecta (10c min) 50c Early Pick 5 / $2 WPS Parlay` |
 | conditions | same block, full paragraph |
-| entries | header row `P#, PP, Horse, VS, A/S, Med, Jockey, Wgt, Trainer, M/L, LiveOdds` |
+| entries | header row `P#, PP, Horse, VS, A/S, Med, Jockey, Wgt, Trainer, M/L, LiveOdds` — **but see rule 1: a claiming race adds a `Claim $` column** |
 | horse + state suffix | a single cell — `Broheim (KY)`, `Prime Artist (FR)`. The split-on-parenthetical risk the PDF spec worried about does not arise |
-| live odds | per race: present on races 3, 6, 7; blank on the other eight |
+| live odds | the `LiveOdds` column exists on every race and is **empty in all 116 rows** of this capture — an entries page saved before wagering opened. See the correction under Open questions |
 | scratches | 3 in this card (races 3, 5, 7) |
+| also-eligibles | a 1-cell `Also Eligibles:` separator row in races 3, 10 and 11; entries after it are AEs |
 
-### Three parsing rules the sample forces
+### Five parsing rules the sample forces
 
-1. **A scratched row has 6 cells, not 11.**
+1. **The column count is NOT fixed — map columns from each race's own header row.**
+   A claiming race inserts a `Claim $` column, giving **12 instead of 11**:
+   `["P#","PP","Horse","VS","A/S","Med","Claim $","Jockey","Wgt","Trainer","M/L","LiveOdds"]`
+   against race 1's 11-column form. Races 3, 6 and 7 are 12-column here; the rest are 11.
+   Reading a fixed index shifts jockey, weight, trainer, M/L and live odds by one on every
+   claiming race — which is precisely the mistake made while first analysing this file,
+   where a 12-column row's `M/L` was misread as its live odds.
+2. **A scratched row has 6 cells, whatever the race's column count.**
    `[" SCR", "King of Clubs (KY)", "", "----Scratched----", "", ""]` — the dashed bar spans
    the rest by colspan. Detect a scratch **by row shape, never by column index**.
-2. **Entities need two unescape passes** when the file is a saved *view-source* page: the
+3. **Entities need two unescape passes** when the file is a saved *view-source* page: the
    markup is escaped twice, so `&amp;nbsp;` → `&nbsp;` → space. After a single pass,
    `&#44; &amp; &ndash; &nbsp; &copy;` all survive into the output.
-3. **The UI artifact is `See More See Less`** — 22 of them, two per race, trailing each
+4. **The UI artifact is `See More See Less`** — 22 of them, two per race, trailing each
    conditions paragraph. Strip via a small appendable pattern list; assume more turn up on
-   other tracks' pages.
+   other tracks' pages. It is only visible once tags are stripped — in raw markup the
+   phrase is split across elements.
+5. **`Also Eligibles:` is a 1-cell separator row**, not an entry. Rows after it are
+   also-eligibles, which `shared/entries-parser.js` already has a convention for.
 
 ### Capture method — accept both forms
 
@@ -150,8 +162,13 @@ HTML as given — so nobody has to remember which way a file was captured.
 1. **"Track-agnostic" is a claim, not a finding.** The verified sample is Del Mar; the actual
    target is Kentucky Downs. Capturing the KD page and parsing it is the first real test, and
    should happen before the parser is described as generic anywhere.
-2. **Only 3 of 11 races carried live odds** in the sample, so the M/L fallback is the common
-   path rather than the exception. Blank live odds are not a parser fault.
+2. **Live odds were empty in the entire sample** — all 116 rows. This capture predates
+   wagering, so the M/L fallback is not merely the common path, it is the ONLY path this
+   fixture exercises. A second capture taken close to post is needed before the live-odds
+   branch can be tested at all, and blank live odds must never be read as a parser fault.
+   *(Correction, same day: an earlier reading of this file claimed live odds were present
+   on races 3, 6 and 7. That was wrong — it read column index 10, which is `M/L` in a
+   12-column claiming race. That error is what produced rule 1 above.)*
 3. **One `odds_captured_at` per card** means later races are staler than earlier ones by
    construction. That is the design — it is what the staleness indicator exists to surface —
    not a defect to fix later.
