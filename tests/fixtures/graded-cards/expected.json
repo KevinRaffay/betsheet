@@ -1,0 +1,209 @@
+{
+  "purpose": "Grader regression fixtures (P-0.2). Frozen card exports with the grade summaries they were produced with. P-6.1 re-runs the grader against these and must reproduce every figure to the cent; a mismatch means grading BEHAVIOUR changed and is a finding, not a rounding error.",
+  "frozenFrom": "archive/exports (D107), which is itself frozen and never migrated forward",
+  "outcomeKinds": "win / loss / refund / partial - the only four the grader emits. There is no dead-heat outcome, so the original spec had nothing to select for it.",
+  "knownGap": "No card in the entire corpus carries a MULTI-RACE ticket (tickets.race_id IS NULL), so the doubles/parlay grading path has no fixture and P-6.1 cannot cover it.",
+  "cards": [
+    {
+      "file": "card-139.json",
+      "cardId": 139,
+      "why": "the pivot doc names it: Sonnet 5, 2026-09-05, spans all four outcomes",
+      "track": "Del Mar",
+      "date": "2026-09-05",
+      "llmModel": "claude-sonnet-5",
+      "tickets": 66,
+      "expected": {
+        "costCents": 50000,
+        "returnedCents": 44955,
+        "plCents": -5045,
+        "outcomes": {
+          "loss": 45,
+          "win": 15,
+          "refund": 4,
+          "partial": 2
+        }
+      },
+      "engineVersion": "llm",
+      "template": "llm",
+      "bucket": "LLM_GENERATED"
+    },
+    {
+      "file": "card-144.json",
+      "cardId": 144,
+      "why": "the pivot doc names it: Fable 5.1, the only profitable LLM card of the three",
+      "track": "Del Mar",
+      "date": "2026-09-05",
+      "llmModel": "claude-fable-5-1",
+      "tickets": 89,
+      "expected": {
+        "costCents": 49680,
+        "returnedCents": 56695,
+        "plCents": 7015,
+        "outcomes": {
+          "loss": 65,
+          "win": 14,
+          "refund": 5,
+          "partial": 5
+        }
+      },
+      "engineVersion": "llm",
+      "template": "llm",
+      "bucket": "LLM_GENERATED"
+    },
+    {
+      "file": "card-146.json",
+      "cardId": 146,
+      "why": "the pivot doc names it: Opus 5, partial-heavy (6) and the worst P&L",
+      "track": "Del Mar",
+      "date": "2026-09-05",
+      "llmModel": "claude-opus-5",
+      "tickets": 70,
+      "expected": {
+        "costCents": 45050,
+        "returnedCents": 35272,
+        "plCents": -9778,
+        "outcomes": {
+          "loss": 53,
+          "win": 9,
+          "partial": 6,
+          "refund": 2
+        }
+      },
+      "engineVersion": "llm",
+      "template": "llm",
+      "bucket": "LLM_GENERATED"
+    },
+    {
+      "file": "card-110.json",
+      "cardId": 110,
+      "why": "a second LLM day, so the LLM path is not pinned to one card date",
+      "track": "Del Mar",
+      "date": "2026-09-03",
+      "llmModel": null,
+      "tickets": 43,
+      "expected": {
+        "costCents": 50000,
+        "returnedCents": 40550,
+        "plCents": -9450,
+        "outcomes": {
+          "loss": 30,
+          "win": 10,
+          "refund": 3
+        }
+      },
+      "engineVersion": "llm",
+      "template": "llm",
+      "bucket": "LLM_GENERATED"
+    },
+    {
+      "file": "card-102.json",
+      "cardId": 102,
+      "why": "the HUMAN path - engine_version human, tickets entered by hand",
+      "track": "Del Mar",
+      "date": "2026-08-30",
+      "llmModel": null,
+      "tickets": 7,
+      "expected": {
+        "costCents": 17200,
+        "returnedCents": 13430,
+        "plCents": -3770,
+        "outcomes": {
+          "loss": 5,
+          "win": 2
+        }
+      },
+      "engineVersion": "human",
+      "template": "human",
+      "bucket": "HUMAN"
+    },
+    {
+      "file": "card-123.json",
+      "cardId": 123,
+      "why": "the EQB_OTR path - picks-to-tickets, its own builder",
+      "track": "Del Mar",
+      "date": "2026-09-04",
+      "llmModel": null,
+      "tickets": 16,
+      "expected": {
+        "costCents": 11200,
+        "returnedCents": 5530,
+        "plCents": -5670,
+        "outcomes": {
+          "win": 6,
+          "partial": 1,
+          "loss": 9
+        }
+      },
+      "engineVersion": "equibase-otr",
+      "template": "equibase-otr",
+      "bucket": "EQB_OTR"
+    },
+    {
+      "file": "card-030.json",
+      "cardId": 30,
+      "why": "a lean-1.1 PROGRAM_ONLY backfill card - the bulk of the 70-day corpus",
+      "track": "Del Mar",
+      "date": "2026-07-17",
+      "llmModel": null,
+      "tickets": 29,
+      "expected": {
+        "costCents": 20000,
+        "returnedCents": 13530,
+        "plCents": -6470,
+        "outcomes": {
+          "loss": 26,
+          "win": 3
+        }
+      },
+      "engineVersion": "lean-1.1",
+      "template": "lean",
+      "bucket": "PROGRAM_ONLY"
+    },
+    {
+      "file": "card-137.json",
+      "cardId": 137,
+      "why": "most partials in the corpus (6) - pro-rata combo refunds, the trickiest rule",
+      "track": "Del Mar",
+      "date": "2026-09-05",
+      "llmModel": null,
+      "tickets": 44,
+      "expected": {
+        "costCents": 30800,
+        "returnedCents": 32600,
+        "plCents": 1800,
+        "outcomes": {
+          "loss": 21,
+          "win": 15,
+          "partial": 6,
+          "refund": 2
+        }
+      },
+      "engineVersion": "equibase-otr",
+      "template": "equibase-otr",
+      "bucket": "EQB_OTR"
+    },
+    {
+      "file": "card-135.json",
+      "cardId": 135,
+      "why": "refunds AND partials on an OTR card, a different builder from 137s day",
+      "track": "Del Mar",
+      "date": "2026-09-05",
+      "llmModel": null,
+      "tickets": 22,
+      "expected": {
+        "costCents": 15400,
+        "returnedCents": 14380,
+        "plCents": -1020,
+        "outcomes": {
+          "loss": 7,
+          "win": 10,
+          "partial": 4,
+          "refund": 1
+        }
+      },
+      "engineVersion": "equibase-otr",
+      "template": "equibase-otr",
+      "bucket": "EQB_OTR"
+    }
+  ]
+}
