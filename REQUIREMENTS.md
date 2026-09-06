@@ -5,6 +5,14 @@ Every requirement maps to the deliverable ID(s) in
 When a requirement's coverage changes (split PRs, resequencing), update this
 map in the same PR.
 
+> **Read the section banners first.** The 2026-09-05 simulator pivot retired
+> whole sections of this map, and P-1 (D110-D113) has now executed those
+> removals. A section marked **RETIRED** describes what the system used to do:
+> the requirements were met, the code that met them is deleted, and the rows
+> are kept because the stored corpus was produced under them and cannot be
+> read without knowing what they were. Nothing marked RETIRED is a gap to be
+> filled. The live map is the pivot section and the one after it.
+
 ## Platform & foundations
 
 | Requirement | Deliverables |
@@ -19,6 +27,12 @@ map in the same PR.
 
 ## Program ingest (workflow step 1)
 
+**RETIRED except the first row (D113).** Del Mar program-PDF parsing, the
+Bottom Line extraction and the ML-sheet merge are deleted. The pasted-entries
+parser (D04) survives and is currently the only way to create a race day; it
+retires when the Equibase entries HTML ingest is wired. The parse-preview rule
+(invariant 9) is not retired at all - it binds every ingest path that remains.
+
 | Requirement | Deliverables |
 | --- | --- |
 | Pasted entries text parsed per race/horse (all program fields) | D04 |
@@ -27,6 +41,14 @@ map in the same PR.
 | Parse preview (read-only) confirmed before saving; corrections at the source + re-parse | D06, D14 |
 
 ## Consensus (workflow step 2)
+
+**RETIRED IN FULL (D110, D112).** There is no consensus subsystem: no
+fetchers, no registry, no classification, no picks parser, no consensus panel.
+The last row is the exception and is *strengthened* rather than retired - "no
+Equibase scraping" is now structural, because D113 left no HTTP client to
+scrape with. Every stored `consensus_picks` row, and every UNANIMOUS / SPLIT /
+CHAOS value on a historical race, stays readable; these rows are what they
+mean.
 
 | Requirement | Deliverables |
 | --- | --- |
@@ -41,6 +63,13 @@ map in the same PR.
 | No Equibase scraping; robots.txt respected, back off resistant sources | D07 (framework rule), D12/D13 (results via paste/PDF) |
 
 ## Card generation (workflow step 3)
+
+**RETIRED IN FULL (D111).** The lean engine is deleted. Nothing generates a
+card from rules any more - the three producers that remain (Equibase OTR
+upload, LLM generation, human entry) each take tickets as given. These rows
+describe how every `lean-*` card in the corpus was built, which is why they are
+kept rather than deleted, and they are the reasons a future generator would
+have to honour invariants 1, 2 and 5.
 
 | Requirement | Deliverables |
 | --- | --- |
@@ -67,6 +96,11 @@ map in the same PR.
 | Mobile at-track view: teller calls large/bold, check-offs, scratches, actual stakes | D23 |
 
 ## Backtesting with historical data (addendum)
+
+**RETIRED (D111, D113).** The simulator, the strategy templates and the batch
+backfill runner are deleted. Bucket isolation (invariant 13) is NOT retired: it
+still governs every P/L and Distributions aggregate, now across HUMAN,
+LLM_GENERATED and EQB_OTR.
 
 | Requirement | Deliverables |
 | --- | --- |
@@ -95,6 +129,13 @@ map in the same PR.
 
 ## Backtest hygiene (addendum 2, 2026-09-02)
 
+**SUPERSEDED, not simply retired (2026-09-05 pivot).** Pre-registration
+relaxed from "a hypothesis before any engine change" to **"label everything,
+conclude nothing until n is stated"**. The old rule guarded an engine that no
+longer exists; the new one guards the analyzer replacing it. The findings
+convention and its files stand as history - see
+[docs/findings/README.md](docs/findings/README.md).
+
 | Requirement | Deliverables |
 | --- | --- |
 | Every card records the engine version that built it; regeneration is append-only and graded results are immutable per (card, engine_version) - improvement is measured by comparing versions (invariant 14) | D34 (schema, recipe, trace, P/L version filter), D28 (append-only generation), every engine PR (bumps the version) |
@@ -110,6 +151,11 @@ map in the same PR.
 
 ## Morning-line sheet (addendum 3, 2026-09-02)
 
+**RETIRED IN FULL (D113).** The ML-sheet parser, its fetcher and the
+program/ML merge are deleted, and the ODDS_ONLY completeness tier is
+unreachable - it was decided by the engine's own `completeness_decided` event.
+Stored ODDS_ONLY cards still report; nothing new can enter the tier.
+
 | Requirement | Deliverables |
 | --- | --- |
 | The track's ML/changes PDF parses into the entries structure and is the entries source of record; the program PDF is analysis-only and cross-validated against it, the sheet winning every disagreement with a warning | D40 |
@@ -117,6 +163,11 @@ map in the same PR.
 | The ML sheet is fetched from the track at its predictable URL when robots allow, audited like every fetch; past dates feed backfill | D40 (on the D07 framework) |
 
 ## Historical backfill (addendum 4, 2026-09-01)
+
+**RETIRED IN FULL (D111, D113).** The dmtc.com crawler, the raw archive, the
+meet-dates probe, the batch runner and the Backfill queue are all deleted. The
+corpus they produced is frozen in `archive/` (D107) and its per-meet reports
+remain in `docs/backfill/` as the record of how it was built.
 
 | Requirement | Deliverables |
 | --- | --- |

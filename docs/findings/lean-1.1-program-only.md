@@ -1,5 +1,24 @@
 # Findings: engine `lean-1.1`, bucket PROGRAM_ONLY, corpus DMR 2025-2026 (70 days)
 
+> **HISTORY — the engine this describes no longer exists.**
+>
+> D111 deleted `shared/card-engine.js`, the strategy templates and the
+> simulator as part of the 2026-09-05 pivot, so `lean-1.1` was not superseded
+> by a `lean-1.2`; it was retired. **No later file will follow this one**, and
+> the convention's "never edited after its version is superseded" rule now
+> applies to it permanently. Nothing below has been revised — this banner is a
+> statement about the world around the file, not a correction to a finding.
+>
+> **Its citations remain checkable.** The runs it cites by id are rows in
+> `simulation_runs` / `simulation_results`, which still exist in the database
+> and in the frozen pre-pivot snapshot (`archive/`, D107) — that snapshot was
+> taken *before* any removal began, for exactly this reason. What is gone is
+> the ability to produce a *new* run to compare against.
+>
+> Read it as the record of what the lean engine did on the 70-day PROGRAM_ONLY
+> corpus, and as the reasons a future generator, if one is ever built, would
+> have to honour invariants 1, 2 and 5.
+
 Written 2026-09-02 from simulation runs **#27-#50** (D52). This file is
 versioned per (engine version, bucket, corpus) and is never edited after
 `lean-1.1` is superseded - a later engine gets a new file (CLAUDE.md,

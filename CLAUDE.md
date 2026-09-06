@@ -370,6 +370,7 @@ where a compressed row dropped a detail its ledger row words differently.
 
 | feature | state | notes |
 | --- | --- | --- |
+| P-1.6: the docs purged of what the pivot removed (D114) | merged | branch `purge-dead-docs` - the last of P-1, and documentation only: no code, no schema, no behaviour. REQUIREMENTS.md's superseded sections carry **RETIRED** banners naming the deliverable that retired each and saying plainly that a retired row is not a gap to fill; README.md describes the simulator it is rather than the generator it was; `docs/findings/` gains a README saying which files are live and which are history, plus an amendment on each. **Nothing was deleted** - the backfill reports are the provenance of the frozen corpus, and the findings are the record of what the deleted engine did. Full record: DELIVERABLES.md D114. |
 | P-1.3: Del Mar program and ML ingestion removed, with the dmtc crawler (D113) | merged | branch `remove-program-ingest` - the program-PDF parser, the ML-sheet parser, the entries merge, the ML fetcher and registry, the dmtc.com crawler and its two CLIs, two retired one-off scripts, four parse routes, the from-archive results shortcut, and 25MB of PDF fixtures. `meetFor`/`meetForDay` relocated to `shared/track-codes.js` first, because `race_days.meet` is still what the P/L and Distributions selectors filter on. **The pasted-entries path is deliberately KEPT**: it is currently the only way to create a race day, and removing it before the Equibase HTML ingest is wired would leave the app unable to open one. `polite-fetch.js` lost its last fetching caller and became `source-audit.js`. Full record: DELIVERABLES.md D113. |
 | P-1.4: consensus removed - D09 classification, the sources, the picks (D112) | merged | branch `remove-consensus` - the fetch runner, `shared/classification.js`, the picks parser, the Consensus panel and two check scripts are gone, and the OTR sheet is a PICKER again rather than also a consensus source. The polite-fetch and audit layer was RELOCATED to `server/polite-fetch.js` first (the D109 pattern): it is HTTP manners, not consensus, and the crawler and ML ingest still depend on it. Two things are recorded rather than glossed: the LLM prompt lost its CONSENSUS section, which is a **prompt-comparability boundary** for a card type with no version axis; and a **missing deleted-day guard on `llm-cards/preview`** was found and fixed - pre-existing, and it spent real money on days invariant 12 excludes. Full record: DELIVERABLES.md D112. |
 | P-1.5: the lean engine, Generate Card, the templates and the simulator removed (D111) | merged | branch `remove-lean-engine` - the pivot's largest removal, and the one that makes P-1.3 and P-1.4 small. **Taken out of the doc's numbered order deliberately**: the engine is the CONSUMER of program analysis and consensus, so removing it first is what the decision record's own "leaves before roots" rule actually requires. Deletes the engine, the 12 lean templates, the simulator, the batch backfill runner, the Generate Card route and button, and five check scripts. Everything that depended on it was kept working rather than weakened: the two real-day grading proofs now grade a FROZEN engine card, and `traceStatus` is cross-referenced against the database instead of a counter no surviving producer can emit. Full record: DELIVERABLES.md D111. |
@@ -473,23 +474,31 @@ where a compressed row dropped a detail its ledger row words differently.
 
 ## Findings
 
-Structure-layer findings live in `docs/findings/`, one file per
-**(engine version, bucket, corpus)** - `docs/findings/lean-1.1-program-only.md`
-is the first (D52: engine `lean-1.1`, bucket PROGRAM_ONLY, the 70-day DMR
-2025-2026 corpus, runs #27-#50). Rules:
+Findings live in `docs/findings/`, one file per **(engine version, bucket,
+corpus)**. **Read `docs/findings/README.md` first** - it says which files are
+live and which are history, and D114 wrote it for exactly that reason.
 
-- A findings file is written from simulation run IDs, both scratch modes
-  (D50), all meets and per meet (D51), and every number in it cites its run.
-  It states what is NOT concluded and the exact question the next corpus
-  must answer.
-- A findings file is **never edited after the engine version it describes
-  is superseded**. A new engine version gets a new file; the old one stays
-  as the record of what the old engine did. Corrections to a live file are
-  fine while its version is current, with the date.
-- No engine change is proposed without a findings file for the version it
-  would replace (REQUIREMENTS, backtest hygiene). `lean-1.2`, if it comes,
-  bumps the version, regenerates append-only under D34 and is compared by
-  version against `lean-1.1` - never by overwriting.
+The pivot relaxed the discipline these were written under, from "a hypothesis
+before any engine change" to **"label everything, conclude nothing until n is
+stated"**. A deliberate loosening, not an abandonment: the old rule guarded an
+engine that has since been deleted, the new one guards the analyzer replacing
+it. Rules still in force:
+
+- Written from run or card IDs, never from memory; every number cites its
+  source. It states what is NOT concluded and the exact question the next
+  corpus must answer.
+- **No P&L figure without its `n`.** The rule the pivot kept most
+  deliberately - the pivot's own motivating anecdote turned out to rest on 1
+  card and 3 graded tickets, with another model looking worse on more data.
+- A findings file is **never edited after the thing it describes is
+  superseded**. A correction to a LIVE file is fine, with the date. An
+  amendment recording a change in the world AROUND the file - a deleted
+  engine, a changed prompt - is not a revision of a finding and is allowed;
+  both existing files now carry one.
+- `lean-1.1-program-only.md` is **history**: its engine was deleted rather
+  than superseded, so no `lean-1.2` file will follow it. Its run citations
+  stay checkable against the frozen snapshot (D107), which is part of why
+  that snapshot was taken before any removal began.
 
 ---
 

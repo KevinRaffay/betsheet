@@ -12,6 +12,45 @@ expectation rather than an impression.
 
 ---
 
+## Amendment, 2026-09-06 (D112): the corpus is split by a prompt change
+
+**This pre-registration is still live, and its hypotheses stand.** But the
+prompt changed underneath it after this file was written and before the corpus
+was collected, so the split has to be recorded here rather than discovered
+later in the data.
+
+D112 removed the **CONSENSUS section** from the per-race user prompt, along
+with the consensus subsystem that filled it. Every card generated from
+2026-09-06 onward is therefore built from a materially different prompt than
+one generated before it.
+
+Why that matters to *this* file specifically, more than to a normal prompt
+edit:
+
+- The prompt version above reads `llm-card-v1 + analyst notes`. It now needs a
+  third state: **`llm-card-v1 + analyst notes, no consensus`**.
+- LLM cards have **no version axis** — `engine_version` is the literal `'llm'`
+  for every one of them — which is the exact problem this file's own "Why this
+  file has a prompt version and no other findings file does" section was
+  written about. Nothing in the data marks the boundary.
+- H1 compares paired generations *with and without notes*. A pair is only a
+  pair if both halves saw the same prompt. **Do not pair a pre-D112 card with a
+  post-D112 one.**
+- H3's 20-cards-a-side threshold counts cards under one prompt, not cards in
+  total. Cards from the two sides of this boundary do not add together toward
+  it.
+
+**How to tell which side a card is on**, without guessing:
+`llm_card_requests.prompt_text` stores what was actually sent for every call
+ever made, so a card's prompt is checkable per race rather than inferred from
+its date. A card whose prompt contains the string `CONSENSUS` predates the
+change.
+
+The change was unavoidable rather than chosen: with nothing writing
+`consensus_picks`, the section could only ever have printed its own "No
+external consensus on file for this race" line, on every card, forever.
+
+
 ## Why this file has a prompt version and no other findings file does
 
 The Findings convention is one file per **(engine version, bucket, corpus)**.

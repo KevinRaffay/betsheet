@@ -1,13 +1,37 @@
 # BetSheet
 
-A local-only horse race betting card generator and strategy tracker. Ingest a
-track program, gather internet consensus picks, generate a betting card
-allocated by confidence, grade it against real Equibase results, and backtest
-strategy templates across every stored card.
+A local-only betting simulator and strategy analyzer for horse racing. Ingest
+a race day cheaply, capture cards from several sources with clean labels, grade
+them against uploaded results, and analyze the graded cards across every
+dimension that might matter.
 
-The near-term goal is **benchmarking card generation against real results**:
-the generate → grade → simulate loop (Phases 1–3) comes before any at-track
-surface (Phase 4: PDF export, here.now publishing, mobile view).
+Cards come from three producers, each writing its own tickets and each kept in
+its own reporting bucket:
+
+- **Equibase "Off to the Races"** — the free at-track sheet, its printed
+  tickets taken verbatim (`EQB_OTR`)
+- **an LLM** — generated race by race from the entries, the program's Bottom
+  Line where one is on file, and your own analyst notes (`LLM_GENERATED`)
+- **you** — typed or built in the ticket builder (`HUMAN`)
+
+Results arrive as a pasted Equibase chart, an uploaded chart PDF, or a saved
+dmtc results page, and every card of the day grades automatically when they
+land.
+
+**The thesis is that strategy emerges from volume, not from design**: as many
+graded cards as possible, from as many tracks, sources and models as possible,
+each labelled cleanly enough that patterns become visible when sliced any way
+you like. The discipline that goes with it is **label everything, conclude
+nothing until n is stated** — no P&L figure is reported without the number of
+cards behind it.
+
+> **History.** BetSheet was a consensus-driven card *generator* until
+> 2026-09-05: it fetched picks from several sources, classified each race
+> UNANIMOUS / SPLIT / CHAOS, and allocated a bankroll from rules. That engine
+> and everything feeding it were removed in favour of the above — the reasoning
+> is in [docs/decisions/2026-09-05-simulator-pivot.md](docs/decisions/2026-09-05-simulator-pivot.md),
+> and the corpus it produced is frozen, readable and still graded in
+> `archive/`.
 
 ## Stack
 
@@ -30,13 +54,12 @@ npm start        # build the client, serve app + API on http://127.0.0.1:8788
 npm run dev      # development: vite on :5175 (proxying /api), api on :8788
 ```
 
-Browser views are available at `/`, `/new`, `/pl`, `/simulate`, `/day/:id`,
-and `/card/:id`. Only data requests use the `/api` prefix, so these routes can
-be bookmarked and refreshed directly.
+Browser views are available at `/`, `/new`, `/pl`, `/distribution`,
+`/replay`, `/day/:id` and `/card/:id`. Only data requests use the `/api`
+prefix, so these routes can be bookmarked and refreshed directly.
 
-The server binds `127.0.0.1` only — BetSheet is not hosted anywhere. Sharing
-a finished card without the local server running is the job of the here.now
-publish feature (Phase 4).
+The server binds `127.0.0.1` only — BetSheet is not hosted anywhere and is not
+meant to be.
 
 > **Experimenting, or about to factory-reset?** Use the scratch clone at
 > `C:eposetsheet-alt` — see
@@ -144,10 +167,11 @@ point it at the main checkout's 900 MB crawler archive instead of copying it:
 BETSHEET_RAW_DIR=C:\repos\betsheet\data\raw
 ```
 
-This is safe, not merely convenient: the archive is read-only on every
-request path (the sole reader is `POST /race-days/:id/results/from-archive`;
-all writes live in the `dmtc-fetch` / `dmtc-probe` CLIs), and a reset never
-touches it.
+This is safe, not merely convenient: nothing reads or writes that archive any
+more — the crawler that filled it and the one route that read it were deleted
+with Del Mar program ingestion (D113) — and a reset never touched it even when
+they existed. The variable is kept because the directory is still on disk and
+pointing the clone at it costs nothing.
 
 To start from a copy of the real corpus rather than an empty database, use
 `VACUUM INTO` — a plain file copy misses the write-ahead log and silently
@@ -170,8 +194,20 @@ install back. `--ignore-scripts` skips the pointless build; the prebuilt
 - [CLAUDE.md](CLAUDE.md) — working notes: invariants, architecture map,
   workflow rules. Kept current with every change.
 - [REQUIREMENTS.md](REQUIREMENTS.md) — requirements mapped to deliverable IDs.
+  Read its section banners first: the pivot retired whole sections, and a
+  RETIRED section describes what the system used to do rather than a gap.
 - [DELIVERABLES.md](DELIVERABLES.md) — the delivery ledger: every PR-sized
-  deliverable with its status.
+  deliverable with its status. The record of why, not just what.
+- [docs/decisions/](docs/decisions/) — decision records: what was decided, why,
+  and what was checked before deciding it. The pivot is the largest.
+- [docs/requirements/](docs/requirements/) — specifications for work that is
+  specified but not yet scheduled.
+- [docs/findings/](docs/findings/) — results and pre-registrations, one file
+  per (engine version, bucket, corpus). See its README for what is live and
+  what is history.
+- [archive/](archive/) — the frozen pre-pivot corpus: a database snapshot plus
+  one trace export per card, taken before any removal began. Nothing in the
+  application reads from it.
 
 ## Responsible gambling
 
