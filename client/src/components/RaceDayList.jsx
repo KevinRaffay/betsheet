@@ -6,6 +6,8 @@ export default function RaceDayList({ onOpen, onNew, onPL, onDistribution, onRep
   const [error, setError] = useState(null);
   const [showDeleted, setShowDeleted] = useState(false);
   const [busy, setBusy] = useState(false);
+  const [dateFilter, setDateFilter] = useState('');
+  const [trackFilter, setTrackFilter] = useState('');
 
   const reload = (deleted = showDeleted) =>
     listRaceDays(deleted).then(setDays).catch((e) => setError(String(e.message)));
@@ -53,6 +55,12 @@ export default function RaceDayList({ onOpen, onNew, onPL, onDistribution, onRep
     }
   };
 
+  const dateOptions = days ? [...new Set(days.map((d) => d.date))].sort().reverse() : [];
+  const trackOptions = days ? [...new Set(days.map((d) => d.track))].sort() : [];
+  const filteredDays = (days || []).filter(
+    (d) => (!dateFilter || d.date === dateFilter) && (!trackFilter || d.track === trackFilter)
+  );
+
   return (
     <section>
       <div className="pagehead">
@@ -68,6 +76,33 @@ export default function RaceDayList({ onOpen, onNew, onPL, onDistribution, onRep
         </div>
       </div>
       {error && <p className="notice notice--error">{error}</p>}
+      {days && days.length > 0 && (
+        <div className="formrow formrow--tight">
+          <label>
+            Date{' '}
+            <select value={dateFilter} onChange={(e) => setDateFilter(e.target.value)}>
+              <option value="">All</option>
+              {dateOptions.map((date) => (
+                <option key={date} value={date}>{date}</option>
+              ))}
+            </select>
+          </label>
+          <label>
+            Track{' '}
+            <select value={trackFilter} onChange={(e) => setTrackFilter(e.target.value)}>
+              <option value="">All</option>
+              {trackOptions.map((track) => (
+                <option key={track} value={track}>{track}</option>
+              ))}
+            </select>
+          </label>
+          {(dateFilter || trackFilter) && (
+            <button className="btn" onClick={() => { setDateFilter(''); setTrackFilter(''); }}>
+              Clear filters
+            </button>
+          )}
+        </div>
+      )}
       {days && days.length === 0 && (
         <p className="placeholder">
           {showDeleted
@@ -75,7 +110,10 @@ export default function RaceDayList({ onOpen, onNew, onPL, onDistribution, onRep
             : 'Nothing stored yet. Upload a saved Equibase entries page to create a race day, or paste the entries text.'}
         </p>
       )}
-      {days && days.length > 0 && (
+      {days && days.length > 0 && filteredDays.length === 0 && (
+        <p className="placeholder">No race days match the selected filters.</p>
+      )}
+      {days && filteredDays.length > 0 && (
         <table className={`grid ${showDeleted ? '' : 'grid--click'}`}>
           <thead>
             <tr>
@@ -85,7 +123,7 @@ export default function RaceDayList({ onOpen, onNew, onPL, onDistribution, onRep
             </tr>
           </thead>
           <tbody>
-            {days.map((d) => (
+            {filteredDays.map((d) => (
               <tr key={d.id} onClick={showDeleted ? undefined : () => onOpen(d.id)}>
                 <td>{d.date}</td>
                 <td>{d.track}</td>
