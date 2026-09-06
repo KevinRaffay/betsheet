@@ -153,22 +153,6 @@ export const manualPicksSave = (id, sourceName, races) =>
     body: JSON.stringify({ sourceName, races }),
   }).then(asJson);
 
-// At The Races racecard-page PDF upload (D69): same preview-then-confirm
-// contract as the manual paste above, just fed by a PDF instead of text.
-export const atrPdfPreview = (id, sourceName, file) => {
-  const qs = sourceName ? `?sourceName=${encodeURIComponent(sourceName)}` : '';
-  return fetch(`/api/race-days/${id}/consensus/atr-pdf-preview${qs}`, {
-    method: 'POST',
-    headers: { 'content-type': 'application/pdf' },
-    body: file,
-  }).then(asJson);
-};
-export const atrPdfSave = (id, sourceName, races) =>
-  fetch(`/api/race-days/${id}/consensus/atr-pdf`, {
-    method: 'POST',
-    headers: { 'content-type': 'application/json' },
-    body: JSON.stringify({ sourceName, races }),
-  }).then(asJson);
 
 // Simulation (D19).
 export const runSimulation = (body = {}) =>
@@ -324,9 +308,9 @@ export const getReplayStanding = (meet) => {
   return fetch(`/api/replay/standing${q}`).then(asJson);
 };
 
-// Equibase "Off to the Races" PDF upload (D71): preview-then-confirm, same
-// contract as the At The Races PDF upload above, just persisting three
-// verbatim cards on confirm instead of consensus picks.
+// Equibase "Off to the Races" PDF upload (D71): preview-then-confirm, the
+// same contract every PDF upload in this codebase follows, just persisting
+// three verbatim cards on confirm instead of consensus picks.
 export const equibaseOtrPreview = (id, file) =>
   fetch(`/api/race-days/${id}/equibase-otr`, {
     method: 'POST',

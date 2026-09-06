@@ -9,7 +9,7 @@
 // D07 stands: no Equibase fetcher. The PDF is a manual download
 // (equibase.com/EntriesPlus2/downloadOffToRaces.cfm), uploaded here as a
 // raw `application/pdf` body - same convention as every other PDF upload
-// in this codebase (server/ingest.js, server/consensus.js's atr-pdf
+// in this codebase (server/ingest.js, server/consensus.js's PDF upload, removed with ATR in D110
 // route; the user's spec named "multipart", which doesn't exist anywhere
 // in this codebase - substituted the real established equivalent, same
 // deviation D69 made for the same reason). Archived under the D41
