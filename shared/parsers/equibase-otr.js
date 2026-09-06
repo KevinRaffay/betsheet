@@ -33,6 +33,8 @@
 // severity contract as shared/parsers/human-picks.js - blocking decides
 // which ticket gets built, not the whole race or day).
 
+import { nameKey } from './human-picks.js';
+
 export const OTR_COLUMN_BOUNDARY = 360;
 
 const TSV_MARKER_RE = /^###(PAGE|FLOW|BLOCK|LINE)###$/;
@@ -148,8 +150,6 @@ function extractNames(text) {
   }
   return out;
 }
-
-const nameKey = (s) => String(s ?? '').toUpperCase().replace(/[‘’]/g, "'").replace(/\s+/g, ' ').trim();
 
 /**
  * Parse the whole-day TSV. `entriesByRace` (optional): { [raceNumber]:

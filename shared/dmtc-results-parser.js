@@ -16,6 +16,8 @@
 // The page links to Equibase's chart embed; only the date is read off
 // that link's text - it is NEVER fetched (invariant 6).
 
+import { nameKey as sharedNameKey } from './parsers/human-picks.js';
+
 const TRACK_NAMES = { DMR: 'Del Mar' };
 const NUM_WORDS = ['', 'One', 'Two', 'Three', 'Four', 'Five', 'Six', 'Seven', 'Eight', 'Nine', 'Ten', 'Eleven', 'Twelve'];
 const FRACTIONS = { '1/2': 'One Half', '1/4': 'One Quarter', '3/4': 'Three Quarters', '1/8': 'One Eighth', '3/8': 'Three Eighths', '5/8': 'Five Eighths', '7/8': 'Seven Eighths', '1/16': 'One Sixteenth', '3/16': 'Three Sixteenths', '70': 'Seventy Yards' };
@@ -93,7 +95,10 @@ export function parsePayoffs(text, warnings, raceNumber) {
   return { exotics, carryovers };
 }
 
-const nameKey = (s) => String(s ?? '').toUpperCase().replace(/\s*\((GB|IRE|FR|ARG|CHI|AUS|JPN|GER|NZ|SAF|URU|BRZ|PER|MEX|KOR|CAN)\)\s*$/, '').replace(/[^A-Z0-9]/g, '');
+// Delegates to the canonical nameKey (D125): was a fixed country-code
+// allowlist that missed anything outside GB/IRE/FR/etc; the shared version
+// strips any parenthetical suffix, not just a listed one.
+const nameKey = (s) => sharedNameKey(s).replace(/[^A-Z0-9]/g, '');
 
 /** One race block -> the D12 race. */
 export function parseRaceBlock(number, html, warnings) {
