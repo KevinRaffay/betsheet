@@ -8,6 +8,15 @@
 // survives; the race-day id sequence restarts at 1, which is safe ONLY
 // because the logs that could have referenced old ids are wiped in the
 // same action.
+//
+// WARNING for any future caller: `resetApp` takes a `db`, but the log half of
+// the reset does NOT. `resetLogs()` operates on the log directory the logger
+// was CONFIGURED with, so calling `resetApp` against some other database - a
+// copy, a probe, a fixture - still deletes the real log files. Found the hard
+// way 2026-09-06, when a reset run against a scratch copy of the corpus wiped
+// the live decision-trace and fetch-audit streams. If you want a reset that
+// touches only a throwaway database, point BETSHEET_LOG_DIR somewhere
+// throwaway too, in the same process, before the logger is first used.
 
 import express from 'express';
 import { getDb } from './db.js';
@@ -16,23 +25,63 @@ import { seedTemplates } from './templates.js';
 
 const log = getLogger('app');
 
-// Parents last where FKs cascade; standalone tables explicitly.
+// Children before parents. The ORDER is load-bearing and cannot be derived:
+// most FKs here cascade, but `cards.strategy_template_id`,
+// `simulation_runs.strategy_template_id`, `fetch_attempts.source_id` and
+// `consensus_picks.source_id` are ON DELETE NO ACTION, so the referencing rows
+// have to go first or the delete is refused.
 const WIPE_ORDER = [
   'actual_stakes', 'publishes', 'graded_tickets', 'tickets', 'allocations',
+  'human_race_state', 'llm_card_requests',
   'cards', 'simulation_results', 'simulation_runs', 'strategy_templates',
   'consensus_picks', 'fetch_attempts', 'sources',
   'result_scratches', 'exotic_payoffs', 'race_results', 'result_charts',
-  'entries', 'races', 'race_days', 'backfill_queue',
+  'entries', 'races', 'llm_notes', 'race_days', 'backfill_queue',
 ];
+
+// The schema, not user data - it is what makes the fresh era the same shape.
+const KEEP = new Set(['schema_migrations']);
+
+/** Every real table in the database, sqlite's own internals excluded. */
+function allTables(db) {
+  return db.prepare(
+    "SELECT name FROM sqlite_master WHERE type = 'table' AND name NOT LIKE 'sqlite_%' ORDER BY name",
+  ).all().map((r) => r.name);
+}
 
 export function resetApp(db) {
   const counts = {};
+  // A table this list has never heard of is deleted FIRST, in the leaf-most
+  // position, because a brand-new table is far likelier to be a child of an
+  // existing one than a parent of one. This is what stops the list going
+  // stale the way it did between migrations 015 and 023: `human_race_state`,
+  // `llm_card_requests` and `llm_notes` were added after it was written, were
+  // cleared only by cascade, and so were absent from `rowsRemoved` - 169 rows
+  // destroyed and not named in the audit event this reset writes about itself.
+  const unnamed = allTables(db).filter((t) => !WIPE_ORDER.includes(t) && !KEEP.has(t));
+
   const wipe = db.transaction(() => {
-    for (const table of WIPE_ORDER) {
+    for (const table of [...unnamed, ...WIPE_ORDER]) {
       counts[table] = db.prepare(`DELETE FROM ${table}`).run().changes;
     }
     // Fresh ids for a fresh era - safe only because the logs go too.
     db.prepare("DELETE FROM sqlite_sequence WHERE name = 'race_days'").run();
+
+    // Nothing may survive a reset unnoticed. Asserted INSIDE the transaction,
+    // so a table left with rows rolls the whole wipe back and throws - the
+    // caller keeps its data and hears about it, rather than being told the
+    // app is factory-fresh when it is not. The log files are untouched at
+    // this point, which is why the assertion has to happen here and not after.
+    const survivors = allTables(db)
+      .filter((t) => !KEEP.has(t))
+      .map((t) => [t, db.prepare(`SELECT COUNT(*) c FROM ${t}`).get().c])
+      .filter(([, c]) => c > 0);
+    if (survivors.length) {
+      throw new Error(
+        `Reset did not empty every table; nothing was wiped: ${
+          survivors.map(([t, c]) => `${t}=${c}`).join(', ')}`,
+      );
+    }
   });
   wipe();
   db.exec('VACUUM');

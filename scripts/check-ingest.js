@@ -7,6 +7,7 @@
 // and parse the real program PDF end-to-end.
 
 import { spawn } from 'node:child_process';
+import Database from 'better-sqlite3';
 import fs from 'node:fs';
 import os from 'node:os';
 import path from 'node:path';
@@ -328,6 +329,41 @@ try {
   const emptyDeleted = await fetch(`${BASE}/api/race-days?deleted=1`).then((r) => r.json());
   check('after reset: no live and no deleted race days',
     emptyLive.length === 0 && emptyDeleted.length === 0);
+
+  // D119: the hole this suite used to have. It checked race_days and entries
+  // and stopped, so a table missing from WIPE_ORDER was invisible here - which
+  // is exactly what happened to human_race_state, llm_card_requests and
+  // llm_notes, added by migrations 015/018/023 after the list was written.
+  // They were cleared by FK cascade, so the app LOOKED reset while 169 rows
+  // went unreported in the audit event. Read the tables out of the schema
+  // rather than listing them, so this assertion cannot go stale the same way.
+  {
+    const probe = new Database(path.join(tmp, 'check.sqlite'), { readonly: true });
+    const tables = probe.prepare(
+      "SELECT name FROM sqlite_master WHERE type = 'table' AND name NOT LIKE 'sqlite_%' ORDER BY name",
+    ).all().map((r) => r.name).filter((t) => t !== 'schema_migrations');
+    // strategy_templates is the ONE table that comes back non-empty, and that
+    // is correct: the built-in templates are code, not user data, and cards
+    // reference them by FK from the first save of the new era.
+    const nonEmpty = tables
+      .filter((t) => t !== 'strategy_templates')
+      .map((t) => [t, probe.prepare(`SELECT COUNT(*) c FROM ${t}`).get().c])
+      .filter(([, c]) => c > 0);
+    check('after reset: EVERY table is empty, not just the ones anyone thought to check',
+      nonEmpty.length === 0, JSON.stringify(nonEmpty));
+    const seeded = probe.prepare('SELECT name FROM strategy_templates ORDER BY name').all().map((r) => r.name);
+    check('after reset: strategy_templates holds exactly the three surviving producers, reseeded',
+      seeded.join(',') === 'equibase-otr,human,llm', seeded.join(','));
+
+    // And the report has to name them all: a reset that destroys rows it does
+    // not mention is not auditable, whatever the row counts say.
+    const unreported = tables.filter((t) => !(t in resetBody.rowsRemoved));
+    check('after reset: rowsRemoved names every table it wiped',
+      unreported.length === 0, `unreported: ${unreported.join(', ')}`);
+    check('after reset: the tables added since WIPE_ORDER was written are reported explicitly',
+      ['human_race_state', 'llm_card_requests', 'llm_notes'].every((t) => t in resetBody.rowsRemoved));
+    probe.close();
+  }
 
   await new Promise((r) => setTimeout(r, 300));
   const appLogFile = path.join(tmp, 'logs', 'app.jsonl');
