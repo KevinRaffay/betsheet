@@ -129,3 +129,22 @@ map in the same PR.
 | The corpus itself is a deliverable: one row per meet, with preconditions, acceptance, a committed report (docs/backfill/<meet>.md), and the golden + queue decisions recorded | D44, D45, D46 |
 | No later meet starts until the earlier meet's report is reviewed (D44 -> D45 -> D46) | D44, D45, D46 |
 | Index source, in order: the track calendar when it carries race counts; else a committed meet-dates table built once by a bounded, audited probe of the publicly published meet window. Blind enumeration outside a published window is prohibited. Without a calendar count, sheet + program + results must agree on the race count (blocking) | D47 (D41 + D43 rule) |
+
+## Manual entries ingest, no automated feed (addendum 5, 2026-09-05)
+
+Full specification, with the verified page structure and the rejected PDF route:
+[docs/requirements/equibase-entries-ingest.md](docs/requirements/equibase-entries-ingest.md).
+Specified but NOT scheduled - deliverable IDs get claimed when the work is picked up.
+
+| Requirement | Deliverables |
+| --- | --- |
+| Generate a live card at a track with no automated entries feed (first target Kentucky Downs) from a manually saved copy of Equibase's entries page | - (not scheduled) |
+| The parser takes an HTML STRING and never fetches - invariant 6 stands, Equibase is never scraped; the same manual-upload posture as D69 (ATR racecard) and D71 (OTR sheet) | - (not scheduled) |
+| Parsed against Equibase's page template rather than one track, so a new track on the same template needs no code - untested until a second track's page is parsed | - (not scheduled) |
+| Live odds preferred over morning line when present, M/L as fallback; both stored, neither overwriting the other; one `odds_captured_at` for the whole card | - (not scheduled) |
+| Scratched horses retained and flagged, excluded from the active count, detected by row SHAPE (a scratch row carries 6 cells, not 11) | - (not scheduled) |
+| Entries land through the day-creation path, so one upload populates every race for the LLM modal, ticket builder, card sheet and Replay alike | - (not scheduled) |
+| Warnings-first read-only preview before anything is written (invariant 9), as every other ingest path does | - (not scheduled) |
+| Per-card `track` + `entries_source = EQB_MANUAL_UPLOAD` for grading-dashboard hygiene, so these cards never blend into the Del Mar engine corpus (invariant 13) | - (not scheduled) |
+| Per-race staleness shown as "entries as of X, post Y", non-blocking | - (not scheduled) |
+| The PDF route is rejected on evidence, not preference: the sample print-to-PDF has no text layer at all (zero embedded fonts; pdftotext 14 bytes; pdfjs 0 chars) | - (rejected) |
