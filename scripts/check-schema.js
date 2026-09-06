@@ -66,6 +66,60 @@ check('llm_notes is keyed by day+race and carries NO card_id (notes belong to a 
     && names.includes('notes_text') && !names.includes('card_id');
 })());
 
+// D115 Equibase entries ingest (migration 024). The rebuild half is the risky
+// one: race_days is the root of TEN ON DELETE CASCADE children, so a rebuild
+// run with foreign_keys ON would empty every one of them. What is asserted
+// here is that the rebuild preserved everything it was supposed to, because a
+// silently-dropped constraint is the failure mode that would not show up until
+// something depended on it months later.
+check('entries_source admits equibase_html and still refuses anything unlisted', (() => {
+  const dayId = db.prepare(
+    "INSERT INTO race_days (track, date, correlation_id, entries_source) VALUES ('Kentucky Downs', '2026-09-06', 'cid-024', 'equibase_html')",
+  ).run().lastInsertRowid;
+  let refused = false;
+  try {
+    db.prepare("UPDATE race_days SET entries_source = 'not_a_source' WHERE id = ?").run(dayId);
+  } catch { refused = true; }
+  const stored = db.prepare('SELECT entries_source FROM race_days WHERE id = ?').get(dayId).entries_source;
+  db.prepare('DELETE FROM race_days WHERE id = ?').run(dayId);
+  return stored === 'equibase_html' && refused;
+})());
+check('the three pre-existing entries_source values still pass', (() => {
+  let ok = true;
+  for (const v of ['program', 'ml_sheet', 'both']) {
+    try {
+      const id = db.prepare(
+        "INSERT INTO race_days (track, date, correlation_id, entries_source) VALUES ('T024', ?, 'cid', ?)",
+      ).run(`2026-01-0${v.length % 9 + 1}`, v).lastInsertRowid;
+      db.prepare('DELETE FROM race_days WHERE id = ?').run(id);
+    } catch { ok = false; }
+  }
+  return ok;
+})());
+check('the race_days rebuild kept AUTOINCREMENT - invariant 12 turns on ids never being reused',
+  db.prepare("SELECT COUNT(*) c FROM sqlite_master WHERE type = 'table' AND name = 'race_days' AND sql LIKE '%AUTOINCREMENT%'").get().c === 1);
+check('the race_days rebuild kept UNIQUE(track, date)', (() => {
+  const a = db.prepare("INSERT INTO race_days (track, date, correlation_id) VALUES ('Dup Downs', '2026-02-02', 'cid')").run().lastInsertRowid;
+  let refused = false;
+  try {
+    db.prepare("INSERT INTO race_days (track, date, correlation_id) VALUES ('Dup Downs', '2026-02-02', 'cid2')").run();
+  } catch { refused = true; }
+  db.prepare('DELETE FROM race_days WHERE id = ?').run(a);
+  return refused;
+})());
+check('the race_days rebuild recreated idx_race_days_meet (it rides on the table, not the definition)',
+  db.prepare("SELECT COUNT(*) c FROM sqlite_master WHERE type = 'index' AND name = 'idx_race_days_meet'").get().c === 1);
+check('race_days.odds_captured_at exists and is nullable - one timestamp per CARD, by design',
+  db.prepare("SELECT COUNT(*) c FROM pragma_table_info('race_days') WHERE name = 'odds_captured_at' AND \"notnull\" = 0").get().c === 1);
+check('entries gained live odds, medication, age/sex, claim price and the AE flag - all nullable but the flag',
+  db.prepare(`SELECT COUNT(*) c FROM pragma_table_info('entries') WHERE name IN
+    ('live_odds','live_odds_decimal','medication','age_sex','claim_price','also_eligible')`).get().c === 6);
+check('live odds are stored BESIDE the morning line, never over it - both columns survive',
+  db.prepare(`SELECT COUNT(*) c FROM pragma_table_info('entries') WHERE name IN
+    ('morning_line','morning_line_decimal','live_odds','live_odds_decimal')`).get().c === 4);
+check('medication is its own column, NOT merged into equipment (different facts, merging loses both)',
+  db.prepare("SELECT COUNT(*) c FROM pragma_table_info('entries') WHERE name IN ('medication','equipment')").get().c === 2);
+
 // --- track canonicalization backfill (D35): the migration's own SQL,
 // exercised directly against rows shaped like the ones it was written to
 // fix - saved before D35 existed, each spelled a different way. ---
