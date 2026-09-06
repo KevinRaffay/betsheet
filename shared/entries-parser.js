@@ -34,6 +34,7 @@ const MONTHS = {
 // Re-exported so this file's own consumers keep working until it is deleted
 // (P-2.5). The implementation now lives in shared/betmath.js (D109).
 import { morningLineToDecimal } from './betmath.js';
+import { nameKey } from './parsers/human-picks.js';
 export { morningLineToDecimal };
 
 const moneyToCents = (s) => Math.round(Number(String(s).replace(/[$,]/g, '')) * 100);
@@ -218,8 +219,8 @@ export function parseEntries(text) {
           const name = (m ? m[1] : part).trim();
           const reason = m ? m[2].trim() : null;
           race.scratches.push({ horseName: name, reason });
-          const entry = race.entries.find((e) => e.horseName === name)
-            || (pending && pending.entry.horseName === name ? pending.entry : null);
+          const entry = race.entries.find((e) => nameKey(e.horseName) === nameKey(name))
+            || (pending && nameKey(pending.entry.horseName) === nameKey(name) ? pending.entry : null);
           if (entry) {
             entry.scratched = true;
             entry.scratchReason = reason;

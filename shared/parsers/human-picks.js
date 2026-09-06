@@ -98,8 +98,13 @@ const ODDS_RE = /^\d+(?:\.\d+)?(?:[-/]\d+(?:\.\d+)?)?$/;
  */
 const TELLER_LINE_RE = /^(?:races?\s+\d+(?:\s*-\s*\d+)*\s*,?\s+)?(?:\$|\.\d|\d+\s*(?:c|¢|-?cents?)(?=\s|$))/i;
 
-const nameKey = (s) => String(s ?? '').toUpperCase().replace(/[‘’]/g, "'").replace(/\s+/g, ' ').trim();
-const stripParens = (s) => String(s ?? '').replace(PARENTHETICAL_RE, ' ').replace(/\s+/g, ' ').trim();
+// Exported (D125) so every other file that matches horse names imports this
+// ONE implementation instead of keeping its own copy - five near-identical
+// copies existed before this, none stripping a bred-country/state suffix
+// like "Eternal Reign (IRE)", which is why a chart's plain "Eternal Reign"
+// failed to resolve against an entries row printing the full name.
+export const stripParens = (s) => String(s ?? '').replace(PARENTHETICAL_RE, ' ').replace(/\s+/g, ' ').trim();
+export const nameKey = (s) => stripParens(s).toUpperCase().replace(/[‘’]/g, "'").replace(/\s+/g, ' ').trim();
 const toCents = (s) => {
   const n = Number(String(s ?? '').replace(/[$,]/g, '').trim());
   return Number.isFinite(n) ? Math.round(n * 100) : null;

@@ -15,6 +15,7 @@ import os from 'node:os';
 import path from 'node:path';
 import { fileURLToPath, URL } from 'node:url';
 import { livePgms, makeHumanCard, winAndBoxText } from './lib/test-cards.js';
+import { nameKey } from '../shared/parsers/human-picks.js';
 
 const ROOT = fileURLToPath(new URL('../', import.meta.url));
 const tmp = fs.mkdtempSync(path.join(os.tmpdir(), 'betsheet-gradecheck-'));
@@ -161,7 +162,6 @@ const card = JSON.parse(fs.readFileSync(
 
 // The chart's grading view; scratches resolve to program numbers by name
 // against the program entries - same policy the server applies at save.
-const nameKey = (s) => String(s ?? '').toUpperCase().replace(/[‘’]/g, "'").replace(/\s+/g, ' ').trim();
 const dayReal = buildDayResults(chart.races.map((x) => ({
   number: x.number,
   results: x.results.map((res) => ({

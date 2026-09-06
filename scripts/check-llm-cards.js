@@ -42,6 +42,7 @@ console.log('-- pure: buildLlmRaceUserPrompt --');
     entries: [
       { programNumber: '1', horseName: 'One Runner', morningLine: '5/2', programRank: 1, bestBet: true, scratched: false },
       { programNumber: '2', horseName: 'Two Runner', morningLine: '4/1', programRank: null, bestBet: false, scratched: true },
+      { programNumber: '3', horseName: 'Eternal Reign (IRE)', morningLine: '10/1', programRank: null, bestBet: false, scratched: false },
     ],
     bottomLineText: 'One Runner drops in class and adds blinkers.',
     bankroll: { perRaceCents: 2500, remainingCents: 5000, racesRemaining: 2 },
@@ -49,6 +50,10 @@ console.log('-- pure: buildLlmRaceUserPrompt --');
   check('carries race header, wager menu and bankroll', prompt.includes('RACE 1 of 2') && prompt.includes('$1 Exacta') && prompt.includes('$25.00'));
   check('carries every entry with scratch/best-bet/rank annotations', prompt.includes('#1 One Runner') && prompt.includes('BEST BET') && prompt.includes('#2 Two Runner (SCRATCHED)'));
   check('carries the Bottom Line text', prompt.includes('One Runner drops in class'));
+  // D125: entries.horse_name keeps a bred-country/state suffix verbatim, but
+  // the model should read the bare name - the suffix is noise on every card.
+  check('strips a parenthetical suffix from the entry name shown to the model (D125)',
+    prompt.includes('#3 Eternal Reign -') && !prompt.includes('Eternal Reign (IRE)'), prompt);
   // D112: the CONSENSUS section is gone with consensus. The prompt must carry
   // no trace of it - not the header, and not the "no external consensus on
   // file" fallback that would otherwise print on every single card forever.

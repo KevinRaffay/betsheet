@@ -219,8 +219,18 @@ try {
   // 5a. Preview: archives + parses, writes nothing.
   const preview = await (await jpostPdf(`/api/race-days/${day.id}/equibase-otr`, pdfBytes)).json();
   check('preview: 8 races resolved', preview.races?.length === 8, JSON.stringify(preview.races?.map((r) => r.race)));
-  check('preview: zero BLOCKING warnings (non-blocking name_mismatch warnings for foreign-bred suffixes like "Certitude (FR)" are expected and correct)',
+  check('preview: zero BLOCKING warnings',
     !preview.warnings.some((w) => w.blocking), JSON.stringify(preview.warnings));
+  // D125: this fixture's entries carry real foreign-bred suffixes (R2 "Certitude
+  // (FR)" among them) while the OTR sheet's own picks print the bare name - before
+  // the shared nameKey stripped parenthetical suffixes this produced a non-blocking
+  // name_mismatch warning on every such horse the sheet happened to pick. A genuine,
+  // unrelated name_mismatch survives on this same fixture ("Dats Ms. Blame" vs "Dats
+  // Ms Blame" - a real punctuation difference, not a suffix), so the assertion is
+  // narrowed to the specific suffix case rather than "zero name_mismatch warnings".
+  check('preview: no name_mismatch warning for the Certitude (FR) suffix difference',
+    !preview.warnings.some((w) => w.type === 'name_mismatch' && w.message.includes('Certitude')),
+    JSON.stringify(preview.warnings.filter((w) => w.type === 'name_mismatch')));
   check('preview: parseToken is the archived file\'s sha256', typeof preview.parseToken === 'string' && preview.parseToken.length === 64);
   check('preview: variant totals are $112 / $112 / $224', preview.variantTotals['some-reward'] === 11200 && preview.variantTotals['higher-reward'] === 11200 && preview.variantTotals.both === 22400, JSON.stringify(preview.variantTotals));
 

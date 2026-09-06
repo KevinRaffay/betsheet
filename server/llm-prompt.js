@@ -3,6 +3,8 @@
 // block back out of the model's response. Pure - no network, no DB.
 // Keep this file and the doc in sync when the template changes.
 
+import { stripParens } from '../shared/parsers/human-picks.js';
+
 const TICKET_BLOCK_START = '<<<TICKETS>>>';
 const TICKET_BLOCK_END = '<<<END TICKETS>>>';
 
@@ -207,6 +209,11 @@ const dollars = (cents) => (cents / 100).toFixed(2);
  * records that boundary. It was unavoidable rather than chosen: with nothing
  * writing consensus_picks, the section could only ever have printed its own
  * "no external consensus on file" line, forever.
+ *
+ * D125: `horseName` is printed with any parenthetical suffix stripped
+ * (`Eternal Reign (IRE)` -> `Eternal Reign`) - the model gets the bare name,
+ * the suffix is noise it would otherwise have to look past on every entry.
+ * Same prompt-comparability note as above applies.
  */
 export function buildLlmRaceUserPrompt({
   raceNumber, totalRaces, track, date, race, entries, bottomLineText, bankroll, notes,
@@ -222,7 +229,7 @@ export function buildLlmRaceUserPrompt({
     const bits = [`ML ${e.morningLine ?? '?'}`];
     if (e.programRank != null) bits.push(`program rank ${e.programRank}`);
     if (e.bestBet) bits.push('BEST BET');
-    lines.push(`#${e.programNumber} ${e.horseName}${e.scratched ? ' (SCRATCHED)' : ''} - ${bits.join(', ')}`);
+    lines.push(`#${e.programNumber} ${stripParens(e.horseName)}${e.scratched ? ' (SCRATCHED)' : ''} - ${bits.join(', ')}`);
   }
   if (bottomLineText) {
     lines.push('');

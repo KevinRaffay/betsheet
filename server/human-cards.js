@@ -13,7 +13,7 @@
 // enforced independently rather than trusted from the client.
 
 import express from 'express';
-import { parseHumanPicksText } from '../shared/parsers/human-picks.js';
+import { parseHumanPicksText, nameKey } from '../shared/parsers/human-picks.js';
 import { estimateTicketPayouts } from '../shared/betmath.js';
 import { getDb } from './db.js';
 import { gradeAndPersist } from './grading.js';
@@ -31,8 +31,6 @@ class HumanCardError extends Error {
     this.status = status;
   }
 }
-
-const nameKey = (s) => String(s ?? '').toUpperCase().replace(/[‘’]/g, "'").replace(/\s+/g, ' ').trim();
 
 /** Shared with server/llm-cards.js (D63) - same race/scratch resolution for either picker. */
 export function loadRace(db, dayId, raceNumber) {

@@ -10,6 +10,7 @@ import fs from 'node:fs';
 import path from 'node:path';
 import { fileURLToPath, URL } from 'node:url';
 import { parseChart } from '../shared/chart-parser.js';
+import { nameKey } from '../shared/parsers/human-picks.js';
 
 const ROOT = fileURLToPath(new URL('../', import.meta.url));
 const FIX = path.join(ROOT, 'tests', 'fixtures');
@@ -125,7 +126,6 @@ check('no show pool: header without Show -> 2 prices = win/place, 1 = place', ((
 // ---- cross-fixture: chart vs. the program for the SAME day ----
 
 const prog = JSON.parse(fs.readFileSync(path.join(FIX, 'days', 'delmar-2026-08-30.entries.json'), 'utf8'));
-const nameKey = (s) => String(s ?? '').toUpperCase().replace(/[‘’]/g, "'").replace(/\s+/g, ' ').trim();
 
 check('every chart finisher exists in the program entries (same pgm + name)',
   out.races.every((r) => {

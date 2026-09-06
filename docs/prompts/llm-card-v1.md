@@ -76,6 +76,17 @@ Cards generated before 2026-09-06 carry a CONSENSUS section; cards after it do
 not. `llm_card_requests.prompt_text` stores what was actually sent for every
 call ever made, so the boundary is checkable per card rather than inferred.
 
+## ENTRIES horse names strip a parenthetical suffix (D125)
+
+An Equibase entries page prints a bred-country or state suffix on some
+names (`Eternal Reign (IRE)`, `Broheim (KY)`); `entries.horse_name` keeps it
+verbatim (invariant 9 - the stored/displayed name never changes), but the
+ENTRIES line below now prints the bare name (`stripParens`, shared with
+every other horse-name comparison in the codebase - see
+`shared/parsers/human-picks.js`). Same prompt-comparability note as D112
+applies in miniature: this is a real, un-versioned change to what the model
+reads, checkable per card via `llm_card_requests.prompt_text` the same way.
+
 ## Per-race prompt template
 
 The server builds this by plain string interpolation (`server/llm-prompt.js`),
@@ -200,7 +211,7 @@ Race bankroll: ${{perRaceBankrollDollars}} ({{racesRemaining}} race(s)
 left of ${{remainingBankrollDollars}} on this card)
 
 ENTRIES
-#{{programNumber}} {{horseName}}{{" (SCRATCHED)" if scratched}} - ML {{morningLine}}{{", program rank " + programRank if programRank}}{{", BEST BET" if bestBet}}
+#{{programNumber}} {{horseName, parenthetical suffix stripped}}{{" (SCRATCHED)" if scratched}} - ML {{morningLine}}{{", program rank " + programRank if programRank}}{{", BEST BET" if bestBet}}
 ... one line per entry ...
 
 PROGRAM BOTTOM LINE

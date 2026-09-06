@@ -47,6 +47,7 @@ const day = {
         entry('5', 'Bee Eye Gee', '5/1', 5),
         entry('6', 'Scratched Sam', '8/1', 8, { scratched: true }),
         entry('7', 'Chart Scratch Cal', '12/1', 12),
+        entry('8', 'Eternal Reign (IRE)', '10/1', 10),
       ],
     },
     {
@@ -429,6 +430,21 @@ try {
   check('name mismatch -> non-blocking, names the real entry', await (async () => {
     const ws = await w('Win\t#2 Not Tahini\t$25');
     return ws.length === 1 && ws[0].type === 'name_mismatch' && ws[0].blocking === false && ws[0].message.includes('Tahini');
+  })());
+  // D125: entries carry a bred-country/state suffix verbatim ("Eternal Reign
+  // (IRE)"), but a human paste (and every other source) may print the bare
+  // name - that must NOT read as a mismatch.
+  check('a parenthetical suffix on the entry is ignored - no name_mismatch (D125)', await (async () => {
+    const ws = await w('Win\t#8 Eternal Reign\t$25');
+    return ws.length === 0;
+  })());
+  check('...but a genuinely wrong name on that same entry still mismatches (D125 negative control)', await (async () => {
+    const ws = await w('Win\t#8 Eternal Reigns\t$25');
+    return ws.length === 1 && ws[0].type === 'name_mismatch' && ws[0].blocking === false && ws[0].message.includes('Eternal Reign (IRE)');
+  })());
+  check('a name-only token also ignores the suffix (D125)', await (async () => {
+    const ws = await w('Win\tEternal Reign\t$25');
+    return ws.length === 0;
   })());
   check('unknown program -> blocking', await (async () => {
     const ws = await w('Win\t#99\t$25');

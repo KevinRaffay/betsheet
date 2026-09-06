@@ -15,6 +15,7 @@ import { getDb } from './db.js';
 import { gradeAllCards } from './grading.js';
 import { getLogger, newCorrelationId } from './logging.js';
 import { canonicalizeTrack } from '../shared/track-codes.js';
+import { nameKey } from '../shared/parsers/human-picks.js';
 
 const log = getLogger('app');
 const traceLog = getLogger('decision-trace');
@@ -24,9 +25,6 @@ export const resultsRouter = express.Router();
 // Results provenance (D42, migration 010): where the day's results came from.
 // Re-saving from ANY source replaces the day's results and regrades every card.
 const SOURCE_KINDS = { paste: 'equibase_paste', pdf: 'equibase_pdf', equibase_paste: 'equibase_paste', equibase_pdf: 'equibase_pdf', dmtc_html: 'dmtc_html' };
-
-const nameKey = (s) => String(s ?? '').toUpperCase().replace(/[‘’]/g, "'")
-  .replace(/\s+/g, ' ').trim();
 
 /**
  * Persist a confirmed results parse for a day - the ONE writer of
