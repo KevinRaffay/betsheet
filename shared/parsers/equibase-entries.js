@@ -329,7 +329,12 @@ export function parseEquibaseEntriesHtml(rawHtml, { track = null, date = null } 
   const races = [];
   const html = unwrapViewSource(rawHtml);
 
-  const header = clean(html).match(/([A-Za-z .'-]+?)\s*\/\s*([A-Z][a-z]+ \d{1,2}, \d{4})\s*\/\s*All Races/);
+  // D122: `&` belongs in the class. Without it "Mountaineer Casino Racetrack &
+  // Resort" matched only " Resort", and THAT is what would have been stored as
+  // the track name and keyed UNIQUE(track, date) on. The class still excludes
+  // `/`, which is what keeps the lazy match from crossing the breadcrumb
+  // separator and swallowing "Home / Entries /".
+  const header = clean(html).match(/([A-Za-z .'&-]+?)\s*\/\s*([A-Z][a-z]+ \d{1,2}, \d{4})\s*\/\s*All Races/);
   const pageTrack = track ?? (header ? header[1].trim() : null);
   const printedDate = header ? header[2].trim() : null;
   // The page prints "September 6, 2026"; every date this codebase stores is

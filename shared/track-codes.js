@@ -23,6 +23,68 @@ const REGISTRY = [
   // "Kentucky Downs"; the aliases cover its report code and the spaceless form
   // a saved filename tends to carry.
   { code: 'KD', display: 'Kentucky Downs', aliases: ['KD', 'KDOWNS'] },
+
+  // D122: the 37 tracks a 91-page Equibase capture turned up, added together
+  // rather than one at a time, because the corpus that names them exists now
+  // and will not be re-downloadable later - these pages are replaced daily.
+  //
+  // The CODE is Equibase's own track id, read out of each page's own links.
+  // Not invented, and not derived: `canonicalizeTrack`'s fallback takes the
+  // first three letters of whatever the page printed, which had Canterbury
+  // Park as CAN, Charles Town as HOL, Horseshoe Indianapolis as HOR and
+  // Mountaineer as RES - codes that collide with each other's tracks and move
+  // whenever a page changes its wording. Registering pins them.
+  //
+  // A registry entry still blocks nothing: an unlisted track saves fine with a
+  // derived code. What these buy is one canonical display spelling per track
+  // and a code that survives the source rewording itself.
+  { code: 'AJX', display: 'Ajax Downs', aliases: ['AJX'] },
+  { code: 'ALB', display: 'Albuquerque', aliases: ['ALB'] },
+  { code: 'ASD', display: 'Assiniboia Downs', aliases: ['ASD', 'ASSINIBOIA'] },
+  { code: 'ATO', display: 'Atokad Downs', aliases: ['ATO', 'ATOKAD'] },
+  { code: 'BKF', display: 'Blackfoot', aliases: ['BKF'] },
+  { code: 'BTP', display: 'Belterra Park', aliases: ['BTP', 'BELTERRA'] },
+  { code: 'CBY', display: 'Canterbury Park', aliases: ['CBY', 'CANTERBURY'] },
+  { code: 'CD', display: 'Churchill Downs', aliases: ['CD'] },
+  { code: 'CNL', display: 'Colonial Downs', aliases: ['CNL', 'COLONIAL'] },
+  { code: 'CTM', display: 'Century Mile', aliases: ['CTM'] },
+  { code: 'DEL', display: 'Delaware Park', aliases: ['DEL', 'DELAWARE'] },
+  { code: 'ELK', display: 'Elko County Fair', aliases: ['ELK', 'ELKOFAIR', 'ELKO'] },
+  { code: 'EMD', display: 'Emerald Downs', aliases: ['EMD', 'EMERALD'] },
+  { code: 'EVD', display: 'Evangeline Downs', aliases: ['EVD', 'EVANGELINE'] },
+  { code: 'FE', display: 'Fort Erie', aliases: ['FE'] },
+  { code: 'FL', display: 'Finger Lakes', aliases: ['FL'] },
+  { code: 'FP', display: 'Fairmount Park', aliases: ['FP', 'FAIRMOUNT'] },
+  { code: 'GP', display: 'Gulfstream Park', aliases: ['GP', 'GULFSTREAM'] },
+  { code: 'IND', display: 'Horseshoe Indianapolis', aliases: ['IND', 'INDIANAGRANDRACING', 'INDIANAGRAND'] },
+  { code: 'LA', display: 'Los Alamitos', aliases: ['LA', 'LOSALAMITOSQUARTERHORSE', 'LOSAL'] },
+  { code: 'LAD', display: 'Louisiana Downs', aliases: ['LAD', 'LOUISIANA'] },
+  { code: 'LRL', display: 'Laurel Park', aliases: ['LRL', 'LAUREL'] },
+  { code: 'LS', display: 'Lone Star Park', aliases: ['LS', 'LONESTAR'] },
+  { code: 'MTH', display: 'Monmouth Park', aliases: ['MTH', 'MONMOUTH'] },
+  { code: 'PID', display: 'Presque Isle Downs', aliases: ['PID', 'PRESQUEISLE'] },
+  { code: 'PRM', display: 'Prairie Meadows', aliases: ['PRM'] },
+  { code: 'PRX', display: 'Parx Racing', aliases: ['PRX', 'PARX'] },
+  { code: 'RP', display: 'Remington Park', aliases: ['RP', 'REMINGTON'] },
+  { code: 'SAR', display: 'Saratoga', aliases: ['SAR'] },
+  { code: 'SRR', display: 'Sandy Ridge Racing', aliases: ['SRR', 'SANDYRIDGE'] },
+  { code: 'SWF', display: 'Sweetwater Downs', aliases: ['SWF', 'SWEETWATER'] },
+  { code: 'TDN', display: 'Thistledown', aliases: ['TDN'] },
+  { code: 'TIM', display: 'Timonium', aliases: ['TIM'] },
+  { code: 'WO', display: 'Woodbine', aliases: ['WO'] },
+
+  // Three whose page name is not the track's name. The long form is kept as
+  // an alias so a save that arrives spelled the page's way still lands on the
+  // same row, while the short form is what gets stored and shown.
+  { code: 'CT', display: 'Charles Town', aliases: ['CT', 'HOLLYWOODCASINOATCHARLESTOWNRACES', 'CHARLESTOWNRACES'] },
+  // "Lethbridge Rmtc" in the page header, "Lethbridge - Rmtc" in every race
+  // block on the same page - the mismatch behind D122's wager-menu bug.
+  { code: 'LBG', display: 'Lethbridge', aliases: ['LBG', 'LETHBRIDGERMTC'] },
+  // "Mountaineer Casino Racetrack & Resort". Until D122 widened the entries
+  // header's character class the `&` fell outside it and this parsed as the
+  // bare word "Resort" - which is what would have been stored and keyed on,
+  // so that spelling is an alias too, for any row already written that way.
+  { code: 'MNR', display: 'Mountaineer', aliases: ['MNR', 'MOUNTAINEERCASINORACETRACKRESORT', 'RESORT'] },
 ];
 
 const lettersOnly = (s) => String(s ?? '').toUpperCase().replace(/[^A-Z]/g, '');
