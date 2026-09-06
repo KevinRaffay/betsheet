@@ -253,7 +253,20 @@ function parseHeaderBlock(block, raceNumber, warnings, track) {
   const post = tail.match(/POST\s+Time\s*-\s*(\d{1,2}:\d{2}\s*[AP]M)(?:\s*([A-Z]{2,3}))?/i);
   const purse = tail.match(/Purse\s+\$([\d,]+)/i);
   const distance = tail.match(/\.\s*([A-Z][a-z]+(?:\s+[A-Za-z]+){0,4}?\s+(?:Furlongs?|Miles?|Yards?)[^.]*)\./);
-  const surface = tail.match(/\((Turf|Dirt|All Weather|Synthetic)\)/i);
+  // D124: the page prints four surface parentheticals, not one. Measured
+  // across 91 real cards: 'Turf' 166, 'All Weather Track' 41, 'Inner turf' 21,
+  // 'Outer turf' 8 - and the last three were all missed, so 70 races came back
+  // with no surface at all while the page said so plainly.
+  //
+  // Stored VERBATIM rather than folded into a Turf/Dirt/All-Weather vocabulary:
+  // inner and outer turf are different courses at the same track and a
+  // handicapper reads them differently, and a distinction dropped at ingest
+  // cannot be recovered without re-saving the page. Grouping them is a
+  // read-side question for whatever reports on surface.
+  //
+  // 'Dirt' is deliberately NOT in this list, because the page never prints it -
+  // see the null case below.
+  const surface = tail.match(/\((Turf|Inner turf|Outer turf|All Weather Track|All Weather|Synthetic)\)/i);
 
   // ---- wager menu and race type, between "Free Tools:" and "Purse $" ----
   // Anchored on the TRACK NAME, which separates them. A track the header did
@@ -312,6 +325,14 @@ function parseHeaderBlock(block, raceNumber, warnings, track) {
     postTimeZone: post && post[2] ? post[2] : null,
     purseCents: purse ? Math.round(Number(purse[1].replace(/,/g, '')) * 100) : null,
     distance: distance ? distance[1].trim() : null,
+    // Null when the page prints no parenthetical at all, which it does for
+    // every dirt race - dirt is the unmarked default. **Not inferred**, on
+    // purpose: absence was Dirt in 567 of 567 joined races in the 2026-09-06
+    // corpus (checked against the race-card index page, which DOES print a
+    // surface column), so the inference would probably be right - but 'the
+    // page did not say' and 'the page said dirt' are different facts, and this
+    // parser's job is to report the first. A caller that wants the second has
+    // an independent source for it.
     surface: surface ? surface[1] : null,
     raceType,
     wagerMenu,

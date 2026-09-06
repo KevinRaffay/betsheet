@@ -182,6 +182,47 @@ for (const junk of ['', '<html></html>', 'not html at all', '<table class="fullw
     Array.isArray(r.races) && r.warnings.some((w) => w.blocking));
 }
 
+console.log('\n-- every surface the page actually prints (D124) --');
+{
+  // Woodbine 2026-09-07: three of the four printed forms on one card. Before
+  // D124 the regex knew only `(Turf)`, so `All Weather Track`, `Inner turf`
+  // and `Outer turf` all came back null - 70 of 803 races across the corpus
+  // with no surface while the page said so plainly.
+  const doc = fs.readFileSync(path.join(DIR, 'WO090726CAN-EQB.surfaces.html'), 'utf8');
+  const r = parseEquibaseEntriesHtml(doc);
+  const seen = new Set(r.races.map((x) => x.surface).filter(Boolean));
+  check('reads Turf, All Weather Track and Inner turf off one card',
+    ['Turf', 'All Weather Track', 'Inner turf'].every((v) => seen.has(v)), [...seen].join(' | '));
+  check('...stored VERBATIM, not folded into a Turf/Dirt vocabulary - inner and outer '
+    + 'turf are different courses and the distinction cannot be recovered later',
+    seen.has('Inner turf') && !seen.has('Inner Turf'));
+  check('the surface never leaks into the conditions text',
+    r.races.every((x) => !x.surface || !(x.conditions ?? '').startsWith(x.surface)));
+
+  // The fourth form, from a card too large to commit for one assertion.
+  const outer = parseEquibaseEntriesHtml(
+    '<html>Colonial Downs / September 6, 2026 / All Races'
+    + '<div>Free Tools: $1 Exacta Colonial Downs ALLOWANCE Purse $50,000. One Mile. (Outer turf) For three year olds.</div>'
+    + '<table class="fullwidth"><tr><th>P#</th><th>Horse</th></tr><tr><td>1</td><td>A Horse</td></tr></table></html>',
+  );
+  check('reads Outer turf too', outer.races[0]?.surface === 'Outer turf', JSON.stringify(outer.races[0]?.surface));
+}
+
+console.log('\n-- dirt is UNMARKED, and is not guessed (D124) --');
+{
+  // The page prints no parenthetical at all for a dirt race. Absence was Dirt
+  // in 567 of 567 races when joined against the race-card index page, which
+  // does print a surface column - so inferring it would very likely be right.
+  // It is still not inferred: "the page did not say" and "the page said dirt"
+  // are different facts, and this parser reports the first.
+  const doc = fs.readFileSync(path.join(DIR, 'TDN091026USA-EQB.reduced-table.html'), 'utf8');
+  const r = parseEquibaseEntriesHtml(doc);
+  check('an all-dirt card reports null surface throughout, never a guessed "Dirt"',
+    r.races.every((x) => x.surface === null), JSON.stringify([...new Set(r.races.map((x) => x.surface))]));
+  check('...while still reading the distance and conditions it DOES print',
+    r.races.every((x) => x.distance && x.conditions));
+}
+
 console.log('\n-- the REDUCED table: no program number, no morning line (D122) --');
 {
   // Thistledown 2026-09-10, saved 4 days out. Equibase serves a narrower
