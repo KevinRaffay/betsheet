@@ -782,6 +782,58 @@ try {
       && human.filter((c) => c.name === null).length === 2;
   })());
 
+  // D140: the day builder's card picker needs to say which of those three
+  // cards is worth carrying on with. It reads these two counts off the same
+  // list call - a ticket count alone cannot distinguish a card whose only
+  // race was a PASS (state row, no ticket) from an untouched one, which is
+  // exactly the shape `namedCardId` has after the frozen-name check passed
+  // race 2 on it.
+  check('D140: the card list reports locked/revealed race counts per card', await (async () => {
+    const cards = await jget(`/api/race-days/${nameDayId}/cards`);
+    const named = cards.find((c) => c.id === namedCardId);
+    // race 1 locked with tickets + race 2 PASSed = 2 locked races, 0 revealed.
+    return named.locked_races === 2 && named.revealed_races === 0 && named.tickets === 1;
+  })(), JSON.stringify((await jget(`/api/race-days/${nameDayId}/cards`))
+    .map((c) => [c.card_number, c.locked_races, c.revealed_races, c.tickets])));
+  check('D140: a PASS-only card reports a locked race and no tickets - what a ticket count alone cannot say', await (async () => {
+    const res = await jpost(`/api/race-days/${nameDayId}/human-cards`, { race: 2, pass: true });
+    const fresh = await res.json();
+    const cards = await jget(`/api/race-days/${nameDayId}/cards`);
+    const card = cards.find((c) => c.id === fresh.cardId);
+    return res.status === 201 && card && card.locked_races === 1 && card.tickets === 0 && card.revealed_races === 0;
+  })(), 'see the list dump above if this fails');
+  // The picker warns before a click that cannot be taken back: locking onto
+  // a graded card regrades it, while `deleteHumanTicket` refuses on this
+  // exact predicate - so the warning is the only remedy the UI can offer.
+  check('D140: `graded` matches the predicate the ticket delete refuses on', await (async () => {
+    const nameCards = await jget(`/api/race-days/${nameDayId}/cards`);
+    // nameDay has no results, so nothing on it can be graded...
+    const noneGraded = nameCards.every((c) => !c.graded);
+    // ...while the main fixture day's results were saved above, so its human
+    // card is graded and its ticket delete is refused (asserted at D103).
+    const graded = (await jget(`/api/race-days/${dayId}/cards`)).find((c) => c.id === humanCardId);
+    return noneGraded && Boolean(graded.graded);
+  })());
+  check('D140: the counts are zero on a non-human card, never null', await (async () => {
+    const cards = await jget(`/api/race-days/${dayId}/cards`);
+    const others = cards.filter((c) => c.template !== 'human');
+    return others.length > 0 && others.every((c) => c.locked_races === 0 && c.revealed_races === 0);
+  })());
+  // The picker's whole point: the API has always accepted an arbitrary
+  // cardId, so a card that is no longer the day's latest must still take a
+  // lock. Verified on the FIRST-created card here, with three newer cards
+  // sitting above it - re-locking its PASSed race 2 replaces the PASS with
+  // a real ticket, which is the unrevealed-re-lock case D54 allows.
+  check('D140: a card that is no longer the latest still accepts a lock (what the picker exposes)', await (async () => {
+    const before = (await jget(`/api/race-days/${nameDayId}/cards`)).find((c) => c.id === namedCardId);
+    const r = await jpost(`/api/race-days/${nameDayId}/human-cards`, { race: 2, text: 'Win	#1	$25', cardId: namedCardId });
+    const body = await r.json();
+    const after = (await jget(`/api/race-days/${nameDayId}/cards`)).find((c) => c.id === namedCardId);
+    return r.status === 201 && body.cardId === namedCardId
+      && after.locked_races === before.locked_races && after.tickets === before.tickets + 1;
+  })(), JSON.stringify((await jget(`/api/race-days/${nameDayId}/cards`))
+    .map((c) => [c.card_number, c.locked_races, c.revealed_races, c.tickets])));
+
   console.log('-- no-version-bump identity --');
   const { ENGINE_VERSION } = await import('../shared/version.js');
   check('ENGINE_VERSION unchanged at lean-1.1', ENGINE_VERSION === 'lean-1.1', ENGINE_VERSION);

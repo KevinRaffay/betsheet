@@ -6,6 +6,22 @@ import EntriesTable from './EntriesTable.jsx';
 
 const money = (cents) => (cents == null ? '—' : cents % 100 === 0 ? `$${cents / 100}` : `$${(cents / 100).toFixed(2)}`);
 
+// D140: one option line per human card on the day. `locked_races` /
+// `revealed_races` come from the day's card list (server/cards.js) - a
+// ticket count alone cannot tell a fresh card from one whose every race was
+// a PASS, and "revealed" is the one state that closes races to further
+// writes, so both are said out loud rather than left to be discovered by a
+// 409 on lock.
+const cardOptionLabel = (c) => [
+  `#${c.card_number}`,
+  c.name ? `“${c.name}”` : null,
+  `${c.locked_races ?? 0} race${(c.locked_races ?? 0) === 1 ? '' : 's'} locked`,
+  `${c.tickets ?? 0} ticket${(c.tickets ?? 0) === 1 ? '' : 's'}`,
+  money(c.total_cents ?? 0),
+  (c.revealed_races ?? 0) > 0 ? `${c.revealed_races} revealed` : null,
+  c.graded ? 'graded' : null,
+].filter(Boolean).join(' · ');
+
 // The day-level ticket builder (D87; opened from BOTH the Replay day landing
 // and the ordinary /day view since D98). Build several races, then lock them -
 // which is exactly the shape PRE_COMMIT was designed to detect: every lock
@@ -55,6 +71,24 @@ const money = (cents) => (cents == null ? '—' : cents % 100 === 0 ? `$${cents 
 // split management across two components for no reason a caller ever needed
 // to know which card id they were passing, so it is undone here - callers
 // pass only `dayId`, `bankrollCents` and `context`, nothing card-specific.
+//
+// D140: and the card built onto is CHOSEN, not merely inherited. D139 still
+// only ever resumed the day's LATEST human card, so a card left half-built
+// the moment a newer one was started was unreachable from here - the API
+// has taken an arbitrary `cardId` since D54, the UI simply never offered
+// one. The picker lists every human card on the day (newest first) with how
+// far along each is, and switching to one re-reads the day through that
+// card's own lock/reveal state. Switching is a card-SESSION boundary: the
+// per-card ephemerals (previews, batch results, the correlation id that
+// invariant 8 scopes to one card session) are dropped, while drafts and
+// their text are NOT - a draft belongs to (day, race), the same rule
+// handleStartNewCard has followed since D139.
+//
+// What switching does NOT do is loosen any editing rule. A locked race on
+// the selected card is still delete-only (invariant 15: re-locking
+// re-stamps picks_locked_at), a revealed race is still refused by the
+// server, and a "draft" card here means only "not every race is locked
+// yet" - there is no draft STATE on a card, and this modal invents none.
 export default function DayTicketBuilderModal({
   dayId, bankrollCents, onClose, onCardChanged, context = 'replay',
 }) {
@@ -62,6 +96,7 @@ export default function DayTicketBuilderModal({
   const [cardId, setCardId] = useState(null);
   const [cardNumber, setCardNumber] = useState(null);
   const [cardName, setCardName] = useState(null); // the RESOLVED name of `cardId`, once one exists
+  const [humanCards, setHumanCards] = useState([]); // D140: every human card on the day, newest first
   const [newCardName, setNewCardName] = useState(''); // draft name, editable only while cardId is null
   const [races, setRaces] = useState(null);
   const [open, setOpen] = useState(() => new Set());
@@ -79,14 +114,24 @@ export default function DayTicketBuilderModal({
   // this modal. Also the source of truth for `cardName`/`cardNumber` after
   // any lock, so re-run it whenever a save might have minted or added to a
   // card, not just on mount.
-  const loadCard = () => listCards(dayId).then((cards) => {
+  //
+  // D140: it keeps the whole list too, and it must never move a deliberate
+  // choice. Called with NO argument (open) it resumes the latest, D98's
+  // rule unchanged; called WITH an id (after a lock, which is the only
+  // thing that can mint one) it stays on exactly that card. Nothing else
+  // re-runs it, so the picker's own selection is never overwritten from
+  // under the user - and a card that has genuinely gone (deleted in
+  // another tab) resolves to null, which shows the name field again rather
+  // than silently redirecting the next lock onto some other card.
+  const loadCards = (select) => listCards(dayId).then((cards) => {
     const human = cards.filter((c) => c.template === 'human').sort((a, b) => b.card_number - a.card_number);
-    const latest = human[0] ?? null;
-    setCardId(latest?.id ?? null);
-    setCardNumber(latest?.card_number ?? null);
-    setCardName(latest?.name ?? null);
+    setHumanCards(human);
+    const on = (select === undefined ? human[0] : human.find((c) => c.id === select)) ?? null;
+    setCardId(on?.id ?? null);
+    setCardNumber(on?.card_number ?? null);
+    setCardName(on?.name ?? null);
   }).catch(() => {});
-  useEffect(() => { loadCard(); }, [dayId]); // eslint-disable-line react-hooks/exhaustive-deps
+  useEffect(() => { loadCards(); }, [dayId]); // eslint-disable-line react-hooks/exhaustive-deps
 
   const reload = () => getReplayDayRaces(dayId, cardId)
     .then((d) => setRaces(d.races))
@@ -171,7 +216,7 @@ export default function DayTicketBuilderModal({
       setCardId(r.cardId); setCorrelationId(r.correlationId);
       forgetDraft(n);
       await reload();
-      await loadCard();
+      await loadCards(r.cardId);
       onCardChanged?.();
     } catch (e) { setError(String(e.message)); } finally { setBusy(false); }
   };
@@ -185,7 +230,7 @@ export default function DayTicketBuilderModal({
       setCardId(r.cardId ?? cardId);
       forgetDraft(n);
       await reload();
-      await loadCard();
+      await loadCards(r.cardId ?? cardId);
       onCardChanged?.();
     } catch (e) { setError(String(e.message)); } finally { setBusy(false); }
   };
@@ -221,10 +266,32 @@ export default function DayTicketBuilderModal({
     setCardId(localCard); setCorrelationId(localCorr);
     setProgress(null); setResults(out);
     await reload();
-    await loadCard();
+    await loadCards(localCard);
     onCardChanged?.();
     setBusy(false);
     return out;
+  };
+
+  // D140: point this session at another of the day's human cards - or at no
+  // card at all (`null`, which is what "Start a New Card" is). Everything
+  // dropped here is per-CARD: a preview's over-bankroll figure was computed
+  // against the old card's spend, the batch results named its races, and the
+  // correlation id is scoped to one card session (invariant 8) - carrying it
+  // across would file two cards' events under one trace. Everything kept is
+  // per-(day, race): the typed text and its drafts, which is the same
+  // reasoning D139 gave for keeping them across "Start a New Card". The
+  // races themselves reload through the new card's lock/reveal state on
+  // their own - `reload` already keys on cardId.
+  const switchTo = (id) => {
+    const on = humanCards.find((c) => c.id === id) ?? null;
+    setCardId(on?.id ?? null);
+    setCardNumber(on?.card_number ?? null);
+    setCardName(on?.name ?? null);
+    setCorrelationId(null);
+    setPreviewByRace(new Map());
+    setOpen(new Set());
+    setResults(null);
+    setError(null);
   };
 
   // D139: stop resuming this day's latest human card so the next lock mints
@@ -234,16 +301,12 @@ export default function DayTicketBuilderModal({
   // table. Deliberately does NOT clear textByRace/drafts: a draft is a
   // property of (day, race), not of a card, so unsaved text a user typed
   // survives switching which card it will eventually lock onto.
+  // D140: it is now one case of switchTo - "no card" is a selectable
+  // position in the picker, and starting new is choosing it.
   const handleStartNewCard = () => {
     if (busy) return;
-    setCardId(null);
-    setCardNumber(null);
-    setCardName(null);
+    switchTo(null);
     setNewCardName('');
-    setPreviewByRace(new Map());
-    setOpen(new Set());
-    setResults(null);
-    setError(null);
   };
 
   // Closing IS the commit (D103). A failure keeps the dialog open with its
@@ -266,6 +329,10 @@ export default function DayTicketBuilderModal({
     try {
       await deleteHumanTicket(cardId, ticketId, correlationId);
       await reload();
+      // D140: the picker line quotes ticket counts and spend, so a delete
+      // has to refresh the list too or the option goes stale against the
+      // race cards right beside it.
+      await loadCards(cardId);
       onCardChanged?.();
     } catch (e) { setError(String(e.message)); } finally { setBusy(false); }
   };
@@ -282,6 +349,20 @@ export default function DayTicketBuilderModal({
   // being typed for a not-yet-minted one - never both at once, since typing
   // is only possible while cardId is null.
   const displayName = cardId ? cardName : (newCardName.trim() || null);
+  // D140: how far along the SELECTED card is, said in the terms the picker
+  // is for - a card with locked races is one you can carry on with, a card
+  // with revealed races has been played out in Replay and its revealed
+  // races are closed to further writes. Read off the same `humanCards` rows
+  // the options are built from, so the line and the option cannot disagree.
+  const selected = humanCards.find((c) => c.id === cardId) ?? null;
+  const selectedSummary = selected
+    ? [
+      `${selected.locked_races ?? 0} race${(selected.locked_races ?? 0) === 1 ? '' : 's'} locked`,
+      `${selected.tickets ?? 0} ticket${(selected.tickets ?? 0) === 1 ? '' : 's'}`,
+      money(selected.total_cents ?? 0),
+      ...((selected.revealed_races ?? 0) > 0 ? [`${selected.revealed_races} revealed`] : []),
+    ].join(' · ')
+    : 'a card in progress';
 
   return (
     <div className="modal-backdrop">
@@ -331,19 +412,27 @@ export default function DayTicketBuilderModal({
               read-only, since a name is frozen at creation like llm_model;
               a not-yet-minted card offers the name field instead. */}
           <div className="formrow formrow--tight">
-            {cardId != null ? (
-              <>
-                <span className="dim">
-                  Building onto card #{cardNumber}{cardName ? ` — “${cardName}”` : ''}.
-                </span>
-                <button
-                  className="btn btn--sm" disabled={busy} onClick={handleStartNewCard}
-                  title="Start a brand-new human card instead of adding to this one - the current card stays in the Betting cards table"
-                >
-                  Start a New Card
-                </button>
-              </>
-            ) : (
+            <label>
+              Human card{' '}
+              <select
+                className="in in--sm" value={cardId ?? ''} disabled={busy}
+                onChange={(e) => switchTo(e.target.value === '' ? null : Number(e.target.value))}
+              >
+                <option value="">New card{humanCards.length > 0 ? ' (not saved yet)' : ''}</option>
+                {humanCards.map((c) => (
+                  <option key={c.id} value={c.id}>{cardOptionLabel(c)}</option>
+                ))}
+              </select>
+            </label>
+            {cardId != null && (
+              <button
+                className="btn btn--sm" disabled={busy} onClick={handleStartNewCard}
+                title="Start a brand-new human card instead of adding to this one - the current card stays in the Betting cards table"
+              >
+                Start a New Card
+              </button>
+            )}
+            {cardId == null && (
               <label>
                 New card's name (optional){' '}
                 <input
@@ -353,6 +442,29 @@ export default function DayTicketBuilderModal({
               </label>
             )}
           </div>
+          <p className="dim">
+            {cardId != null
+              ? <>Building onto card #{cardNumber}{cardName ? ` — “${cardName}”` : ''}
+                  {' '}— {selectedSummary}. Pick another card above to carry on with one you left unfinished;
+                  a race already locked on it can be deleted ticket by ticket, but not edited. Switching keeps
+                  everything you have typed and clears previews, so preview again before locking.</>
+              : <>Nothing is saved until you lock a race — the first lock mints the new card. Every card
+                  already on this day stays exactly as you left it and is still selectable above.</>}
+          </p>
+          {/* D140: locking onto an already-graded card REGRADES it, and the
+              per-ticket delete is refused on exactly that condition - so
+              there is no way back from inside the app. Said before the
+              click, never blocked: on a live day the results of race 1 land
+              while race 5 is still being built, so refusing here would
+              break the ordinary flow this modal exists for. */}
+          {selected?.graded && (
+            <p className="notice notice--warn">
+              Card #{cardNumber} has already been graded against this day's results. Locking another race
+              onto it regrades the card and moves a P/L figure that has already been reported — and a
+              graded card's tickets can no longer be deleted from here. Start a new card instead unless
+              you mean to change what this one played.
+            </p>
+          )}
 
           {!races ? <p className="placeholder">Loading…</p> : (
             <div className="race-grid">

@@ -19,11 +19,33 @@ export const cardsRouter = express.Router();
 
 cardsRouter.get('/race-days/:id/cards', (req, res) => {
   const db = getDb();
+  // D140: `locked_races` / `revealed_races` say how far along a HUMAN card
+  // is, which is what the day builder's card picker needs to tell a card
+  // still being built from one that has been played out - a ticket count
+  // alone cannot (a card with three PASSes has no tickets and is not
+  // untouched). Correlated subqueries rather than a third JOIN on purpose:
+  // joining human_race_state here would multiply the ticket rows the
+  // COUNT/SUM above are grouped over. Zero for every non-human card, which
+  // is the truth - nothing else writes that table.
+  //
+  // `graded` is the same predicate `deleteHumanTicket` refuses on
+  // (server/human-cards.js): once a card carries any grade row, its P/L has
+  // been reported. Locking ANOTHER race onto such a card is still allowed -
+  // it has to be, since a live day's results land race by race while later
+  // races are still being built - but it silently REGRADES the card, and
+  // there is no in-app way back (the ticket delete is refused on exactly
+  // this predicate). The picker therefore has to be able to say so before
+  // the click, not after.
   const cards = db.prepare(`
     SELECT c.id, c.card_number, c.variant, c.name, st.name AS template,
            c.bankroll_cents, c.per_race_min_cents, c.engine_version, c.llm_model, c.notes_present,
            c.status, c.consensus_completeness, c.created_at,
-           COUNT(t.id) AS tickets, COALESCE(SUM(t.cost_cents), 0) AS total_cents
+           COUNT(t.id) AS tickets, COALESCE(SUM(t.cost_cents), 0) AS total_cents,
+           (SELECT COUNT(*) FROM human_race_state h WHERE h.card_id = c.id) AS locked_races,
+           (SELECT COUNT(*) FROM human_race_state h
+             WHERE h.card_id = c.id AND h.results_revealed_at IS NOT NULL) AS revealed_races,
+           EXISTS(SELECT 1 FROM graded_tickets gt JOIN tickets gtt ON gtt.id = gt.ticket_id
+                   WHERE gtt.card_id = c.id) AS graded
     FROM cards c
     LEFT JOIN strategy_templates st ON st.id = c.strategy_template_id
     LEFT JOIN tickets t ON t.card_id = c.id
