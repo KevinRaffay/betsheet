@@ -128,9 +128,20 @@ export async function listCards(raceDayId) {
 
 export const getCard = (cardId) => tx(CARDS, 'readonly', (s) => s.get(cardId));
 
-/** Write one card whole. Stamps `updatedAt`, which is what the unexported counter reads. */
-export function putCard(card) {
-  const next = { ...card, updatedAt: new Date().toISOString() };
+/**
+ * Write one card whole. Stamps `updatedAt`, which is what the unexported
+ * counter reads.
+ *
+ * `preserveUpdatedAt` is for RESTORE and only for restore: a card rehydrated
+ * from an export file has not been edited, it has been put back, so stamping
+ * it "changed just now" would make every restored card read as unexported
+ * work the moment it arrived - the opposite of the truth, and a counter that
+ * cries wolf is a counter nobody reads.
+ */
+export function putCard(card, { preserveUpdatedAt = false } = {}) {
+  const next = preserveUpdatedAt && card.updatedAt
+    ? { ...card }
+    : { ...card, updatedAt: new Date().toISOString() };
   return tx(CARDS, 'readwrite', (s) => s.put(next)).then(() => next);
 }
 

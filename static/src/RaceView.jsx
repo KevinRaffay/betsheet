@@ -23,7 +23,7 @@ const joinText = (a, b) => [a, b].map((s) => (s ?? '').trim()).filter(Boolean).j
 // builder composes ON TOP of it, and every keystroke writes the sum. The
 // builder starting empty after a refresh is then harmless: nothing it produced
 // was ever only in its own state.
-export default function RaceView({ payload, raceNumber, card, deviceId, onSaveCard }) {
+export default function RaceView({ payload, raceNumber, card, deviceId, onSaveCard, onBackup }) {
   const race = raceOf(payload, raceNumber);
   const state = card?.races?.[raceNumber] ?? null;
   const committed = state?.text ?? '';
@@ -73,12 +73,16 @@ export default function RaceView({ payload, raceNumber, card, deviceId, onSaveCa
       passed: false,
     });
     setBuilderText('');
+    // The rolling backup (D152): a locked race is work that exists in exactly
+    // one browser until a file leaves it, so every lock offers one.
+    await onBackup?.(card.cardId);
     navigate('/');
   };
 
   const pass = async () => {
     await writeRace({ text: '', tickets: [], lockedAt: new Date().toISOString(), passed: true });
     setBuilderText('');
+    await onBackup?.(card.cardId);
     navigate('/');
   };
 

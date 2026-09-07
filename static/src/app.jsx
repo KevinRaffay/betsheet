@@ -4,6 +4,8 @@ import { newDeviceId } from './card.js';
 import { validateStaticPayload } from '@shared/static-payload.js';
 import DayView from './DayView.jsx';
 import RaceView from './RaceView.jsx';
+import CardsView from './CardsView.jsx';
+import { rollingBackup } from './exchange.js';
 
 // The static ticket builder's shell (D151).
 //
@@ -33,6 +35,7 @@ function useHashRoute() {
     const raw = window.location.hash.replace(/^#/, '') || '/';
     const m = /^\/race\/(\d+)$/.exec(raw);
     if (m) return { name: 'race', number: Number(m[1]) };
+    if (raw === '/cards') return { name: 'cards' };
     return { name: 'day' };
   };
   const [route, setRoute] = useState(read);
@@ -120,6 +123,17 @@ export default function App() {
     if (payload) setMeta(`activeCard:${payload.raceDay.raceDayId}`, cardId).catch(() => { /* a lost selection is recoverable; a thrown one is not */ });
   }, [payload]);
 
+  // The rolling backup (D152), fired by RaceView after every lock or PASS.
+  // Re-read from storage first so the file carries the write that just
+  // happened rather than the card object the caller was holding.
+  const backup = useCallback(async (cardId) => {
+    if (!payload) return;
+    const fresh = (await listCards(payload.raceDay.raceDayId)).find((c) => c.cardId === cardId);
+    if (!fresh) return;
+    await rollingBackup({ card: fresh, payload, deviceId });
+    await reloadCards();
+  }, [payload, deviceId, reloadCards]);
+
   const unexported = cards.filter(isUnexported).length;
 
   // The last line of defence, not the main one: drafts are already on disk
@@ -180,6 +194,8 @@ export default function App() {
         </div>
         <div className="static-counter">
           <span className={unexported > 0 ? 'tag tag--gold' : 'tag'}>unexported: {unexported}</span>
+          {' '}
+          <button className="btn btn--sm" onClick={() => { window.location.hash = '/cards'; }}>Cards &amp; export</button>
         </div>
       </header>
 
@@ -193,7 +209,14 @@ export default function App() {
         </div>
       )}
 
-      {route.name === 'race' ? (
+      {route.name === 'cards' ? (
+        <CardsView
+          payload={payload}
+          cards={cards}
+          deviceId={deviceId}
+          onReloadCards={reloadCards}
+        />
+      ) : route.name === 'race' ? (
         <RaceView
           payload={payload}
           raceNumber={route.number}
@@ -202,6 +225,7 @@ export default function App() {
           deviceId={deviceId}
           onSaveCard={saveCard}
           onSelectCard={selectCard}
+          onBackup={backup}
         />
       ) : (
         <DayView
