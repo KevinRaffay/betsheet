@@ -417,6 +417,7 @@ row words differently.
 
 | feature | state | notes |
 | --- | --- | --- |
+| HOUSE RULE: a call to action must stay reachable without sideways scrolling on a phone (D157) | merged | branch `mobile-cta-visible` - **user rule 2026-09-07**, found on the live Pages builder. `.grid { overflow-x: auto }` stops a wide table stretching the page by pushing the RIGHTMOST column out of sight, and in every table here that column is the button. Descriptive columns now carry `col-detail` and are hidden below 720px; desktop is unchanged. Enforced by `check-static-app`, with a negative control. Full record: DELIVERABLES.md D157. |
 | Fix: the Pages workflow segfaulted on its first run - node 20 vs dependencies requiring 22+ (D156) | merged | branch `fix-pages-workflow-node` - `npm ci` only WARNS on an engine mismatch, so a wrong runtime installs a native binding for the wrong ABI and `better-sqlite3` segfaults on load (exit 139, no output). Pinned to node 24, `engines.node` declared, and a guard step that refuses a bad runtime before any check runs. Also dropped `actions/configure-pages`, whose outputs this build ignores and which fails when Pages is not enabled - the `build` job is now Pages-independent and goes green today. Full record: DELIVERABLES.md D156. |
 | Static Pages target: build HUMAN cards on a phone at the track, carry them home as files (D150-D155) | merged | branch `static-pages-target` - a build-only deploy of a card CONSTRUCTION surface: no corpus, no grading, no generation, no database. D150 the payload builder (hash covers the race day alone, so the home import can verify the entries have not moved). D151 the browser app, reusing `TicketBuilder`/`EntriesTable` rather than forking them, with LLM/OTR excluded structurally and proven against the built bundle. D152 export+restore as a pair, with a rolling backup that is free because D153's import dedupes. D153 the import, keyed on the new `cards.external_id` (migration 027), merging into the ordinary HUMAN bucket. D154 the Pages workflow. D155 the offline shell. **Archaeology first changed the design**: the named source the spec assumed (`emubets`/`drf`) does not exist - it is unscheduled requirement P-3.2 - and Kevin's call was to drop it from this scope. Browser and offline testing found five real bugs, all fixed and pinned. Full record per ID: DELIVERABLES.md D150-D155. |
 | LLM cards: capture generation inputs (prompt, response, notes, model, template version), not just outputs (D149) | merged | PR [#191](https://github.com/KevinRaffay/betsheet/pull/191), branch `llm-input-capture` - two cards generated from different analyst-notes payloads had no way to be reproduced or diffed, and one card's grade moved through six mid-session regenerations reconstructable only by timestamp-diffing. Widened `llm_card_requests` (migration 026, reused rather than a parallel table) with correlation id, prompt/notes hashes, a hash-derived template version, and request params; added `llm_request_sent`/`llm_response_received`/`race_regenerated` trace events; export bumped to `SCHEMA_VERSION` 3 with a top-level `llmInputs` block (`null`, never `[]`, when unknown), `?omitLlmInputs=1` for a shareable redacted form. Kevin's call before merge: regeneration keeps mutating in place, even on a graded card - no new card id, no follow-up scheduled. Full record: DELIVERABLES.md D149. |
@@ -668,6 +669,23 @@ it. Rules still in force:
   so the new value is in place before any child commits. Neither bug is
   reachable from a check script (they need a real render tree) and both were
   found by driving the app in a browser.
+- **A call to action must be reachable without sideways scrolling on a phone
+  - HOUSE RULE** (user rule, 2026-09-07, D157). Every UI in this codebase that
+  a phone can reach must keep its primary action - the button the screen
+  exists for - inside the viewport at 375px. Found live on the deployed Pages
+  builder: the races grid carried Distance / Surface / Runners between the
+  post time and the **Build** button, `.grid { overflow-x: auto }` stopped the
+  page from stretching by pushing the RIGHTMOST column out of sight, and the
+  rightmost column in these tables is always the button. The table looked
+  fine; the only thing you could not reach was the one thing you came for.
+  **The fix is to drop descriptive columns, never to shrink or move the
+  action**: mark them `className="col-detail"`, which `static/src/static.css`
+  hides below 720px, leaving identity + state + action. Applies to the cards
+  table (Export / Forget) for the same reason. `scripts/check-static-app.js`
+  asserts that every static table with a button column has `col-detail`
+  columns, so a new table cannot quietly reintroduce the problem. Desktop is
+  untouched and still shows every column - this is a mobile rule, not a
+  simplification of the data.
 - **A wrong Node version here is a SEGFAULT, not an install error** (D156).
   `better-sqlite3@13` requires node `>=22` and `pdfjs-dist@6` `>=22.13`, and
   **npm treats an engine mismatch as a WARNING** (`EBADENGINE`) unless

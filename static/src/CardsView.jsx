@@ -134,7 +134,14 @@ export default function CardsView({ payload, cards, deviceId, onReloadCards }) {
 
         <table className="grid">
           <thead>
-            <tr><th>Card</th><th>Races</th><th>Tickets</th><th>Cost</th><th>State</th><th /></tr>
+            {/* Same house rule as the races grid: Export and Forget are the
+                actions this whole screen exists for, so the counts give way
+                at mobile width rather than pushing them off the edge. */}
+            <tr>
+              <th>Card</th>
+              <th className="col-detail">Races</th>
+              <th className="col-detail">Tickets</th>
+              <th>Cost</th><th>State</th><th /></tr>
           </thead>
           <tbody>
             {cards.length === 0 && (
@@ -147,8 +154,8 @@ export default function CardsView({ payload, cards, deviceId, onReloadCards }) {
                   {c.name && <><br /><span className="dim">{c.name}</span></>}
                   {c.sawReferenceCards && <span className="tag tag--gold">saw reference cards</span>}
                 </td>
-                <td>{lockedRaces(c).length}</td>
-                <td>{cardTickets(c).length}</td>
+                <td className="col-detail">{lockedRaces(c).length}</td>
+                <td className="col-detail">{cardTickets(c).length}</td>
                 <td>{money(cardCostCents(c))}</td>
                 <td>
                   {isUnexported(c)
