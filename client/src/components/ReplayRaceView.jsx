@@ -4,6 +4,7 @@ import {
   revealReplayRace,
 } from '../api.js';
 import TicketBuilder from './TicketBuilder.jsx';
+import EntriesTable from './EntriesTable.jsx';
 
 const money = (cents) => (cents == null ? '—' : cents % 100 === 0 ? `$${cents / 100}` : `$${(cents / 100).toFixed(2)}`);
 const signed = (cents) => (cents == null ? '—' : (
@@ -142,23 +143,7 @@ export default function ReplayRaceView({ dayId, initialRace = 1, onBack, onOpenS
         </div>
         {blind.conditions && <p className="conditions">{blind.conditions}</p>}
         {blind.wagerMenu && <p className="dim wager">{blind.wagerMenu}</p>}
-        <table className="grid grid--entries">
-          <thead>
-            <tr><th>#</th><th>Horse</th><th>Jockey</th><th>Trainer</th><th>M/L</th><th>Rank</th></tr>
-          </thead>
-          <tbody>
-            {blind.entries.map((e) => (
-              <tr key={e.programNumber} className={e.scratched ? 'row--scratched' : ''}>
-                <td>{e.programNumber}</td>
-                <td>{e.horseName}{e.bestBet ? <span className="tag tag--gold">BEST BET</span> : null}{e.scratched ? <span className="tag tag--red">SCR</span> : null}</td>
-                <td>{e.jockey ?? ''}</td>
-                <td>{e.trainer ?? ''}</td>
-                <td>{e.morningLine ?? ''}</td>
-                <td className="dim">{e.programRank ?? ''}</td>
-              </tr>
-            ))}
-          </tbody>
-        </table>
+        <EntriesTable entries={blind.entries} open />
         {blind.bottomLineText && (
           <details className="race-bottom-line" open>
             <summary>Bottom Line</summary>
