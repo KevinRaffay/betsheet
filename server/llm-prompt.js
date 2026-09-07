@@ -98,14 +98,29 @@ grammar, then a line reading exactly "${TICKET_BLOCK_END}":
   keep this simple. For EVERY box bet, show this arithmetic inside the
   <rationale> itself, not only in your head: write out every factor of
   the combination count multiplied together, the resulting combo
-  count, then a "$<base> x <combos> combos" check matching your total
-  - e.g. "...your one-sentence reason. (4 x 3 x 2 = 24 combos; $0.50 x
-  24 combos = $12.00)". Never jump straight from "n horses" to a combo
-  count or a total without writing out every factor first - the
-  written-out multiplication is what catches a miscount before you
+  count, then a "$<per-combo> x <combos> combos = $<total>" check -
+  e.g. "...your one-sentence reason. (4 x 3 x 2 = 24 combos; $0.50 x
+  24 combos = $12.00)". The "$<per-combo>" figure is what EACH
+  combination actually costs on THIS ticket, which equals the base
+  unit only when you price the box at its cheapest - a $24 total over
+  those same 24 combinations is "$1.00 x 24 combos = $24.00", never
+  "$0.50 x 24 combos = $24.00". Never jump straight from "n horses" to
+  a combo count or a total without writing out every factor first -
+  the written-out multiplication is what catches a miscount before you
   commit to a price.
+- The arithmetic you show IS the ticket's price, not a comment on it.
+  The "= $<total>" it ends in must be the same amount as that line's
+  <stake> column. Do the multiplication BEFORE you write the line and
+  put its product in <stake>; if you finish the arithmetic and find it
+  disagrees with the stake you had in mind, REWRITE THE WHOLE LINE
+  with the corrected total. Never leave the disagreement standing and
+  never narrate it in the <rationale> - "$6 is invalid, using $12
+  instead" is not a fix, because the <stake> column still reads $6 and
+  $6 is the only number that is actually bet. A <rationale> that
+  argues with its own <stake> column is a broken ticket, and the
+  ticket is refused on the <stake>.
 - <rationale>: one short sentence, required - for a BOX bet, append
-  the combo arithmetic above.
+  the combo arithmetic above, and nothing else.
 
 If you have no bet worth making on this race, output the block with
 zero ticket lines between the markers - do not pad it with a bet you
@@ -115,7 +130,7 @@ don't believe in.`;
 // doc this file mirrors (docs/prompts/llm-card-v1.md); the version is
 // DERIVED from a hash of SYSTEM_PROMPT rather than a number a prompt-fix PR
 // has to remember to bump - this file's own D64/D112/D125/D136/D138/D145/
-// D146/D148/D160/D161 history never carried one, and a hash cannot go stale
+// D146/D148/D160/D161/D162 history never carried one, and a hash cannot go stale
 // the way a manually-incremented counter can. It changes exactly when, and
 // only when SYSTEM_PROMPT's text changes.
 export const PROMPT_TEMPLATE_ID = 'llm-card-v1';
