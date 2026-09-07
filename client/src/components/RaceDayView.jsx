@@ -1,5 +1,5 @@
 import React, { useEffect, useState } from 'react';
-import { deleteRaceDay, deletionPreview, getRaceDay } from '../api.js';
+import { deleteRaceDay, deletionPreview, getLlmNotes, getRaceDay } from '../api.js';
 import CardsPanel from './CardsPanel.jsx';
 import ResultsPanel from './ResultsPanel.jsx';
 import EquibaseOtrPanel from './EquibaseOtrPanel.jsx';
@@ -25,10 +25,19 @@ export default function RaceDayView({ id, onBack, onOpenCard }) {
   // own children and call its `reload` directly.
   const [cardsVersion, setCardsVersion] = useState(0);
   const [showNotesModal, setShowNotesModal] = useState(false);
+  // Read-only: the analyst notes entered via "Enter Analyst Notes" / the LLM
+  // generator's own notes fields (same `llm_notes` draft, D92), keyed by race
+  // number so each race's collapsible panel below can look itself up.
+  const [notesByRace, setNotesByRace] = useState(new Map());
 
   useEffect(() => {
     getRaceDay(id).then(setDay).catch((e) => setError(String(e.message)));
   }, [id]);
+
+  const loadNotes = () => getLlmNotes(id)
+    .then((n) => setNotesByRace(new Map(Object.entries(n.byRace ?? {}).map(([k, v]) => [Number(k), v]))))
+    .catch(() => {}); // supplementary display only - a fetch failure here shouldn't block the page
+  useEffect(() => { loadNotes(); }, [id]); // eslint-disable-line react-hooks/exhaustive-deps
 
   const askDelete = async () => {
     setBusy(true);
@@ -70,7 +79,9 @@ export default function RaceDayView({ id, onBack, onOpenCard }) {
         </div>
       </div>
 
-      {showNotesModal && <RaceDayNotesModal dayId={day.id} onClose={() => setShowNotesModal(false)} />}
+      {showNotesModal && (
+        <RaceDayNotesModal dayId={day.id} onClose={() => { setShowNotesModal(false); loadNotes(); }} />
+      )}
 
       {confirm && (
         <div className="notice notice--warn">
@@ -175,6 +186,26 @@ export default function RaceDayView({ id, onBack, onOpenCard }) {
             </tbody>
           </table>
           {race.wager_menu && <p className="dim wager">{race.wager_menu}</p>}
+          {(() => {
+            const note = notesByRace.get(race.number) ?? null;
+            const hasNote = Boolean(note?.text);
+            return (
+              <details className="race-notes">
+                <summary>Analyst Notes{hasNote ? '' : ' — none'}</summary>
+                {hasNote ? (
+                  <>
+                    <p className="notes-text">{note.text}</p>
+                    <p className="dim">
+                      {note.sourceLabel ? `Source: ${note.sourceLabel}` : 'Source: —'}
+                      {note.updatedAt ? ` · updated ${note.updatedAt}` : ''}
+                    </p>
+                  </>
+                ) : (
+                  <p className="dim">No analyst notes for this race.</p>
+                )}
+              </details>
+            );
+          })()}
         </details>
       ))}
     </section>
