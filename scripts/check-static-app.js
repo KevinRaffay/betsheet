@@ -239,6 +239,39 @@ console.log('\n-- calls to action stay reachable on a phone (D157 house rule) --
   }
 }
 
+console.log('\n-- the race screen fits a phone (D158) --');
+{
+  const raceView = fs.readFileSync(path.join(ROOT, 'static', 'src', 'RaceView.jsx'), 'utf8');
+  const entriesTable = fs.readFileSync(path.join(ROOT, 'client', 'src', 'components', 'EntriesTable.jsx'), 'utf8');
+  const mobile = fs.readFileSync(path.join(ROOT, 'static', 'src', 'mobile.js'), 'utf8');
+  const css = fs.readFileSync(path.join(ROOT, 'static', 'src', 'static.css'), 'utf8');
+
+  check('the static race view collapses entries on a phone', /open=\{!isMobile\}/.test(raceView));
+  check('and hides the rank column, which its payload never carries',
+    /showRank=\{false\}/.test(raceView));
+  check('the race CONDITIONS blurb is not rendered', !/\{race\.conditions/.test(raceView),
+    'the eligibility boilerplate is back on the race screen');
+
+  // The payload half of the same fact: if a rank ever DID ship, the column
+  // being off would be hiding real data rather than a column of dashes.
+  check('the payload builder still emits no program_rank',
+    !/program_rank/.test(fs.readFileSync(path.join(ROOT, 'scripts', 'build-static-payload.js'), 'utf8')));
+
+  // The shared component must stay unchanged for its three desktop callers.
+  check('EntriesTable defaults showRank TRUE so desktop is untouched',
+    /showRank = true/.test(entriesTable));
+  for (const caller of ['DayTicketBuilderModal.jsx', 'LlmCardModal.jsx', 'ReplayRaceView.jsx']) {
+    const src = fs.readFileSync(path.join(ROOT, 'client', 'src', 'components', caller), 'utf8');
+    check(`${caller} does not pass showRank, so it keeps the column`, !/showRank/.test(src));
+  }
+
+  // One breakpoint, two files. They drift silently if nobody checks.
+  const jsBreakpoint = (mobile.match(/MOBILE_MAX_WIDTH = (\d+)/) ?? [])[1];
+  const cssBreakpoint = (css.match(/@media \(max-width: (\d+)px\)/) ?? [])[1];
+  check('the JS and CSS mobile breakpoints agree', jsBreakpoint === cssBreakpoint,
+    `mobile.js says ${jsBreakpoint}, static.css says ${cssBreakpoint}`);
+}
+
 fs.rmSync(tmp, { recursive: true, force: true });
 
 if (failures) {
