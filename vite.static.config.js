@@ -21,10 +21,20 @@ const r = (p) => fileURLToPath(new URL(p, import.meta.url));
 
 export default defineConfig({
   root: 'static',
-  // Relative asset URLs, so the same build works at a Pages sub-path
-  // (/betsheet/), at a domain root, and off the local filesystem. D154 pins
-  // this to the Pages base explicitly.
-  base: './',
+  // DEVIATION from D154's spec, stated deliberately. The spec asks for
+  // `base: '/betsheet/'`; this defaults to RELATIVE and lets the deploy set
+  // the Pages base through BETSHEET_STATIC_BASE (which
+  // .github/workflows/deploy-pages.yml does, to exactly '/betsheet/').
+  //
+  // The reason a hard-coded base was specified is the SPA 404 problem, and
+  // hash routing already solves that completely - no path after the origin
+  // ever reaches GitHub's router. What is left is asset resolution, and a
+  // relative base resolves correctly at a Pages sub-path AND from a local
+  // `dist-static` preview AND from a file:// copy on a phone with no signal.
+  // An absolute base works only at the one origin it names. Since the
+  // deployed artifact still carries '/betsheet/', nothing about the Pages
+  // deploy differs; only the local builds get more portable.
+  base: process.env.BETSHEET_STATIC_BASE || './',
   plugins: [react()],
   resolve: {
     alias: {

@@ -1,0 +1,115 @@
+# Deploy the at-the-track ticket builder to GitHub Pages (D154).
+#
+# WHAT GETS DEPLOYED IS ONE RACE DAY. `static/public/payload.json` is a
+# committed file built by `npm run build-static-payload -- <raceDayId>`, so
+# publishing a new payload is an ordinary commit and push, and it REPLACES the
+# deployed race day. There is no per-day URL and no archive of past days: the
+# app is a construction surface for the day you are at, not a corpus.
+#
+# The build is deliberately the only thing this workflow can do. It has no
+# database, no secrets and no network access to anything but npm - every piece
+# of race data it publishes was committed by a person who ran the payload
+# builder at home.
+#
+# THIS DEPLOY CANNOT WORK UNTIL PAGES IS ENABLED ON THE REPOSITORY, and on a
+# Free plan that means making the repository public (GitHub Pages from a
+# private repository requires Pro/Team). Until then the workflow is here,
+# correct, and will fail at the `deploy` job with a permissions error - which
+# is the honest state, rather than a pipeline that silently does nothing.
+#
+# NOTE, BEFORE ENABLING: a GitHub Pages site is PUBLICLY READABLE even when it
+# is built from a private repository (private Pages needs Enterprise Cloud).
+# Whatever is in payload.json is on the open internet at a guessable URL. Race
+# entries are public information that Equibase already publishes; the day's own
+# LLM and OTR picks are not, and `--reference-cards` puts them in the payload.
+# Build the deployed payload WITHOUT that flag unless publishing those picks is
+# a deliberate choice.
+
+name: Deploy static ticket builder
+
+on:
+  workflow_dispatch:
+  push:
+    branches: [main]
+    paths:
+      # The payload is the race day, so a payload commit is a deploy.
+      - 'static/**'
+      - 'shared/**'
+      # The two desktop components the static app reuses rather than forking.
+      - 'client/src/components/TicketBuilder.jsx'
+      - 'client/src/components/EntriesTable.jsx'
+      - 'client/src/styles.css'
+      - 'vite.static.config.js'
+      - 'package.json'
+      - 'package-lock.json'
+      - '.github/workflows/deploy-pages.yml'
+
+permissions:
+  contents: read
+  pages: write
+  id-token: write
+
+# One deploy at a time, and never cancel one in flight: a half-replaced Pages
+# site is a race day nobody can build against.
+concurrency:
+  group: pages
+  cancel-in-progress: false
+
+jobs:
+  build:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 20
+          cache: npm
+
+      - run: npm ci
+
+      - name: Refuse to deploy without a race day
+        # An empty deploy is worse than no deploy: the app would load at the
+        # track and report that no race day is published, with no way to fix it
+        # from there.
+        run: |
+          test -f static/public/payload.json \
+            || { echo "::error::static/public/payload.json is missing. Run: npm run build-static-payload -- <raceDayId>"; exit 1; }
+          node --input-type=module -e "
+            import fs from 'node:fs';
+            import { validateStaticPayload } from './shared/static-payload.js';
+            const p = JSON.parse(fs.readFileSync('static/public/payload.json', 'utf8'));
+            const problems = validateStaticPayload(p);
+            if (problems.length) { console.error('::error::payload.json is not valid:\n- ' + problems.join('\n- ')); process.exit(1); }
+            console.log(\`Deploying \${p.raceDay.track} \${p.raceDay.date} (race day \${p.raceDay.raceDayId}), \${p.races.length} races, \${p.payloadHash}\`);
+            if (p.referenceCards) console.log('::warning::This payload embeds reference cards, which will be publicly readable.');
+          "
+
+      - name: Verify the bundle ships no generator code
+        # The same check-static-app that runs locally, as the deploy gate:
+        # "no LLM or OTR generation in the bundle" is a hard constraint, and a
+        # constraint nothing enforces at deploy time is a comment.
+        run: npm run check-static-app
+
+      - name: Build
+        env:
+          # D154's Pages base. vite.static.config.js defaults to a relative
+          # base for local builds; this is where the deployed sub-path is set.
+          BETSHEET_STATIC_BASE: /betsheet/
+        run: npm run build:static
+
+      - uses: actions/configure-pages@v5
+
+      - uses: actions/upload-pages-artifact@v3
+        with:
+          path: dist-static
+
+  deploy:
+    needs: build
+    runs-on: ubuntu-latest
+    environment:
+      name: github-pages
+      url: ${{ steps.deployment.outputs.page_url }}
+    steps:
+      - id: deployment
+        uses: actions/deploy-pages@v4

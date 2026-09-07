@@ -164,6 +164,26 @@ console.log('\n-- the built bundle ships no generator code --');
     /src="\.\/assets\//.test(html) && !/src="\/assets\//.test(html), html.match(/src="[^"]*"/)?.[0] ?? '');
 }
 
+console.log('\n-- the Pages build carries the deployed base (D154) --');
+{
+  // What .github/workflows/deploy-pages.yml actually runs. Asserted here so
+  // the workflow and the config cannot drift apart silently - a deploy that
+  // produced root-absolute asset URLs would 404 on every file at
+  // user.github.io/betsheet/ and there is no way to notice that locally.
+  execFileSync(process.execPath, [path.join(ROOT, 'node_modules', 'vite', 'bin', 'vite.js'),
+    'build', '--config', path.join(ROOT, 'vite.static.config.js')],
+  { cwd: ROOT, stdio: 'pipe', env: { ...process.env, BETSHEET_STATIC_BASE: '/betsheet/' } });
+  const html = fs.readFileSync(path.join(ROOT, 'dist-static', 'index.html'), 'utf8');
+  check('BETSHEET_STATIC_BASE puts the app under /betsheet/',
+    /src="\/betsheet\/assets\//.test(html), html.match(/src="[^"]*"/)?.[0] ?? '');
+
+  const workflow = fs.readFileSync(path.join(ROOT, '.github', 'workflows', 'deploy-pages.yml'), 'utf8');
+  check('the workflow sets that exact base', /BETSHEET_STATIC_BASE:\s*\/betsheet\//.test(workflow));
+  check('the workflow refuses to deploy without a payload', /payload\.json/.test(workflow));
+  check('a payload IS committed for the deploy to publish',
+    fs.existsSync(path.join(ROOT, 'static', 'public', 'payload.json')));
+}
+
 fs.rmSync(tmp, { recursive: true, force: true });
 
 if (failures) {
