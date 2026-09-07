@@ -9,7 +9,6 @@
 
 import express from 'express';
 import { canonicalizeTrack, meetForDay } from '../shared/track-codes.js';
-import { parseEntries } from '../shared/entries-parser.js';
 import { parseEquibaseEntriesHtml } from '../shared/parsers/equibase-entries.js';
 import { parseChart } from '../shared/chart-parser.js';
 import { parseDmtcResults } from '../shared/dmtc-results-parser.js';
@@ -22,37 +21,6 @@ const fetchLog = getLogger('fetch-audit');
 const traceLog = getLogger('decision-trace');
 
 export const ingestRouter = express.Router();
-
-// D35: an unrecognized track still parses and saves - it gets a derived
-// code (canonicalizeTrack), never a block - but the preview names it so a
-// typo or a new track is visible before Save rather than surfacing later as
-// a silent classification/fetch miss (D53's root cause).
-function addTrackWarning(parsed) {
-  if (!parsed?.track || !Array.isArray(parsed.warnings)) return parsed;
-  const { recognized, code } = canonicalizeTrack(parsed.track);
-  if (!recognized) {
-    parsed.warnings.push({
-      type: 'unrecognized_track',
-      message: `"${parsed.track}" is not a known track; it will save under a derived code (${code}). Check the spelling above.`,
-    });
-  }
-  return parsed;
-}
-
-ingestRouter.post('/parse/entries-text', (req, res) => {
-  const text = String(req.body?.text ?? '');
-  const correlationId = req.get('x-correlation-id') || newCorrelationId();
-  const parsed = addTrackWarning(parseEntries(text));
-  log.info('parse_completed', {
-    correlationId,
-    kind: 'entries_text',
-    bytes: text.length,
-    races: parsed.races.length,
-    entries: parsed.races.reduce((a, r) => a + r.entries.length, 0),
-    warnings: parsed.warnings.length,
-  });
-  res.json({ correlationId, ...parsed });
-});
 
 // D116: a race day from a manually saved Equibase entries page - the ingest
 // path for any track with no automated feed, and the reason a Kentucky Downs

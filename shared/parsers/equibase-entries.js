@@ -6,7 +6,7 @@
 // posture as the OTR sheet (D71) and the ATR racecard (D69).
 //
 // Browser-safe on purpose - no `node:` imports - so the ingest preview can run
-// it client-side exactly as shared/entries-parser.js does.
+// it client-side, for both a file upload and a pasted-markup preview.
 //
 // The PDF route was measured and rejected before this existed: a print-to-PDF
 // of the same page has no text layer at all (zero embedded fonts, pdftotext 14
@@ -19,8 +19,10 @@
 // carrying its own `blocking` boolean - the per-item severity convention
 // shared/parsers/human-picks.js and shared/parsers/equibase-otr.js use.
 
-// From betmath, not entries-parser: the helper moved there in D109 precisely
-// so this parser does not depend on a file the pivot deletes (P-2.5).
+// From betmath, not the old shared/entries-parser.js: the helper moved there
+// in D109 precisely so this parser did not depend on a file the pivot would
+// go on to delete (P-2.5, done - the plain-text pasted-entries parser and
+// its route are gone; this file is the only entries parser left).
 import { morningLineToDecimal } from '../betmath.js';
 
 // Web-UI text that bleeds into the saved page. Appendable on purpose: more

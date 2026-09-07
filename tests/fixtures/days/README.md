@@ -25,3 +25,24 @@ work on, and none of them cares where those entries came from:
 now the source of record for that day's entries, and the same day's chart
 (`tests/fixtures/charts/`) and Equibase OTR sheet
 (`tests/fixtures/equibase-otr/DMR-2026-08-30.pdf`) are pinned to it.
+
+`dmtc-2026-09-03.entries.json` is the real Del Mar card for 2026-09-03 — 8
+races, 81 entries, zero warnings. It began life as
+`tests/fixtures/entries/dmtc-2026-09-03.txt`, the golden fixture for the
+plain-text pasted-entries parser (`shared/entries-parser.js`), captured off
+dmtc.com. That parser and its whole `tests/fixtures/entries/` directory
+(the raw text, the synthetic coupled-entry fixture, both goldens) were
+deleted when the `/new` page's paste box was retargeted at the Equibase
+entries HTML parser (`shared/parsers/equibase-entries.js`) instead — one
+parser for both the file-upload and paste-into-textarea routes. This file is
+this day's frozen output, produced by the retired parser one last time before
+deletion, so the two suites that need this exact day (its program numbers
+line up with the Equibase OTR PDF fixture for the same date) keep working
+without it:
+
+| suite | what it needs the day for |
+| --- | --- |
+| `check-ingest` | the parse->save->read-back and track-canonicalization round trip |
+| `check-equibase-otr` | seeds the real day the OTR PDF fixture's picks resolve against |
+
+**Never regenerate it.** The parser that produced it is gone.

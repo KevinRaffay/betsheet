@@ -2,9 +2,9 @@
 // Run: npm run check-ingest
 //
 // Boots the REAL server (child process) against a temp database and temp
-// log dir, then exercises the whole flow over HTTP: parse the real pasted
-// fixture, save it, read it back, conflict + replace, reject bad payloads,
-// and parse the real program PDF end-to-end.
+// log dir, then exercises the whole flow over HTTP: save a real fixture day,
+// read it back, conflict + replace, reject bad payloads, and parse a real
+// Equibase entries page end-to-end.
 
 import { spawn } from 'node:child_process';
 import Database from 'better-sqlite3';
@@ -51,24 +51,18 @@ async function waitForHealth() {
 try {
   check('server boots on a temp db', await waitForHealth(), serverOut.slice(-400));
 
-  // --- parse the real pasted fixture ---
-  const fixture = fs.readFileSync(
-    path.join(ROOT, 'tests', 'fixtures', 'entries', 'dmtc-2026-09-03.txt'), 'utf8');
-  const parseRes = await fetch(`${BASE}/api/parse/entries-text`, {
-    method: 'POST',
-    headers: { 'content-type': 'application/json' },
-    body: JSON.stringify({ text: fixture }),
-  });
-  const parsed = await parseRes.json();
-  check('parse endpoint: real fixture -> 8 races, correlation id',
-    parseRes.ok && parsed.races.length === 8 && typeof parsed.correlationId === 'string');
-
-  const echo = await fetch(`${BASE}/api/parse/entries-text`, {
-    method: 'POST',
-    headers: { 'content-type': 'application/json', 'x-correlation-id': 'cid-echo' },
-    body: JSON.stringify({ text: 'Race 1\n' }),
-  }).then((r) => r.json());
-  check('parse endpoint echoes a supplied correlation id', echo.correlationId === 'cid-echo');
+  // --- a real fixture day, save + read back ---
+  //
+  // Frozen output of the retired plain-text pasted-entries parser
+  // (shared/entries-parser.js, deleted along with the /new page's paste box
+  // that used to call it - the paste box now runs the same Equibase HTML
+  // parser as the file upload, exercised further down). This day's own
+  // program numbers line up with the Equibase OTR PDF fixture, which is why
+  // it is frozen rather than dropped - see tests/fixtures/days/README.md.
+  const parsed = JSON.parse(fs.readFileSync(
+    path.join(ROOT, 'tests', 'fixtures', 'days', 'dmtc-2026-09-03.entries.json'), 'utf8'));
+  check('fixture day: 8 races, 81 entries', parsed.races.length === 8
+    && parsed.races.reduce((a, r) => a + r.entries.length, 0) === 81);
 
   // --- save, read back ---
   const payload = {
@@ -80,7 +74,7 @@ try {
   };
   const saveRes = await fetch(`${BASE}/api/race-days`, {
     method: 'POST',
-    headers: { 'content-type': 'application/json', 'x-correlation-id': parsed.correlationId },
+    headers: { 'content-type': 'application/json' },
     body: JSON.stringify(payload),
   });
   const saved = await saveRes.json();
@@ -406,20 +400,13 @@ try {
   check('the saved day carries the canonical display name and code regardless of input spelling',
     spellRow.track === 'Del Mar' && spellRow.track_code === 'DMR', JSON.stringify(spellRow));
 
-  const unknownTrack = await fetch(`${BASE}/api/parse/entries-text`, {
-    method: 'POST', headers: { 'content-type': 'application/json' },
-    body: JSON.stringify({ text: 'Santa Anita Daily Entries\nRace 1\n' }),
-  }).then((r) => r.json());
-  check('an unrecognized track never blocks the preview, just warns',
-    unknownTrack.track === 'Santa Anita' &&
-    unknownTrack.warnings.some((w) => w.type === 'unrecognized_track'), JSON.stringify(unknownTrack.warnings));
+  // The unrecognized-track preview warning lived only in the retired
+  // plain-text /parse/entries-text route (removed along with
+  // shared/entries-parser.js); an unknown track still saves under a derived
+  // code either way (canonicalizeTrack, checked above), it just no longer
+  // gets a preview-time warning naming it - a pre-existing gap on the
+  // Equibase route, not something this removal introduced.
 
-  const knownTrack = await fetch(`${BASE}/api/parse/entries-text`, {
-    method: 'POST', headers: { 'content-type': 'application/json' },
-    body: JSON.stringify({ text: 'Del Mar Daily Entries\nRace 1\n' }),
-  }).then((r) => r.json());
-  check('a recognized track never warns',
-    !knownTrack.warnings.some((w) => w.type === 'unrecognized_track'));
   // ---- Equibase entries page: preview -> save -> read back (D116) ----
   //
   // LAST in the file, deliberately: it saves a day and soft-deletes it, and a
@@ -452,6 +439,25 @@ try {
       (await fetch(`${BASE}/api/parse/equibase-entries`, {
         method: 'POST', headers: { 'content-type': 'application/json' }, body: JSON.stringify({ html: '' }),
       })).status === 400);
+    const echo = await fetch(`${BASE}/api/parse/equibase-entries`, {
+      method: 'POST',
+      headers: { 'content-type': 'application/json', 'x-correlation-id': 'cid-echo' },
+      body: JSON.stringify({ html: eqHtml }),
+    }).then((r) => r.json());
+    check('parse endpoint echoes a supplied correlation id', echo.correlationId === 'cid-echo');
+
+    // The /new page's paste box (no file, so no last-modified time) posts the
+    // exact same shape minus oddsCapturedAt - the one place it differs from
+    // the file-upload path is that the capture time comes back unknown
+    // rather than guessed.
+    const pasted = await (await fetch(`${BASE}/api/parse/equibase-entries`, {
+      method: 'POST', headers: { 'content-type': 'application/json' },
+      body: JSON.stringify({ html: eqHtml }),
+    })).json();
+    check('pasted markup (no oddsCapturedAt) parses identically, capture time unknown',
+      pasted.races.length === 11
+      && pasted.races.reduce((a, r) => a + r.entries.length, 0) === 113
+      && pasted.oddsCapturedAt === null);
 
     // Saved under a date of its own so it cannot collide with the other days
     // this script creates.

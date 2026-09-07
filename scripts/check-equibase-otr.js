@@ -206,8 +206,12 @@ try {
   }
   check('server boots', up, serverOut.slice(-400));
 
-  const entriesFixture = fs.readFileSync(path.join(ROOT, 'tests', 'fixtures', 'entries', 'dmtc-2026-09-03.txt'), 'utf8');
-  const parsedEntries = await (await jpost('/api/parse/entries-text', { text: entriesFixture })).json();
+  // Frozen output of the retired plain-text pasted-entries parser
+  // (shared/entries-parser.js) - this day's own program numbers line up
+  // with the OTR PDF fixture below, which is why it is frozen rather than
+  // dropped. See tests/fixtures/days/README.md.
+  const parsedEntries = JSON.parse(fs.readFileSync(
+    path.join(ROOT, 'tests', 'fixtures', 'days', 'dmtc-2026-09-03.entries.json'), 'utf8'));
   const pdfBytes = fs.readFileSync(fixturePdf);
 
   // -------- main day: real Del Mar 2026-09-03, real entries --------
@@ -336,8 +340,8 @@ try {
   check('track mismatch (same date, different track): refused with 422', trackMismatchUpload.status === 422);
 
   // -------- 8. bucket isolation in P/L against the engine's own bucket, HUMAN, LLM_GENERATED --------
-  // (This fixture day is seeded from entries-text only, no program PDF, so
-  // the live-generated lean card lands in ODDS_ONLY per D40 - not
+  // (This fixture day carries entries only, no program PDF, so the
+  // live-generated lean card lands in ODDS_ONLY per D40 - not
   // PROGRAM_ONLY. Either way it must never mix with EQB_OTR.)
   // Synthetic results so every card on this day grades (loss is fine -
   // this proves isolation, not payout correctness).
