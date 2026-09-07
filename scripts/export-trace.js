@@ -4,6 +4,7 @@
 //
 //   npm run export-trace -- --card 3                 # stdout
 //   npm run export-trace -- --card 3 --out card3.json
+//   npm run export-trace -- --card 3 --omit-llm-inputs   # shareable form (D149)
 //
 // Respects BETSHEET_DB / BETSHEET_LOG_DIR like the server does.
 
@@ -23,7 +24,7 @@ if (!Number.isInteger(cardId)) {
   process.exit(1);
 }
 
-const out = buildCardExport(getDb(), cardId);
+const out = buildCardExport(getDb(), cardId, { omitLlmInputs: args.includes('--omit-llm-inputs') });
 if (out.error) {
   console.error(out.error);
   process.exit(1);

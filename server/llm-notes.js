@@ -99,6 +99,12 @@ export function loadNotesForRace(db, raceDayId, raceNumber) {
     prompt: { card, race },
     truncated,
     sourceLabel,
+    // D149: the same composed/sanitized/truncated string notes_hash and
+    // notes_char_count below are computed over - what the model actually
+    // saw, as opposed to notes_race_text/notes_card_text's raw human input.
+    // Exposed here rather than recomputed at the call site so there is
+    // exactly one join expression for "what did the model see" in the codebase.
+    composed,
     snapshot: {
       notes_present: 1,
       notes_race_text: raceNote?.text ?? null,

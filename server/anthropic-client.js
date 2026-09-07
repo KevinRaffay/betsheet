@@ -41,6 +41,11 @@ export const SELECTABLE_MODELS = KNOWN_MODELS.filter((m) => !m.retired);
 
 export const hasKey = () => Boolean(process.env.ANTHROPIC_API_KEY);
 
+// D149: complete()'s own defaults, exported so a caller recording "what was
+// requested" for a call that never reached the API (no key, a stub, a
+// network failure before any response) doesn't have to duplicate them.
+export const DEFAULT_REQUEST_PARAMS = { maxTokens: 4000, temperature: 1 };
+
 export class AnthropicError extends Error {
   constructor(message, status) {
     super(message);
@@ -64,7 +69,8 @@ function buildMessages(user, prefill) {
  * rather than burning the call on a model that refuses prefills.
  */
 export async function complete({
-  system, user, prefill = '', maxTokens = 4000, temperature = 1, timeoutMs = 60000, model = MODEL,
+  system, user, prefill = '', maxTokens = DEFAULT_REQUEST_PARAMS.maxTokens, temperature = DEFAULT_REQUEST_PARAMS.temperature,
+  timeoutMs = 60000, model = MODEL,
 }) {
   const key = process.env.ANTHROPIC_API_KEY;
   if (!key) throw new AnthropicError('ANTHROPIC_API_KEY is not set', 401);
@@ -117,5 +123,9 @@ export async function complete({
     usage: data.usage ? { input: data.usage.input_tokens ?? null, output: data.usage.output_tokens ?? null } : null,
     stopReason: data.stop_reason,
     model,
+    // D149: the resolved sampling params actually sent, defaults included -
+    // so a caller logging this call's inputs never has to duplicate this
+    // function's own defaults to know what was requested.
+    requestParams: { maxTokens, temperature },
   };
 }
