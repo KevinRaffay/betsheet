@@ -3,6 +3,7 @@
 // block back out of the model's response. Pure - no network, no DB.
 // Keep this file and the doc in sync when the template changes.
 
+import crypto from 'node:crypto';
 import { stripParens } from '../shared/parsers/human-picks.js';
 
 const TICKET_BLOCK_START = '<<<TICKETS>>>';
@@ -86,6 +87,15 @@ If you have no bet worth making on this race, output the block with
 zero ticket lines between the markers - do not pad it with a bet you
 don't believe in.`;
 
+// D149: identifies which template rendered a stored prompt. The id names the
+// doc this file mirrors (docs/prompts/llm-card-v1.md); the version is
+// DERIVED from a hash of SYSTEM_PROMPT rather than a number a prompt-fix PR
+// has to remember to bump - this file's own D64/D112/D125/D136/D138/D145/
+// D146/D148 history never carried one, and a hash cannot go stale the way a
+// manually-incremented counter can. It changes exactly when, and only when,
+// SYSTEM_PROMPT's text changes.
+export const PROMPT_TEMPLATE_ID = 'llm-card-v1';
+export const PROMPT_TEMPLATE_VERSION = crypto.createHash('sha256').update(SYSTEM_PROMPT).digest('hex').slice(0, 12);
 
 // ---------- analyst notes (D92) ----------
 

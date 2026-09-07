@@ -83,6 +83,7 @@ have to honour invariants 1, 2 and 5.
 | Known-failure-mode warnings encoded on the sheet | D10, D11 |
 | 2+-source flagged horses get small coverage even in lean mode | D10 |
 | An LLM can generate a card manually, race by race, from entries and already-fetched consensus (no search); stored in its own LLM_GENERATED bucket, compared against lean and human via the existing standing/P&L machinery, never pooled | D63 |
+| An LLM card's generation calls record what they CONSUMED (rendered prompt, raw response, notes, model, sampling params, prompt template id/version), not just what they produced - so two differently-noted generations of the same race day (e.g. cards 180/181) can be diffed and reproduced, and a regeneration under a new correlation id is traced (`race_regenerated`) rather than only reconstructable by diffing `ticket_added` timestamps against the final ticket set. Exported at `card-trace-export` schemaVersion 3 as a top-level `llmInputs` block, `null` for a non-LLM card or one that predates this capture; a `--omit-llm-inputs`/`?omitLlmInputs=1` form keeps only hashes/chars for sharing | D149 |
 
 ## Card presentation (workflow step 4)
 
