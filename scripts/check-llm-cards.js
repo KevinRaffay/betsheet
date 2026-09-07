@@ -80,6 +80,12 @@ console.log('-- pure: buildLlmRaceUserPrompt --');
   // generation hit exactly that gap ($0.75 on a 50c trifecta, 1.5 steps).
   check('system prompt states the base-unit rule applies to straight exotics too, not just boxes (2026-09-07 fix)',
     SYSTEM_PROMPT.includes('STRAIGHT or BOXED') && SYSTEM_PROMPT.includes('$0.75') && SYSTEM_PROMPT.includes('1 combination'));
+  // 2026-09-07 fix #2: the prompt never stated the win/place/show minimum at
+  // all, so a real generation produced a $1 win bet - below the $2 floor
+  // wagerLimitsFor enforces (menu.win defaults to $2, never overridden by any
+  // printed wager menu - see shared/betmath.js's MENU_PATTERNS).
+  check('system prompt states the $2 win/place/show minimum and $1 increment (2026-09-07 fix #2)',
+    SYSTEM_PROMPT.includes('Win, place and show have a $2 minimum') && SYSTEM_PROMPT.includes('$1\n  increments'));
 }
 
 // ---------- analyst notes, pure (D92) ----------
