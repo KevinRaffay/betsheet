@@ -51,10 +51,16 @@ grammar, then a line reading exactly "${TICKET_BLOCK_END}":
   with "/", e.g. "#4 / #2" (4 to win, 2 to place). Box types list
   every horse in the box separated by ",", e.g. "#4,#2,#7".
 - <stake>: the TOTAL dollar amount for that ticket (not per-combo),
-  e.g. "$20". For a BOX bet, the total must divide EXACTLY and EVENLY
-  across every combination the box produces, with each combination's
-  share a whole multiple of that wager type's base unit shown in the
-  wager menu above. The number of combinations is:
+  e.g. "$20". Every exacta/trifecta/superfecta - STRAIGHT or BOXED -
+  must price in whole multiples of that wager type's base unit shown
+  in the wager menu above, per combination. A STRAIGHT bet (one
+  specific finish order, e.g. "#4 / #2 / #7" for a trifecta) is always
+  1 combination, so its total must BE that multiple directly - a 50c
+  trifecta prices at $0.50, $1.00, $1.50, ... - NOT $0.75, which is 1.5
+  steps of 50c, not a whole one. For a BOX bet, the total must divide
+  EXACTLY and EVENLY across every combination the box produces, with
+  each combination's share a whole multiple of the base unit. The
+  number of combinations is 1 for a straight bet, and for a box:
     exacta box:     n x (n-1)
     trifecta box:   n x (n-1) x (n-2)
     superfecta box: n x (n-1) x (n-2) x (n-3)
