@@ -246,8 +246,17 @@ grammar, then a line reading exactly "<<<END TICKETS>>>":
   minimum. Compute combinations x base-unit FIRST, then pick your
   total as a multiple of that - never pick a total that merely "sounds
   right" and divide afterward. Prefer smaller boxes (3-4 horses) to
-  keep this simple.
-- <rationale>: one short sentence, required.
+  keep this simple. For EVERY box bet, show this arithmetic inside the
+  <rationale> itself, not only in your head: write out every factor of
+  the combination count multiplied together, the resulting combo
+  count, then a "$<base> x <combos> combos" check matching your total
+  - e.g. "...your one-sentence reason. (4 x 3 x 2 = 24 combos; $0.50 x
+  24 combos = $12.00)". Never jump straight from "n horses" to a combo
+  count or a total without writing out every factor first - the
+  written-out multiplication is what catches a miscount before you
+  commit to a price.
+- <rationale>: one short sentence, required - for a BOX bet, append
+  the combo arithmetic above.
 
 If you have no bet worth making on this race, output the block with
 zero ticket lines between the markers - do not pad it with a bet you
@@ -465,6 +474,44 @@ untouched, so no version bump.
   "box". No parser, server, or schema change - both blocks were exactly
   correct; the model was missing the specific anchor it needed for a
   4-horse trifecta box and for the type/selection-format pairing.
+- **2026-09-07: the SAME 4-horse trifecta box miscount recurred under the
+  D160-fixed prompt (D161).** Live bug report, one race after D160 merged:
+  `trifecta box | #9,#6,#3,#2 | $6` with the rationale literally reading
+  "...at 50c per combination" - the identical mistake the D160 fix's own
+  worked example spelled out verbatim (4 horses, 12-combo assumption,
+  actual 24, $6 lands at $0.25/combo). Confirmed against the logged
+  `response_text`: `prompt_template_version` on the request matched the
+  POST-D160 hash, so the model read the corrected prompt - including the
+  new trifecta-box worked example - and miscounted anyway. **A textual
+  warning plus one worked example was not sufficient**, even naming the
+  exact wrong number (12) and the exact right number (24) the model needed.
+  Escalation, still prompt-only: rather than add a THIRD example (D160 was
+  itself the second), the `<stake>` rule now REQUIRES every box bet's
+  `<rationale>` to show the combination arithmetic inline - every factor of
+  the combo count multiplied together, then a `"$<base> x <combos> combos"`
+  check matching the total - rather than allow the model to reach a total
+  from an unstated mental calculation. This is a different KIND of fix than
+  D160's: forcing the multiplication to appear as output tokens (rather
+  than only being described in the instructions) is what the literature
+  calls making the model "show its work," which tends to catch a slip a
+  purely-instructed rule does not, because the model must commit to
+  concrete factor values rather than a remembered rule. It also has a
+  concrete, MACHINE-CHECKABLE side effect for free: `shared/parsers/
+  human-picks.js`'s existing `STAKE_CHECK_RE` / `parenthetical_mismatch`
+  cross-check (added for the teller grammar, D84) already scans a ticket's
+  trailing text for exactly a `"$N x M combos"` pattern and raises a
+  non-blocking warning when it disagrees with the actual combos/stake - for
+  the LLM's column grammar, that trailing text IS the `<rationale>` column
+  (`parseColumnRow`'s `checkTail = rest.join(' ')`), so a model that now
+  states its arithmetic and still gets it wrong surfaces a SECOND, distinct
+  warning naming the disagreement, not just the primary blocking one. No
+  parser, server, or schema change - the cross-check already existed for a
+  different grammar; this only asks the model to populate the field it
+  already reads. **Not claimed to be foolproof** - the same "not provably
+  foolproof" caveat every fix above carries applies here too, more visibly
+  than ever given this is the second miscount on the same box type - the
+  blocking validation in `shared/parsers/human-picks.js` remains the actual
+  backstop regardless of what the model writes.
 
 ## Model selection (D75)
 
@@ -565,9 +612,9 @@ rather than a bucketing rule.
 
 **Deliberately a hash of `SYSTEM_PROMPT`, computed at module load, not a
 manually incremented number.** This file's own D64, D112, D125, D136, D138,
-D145, D146, D148 and D160 fixes are nine PRs that edited the prompt and not
-one of them carried a version marker - a manually-bumped counter would have
-needed every one of those PRs to remember a step nothing enforced, the same failure
+D145, D146, D148, D160 and D161 fixes are ten PRs that edited the prompt and
+not one of them carried a version marker - a manually-bumped counter would
+have needed every one of those PRs to remember a step nothing enforced, the same failure
 mode `ENGINE_VERSION` and `cards.saw_classification` have each already hit in
 this codebase in other forms. A hash of the actual text cannot go stale that
 way: it changes exactly when, and only when, `SYSTEM_PROMPT` does.
