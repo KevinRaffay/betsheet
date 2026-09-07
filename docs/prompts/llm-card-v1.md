@@ -172,7 +172,19 @@ Rules:
   program number. Never invent a horse or a program number.
 - Never bet a scratched horse.
 - Your total stakes for this race must not exceed the race bankroll
-  given below.
+  given below. That bankroll is a CEILING, not a target. Spending less
+  than all of it is correct and completely normal - there is no reward
+  for using it up, and money left unspent is not a wasted opportunity.
+  NEVER price a ticket by subtracting what you have already spent from
+  the bankroll and betting the remainder: pick each stake from the
+  amounts that are LEGAL for that bet type first (see <stake> below),
+  and only then check that it still fits what is left. A leftover that
+  no legal stake can absorb is the expected outcome, not a problem to
+  solve - leave it. If no legal price for a ticket you wanted fits the
+  money remaining, DROP THAT TICKET COMPLETELY and end the block; do
+  not squeeze it in at an illegal price, and never announce a rewrite
+  ("...so this line is rewritten below") without actually writing the
+  corrected line.
 - Include longshots where you see value, and same-race exotics
   (exacta / exacta box / trifecta / trifecta box / superfecta /
   superfecta box) where warranted - no multi-race wagers (Daily
@@ -269,7 +281,14 @@ grammar, then a line reading exactly "<<<END TICKETS>>>":
   instead" is not a fix, because the <stake> column still reads $6 and
   $6 is the only number that is actually bet. A <rationale> that
   argues with its own <stake> column is a broken ticket, and the
-  ticket is refused on the <stake>.
+  ticket is refused on the <stake>. When the two disagree it is always
+  the <stake> that gives way, NEVER the per-combination figure: that
+  figure is the wager type's base unit or a whole multiple of it, and
+  nothing else. Inventing a fraction to make a total come out - e.g.
+  writing "$0.177 x 24 combos = $4.25" so that a $4.25 budget scrap
+  can be spent - is not arithmetic, it is a price that does not exist
+  at the window; the real move is to bet $12.00 (a legal 24-combo box)
+  or not to make the bet at all.
 - <rationale>: one short sentence, required - for a BOX bet, append
   the combo arithmetic above, and nothing else.
 
@@ -565,6 +584,78 @@ untouched, so no version bump.
   $24 case is spelled out. No parser, server, or schema change. **Not
   claimed to be foolproof**, same caveat as every fix above; the blocking
   validation is still the backstop, and it did its job here.
+- **2026-09-07: the per-race bankroll was a number no legal wager could add
+  up to (D163).** Live bug report of four blocked races on day 263, all on
+  the post-D162 prompt (`prompt_template_version` `b97234232fc3`), all
+  reproduced from the stored `response_text` through the real parse path:
+  race 3 `$1.33 per combo is not a multiple of the $1.00 increment for
+  exacta`, race 10 `$4.25 does not split evenly across 24 combos`, race 11
+  `$1.75 per combo is not a multiple of the $0.50 increment for trifecta`,
+  race 14 `$10.00 does not split evenly across 6 combos`. **This one is NOT
+  primarily a prompt defect, which is why it is the first fix in this list
+  to change server code.** The tell is that in every single case the illegal
+  stake is EXACTLY the money left over:
+
+  | race | already staked | race bankroll | remainder | illegal ticket |
+  | --- | --- | --- | --- | --- |
+  | 3 | $13.00 | $14.33 | **$1.33** | `exacta \| #7 / #3 \| $1.33` |
+  | 11 | $12.50 | $14.25 | **$1.75** | `trifecta \| #6 / #12 / #4 \| $1.75` |
+  | 10 | $10.00 | $14.25 | **$4.25** | `trifecta box \| 4 horses \| $4.25` |
+  | 14 | $5.00 | $14.38 | $9.38 | `exacta box \| 3 horses \| $10` |
+
+  Those bankrolls come from `previewLlmRace`'s
+  `Math.round(remainingCents / remaining)`: $172.00 over 12 races is
+  $14.3333, $85.50 over 6 is $14.25, $57.50 over 4 is $14.375. **The
+  cheapest wager step in play is 50c and is usually $1, so a target ending
+  in .33 or .38 cannot be spent exactly by any combination of legal
+  wagers.** The model was handed a figure it could not hit, and nothing in
+  the prompt said a remainder was allowed to survive - "must not exceed the
+  race bankroll" reads as a target as easily as a ceiling - so it made the
+  last ticket the plug and the plug was illegal. Race 14 is the extreme
+  case and worth reading: its wager menu really does print `$5 Exacta`
+  (confirmed - `parseWagerMenu` returns `exacta: 500`), so a 3-horse exacta
+  box genuinely costs 6 x $5 = $30 against a $14.38 bankroll. The model
+  reasoned about this correctly in the rationale - "$5.00 x 6 combos =
+  $30.00 exceeds bankroll, so this line is rewritten below" - and then
+  never wrote the rewrite, leaving an illegal $10 standing and ending the
+  block. **Race 10 is D162 backfiring and is recorded here as such**: told
+  by D162 that the shown arithmetic must equal the `<stake>`, the model
+  made the two agree by inventing a per-combination price of $0.177
+  (`$0.177 x 24 combos = $4.25`) rather than by changing the stake. D162
+  said the two must match but never said WHICH side gives way. Fix is in
+  three parts, one of them server-side:
+  1. **Server (`server/llm-cards.js`):** the new exported
+     `perRaceBankrollCents(remainingCents, racesRemaining)` floors the share
+     to a whole DOLLAR, so the four cases above all become $14.00. FLOOR,
+     not round - per-race shares must never sum to more than the bankroll
+     they are carved from, and `Math.round` genuinely violated that
+     ($57.50 / 4 rounds UP to $14.38, and 4 x $14.38 = $57.52). Costs at
+     most 99c of headroom per race, which only a 50c trifecta is
+     fine-grained enough to notice.
+  2. **Prompt, the budget rule:** the bankroll is stated to be a CEILING,
+     not a target; spending less is normal and unspent money is not a
+     wasted opportunity; a stake is never derived by subtracting what has
+     been spent from the bankroll; and if no legal price fits what is left,
+     the ticket is DROPPED completely rather than squeezed in - with race
+     14's dangling "...so this line is rewritten below" named as its own
+     prohibition.
+  3. **Prompt, the D162 clarification:** when the arithmetic and the
+     `<stake>` disagree it is always the `<stake>` that gives way, never
+     the per-combination figure, which is the base unit or a whole multiple
+     of it and nothing else. `$0.177 x 24 combos = $4.25` is quoted as the
+     anti-example, with the reason: it is not arithmetic, it is a price
+     that does not exist at the window.
+
+  No schema change and no `ENGINE_VERSION` bump - an LLM card's
+  `engine_version` is the literal `'llm'` and has no version axis, so this
+  is another **un-versioned, permanent comparability boundary**, the first
+  one that moves a generation INPUT rather than only the prompt text.
+  Cards generated before this change saw different per-race bankrolls than
+  cards generated after; `llm_card_requests.prompt_text` carries the actual
+  figure per request, so which side of the boundary a stored card sits on
+  is checkable per row. **Not claimed to be foolproof** - the blocking
+  validation in `shared/parsers/human-picks.js` remains the backstop, and
+  it correctly refused all four of these.
 
 ## Model selection (D75)
 
@@ -665,8 +756,8 @@ rather than a bucketing rule.
 
 **Deliberately a hash of `SYSTEM_PROMPT`, computed at module load, not a
 manually incremented number.** This file's own D64, D112, D125, D136, D138,
-D145, D146, D148, D160, D161 and D162 fixes are eleven PRs that edited the
-prompt and not one of them carried a version marker - a manually-bumped
+D145, D146, D148, D160, D161, D162 and D163 fixes are twelve PRs that edited
+the prompt and not one of them carried a version marker - a manually-bumped
 counter would have needed every one of those PRs to remember a step nothing
 enforced, the same failure
 mode `ENGINE_VERSION` and `cards.saw_classification` have each already hit in

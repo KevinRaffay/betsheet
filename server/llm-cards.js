@@ -61,6 +61,33 @@ function spentSoFar(db, cardId, excludeRaceId) {
   `).get(cardId, excludeRaceId ?? -1).n;
 }
 
+/**
+ * The per-race share of what is left, floored to a WHOLE DOLLAR (D163).
+ *
+ * An even division lands on numbers no legal wager can add up to: $172.00
+ * over 12 races is $14.3333, $57.50 over 4 is $14.375. Rounding those to the
+ * cent - which this did until D163 - hands the model a target of "$14.33"
+ * when the cheapest step in play is 50c and is usually $1, so the last cents
+ * are unspendable by construction. Live evidence (day 263, requests 329/336/
+ * 337/340, all on the post-D162 prompt): four races blocked, and in every one
+ * the illegal stake was EXACTLY the leftover - $1.33 on a $1 exacta, $1.75 on
+ * a 50c trifecta, $4.25 across 24 combos, and a race where nothing legal fit
+ * at all. The model was not miscounting; it was trying to hit a figure that
+ * cannot be hit, because nothing told it a remainder was allowed to survive.
+ *
+ * FLOOR, not round: the per-race shares must never sum to MORE than the
+ * bankroll they are carved from, which rounding up can do.
+ *
+ * This trims at most 99c of headroom off a race, and a 50c trifecta is the
+ * only wager fine-grained enough to notice. That is the deliberate trade -
+ * a target that can actually be spent is worth more than the last 99 cents,
+ * and the prompt now says plainly that leftover money is fine anyway.
+ */
+export function perRaceBankrollCents(remainingCents, racesRemaining) {
+  const races = Math.max(1, racesRemaining);
+  return Math.floor(Math.max(0, remainingCents) / races / 100) * 100;
+}
+
 /** Races on this day with no tickets on this card yet (includes the race about to be generated). */
 function racesRemaining(db, cardId, dayId, excludeRaceId) {
   const total = raceNumbersFor(db, dayId).length;
@@ -124,7 +151,7 @@ export async function previewLlmRace(db, day, raceNumber, cardId, {
   const spentCents = card ? spentSoFar(db, card.id, race.id) : 0;
   const remainingCents = Math.max(0, bankrollCents - spentCents);
   const remaining = racesRemaining(db, card?.id, day.id, race.id);
-  const perRaceCents = Math.round(remainingCents / remaining);
+  const perRaceCents = perRaceBankrollCents(remainingCents, remaining);
 
   // Analyst notes (D92). A POSITIVE `interactive` gate, so a future batch
   // runner that forgets the flag gets a notes-free prompt by default rather

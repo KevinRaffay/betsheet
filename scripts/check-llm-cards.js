@@ -133,6 +133,61 @@ console.log('-- pure: buildLlmRaceUserPrompt --');
   // any box priced above the base unit.
   check('system prompt names the per-combination cost, not the base unit, in the check (D162 fix)',
     SYSTEM_PROMPT.includes('"$1.00 x 24 combos = $24.00"') && !SYSTEM_PROMPT.includes('$<base> x'));
+  // D163: four races blocked on the post-D162 prompt, and in every one the
+  // illegal stake was EXACTLY the unspent remainder of an unspendable per-race
+  // bankroll. The prompt half says the bankroll is a ceiling and a leftover is
+  // fine; the server half (perRaceBankrollCents, below) stops handing out
+  // targets like $14.33 in the first place.
+  check('system prompt calls the bankroll a ceiling and forbids betting the remainder (D163 fix)',
+    SYSTEM_PROMPT.includes('a CEILING, not a target')
+      && SYSTEM_PROMPT.includes('NEVER price a ticket by subtracting what you have already spent')
+      && SYSTEM_PROMPT.includes('DROP THAT TICKET COMPLETELY'));
+  // D163, the D162 backfire: told that the arithmetic must equal the stake,
+  // request 336 made them agree by inventing a per-combo of $0.177 rather
+  // than by changing the stake. Say which side gives way.
+  check('system prompt says the <stake> gives way, never the per-combination figure (D163 fix)',
+    SYSTEM_PROMPT.includes('it is always\n  the <stake> that gives way')
+      && SYSTEM_PROMPT.includes('$0.177 x 24 combos = $4.25'));
+}
+
+// ---------- pure: the per-race bankroll is spendable (D163) ----------
+console.log('-- pure: perRaceBankrollCents --');
+{
+  const { perRaceBankrollCents } = await import('../server/llm-cards.js');
+  const $ = (c) => `$${(c / 100).toFixed(2)}`;
+
+  // The four real day-263 cases, each of which produced a blocked ticket
+  // whose illegal stake was exactly the leftover this rounding created.
+  for (const [label, remaining, races, oldValue] of [
+    ['race 3 ($172.00 / 12)', 17200, 12, 1433],
+    ['race 10 ($85.50 / 6)', 8550, 6, 1425],
+    ['race 11 ($85.50 / 6)', 8550, 6, 1425],
+    ['race 14 ($57.50 / 4)', 5750, 4, 1438],
+  ]) {
+    const got = perRaceBankrollCents(remaining, races);
+    check(`${label}: ${$(oldValue)} -> ${$(got)}, a whole dollar`, got === 1400,
+      `got ${$(got)}`);
+  }
+
+  check('every result is a whole number of dollars', [
+    [17200, 12], [8550, 6], [5750, 4], [10000, 3], [1, 1], [99, 1], [12345, 7],
+  ].every(([r, n]) => perRaceBankrollCents(r, n) % 100 === 0));
+
+  // FLOOR, not round: the shares must never sum to more than the bankroll.
+  // Math.round did violate this - $172.00/12 rounded to $14.33, and 12 x
+  // $14.33 = $171.96 only because the round happened to go down; $57.50/4
+  // rounded UP to $14.38, and 4 x $14.38 = $57.52, over the bankroll.
+  check('shares never sum to more than the bankroll they came from', [
+    [17200, 12], [8550, 6], [5750, 4], [10000, 3], [999, 7], [100, 3],
+  ].every(([r, n]) => perRaceBankrollCents(r, n) * n <= r));
+  check('the old Math.round DID overspend on the real race-14 case (negative control)',
+    Math.round(5750 / 4) * 4 > 5750);
+
+  // Degenerate inputs never produce a negative or NaN target.
+  check('less than a dollar per race floors to $0, never a fraction', perRaceBankrollCents(50, 1) === 0);
+  check('a spent-out card floors to $0', perRaceBankrollCents(0, 8) === 0);
+  check('a negative remainder is clamped to $0', perRaceBankrollCents(-500, 4) === 0);
+  check('zero races is treated as one, never a divide-by-zero', perRaceBankrollCents(1400, 0) === 1400);
 }
 
 // ---------- analyst notes, pure (D92) ----------

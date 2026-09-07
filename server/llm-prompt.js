@@ -21,7 +21,19 @@ Rules:
   program number. Never invent a horse or a program number.
 - Never bet a scratched horse.
 - Your total stakes for this race must not exceed the race bankroll
-  given below.
+  given below. That bankroll is a CEILING, not a target. Spending less
+  than all of it is correct and completely normal - there is no reward
+  for using it up, and money left unspent is not a wasted opportunity.
+  NEVER price a ticket by subtracting what you have already spent from
+  the bankroll and betting the remainder: pick each stake from the
+  amounts that are LEGAL for that bet type first (see <stake> below),
+  and only then check that it still fits what is left. A leftover that
+  no legal stake can absorb is the expected outcome, not a problem to
+  solve - leave it. If no legal price for a ticket you wanted fits the
+  money remaining, DROP THAT TICKET COMPLETELY and end the block; do
+  not squeeze it in at an illegal price, and never announce a rewrite
+  ("...so this line is rewritten below") without actually writing the
+  corrected line.
 - Include longshots where you see value, and same-race exotics
   (exacta / exacta box / trifecta / trifecta box / superfecta /
   superfecta box) where warranted - no multi-race wagers (Daily
@@ -118,7 +130,14 @@ grammar, then a line reading exactly "${TICKET_BLOCK_END}":
   instead" is not a fix, because the <stake> column still reads $6 and
   $6 is the only number that is actually bet. A <rationale> that
   argues with its own <stake> column is a broken ticket, and the
-  ticket is refused on the <stake>.
+  ticket is refused on the <stake>. When the two disagree it is always
+  the <stake> that gives way, NEVER the per-combination figure: that
+  figure is the wager type's base unit or a whole multiple of it, and
+  nothing else. Inventing a fraction to make a total come out - e.g.
+  writing "$0.177 x 24 combos = $4.25" so that a $4.25 budget scrap
+  can be spent - is not arithmetic, it is a price that does not exist
+  at the window; the real move is to bet $12.00 (a legal 24-combo box)
+  or not to make the bet at all.
 - <rationale>: one short sentence, required - for a BOX bet, append
   the combo arithmetic above, and nothing else.
 
@@ -130,7 +149,7 @@ don't believe in.`;
 // doc this file mirrors (docs/prompts/llm-card-v1.md); the version is
 // DERIVED from a hash of SYSTEM_PROMPT rather than a number a prompt-fix PR
 // has to remember to bump - this file's own D64/D112/D125/D136/D138/D145/
-// D146/D148/D160/D161/D162 history never carried one, and a hash cannot go stale
+// D146/D148/D160/D161/D162/D163 history never carried one, and a hash cannot go stale
 // the way a manually-incremented counter can. It changes exactly when, and
 // only when SYSTEM_PROMPT's text changes.
 export const PROMPT_TEMPLATE_ID = 'llm-card-v1';
