@@ -11,7 +11,7 @@ const dollars = (cents) => `$${(cents / 100).toFixed(2)}`;
 // At The Races PDF upload (D69), removed in D110 - a picker source, not a
 // consensus source, so it lives on the day view itself rather than inside
 // Consensus.
-export default function EquibaseOtrPanel({ dayId }) {
+export default function EquibaseOtrPanel({ dayId, onSaved }) {
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState(null);
   const [file, setFile] = useState(null);
@@ -46,6 +46,10 @@ export default function EquibaseOtrPanel({ dayId }) {
       setConfirmed(result);
       setPreview(null);
       setFile(null);
+      // The three new cards land in CardsPanel's own table, a sibling this
+      // panel has no reference to - without this it only reappeared after a
+      // full page reload remounted everything.
+      onSaved?.();
     } catch (e) {
       setError(String(e.message));
     } finally {

@@ -17,6 +17,12 @@ export default function RaceDayView({ id, onBack, onOpenCard }) {
   const [error, setError] = useState(null);
   const [confirm, setConfirm] = useState(null); // deletion-preview counts
   const [busy, setBusy] = useState(false);
+  // Bumped when a sibling of CardsPanel (currently just the Equibase OTR
+  // upload) writes cards CardsPanel has no way to know about on its own -
+  // CardsPanel self-fetches on mount, so remounting it via `key` is the
+  // reload. The two in-panel modals don't need this: they're CardsPanel's
+  // own children and call its `reload` directly.
+  const [cardsVersion, setCardsVersion] = useState(0);
 
   useEffect(() => {
     getRaceDay(id).then(setDay).catch((e) => setError(String(e.message)));
@@ -101,9 +107,9 @@ export default function RaceDayView({ id, onBack, onOpenCard }) {
       {/* D98: the hand-builder posts to D54's own endpoints, which take the
           card's bankroll. RaceDayView already holds the day, so pass it down
           rather than making CardsPanel fetch the day a second time. */}
-      <CardsPanel dayId={day.id} bankrollCents={day.bankroll_cents} onOpenCard={onOpenCard} />
+      <CardsPanel key={cardsVersion} dayId={day.id} bankrollCents={day.bankroll_cents} onOpenCard={onOpenCard} />
       <ResultsPanel dayId={day.id} />
-      <EquibaseOtrPanel dayId={day.id} />
+      <EquibaseOtrPanel dayId={day.id} onSaved={() => setCardsVersion((v) => v + 1)} />
       {day.races.map((race) => (
         <details className="race" key={race.id} open>
           <summary>
