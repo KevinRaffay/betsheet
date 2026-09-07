@@ -251,3 +251,40 @@ Specified but NOT scheduled - deliverable IDs get claimed when the work is picke
 | A capture that is not an entries page - the race-card index, or an Equibase bot-challenge or error page an automated collector will sometimes catch - is named as such, never reported as "no races" (the D121 pattern) | - (not scheduled) |
 | Invariant 6 is untouched: BetSheet still receives only a file it was handed and has no HTTP client: how the zip was produced is outside it | - (not scheduled) |
 | Each day keeps its own `odds_captured_at` from its zip entry's timestamp, rather than one time for the whole upload, since D117's staleness indicator reads that field | - (not scheduled) |
+
+## Static Pages target: build HUMAN cards at the track (requested 2026-09-07)
+
+A build-only deploy of a **card construction surface** - not an instance of the
+application. Workflow: create the race day at home -> generate OTR/LLM cards at
+home -> build the payload and deploy -> build HUMAN cards on a phone at the
+track -> carry the export files home -> import, upload results, grade.
+
+**This is the one deliberate exception to "benchmark first, bet later"** (user
+decision 2026-09-07, recorded in CLAUDE.md's opening rule): it is a Phase 4
+mobile surface built ahead of the sequencing, allowed because it only ADDS
+HUMAN cards to the corpus and nothing in Phases 1-3 depends on it.
+
+| Requirement | Deliverables |
+| --- | --- |
+| One race day leaves home as a self-contained JSON payload - identity, per-race entries, morning lines, wager menus - with no Equibase HTML and no parser input of any kind, so parsing stays a home-side job | D150 |
+| A payload built twice from an unchanged race day hashes identically, so the home side can later prove the entries a ticket was built against have not moved | D150 |
+| The day's OTR and LLM cards can optionally ride along, kept behind an explicit reveal, and revealing STAMPS the card being built - a HUMAN card built while reading the LLM card is not an independent source, and the stamp turns that contamination into labelled data rather than an unknown | D150 (payload + `sawReferenceCards`), D151 (the reveal), D153 (`cards.saw_reference_cards`) |
+| A ticket builder in the browser with the desktop's ticket types and validation - achieved by REUSING the desktop components and the shared parser, not by mirroring them, so the two cannot drift | D151 |
+| No server, no SQLite in the browser, no network call to Equibase, no LLM or OTR generation, no grading - and the generation exclusion is proven against the BUILT bundle rather than asserted | D151 (structural exclusion + `check-static-app`), D154 (the same check as a deploy gate) |
+| A partially built card survives a hard refresh mid-build with every ticket intact | D151 |
+| Storage that cannot keep a card refuses to start rather than accepting work into a store that evaporates; a refused durable-storage grant is visible, never silent | D151 |
+| An `unexported` count is always on screen, with a warning on leaving the page while it is non-zero | D151 |
+| Export and restore are a PAIR: a full browser data wipe followed by a restore-from-file recovers every completed card | D152 |
+| Card ids are namespaced per device, so two phones building the same day never collide | D152 (minting), D153 (`cards.external_id`) |
+| A rolling backup fires after every completed race, which is free because import dedupes by card id | D152, D153 |
+| Restoring a file for a different race day is refused with a reason naming both days | D152 |
+| The same export file imported three times produces one set of cards - keyed on card id, reporting "already present" rather than duplicating into the graded corpus | D153 |
+| Import refuses, each failure naming the specific check: a card that is not HUMAN, an unknown or soft-deleted race day, a payload hash that no longer reproduces, and ticket text that will not re-parse | D153 |
+| Imported cards merge into the ordinary HUMAN bucket - `builtOn` is recorded as fact and nothing buckets on it, so provenance stays answerable without splitting the corpus | D153 |
+| Invariant 9 survives the machine boundary: the home import re-parses the ticket text itself and refuses on any blocking warning, never trusting the device's own parse | D153 |
+| Invariant 15 survives it too: the device's real lock times are what `human_race_state` records, so a genuinely pre-committed day still computes as PRE_COMMIT | D153 |
+| Deploy is per race day - publishing a new payload replaces the deployed one - over hash routing, so no SPA 404 fallback is needed | D154 (pipeline), D151 (hash routing) |
+| The app loads and a card can be built fully offline after one online visit, and a redeployed race day is never served stale from cache | D155 |
+| **Deferred, not built**: a scoped write-capable PAT in the browser committing cards to a branch. A write token on a phone carried around a racetrack is a materially different security posture than a page that can touch nothing | - (deferred by the spec) |
+| **Out of scope by the spec**: any read path against the corpus, consensus classification, chart parsing, automatic sync home, and authentication of any kind | - (non-goals) |
+| **Dropped from scope, user decision 2026-09-07**: a named source per HUMAN card (`emubets`/`drf`/`keeneland-tipsheet`). Archaeology found no such field exists - it is unscheduled requirement P-3.2 under "Card source model" above, and the only label a card carries is `cards.name` (D137) | - (see Card source model, P-3.2) |

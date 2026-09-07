@@ -18,6 +18,13 @@ cards. Phase 4's at-track surfaces (PDF, here.now publish, mobile) only start
 once backtesting proves out. Nothing in Phases 1–3 waits on anything in
 Phase 4.
 
+**One deliberate exception, user decision 2026-09-07 (D150-D155):** the
+at-track MOBILE surface was built ahead of that sequencing. It is a card
+CONSTRUCTION surface only - no corpus, no grading, no generation, no database
+- so it adds HUMAN cards to the corpus rather than consuming a benchmark that
+does not exist yet, and nothing in Phases 1–3 depends on it. The rule stands
+for everything else in Phase 4.
+
 ---
 
 ## Invariants
@@ -87,7 +94,16 @@ things live code can break. **Invariant 4 went with the consensus removal
    sheet, the program and the results page must agree, blocking otherwise.
 10. **The server binds 127.0.0.1.** BetSheet is local-only; sharing is the
     here.now publish feature's job (Phase 4). Published cards contain card
-    data only, never personal information.
+    data only, never personal information. **D154 added the one other thing
+    that leaves this machine**: the GitHub Pages static builder publishes a
+    race-day PAYLOAD (entries, morning lines, wager menus - what Equibase
+    already prints publicly) so cards can be built on a phone at the track.
+    The server is untouched and still loopback-only; the Pages app has no
+    server at all. Two rules ride on it: a **Pages site is publicly readable
+    even from a private repo**, so the deployed payload is built WITHOUT
+    `--reference-cards` unless publishing the day's own LLM/OTR picks is a
+    deliberate choice; and nothing personal, no grade and no corpus row ever
+    enters a payload.
 11. **A failing source must be visible.** Every fetch attempt lands in the
     fetch audit log; a source going quiet must surface in the UI, never
     silently thin the cards.
@@ -257,6 +273,14 @@ things live code can break. **Invariant 4 went with the consensus removal
 | `client/src/drafts.js` | unlocked ticket drafts for the day-level builder, in `localStorage` keyed `betsheet:ticket-draft:v1:<dayId>:<race>` - a scratchpad for one browser, not a record the corpus carries. A draft is still TEXT that goes through preview -> lock -> the server's own re-parse (invariant 9) before a ticket exists. Every read/write is wrapped; an unreadable entry is dropped, never surfaced. Blank text clears a draft; it otherwise dies only on lock, PASS or an explicit Discard. |
 | `client/src/styles.css` | all styles: Radix Mauve imports, semantic tokens, light/dark themes, desktop-first layout. |
 
+| `shared/static-payload.js` | the static-payload shape (D150), PURE and browser-safe: `canonicalJson` (deterministic, key-sorted), `hashedRegion`/`canonicalPayloadText` and `validateStaticPayload`. **`payloadHash` covers the race day and NOTHING else** - `generatedAt` and `referenceCards` are excluded, so a payload rebuilt months later from an unchanged race day hashes identically and `scripts/import-static-cards.js` can verify it. Entries are carried in snake_case because `shared/parsers/human-picks.js` reads those rows directly. |
+| `scripts/build-static-payload.js` + `scripts/check-static-payload.js` | `npm run build-static-payload -- <raceDayId> [--out <path>] [--reference-cards]`: one race day as a self-contained JSON file, default `static/public/payload.json` (the file the Pages deploy publishes, so building a payload and deploying a race day are one act). READ-ONLY - never writes to the database, never appears in a trace. No Equibase HTML, no parser input: parsing happens here, the browser gets structured data. A soft-deleted day is refused (invariant 12). |
+| `static/` + `vite.static.config.js` | the at-the-track builder (D151): a SECOND Vite entry with no corpus, no grading, no generation and no database. `app.jsx` (hash-routed shell, storage gate, `unexported: N` counter), `DayView`/`RaceView`/`CardsView`/`ReferenceCards`, `storage.js` (IndexedDB; every mutation writes; refuses to start when storage cannot keep a card; reports a refused `persist()` honestly), `card.js` (the browser's parse, through the REAL shared parser + estimator), `exchange.js` (downloads + the rolling backup). **It REUSES `TicketBuilder.jsx`/`EntriesTable.jsx` from `client/`, never a fork.** **Exclusion of LLM/OTR generation is structural** - no import path reaches it - and is asserted against the BUILT bundle, not by reading the import graph. `RaceView`'s committed-text snapshot is adjusted during RENDER, never in an effect; see Gotchas. |
+| `shared/static-export.js` | the export document a phone hands home (D152) and its validation, shared by the browser writer and the home reader so they cannot drift. schemaVersion 3 and the card-trace-export vocabulary, but its OWN schema name: `trace`/`traceStatus`, `gradeSummary`/`results` cannot honestly exist on a device with no log files and no chart, and `cardId` is a device-namespaced STRING, not the integer row id. `llmInputs` is always `null`, never `[]`. |
+| `static/public/sw.js` | the offline shell (D155). **`payload.json` and navigations are NETWORK FIRST; only content-hashed assets are cache-first** - a payload one day old is not a stale page, it is the wrong races. Reads the hashed bundle names out of `index.html` at install so ONE online visit is enough, and every cache lookup passes `ignoreVary` (see Gotchas). |
+| `scripts/import-static-cards.js` + `scripts/check-static-import.js` | `npm run import-static-cards -- <path> [--yes]` (dry run by default): one export file or a directory of them, into the corpus. **Idempotency is load-bearing** - keyed on `cards.external_id` (migration 027), a re-import reports `already present` and writes nothing, which is what makes D152's rolling backup free and manual file transfer safe. Imported cards merge into the ordinary HUMAN bucket; `built_on` is fact, never a bucket. Re-parses the ticket TEXT through `persistHumanRace` (invariant 9 is not waived by the file) and re-stamps the DEVICE's lock times onto `human_race_state` (invariant 15 reads them; the import clock would be a lie). Seeds `strategy_templates` itself - it never boots the server. |
+| `.github/workflows/deploy-pages.yml` | the Pages deploy (D154), the repo's only workflow. Refuses to deploy without a valid `static/public/payload.json`, gates on `check-static-app`, and sets `BETSHEET_STATIC_BASE=/betsheet/`. **Cannot succeed until Pages is enabled** (Pro/Team on a private repo) - the header says so rather than leaving it to be discovered. |
+
 Planned homes (each arrives with its PR — keep this table honest as they
 land): the Equibase entries HTML ingest route and its UI, which wire up the
 already-built `shared/parsers/equibase-entries.js` (D104) and then replace the
@@ -303,6 +327,16 @@ npm run archive-corpus [-- --force]  # D107: freeze the pre-pivot corpus to arch
 npm run fix-grade-set-versions [-- --yes]  # D99: re-stamp grade sets written under the wrong engine version (regrade then drop the stale set; dry run by default)
 npm run export-trace -- --card N [--out f]  # the LLM feed for one card
 npm run reset -- --yes  # FACTORY RESET: wipe every record AND every log file
+
+# The static Pages target (D150-D155) - the at-the-track card builder
+npm run build-static-payload -- <raceDayId> [--out f] [--reference-cards]  # D150: one race day -> static/public/payload.json (read-only; --reference-cards embeds the day's LLM/OTR cards, which the deploy then publishes PUBLICLY)
+npm run dev:static      # D151: the static app on vite :5186 (needs a payload built first)
+npm run preview:static  # D155: serves the BUILT dist-static on :5187 - the only way to exercise the service worker (it registers in production builds only)
+npm run build:static    # D151: build dist-static (BETSHEET_STATIC_BASE sets the deploy sub-path)
+npm run check-static-payload  # D150: canonicalization, the 13 validation refusals, a real day, hash stability incl. a negative control
+npm run check-static-app      # D151+D154+D155: payload rows and DB rows parse IDENTICALLY, the built bundle ships no LLM/OTR/grading/API code (with a positive control), the Pages base, the service-worker strategies
+npm run import-static-cards -- <path> [--yes]  # D153: import phone-built cards (dry run by default; a directory of rolling backups is one safe import)
+npm run check-static-import   # D153: migration 027, the same file imported three times producing ONE card, all four refusals, invariant 15's lock times
 ```
 
 Further verification commands (simulator runs, distribution reports) are
@@ -383,6 +417,7 @@ row words differently.
 
 | feature | state | notes |
 | --- | --- | --- |
+| Static Pages target: build HUMAN cards on a phone at the track, carry them home as files (D150-D155) | merged | branch `static-pages-target` - a build-only deploy of a card CONSTRUCTION surface: no corpus, no grading, no generation, no database. D150 the payload builder (hash covers the race day alone, so the home import can verify the entries have not moved). D151 the browser app, reusing `TicketBuilder`/`EntriesTable` rather than forking them, with LLM/OTR excluded structurally and proven against the built bundle. D152 export+restore as a pair, with a rolling backup that is free because D153's import dedupes. D153 the import, keyed on the new `cards.external_id` (migration 027), merging into the ordinary HUMAN bucket. D154 the Pages workflow. D155 the offline shell. **Archaeology first changed the design**: the named source the spec assumed (`emubets`/`drf`) does not exist - it is unscheduled requirement P-3.2 - and Kevin's call was to drop it from this scope. Browser and offline testing found five real bugs, all fixed and pinned. Full record per ID: DELIVERABLES.md D150-D155. |
 | LLM cards: capture generation inputs (prompt, response, notes, model, template version), not just outputs (D149) | merged | PR [#191](https://github.com/KevinRaffay/betsheet/pull/191), branch `llm-input-capture` - two cards generated from different analyst-notes payloads had no way to be reproduced or diffed, and one card's grade moved through six mid-session regenerations reconstructable only by timestamp-diffing. Widened `llm_card_requests` (migration 026, reused rather than a parallel table) with correlation id, prompt/notes hashes, a hash-derived template version, and request params; added `llm_request_sent`/`llm_response_received`/`race_regenerated` trace events; export bumped to `SCHEMA_VERSION` 3 with a top-level `llmInputs` block (`null`, never `[]`, when unknown), `?omitLlmInputs=1` for a shareable redacted form. Kevin's call before merge: regeneration keeps mutating in place, even on a graded card - no new card id, no follow-up scheduled. Full record: DELIVERABLES.md D149. |
 | LLM prompt fix: forbid "part-wheel" straight bets - their true combination count was never computed (D148) | merged | PR [#190](https://github.com/KevinRaffay/betsheet/pull/190) `llm-prompt-no-part-wheel` - a real generation's comma-separated list within one straight-bet position multiplied to 18 real combinations the model never computed. Fixed by forbidding the construction outright rather than teaching the math; the parser itself is unchanged (a human's own paste can still use a part-wheel). Full record: DELIVERABLES.md D148. |
 | LLM card modal: pick WHICH LLM card, not just the latest (D147) | merged | PR [#189](https://github.com/KevinRaffay/betsheet/pull/189) `llm-card-picker` - a card generated with one model became unreachable once a newer card existed. Added a card picker mirroring D140's human-card one; fixed a stray literal `0` rendering bug (SQLite's `EXISTS` returns a number, not a boolean) in both this new code and D140's original. Full record: DELIVERABLES.md D147. |
@@ -582,7 +617,11 @@ it. Rules still in force:
   squat on them. The check scripts each bind a fixed port in **8899–8920**
   (betsheet-alt's old 8902 sat inside that band), so a long-running instance
   must stay out of it. 8790/5177 is the escape hatch the preflight prints;
-  leave it free.
+  leave it free. **The static Pages target owns its own pair** (D151/D155):
+  `npm run dev:static` is vite :5186 and `npm run preview:static` is :5187,
+  both in `.claude/launch.json`. Neither has an API half - the static app has
+  no server - and the service worker registers only in a PRODUCTION build, so
+  `preview:static` on :5187 is the only way to exercise it.
 - **A stale `npm run dev` outlives its shell, and used to fail silently** (D80).
   `concurrently -k` only kills siblings when concurrently itself exits, so a
   closed terminal or an ended session orphans the whole tree, which keeps
@@ -613,6 +652,35 @@ it. Rules still in force:
   time the corpus was hidden. Set a `cancelled` flag in the effect and return
   `() => { cancelled = true; }` as the cleanup, which is a FUNCTION and so
   also satisfies the rule above.
+- **State that must track a prop is adjusted during RENDER, not in an effect**
+  (D155). `RaceView.jsx` keeps a snapshot of a race's already-saved ticket
+  text and composes the builder's output on top of it. Reading that text LIVE
+  duplicates every ticket: the saved card flows back down as a prop, the
+  snapshot becomes the sum, and the next render recomputes `$20 W 1` as
+  `$20 W 1 / $20 W 1` - with no new event at all, the render alone does it.
+  Moving the snapshot into a `useEffect` fixes that and breaks something
+  worse: **child effects run before parent effects**, so `TicketBuilder`'s
+  mount-time `onChange('')` fires while the parent still holds the previous
+  (empty) snapshot and writes an empty race over saved text - re-opening a
+  race erased the work in it. Both are fixed by React's documented pattern
+  for this exact case: compare a key during render and `setState` right there,
+  so the new value is in place before any child commits. Neither bug is
+  reachable from a check script (they need a real render tree) and both were
+  found by driving the app in a browser.
+- **A service worker's cache lookups must pass `ignoreVary` here** (D155).
+  Vite emits `<script crossorigin>` for its module bundle, so the browser
+  sends those requests with an `Origin` header, while the worker's
+  install-time `cache.add()` fetches them without one. Any server answering
+  `Vary: Origin` - vite preview does, and static hosts commonly do - then
+  makes `cache.match` MISS on exactly the requests the page needs. The
+  symptom is nasty: the shell loads from cache, the bundle does not, and the
+  screen is blank with a full and correct cache sitting right there. Safe to
+  ignore Vary in this app because everything cached is same-origin and
+  content-hashed. Related: a first visit does NOT populate the asset cache on
+  its own - the page's own script/link requests are issued before the worker
+  activates - so `sw.js` reads the hashed names out of `index.html` at
+  install. Without that, offline works only from the second visit, which at a
+  racetrack means it does not work.
 - **A React effect must never be handed a promise-returning function.**
   `useEffect(reload, deps)` where `reload` is `() => fetch(...).then(...)` stores
   the PROMISE as the effect's cleanup; on unmount React calls it and throws

@@ -8,6 +8,9 @@
     "start": "npm run build && node server/index.js",
     "start-qa": "npm run build && node -e \"process.env.BETSHEET_PORT ||= '8902'; import('./server/index.js')\"",
     "build": "vite build",
+    "build:static": "vite build --config vite.static.config.js",
+    "dev:static": "vite --config vite.static.config.js",
+    "preview:static": "vite preview --config vite.static.config.js",
     "dev": "node scripts/dev-preflight.js && concurrently -k -n vite,api -c cyan,magenta \"vite\" \"node scripts/dev-watch.js\"",
     "serve": "node server/index.js",
     "dev:clean": "node scripts/dev-clean.js",
@@ -43,7 +46,12 @@
     "batch-equibase": "node scripts/batch-import-equibase-entries.js",
     "check-track-codes": "node scripts/check-track-codes.js",
     "check-zip-read": "node scripts/check-zip-read.js",
-    "check-entries-zip": "node scripts/check-entries-zip.js"
+    "check-entries-zip": "node scripts/check-entries-zip.js",
+    "check-static-payload": "node scripts/check-static-payload.js",
+    "check-static-app": "node scripts/check-static-app.js",
+    "check-static-import": "node scripts/check-static-import.js",
+    "import-static-cards": "node scripts/import-static-cards.js",
+    "build-static-payload": "node scripts/build-static-payload.js"
   },
   "dependencies": {
     "@radix-ui/colors": "^3.0.0",

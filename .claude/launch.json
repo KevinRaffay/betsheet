@@ -9,6 +9,24 @@
         "dev:preview"
       ],
       "port": 5185
+    },
+    {
+      "name": "betsheet-static",
+      "runtimeExecutable": "npm",
+      "runtimeArgs": [
+        "run",
+        "dev:static"
+      ],
+      "port": 5186
+    },
+    {
+      "name": "betsheet-static-preview",
+      "runtimeExecutable": "npm",
+      "runtimeArgs": [
+        "run",
+        "preview:static"
+      ],
+      "port": 5187
     }
   ]
 }

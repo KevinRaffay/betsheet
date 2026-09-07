@@ -1,0 +1,38 @@
+/* Additions for the at-the-track builder only (D151). Everything else comes
+   from client/src/styles.css, unmodified, so the shared components render
+   identically here and on the desktop.
+
+   The desktop app is deliberately desktop-first and data-dense. This one is
+   used one-handed, outdoors, on a phone, so the few overrides below are all
+   about touch targets and horizontal room - never about restyling a shared
+   component, which would let the two copies drift. */
+
+.pagehead--static {
+  display: flex;
+  align-items: flex-start;
+  justify-content: space-between;
+  gap: 12px;
+  flex-wrap: wrap;
+}
+
+.static-counter { white-space: nowrap; }
+
+/* A restored-but-unlocked race's text, wrapped: a day's worth of teller calls
+   is long, and a phone has no horizontal room to spare. */
+.draft-line code,
+.wrap { white-space: pre-wrap; overflow-wrap: anywhere; }
+
+@media (max-width: 720px) {
+  .app { padding: 8px; }
+
+  /* Fingers, not a mouse. */
+  .btn, .in, .pgm-chip { min-height: 40px; }
+  .pgm-chip { padding: 6px 10px; }
+
+  /* Wide tables scroll inside themselves rather than widening the page. */
+  .grid { display: block; overflow-x: auto; }
+
+  /* Stack the label/field pairs the desktop lays out in a row. */
+  .formrow { flex-wrap: wrap; }
+  .formrow > label { flex: 1 1 100%; }
+}

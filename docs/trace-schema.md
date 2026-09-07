@@ -72,6 +72,16 @@ A human's pasted tickets, not the engine, produced these - no `inputs_snapshot`/
 | `human_ticket_deleted` | `cardId`, `raceDayId`, `race`, `ticketId`, `betType`, `tellerCall`, `costCents`, `raceRetired` | one ticket was deleted from a locked, unrevealed race (D103). Deliberately NOT a timestamp change: a delete leaves `human_race_state.picks_locked_at` alone, so the card's derived blindness (invariant 15) is the same before and after - which is why deleting is offered where editing is not. `raceRetired` marks the last ticket going, which also drops the race's allocation and its `human_race_state` row |
 | `human_race_locked` | `cardId`, `raceDayId`, `race`, `pass` | one race's picks were locked (or explicitly passed) on a human card - the timestamp this event's `ts` field carries is the same one written to `human_race_state.picks_locked_at`, the fact a later blindness computation (D55) is derived from |
 
+### Static-web cards imported from the Pages target (D153, emitted by `scripts/import-static-cards.js`, under a correlationId minted per imported card)
+
+A card built on a phone at the track (D151) and carried home as a file (D152). It is imported through `persistHumanRace`, the same writer the desktop uses, so it emits the **full human-card event set above** - `card_generated`, one `ticket_added` per ticket, one `human_race_locked` per race - plus the single event below. Every one of them carries the one correlationId this import minted for the card (invariant 8).
+
+Two things about these events are worth knowing when reading a trace. The `ts` on an imported `human_race_locked` is the IMPORT time, because that is when the event was written; the time the race was actually locked at the track is in `human_race_state.picks_locked_at`, which the import re-stamps from the file (see `scripts/import-static-cards.js` on why invariant 15 requires that). And a re-import of an already-present card writes nothing at all - not even this event - because the import skips it entirely.
+
+| event | fields | meaning |
+| --- | --- | --- |
+| `static_card_imported` | `cardId` (the local row id just minted), `raceDayId`, `externalId` (the device-namespaced card id, now on `cards.external_id` - the idempotency key), `deviceId`, `builtOn` (`'static-web'`), `payloadHash` (the payload the phone built against, verified to still reproduce from this database), `sawReferenceCards`, `races`, `exportedAt` (the file's own stamp) | one card arrived from outside this machine. The one place a card's origin is something other than a local action, which is why it is its own event rather than a field on `card_generated` |
+
 ### LLM cards (D63, emitted by `server/llm-cards.js`, streamed under the calling session's correlationId)
 
 An LLM's own picks, not the engine, produced these - no `inputs_snapshot`/`rule_fired`/`allocation_decided` events exist, since `shared/card-engine.js` is never called. `card_generated`/`ticket_added` carry the same fields the Human cards section above documents (`template`/`engineVersion` are `'llm'`). D149 added the three events below to capture what a generation call CONSUMED as well as what it produced - previously only the prompt/response/notes on the `llm_card_requests` DB row recorded that, with nothing in the trace stream itself.
