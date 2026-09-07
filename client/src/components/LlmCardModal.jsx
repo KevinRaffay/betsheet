@@ -1,10 +1,22 @@
 import React, { useEffect, useState } from 'react';
 import {
-  getLlmModels, getLlmNotes, getLlmRequests, getRaceDay, listCards, lockLlmCard, previewLlmCard, saveLlmNote,
+  getLlmModels, getLlmNotes, getLlmRequests, getRaceDay, listCards, lockLlmCard, modelLabel, previewLlmCard, saveLlmNote,
 } from '../api.js';
 import EntriesTable from './EntriesTable.jsx';
 
 const money = (cents) => (cents == null ? '—' : cents % 100 === 0 ? `$${cents / 100}` : `$${(cents / 100).toFixed(2)}`);
+
+// One option line per LLM card on the day - the same shape D140's human-card
+// picker uses (`DayTicketBuilderModal.jsx`'s `cardOptionLabel`), so a card
+// generated with a different model than the day's latest is reachable again
+// instead of permanently shadowed by whichever card `reload()` resumes.
+const llmCardOptionLabel = (c) => [
+  `#${c.card_number}`,
+  modelLabel(c.llm_model),
+  `${c.tickets ?? 0} ticket${(c.tickets ?? 0) === 1 ? '' : 's'}`,
+  money(c.total_cents ?? 0),
+  c.graded ? 'graded' : null,
+].filter(Boolean).join(' · ');
 
 // A ticket may come from a live preview (parseHumanPicksText's camelCase
 // shape: betType/costCents/tellerCall/legs) or a saved DB row (snake_case:
@@ -103,6 +115,7 @@ function NotesEditor({ scope, draft, onEdit, onFlush, disabled }) {
 export default function LlmCardModal({ dayId, onCardChanged, onClose }) {
   const [dayInfo, setDayInfo] = useState(null);
   const [cardId, setCardId] = useState(null);
+  const [llmCards, setLlmCards] = useState([]); // every LLM card on the day, newest first
   const [ticketsByRace, setTicketsByRace] = useState(new Map()); // raceNumber -> { tickets, raceCostCents, reasoningText }
   const [expandedRaces, setExpandedRaces] = useState(new Set());
   // D92: notes live in their OWN Map, never merged into ticketsByRace -
@@ -131,14 +144,27 @@ export default function LlmCardModal({ dayId, onCardChanged, onClose }) {
   // with no LLM card yet, or after "Start a New Card").
   const [lockedModel, setLockedModel] = useState(null);
 
+  // Keeps the whole list, not just the resolved target - the picker below
+  // needs every card to offer, and a card generated with a different model
+  // than the day's latest would otherwise be permanently unreachable once a
+  // newer one exists. Called with NO argument (open, or after `reload()`) it
+  // resumes the latest, the original D75 rule unchanged; called WITH an id
+  // (after a save, which is the only thing that can mint or extend one) it
+  // stays on exactly that card, mirroring `DayTicketBuilderModal.jsx`'s
+  // `loadCards` (D140) so a deliberate selection is never overwritten from
+  // under the user by an unrelated refresh.
+  const loadCards = (select) => listCards(dayId).then((cards) => {
+    const llm = cards.filter((c) => c.template === 'llm').sort((a, b) => b.card_number - a.card_number);
+    setLlmCards(llm);
+    const on = (select === undefined ? llm[0] : llm.find((c) => c.id === select)) ?? null;
+    setCardId(on?.id ?? null);
+    setLockedModel(on?.llm_model ?? null);
+    if (on?.llm_model) setSelectedModel(on.llm_model);
+  }).catch(() => {});
+
   const reload = () => {
     getRaceDay(dayId).then(setDayInfo).catch((e) => setError(String(e.message)));
-    listCards(dayId).then((cards) => {
-      const llm = cards.filter((c) => c.template === 'llm').sort((a, b) => b.card_number - a.card_number)[0];
-      setCardId(llm ? llm.id : null);
-      setLockedModel(llm?.llm_model ?? null);
-      if (llm?.llm_model) setSelectedModel(llm.llm_model);
-    }).catch(() => {});
+    loadCards();
     getLlmModels().then((m) => {
       setModels(m.models ?? []);
       setSelectedModel((prev) => prev || m.default || m.models?.[0]?.id || '');
@@ -229,6 +255,7 @@ export default function LlmCardModal({ dayId, onCardChanged, onClose }) {
   }, [onClose]);
 
   const races = dayInfo?.races ?? [];
+  const selectedCard = llmCards.find((c) => c.id === cardId) ?? null;
   const firstUngenerated = races.find((r) => r.number !== lastSavedRace && !ticketsByRace.has(r.number));
   const lastSavedIndex = lastSavedRace == null
     ? -1
@@ -269,7 +296,10 @@ export default function LlmCardModal({ dayId, onCardChanged, onClose }) {
     setError(null);
     try {
       const r = await lockLlmCard(dayId, { race: openRace, requestId: preview.requestId, bankrollCents: dayInfo.bankroll_cents, cardId }, correlationId);
-      if (!cardId) { setCardId(r.cardId); setLockedModel(r.llmModel ?? selectedModel); }
+      // The picker line quotes ticket counts and spend, so a save has to
+      // refresh the list too - not just the resolved cardId/lockedModel -
+      // or the option this card is showing goes stale next to the race grid.
+      await loadCards(r.cardId);
       const savedRace = openRace;
       setLastSavedRace(savedRace);
       setOpenRace(null);
@@ -292,28 +322,42 @@ export default function LlmCardModal({ dayId, onCardChanged, onClose }) {
     setError(null);
   };
 
-  // D75: stop resuming the day's latest LLM card so the next Generate
-  // starts a brand-new one (the API already supports this - cardId
-  // omitted mints a new card, same D28 append-only convention every other
-  // card type follows - the modal just never exposed the path before).
-  // The old card is untouched, still visible in the Betting cards table.
-  // Deliberately does NOT reset notesByRace/cardNote: notes belong to the DAY,
-  // not the card, which is the whole point of the day+race key. A new card on
-  // the same day should see the same commentary.
-  const handleStartNewCard = () => {
+  // Switching card identity is a card-SESSION boundary (invariant 8: one
+  // correlation id per card session) - drop the in-progress preview and its
+  // correlation id rather than let a stale one attach to the newly selected
+  // card's next call, and close whatever race panel/regenerate-all summary
+  // was open for the PREVIOUS card. `ticketsByRace` refreshes itself via the
+  // effect keyed on `cardId` below, so it isn't cleared here. Deliberately
+  // does NOT touch notesByRace/cardNote: notes belong to the DAY, not the
+  // card, so switching keeps whatever commentary is on file - the same
+  // reasoning `DayTicketBuilderModal.jsx`'s `switchTo` (D140) gives for
+  // keeping its drafts across a card switch.
+  const switchTo = (id) => {
     if (busy) return;
-    setCardId(null);
-    setLockedModel(null); // D76: free the picker again
-    setTicketsByRace(new Map());
+    const target = llmCards.find((c) => c.id === id) ?? null;
+    setCardId(target?.id ?? null);
+    setLockedModel(target?.llm_model ?? null);
+    setSelectedModel((prev) => target?.llm_model ?? prev);
     setExpandedRaces(new Set());
     setOpenRace(null);
     setLastSavedRace(null);
     setPreview(null);
     setError(null);
     setErrorRace(null);
+    setCorrelationId(null);
     setRegenerateAllResults(null);
     setRegenerateAllProgress(null);
   };
+
+  // D75: stop resuming the day's latest LLM card so the next Generate
+  // starts a brand-new one (the API already supports this - cardId
+  // omitted mints a new card, same D28 append-only convention every other
+  // card type follows). The old card is untouched, still visible in the
+  // Betting cards table AND still selectable from the picker below (D147:
+  // this used to be the only way off the day's latest card - now it is one
+  // case of `switchTo`, "no card" being a selectable position in the picker,
+  // the same shape D140 gave the human-card picker's own "New card" option).
+  const handleStartNewCard = () => switchTo(null);
 
   // Regenerate every race, one call at a time, auto-saving each in place -
   // same generate-then-save operation "Regenerate" already does per race,
@@ -359,6 +403,10 @@ export default function LlmCardModal({ dayId, onCardChanged, onClose }) {
     setCorrelationId(localCorrelationId);
     setRegenerateAllProgress(null);
     setRegenerateAllResults(results);
+    // Same reasoning as handleSave: the picker's ticket-count/spend label
+    // for this card is now stale, and a first save here is also the only
+    // way `localCardId` differs from the `cardId` this render started with.
+    if (localCardId) await loadCards(localCardId);
     onCardChanged?.();
     setBusy(false);
   };
@@ -391,6 +439,46 @@ export default function LlmCardModal({ dayId, onCardChanged, onClose }) {
               </p>
               {error && openRace == null && <p className="notice notice--error">{error}</p>}
 
+              {/* One place off the day's latest LLM card - the same shape
+                  DayTicketBuilderModal.jsx's "Human card" picker (D140) gives
+                  human cards, so a card generated with a different model than
+                  the newest one stays reachable rather than being shadowed
+                  the moment a newer card exists. */}
+              <div className="formrow formrow--tight">
+                <label>
+                  LLM card{' '}
+                  <select
+                    className="in in--sm" value={cardId ?? ''} disabled={busy}
+                    onChange={(e) => switchTo(e.target.value === '' ? null : Number(e.target.value))}
+                  >
+                    <option value="">New card{llmCards.length > 0 ? ' (not saved yet)' : ''}</option>
+                    {llmCards.map((c) => (
+                      <option key={c.id} value={c.id}>{llmCardOptionLabel(c)}</option>
+                    ))}
+                  </select>
+                </label>
+                {cardId != null && (
+                  <button
+                    className="btn btn--sm" disabled={busy} onClick={handleStartNewCard}
+                    title="Start a brand-new LLM card instead of overwriting the current one - the current card stays in the Betting cards table"
+                  >
+                    Start a New Card
+                  </button>
+                )}
+              </div>
+              {/* Locking onto an already-graded card silently REGRADES it -
+                  the same hazard D140 found for human cards, said before the
+                  click rather than blocked: a live day's results can land
+                  while later races are still being generated. */}
+              {Boolean(selectedCard?.graded) && (
+                <p className="notice notice--warn">
+                  Card #{selectedCard.card_number} has already been graded against this day's results.
+                  Generating or regenerating another race on it regrades the card and moves a P/L figure
+                  that has already been reported. Start a new card instead unless you mean to change what
+                  this one played.
+                </p>
+              )}
+
               <div className="formrow formrow--tight">
                 <label>
                   Model{' '}
@@ -401,7 +489,7 @@ export default function LlmCardModal({ dayId, onCardChanged, onClose }) {
                 </label>
                 {lockedModel && (
                   <span className="dim">
-                    {' '}This card was generated with {models.find((m) => m.id === lockedModel)?.label ?? lockedModel} - start a new card to try a different model.
+                    {' '}This card was generated with {models.find((m) => m.id === lockedModel)?.label ?? lockedModel} - pick another card above, or start a new one, to try a different model.
                   </span>
                 )}
               </div>
@@ -409,10 +497,6 @@ export default function LlmCardModal({ dayId, onCardChanged, onClose }) {
               <div className="formrow formrow--tight">
                 <button className="btn" disabled={busy || races.length === 0} onClick={handleRegenerateAll}>
                   Regenerate All Races
-                </button>
-                <button className="btn" disabled={busy || ticketsByRace.size === 0} onClick={handleStartNewCard}
-                  title="Start a brand-new LLM card instead of overwriting the current one - the current card stays in the Betting cards table">
-                  Start a New Card
                 </button>
                 {regenerateAllProgress && (
                   <p className="llm-loading" role="status">
