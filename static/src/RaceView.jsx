@@ -3,6 +3,7 @@ import TicketBuilder from '@client/components/TicketBuilder.jsx';
 import EntriesTable from '@client/components/EntriesTable.jsx';
 import { navigate } from './app.jsx';
 import { previewRace, blockingWarnings, raceOf, builderEntries } from './card.js';
+import { useIsMobile } from './mobile.js';
 
 const money = (cents) => (cents == null ? '—' : cents % 100 === 0 ? `$${cents / 100}` : `$${(cents / 100).toFixed(2)}`);
 
@@ -26,6 +27,7 @@ const joinText = (a, b) => [a, b].map((s) => (s ?? '').trim()).filter(Boolean).j
 export default function RaceView({ payload, raceNumber, card, deviceId, onSaveCard, onBackup }) {
   const race = raceOf(payload, raceNumber);
   const state = card?.races?.[raceNumber] ?? null;
+  const isMobile = useIsMobile();
   const [builderText, setBuilderText] = useState('');
   const [busy, setBusy] = useState(false);
 
@@ -148,9 +150,35 @@ export default function RaceView({ payload, raceNumber, card, deviceId, onSaveCa
           {[race.postTime, race.distance, race.surface, race.raceType].filter(Boolean).join(' · ')}
         </span>
       </div>
-      {race.conditions && <p className="dim">{race.conditions}</p>}
+      {/* The race CONDITIONS line is deliberately not rendered (D158). It is
+          three lines of eligibility boilerplate - "For California Bred Or
+          California Sired Maidens, Fillies Two Years Old. Weight, 122 Lbs..."
+          - that pushed the entries and the ticket builder below the fold on a
+          phone for information nobody bets on. It stays in the payload, and
+          therefore in `payloadHash`, so removing it here changes no hash and
+          breaks no import; it is simply not shown on this surface. */}
 
-      <EntriesTable entries={race.entries} open />
+      {/* Collapsed on a phone so the ticket builder - what this screen is for
+          - is reachable without scrolling past 14 rows of entries. Expanded on
+          a desktop, where there is room for both. `showRank` is off because
+          the static payload carries no program_rank at all, so the column
+          would be a dash on every row. */}
+      <EntriesTable
+        // Keyed on the breakpoint so a change remounts the panel and the
+        // default for the new size is re-applied. `<details open>` is DOM
+        // state the browser and the user also own - once someone has tapped
+        // the summary, React's record of `open` no longer matches the DOM and
+        // a later render carrying the same value will not correct it. A
+        // remount always will, and costs nothing on a table this size.
+        // (An earlier comment here blamed React for a panel that stayed open
+        // across a resize. That was wrong: `useIsMobile` had not changed,
+        // because this repo's browser harness dispatches no resize or
+        // matchMedia events at all - see the note in mobile.js.)
+        key={isMobile ? 'mobile' : 'desktop'}
+        entries={race.entries}
+        open={!isMobile}
+        showRank={false}
+      />
 
       {!card && <p className="notice notice--warn">Pick or start a card on the day screen before building.</p>}
 

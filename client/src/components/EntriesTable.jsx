@@ -22,13 +22,23 @@ const normalizeEntry = (e) => ({
 // Bottom Line `<details open>` already on that view) - D135. The LLM and
 // day-builder modals stack every race in one scroll, so theirs default
 // collapsed (the historical behavior, unchanged).
-export default function EntriesTable({ entries, open = false }) {
+//
+// `showRank` (D158) exists for the static at-track builder, whose payload
+// carries no `program_rank` at all - the column renders a dash on every row
+// there, which is width a phone does not have to spare. It defaults TRUE so
+// all three desktop callers are untouched: they read a real DB row, where the
+// program handicapper's rank is a genuine column and a null means "this day
+// has no program analysis", which is worth showing as such.
+export default function EntriesTable({ entries, open = false, showRank = true }) {
   return (
     <details className="race-entries" open={open}>
       <summary>Entries ({entries.length})</summary>
       <table className="grid grid--entries">
         <thead>
-          <tr><th>#</th><th>Horse</th><th>Jockey</th><th>Trainer</th><th>M/L</th><th>Rank</th></tr>
+          <tr>
+            <th>#</th><th>Horse</th><th>Jockey</th><th>Trainer</th><th>M/L</th>
+            {showRank && <th>Rank</th>}
+          </tr>
         </thead>
         <tbody>
           {entries.map(normalizeEntry).map((e, i) => (
@@ -42,7 +52,7 @@ export default function EntriesTable({ entries, open = false }) {
               <td>{e.jockey ?? '—'}</td>
               <td>{e.trainer ?? '—'}</td>
               <td>{e.morningLine ?? '—'}</td>
-              <td>{e.programRank ?? '—'}</td>
+              {showRank && <td>{e.programRank ?? '—'}</td>}
             </tr>
           ))}
         </tbody>
