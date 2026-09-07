@@ -43,7 +43,9 @@
     "batch-equibase": "node scripts/batch-import-equibase-entries.js",
     "check-track-codes": "node scripts/check-track-codes.js",
     "check-zip-read": "node scripts/check-zip-read.js",
-    "check-entries-zip": "node scripts/check-entries-zip.js"
+    "check-entries-zip": "node scripts/check-entries-zip.js",
+    "check-static-payload": "node scripts/check-static-payload.js",
+    "build-static-payload": "node scripts/build-static-payload.js"
   },
   "dependencies": {
     "@radix-ui/colors": "^3.0.0",
