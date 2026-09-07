@@ -75,6 +75,11 @@ console.log('-- pure: buildLlmRaceUserPrompt --');
   // distinctive phrase so the rule cannot be dropped silently.
   check('system prompt forbids stacking straight tickets to cover both orders of the same horses (D138 fix)',
     SYSTEM_PROMPT.includes('a box bet in disguise') && SYSTEM_PROMPT.includes('#5 / #8') && SYSTEM_PROMPT.includes('#8 / #5'));
+  // 2026-09-07 fix: the box-divisibility rule said nothing about a STRAIGHT
+  // exotic also needing to land on the wager type's base unit, and a real
+  // generation hit exactly that gap ($0.75 on a 50c trifecta, 1.5 steps).
+  check('system prompt states the base-unit rule applies to straight exotics too, not just boxes (2026-09-07 fix)',
+    SYSTEM_PROMPT.includes('STRAIGHT or BOXED') && SYSTEM_PROMPT.includes('$0.75') && SYSTEM_PROMPT.includes('1 combination'));
 }
 
 // ---------- analyst notes, pure (D92) ----------

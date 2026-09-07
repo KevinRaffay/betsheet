@@ -203,10 +203,16 @@ grammar, then a line reading exactly "<<<END TICKETS>>>":
   with "/", e.g. "#4 / #2" (4 to win, 2 to place). Box types list
   every horse in the box separated by ",", e.g. "#4,#2,#7".
 - <stake>: the TOTAL dollar amount for that ticket (not per-combo),
-  e.g. "$20". For a BOX bet, the total must divide EXACTLY and EVENLY
-  across every combination the box produces, with each combination's
-  share a whole multiple of that wager type's base unit shown in the
-  wager menu above. The number of combinations is:
+  e.g. "$20". Every exacta/trifecta/superfecta - STRAIGHT or BOXED -
+  must price in whole multiples of that wager type's base unit shown
+  in the wager menu above, per combination. A STRAIGHT bet (one
+  specific finish order, e.g. "#4 / #2 / #7" for a trifecta) is always
+  1 combination, so its total must BE that multiple directly - a 50c
+  trifecta prices at $0.50, $1.00, $1.50, ... - NOT $0.75, which is 1.5
+  steps of 50c, not a whole one. For a BOX bet, the total must divide
+  EXACTLY and EVENLY across every combination the box produces, with
+  each combination's share a whole multiple of the base unit. The
+  number of combinations is 1 for a straight bet, and for a box:
     exacta box:     n x (n-1)
     trifecta box:   n x (n-1) x (n-2)
     superfecta box: n x (n-1) x (n-2) x (n-3)
@@ -337,6 +343,23 @@ untouched, so no version bump.
   stays exactly as strict; this only gives the model what it needs to
   satisfy it. Not provably foolproof (a model can still miscalculate),
   so the existing blocking-warning behavior remains the real backstop.
+- **2026-09-07: a STRAIGHT exotic's total didn't line up with its base
+  unit.** Live bug report: `trifecta | #4 / #2 / #7 | $0.75` on a 50c
+  trifecta race - one specific finish order, so 1 combination, and $0.75
+  is 1.5 steps of the 50c base, not a whole one - correctly BLOCKED by
+  `shared/parsers/human-picks.js` (`non_multiple_stake`,
+  `wagerLimitsFor`'s `stepCents` check, same rule the 2026-09-03 box fix
+  above hits). Same root cause as that fix, in the OTHER half of the
+  rule: the `<stake>` rule explained the box-combination divisibility
+  math in detail but said nothing at all about a STRAIGHT bet needing to
+  land on the base unit too - a straight bet's total looked exempt from
+  the whole section, which starts "For a BOX bet...". Fix is prompt-only,
+  same posture as the box fix: the rule now states the divisibility
+  requirement applies to every exotic - straight or boxed - with 1
+  combination being the straight case, and a worked example matching
+  this exact failure ($0.75 vs the $0.50 step). No parser, server, or
+  schema change - the validation was already correct; this only tells
+  the model the rule it was missing.
 
 ## Model selection (D75)
 
