@@ -70,6 +70,11 @@ console.log('-- pure: buildLlmRaceUserPrompt --');
   check('system prompt names the ticket-block markers', SYSTEM_PROMPT.includes('<<<TICKETS>>>') && SYSTEM_PROMPT.includes('<<<END TICKETS>>>'));
   check('system prompt gives the box combination-count formulas and the divisibility rule (2026-09-03 fix)',
     SYSTEM_PROMPT.includes('exacta box:') && SYSTEM_PROMPT.includes('n x (n-1)') && SYSTEM_PROMPT.includes('$16.50') && SYSTEM_PROMPT.includes('$2.75'));
+  // D138: found live as two $1 exactas (5/8 and 8/5) that cost and covered
+  // exactly what one exacta box on the same pair does - pinned on the
+  // distinctive phrase so the rule cannot be dropped silently.
+  check('system prompt forbids stacking straight tickets to cover both orders of the same horses (D138 fix)',
+    SYSTEM_PROMPT.includes('a box bet in disguise') && SYSTEM_PROMPT.includes('#5 / #8') && SYSTEM_PROMPT.includes('#8 / #5'));
 }
 
 // ---------- analyst notes, pure (D92) ----------

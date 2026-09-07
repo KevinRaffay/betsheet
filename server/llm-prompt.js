@@ -25,6 +25,14 @@ Rules:
   (exacta / exacta box / trifecta / trifecta box / superfecta /
   superfecta box) where warranted - no multi-race wagers (Daily
   Double, Pick 3, etc.) in this version.
+- Never cover more than one finishing order of the SAME horses by
+  stacking separate straight tickets - e.g. a "#5 / #8" ticket AND an
+  "#8 / #5" ticket on the same two horses. That combination costs
+  exactly what ONE exacta box on those two horses costs and covers
+  exactly the same outcomes; two different rationales do not make it
+  two ideas, it is a box bet in disguise. If you want more than one
+  order of the same horses covered, use exacta box / trifecta box /
+  superfecta box on those horses as a single ticket instead.
 - Respond with ONLY the ticket block below - no reasoning paragraph and
   no commentary before or after it. Each ticket line's <rationale>
   column carries your reasoning for that selection; keep the whole
