@@ -457,7 +457,7 @@ export default function DayTicketBuilderModal({
               click, never blocked: on a live day the results of race 1 land
               while race 5 is still being built, so refusing here would
               break the ordinary flow this modal exists for. */}
-          {selected?.graded && (
+          {Boolean(selected?.graded) && (
             <p className="notice notice--warn">
               Card #{cardNumber} has already been graded against this day's results. Locking another race
               onto it regrades the card and moves a P/L figure that has already been reported — and a
