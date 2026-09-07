@@ -294,6 +294,13 @@ label.btn.btn--primary { color: var(--color-accent-text); }
 }
 .conditions { font-size: 12.5px; color: var(--color-text-muted); max-width: 110ch; }
 .wager { font-size: 12.5px; }
+.race-notes { margin: 8px 0 10px; }
+.race-notes > summary {
+  cursor: pointer;
+  color: var(--color-text-muted);
+  font-size: 12px;
+}
+.notes-text { white-space: pre-wrap; max-width: 110ch; margin: 6px 0 0; font-size: 13px; line-height: 1.45; }
 
 /* ---- consensus panel ---- */
 
