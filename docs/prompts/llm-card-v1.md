@@ -207,7 +207,11 @@ grammar, then a line reading exactly "<<<END TICKETS>>>":
   1-combination rule below does not hold for it). If you want more
   than one horse to share a position, use the BOX type on those
   horses instead - box types list every horse in the box separated by
-  ",", e.g. "#4,#2,#7".
+  ",", e.g. "#4,#2,#7". A comma-separated selection list is ONLY ever
+  legal under a box bet type - if your <bet type> does not literally
+  say "box" (e.g. plain "trifecta"), your selections must be "/"-
+  separated single horses, never a comma list; wanting a comma list
+  means your <bet type> must say "box" instead ("trifecta box").
 - <stake>: the TOTAL dollar amount for that ticket (not per-combo),
   e.g. "$20". Win, place and show have a $2 minimum, sold in $1
   increments above it - $2, $3, $4, $5, ... - NEVER below $2 (e.g. $1
@@ -228,10 +232,21 @@ grammar, then a line reading exactly "<<<END TICKETS>>>":
   where n = how many horses you put in the box. Example: a $1 exacta
   box on 3 horses has 3 x 2 = 6 combinations, so a valid total is any
   multiple of 6 x $1 = $6 (e.g. $6, $12, $18) - NOT $16.50, which
-  splits to $2.75 per combination, not a whole dollar. Compute
-  combinations x base-unit FIRST, then pick your total as a multiple
-  of that - never pick a total that merely "sounds right" and divide
-  afterward. Prefer smaller boxes (3-4 horses) to keep this simple.
+  splits to $2.75 per combination, not a whole dollar. A trifecta box
+  and a superfecta box are NOT the exacta box formula with one more
+  horse in it - each has one MORE FACTOR than exacta box, not the same
+  count of factors: exacta box multiplies 2 numbers (n, n-1), trifecta
+  box multiplies 3 (n, n-1, n-2), superfecta box multiplies 4 (n, n-1,
+  n-2, n-3). A 4-horse trifecta box is 4 x 3 x 2 = 24 combinations,
+  NEVER 4 x 3 = 12 - that shorter product is the EXACTA box formula,
+  one factor short for a trifecta box. At a 50c base, 24 combinations
+  needs a multiple of 24 x $0.50 = $12 (e.g. $12, $24) - NOT $6, which
+  is only 12 x 50c (the wrong, exacta-box combination count) and
+  actually prices at $6 / 24 = $0.25 per combination, below the 50c
+  minimum. Compute combinations x base-unit FIRST, then pick your
+  total as a multiple of that - never pick a total that merely "sounds
+  right" and divide afterward. Prefer smaller boxes (3-4 horses) to
+  keep this simple.
 - <rationale>: one short sentence, required.
 
 If you have no bet worth making on this race, output the block with
@@ -406,6 +421,50 @@ untouched, so no version bump.
   `shared/parsers/human-picks.js` still supports part-wheels for a
   human's own paste, which can legitimately want one; only what this
   prompt asks the MODEL to produce narrows.
+- **2026-09-07: a trifecta box's combination count was computed with the
+  EXACTA box formula, one factor short (D160).** Live bug report from a
+  real 11-race generation (card 187, opus 5): six blocked tickets across
+  five races. Root cause confirmed against the actual logged
+  `response_text` for each - two distinct mistakes, not one:
+  1. **The combo-count mistake, four times.** Races 6, 9, 10 and 11 each
+     boxed exactly 4 horses in a trifecta box and each priced it as if the
+     box had 4 x 3 = 12 combinations (the EXACTA box formula) instead of
+     the correct 4 x 3 x 2 = 24 - always exactly half. Race 6 rationale
+     read "50c box on the three most likely" (a trifecta, so 4 horses/50c
+     really needs $12) and priced $6, landing at $6 / 24 = $0.25/combo,
+     below the 50c minimum - same shape on race 9 and race 10 ("50c box of
+     the four main contenders" priced at $6). Race 11 primed a different
+     per-combo target with the same wrong combo count: $9 / 12 (wrong) =
+     $0.75/combo looked clean, but the real $9 / 24 (correct) = $0.375
+     doesn't divide evenly - `non_multiple_stake` instead of
+     `below_minimum`, but the identical root cause. **The prompt's only
+     worked example was for an EXACTA box**, so the model had a template to
+     pattern-match against for 2-factor boxes and nothing anchoring the
+     3-factor case - it's the same failure shape as the two 2026-09-03/
+     2026-09-07 fixes above (a rule stated in words with no worked example
+     for the specific case that broke), just one box type over.
+  2. **A box selection under a non-box bet type name, once.** Race 3 wrote
+     `trifecta | #6,#9,#3 | $3` - the rationale even says "50c box on the
+     three most likely to fill the top three", so the INTENT was a box, but
+     the `<bet type>` column said bare "trifecta" instead of "trifecta
+     box". `shared/parsers/human-picks.js` reads a comma-free, "/"-free
+     selection list as ONE straight-bet leg needing 3 positions, so it
+     correctly blocked with `insufficient_selections` ("a trifecta needs 3
+     positions, got 1") rather than silently treating the comma list as a
+     box. The `<selections>` rule already explained the box comma-list
+     grammar but never tied it back to the `<bet type>` column, so nothing
+     told the model that choosing comma selections obligates the word "box"
+     in the type column too.
+  Fix is prompt-only, same posture as every fix above: the `<stake>` rule's
+  worked example gains a second, TRIFECTA-box case matching this exact
+  failure (4 horses, wrong-vs-right combo count, wrong-vs-right total) and
+  states plainly that trifecta/superfecta box are not the exacta-box
+  formula with one more horse - they have one MORE FACTOR, not the same
+  factor count; the `<selections>` rule gains an explicit link that a
+  comma-separated list is legal ONLY under a bet type whose name says
+  "box". No parser, server, or schema change - both blocks were exactly
+  correct; the model was missing the specific anchor it needed for a
+  4-horse trifecta box and for the type/selection-format pairing.
 
 ## Model selection (D75)
 
@@ -506,9 +565,9 @@ rather than a bucketing rule.
 
 **Deliberately a hash of `SYSTEM_PROMPT`, computed at module load, not a
 manually incremented number.** This file's own D64, D112, D125, D136, D138,
-D145, D146 and D148 fixes are eight PRs that edited the prompt and not one of
-them carried a version marker - a manually-bumped counter would have needed
-every one of those PRs to remember a step nothing enforced, the same failure
+D145, D146, D148 and D160 fixes are nine PRs that edited the prompt and not
+one of them carried a version marker - a manually-bumped counter would have
+needed every one of those PRs to remember a step nothing enforced, the same failure
 mode `ENGINE_VERSION` and `cards.saw_classification` have each already hit in
 this codebase in other forms. A hash of the actual text cannot go stale that
 way: it changes exactly when, and only when, `SYSTEM_PROMPT` does.
