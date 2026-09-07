@@ -118,6 +118,40 @@ free-text field that no longer exists. **This is the mechanism
 that file carries its own amendment recording the change, since its
 pre-registration was written against the old (reasoning-paragraph) mechanism.
 
+## No stacking straight tickets to fake a box (D138) — a further prompt-comparability boundary
+
+**User report 2026-09-06**: a real generation produced two straight exacta
+tickets on the same race -
+
+```
+exacta | 5 / 8 | $1 | Rostovsky over the Rispoli-ridden second-time-back Muscled.
+exacta | 8 / 5 | $1 | Saver with the morning-line favorite on top of my price horse.
+```
+
+- one for each order of the same two horses (#5, #8), each with its own
+rationale sentence. Mechanically this is identical to a single `exacta box
+5,8` ticket: two straight exacta tickets at $1 each cost $2 total and cover
+exactly the two orders an exacta box on the same pair covers for the same
+$2 ($1 base x 2 combinations). The two rationales made it read as two
+distinct ideas when it was one box bet, written twice, at no cost saving
+and no coverage difference. The `Rules:` list gains a bullet naming the
+pattern directly and pointing at the box type as the correct way to cover
+more than one order of the same horses.
+
+**No parser or grading change**: both tickets already parsed, validated and
+graded correctly as two ordinary straight exactas - `shared/parsers/
+human-picks.js` has no way to know two SEPARATE tickets are meant as one
+thesis, and grading two straight exactas that happen to cover a box's
+outcomes is not wrong, just redundant. This is a reasoning-quality fix, not
+a validation gap: the fix is asking the model not to write it that way, not
+teaching the parser to detect and collapse the pattern after the fact.
+
+Same prompt-comparability note as D112, D125 and D136: LLM cards have no
+version axis, so this is a real, permanent, un-versioned change to what
+every future card's prompt asks for. **A card whose prompt does not contain
+the phrase "box bet in disguise" predates this change**, checkable per card
+via `llm_card_requests.prompt_text`, the same mechanism those three document.
+
 ## Per-race prompt template
 
 The server builds this by plain string interpolation (`server/llm-prompt.js`),
@@ -143,6 +177,14 @@ Rules:
   (exacta / exacta box / trifecta / trifecta box / superfecta /
   superfecta box) where warranted - no multi-race wagers (Daily
   Double, Pick 3, etc.) in this version.
+- Never cover more than one finishing order of the SAME horses by
+  stacking separate straight tickets - e.g. a "#5 / #8" ticket AND an
+  "#8 / #5" ticket on the same two horses. That combination costs
+  exactly what ONE exacta box on those two horses costs and covers
+  exactly the same outcomes; two different rationales do not make it
+  two ideas, it is a box bet in disguise. If you want more than one
+  order of the same horses covered, use exacta box / trifecta box /
+  superfecta box on those horses as a single ticket instead.
 - Respond with ONLY the ticket block below - no reasoning paragraph and
   no commentary before or after it. Each ticket line's <rationale>
   column carries your reasoning for that selection; keep the whole
