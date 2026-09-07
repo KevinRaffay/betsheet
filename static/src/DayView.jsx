@@ -69,7 +69,15 @@ export default function DayView({ payload, cards, activeCardId, deviceId, onSele
         <h2>Races</h2>
         <table className="grid">
           <thead>
-            <tr><th>#</th><th>Post</th><th>Distance</th><th>Surface</th><th>Runners</th><th>State</th><th /></tr>
+            <tr>
+              <th>#</th><th>Post</th>
+              {/* col-detail: dropped at mobile width so the Build button - the
+                  only reason this table exists - never lands off the right
+                  edge. See the house rule in CLAUDE.md's Gotchas. */}
+              <th className="col-detail">Distance</th>
+              <th className="col-detail">Surface</th>
+              <th className="col-detail">Runners</th>
+              <th>State</th><th /></tr>
           </thead>
           <tbody>
             {payload.races.map((r) => {
@@ -79,9 +87,9 @@ export default function DayView({ payload, cards, activeCardId, deviceId, onSele
                 <tr key={r.number}>
                   <td>{r.number}</td>
                   <td>{r.postTime ?? '—'}</td>
-                  <td>{r.distance ?? '—'}</td>
-                  <td>{r.surface ?? '—'}</td>
-                  <td>{live}{live !== r.entries.length && <span className="dim"> of {r.entries.length}</span>}</td>
+                  <td className="col-detail">{r.distance ?? '—'}</td>
+                  <td className="col-detail">{r.surface ?? '—'}</td>
+                  <td className="col-detail">{live}{live !== r.entries.length && <span className="dim"> of {r.entries.length}</span>}</td>
                   <td>
                     {!state && <span className="dim">not played</span>}
                     {state?.passed && <span className="tag">PASSED</span>}

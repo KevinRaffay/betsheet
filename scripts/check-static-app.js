@@ -211,6 +211,34 @@ console.log('\n-- the offline shell ships and refuses to serve a stale race day 
     'a worker registered from ./assets/ would take a scope excluding index.html');
 }
 
+console.log('\n-- calls to action stay reachable on a phone (D157 house rule) --');
+{
+  // HOUSE RULE (user, 2026-09-07): a call to action must be reachable without
+  // sideways scrolling on a phone. Asserted by reading the SOURCE rather than
+  // by rendering, because these check scripts never mount React - but the
+  // failure mode is mechanical and so is the guard: any static table that
+  // ends in a button column must also mark descriptive columns `col-detail`,
+  // which static.css hides below 720px. Without this, a new table added later
+  // reintroduces exactly the D157 bug with nothing to catch it.
+  const css = fs.readFileSync(path.join(ROOT, 'static', 'src', 'static.css'), 'utf8');
+  const mobileBlock = css.slice(css.indexOf('@media (max-width: 720px)'));
+  check('static.css hides .col-detail at mobile width',
+    /\.col-detail\s*\{[^}]*display:\s*none/.test(mobileBlock), 'the rule is missing or outside the media query');
+
+  const views = ['DayView.jsx', 'CardsView.jsx'];
+  for (const v of views) {
+    const src = fs.readFileSync(path.join(ROOT, 'static', 'src', v), 'utf8');
+    const hasActionColumn = /<th \/>/.test(src);
+    if (!hasActionColumn) { check(`${v} has no action column to protect`, true); continue; }
+    const detailCount = (src.match(/className="col-detail"/g) ?? []).length;
+    // Header + body cell for each hidden column, so an odd count means one
+    // half was marked and the other was not - the column would still occupy
+    // width on a phone.
+    check(`${v} marks descriptive columns col-detail`, detailCount >= 4, `${detailCount} occurrence(s)`);
+    check(`${v} marks them in matched header/body pairs`, detailCount % 2 === 0, `${detailCount} is odd`);
+  }
+}
+
 fs.rmSync(tmp, { recursive: true, force: true });
 
 if (failures) {
