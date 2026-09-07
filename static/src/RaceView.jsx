@@ -1,4 +1,4 @@
-import React, { useEffect, useMemo, useState } from 'react';
+import React, { useMemo, useState } from 'react';
 import TicketBuilder from '@client/components/TicketBuilder.jsx';
 import EntriesTable from '@client/components/EntriesTable.jsx';
 import { navigate } from './app.jsx';
@@ -26,14 +26,37 @@ const joinText = (a, b) => [a, b].map((s) => (s ?? '').trim()).filter(Boolean).j
 export default function RaceView({ payload, raceNumber, card, deviceId, onSaveCard, onBackup }) {
   const race = raceOf(payload, raceNumber);
   const state = card?.races?.[raceNumber] ?? null;
-  const committed = state?.text ?? '';
   const [builderText, setBuilderText] = useState('');
   const [busy, setBusy] = useState(false);
 
-  // Anything typed before this race was opened is committed text; the builder
-  // always starts empty on a race change, never mid-race (which would drop
-  // what the user is composing right now).
-  useEffect(() => { setBuilderText(''); }, [raceNumber, card?.cardId]);
+  // `committed` is a SNAPSHOT taken when this race is opened, never a live
+  // read of the stored text - and that distinction is the whole correctness of
+  // this screen. Two separate bugs, both found in browser testing, both fixed
+  // by this one shape:
+  //
+  //  1. DUPLICATION. Reading it live is the obvious implementation. The builder
+  //     emits "$20 W 1", the race is written as committed("") + builder("$20 W
+  //     1"), the saved card flows back down as a prop, a live `committed` would
+  //     now BE "$20 W 1" - and the next render recomputes the sum as "$20 W 1 /
+  //     $20 W 1". No new event is needed; the render alone does it.
+  //
+  //  2. WIPING. Snapshotting in an EFFECT fixes duplication and introduces
+  //     something worse. Child effects run before parent effects, so
+  //     TicketBuilder's mount-time `onChange('')` fires while the parent still
+  //     holds the previous (empty) snapshot - and writes an empty race over
+  //     saved text. Re-opening a race with work in it erased the work.
+  //
+  // Adjusting during RENDER (React's documented pattern for state that must
+  // track a prop) fixes both: the new snapshot is in place before any child
+  // commits, so nothing can observe or write the stale value.
+  const [committed, setCommitted] = useState('');
+  const [snapshotKey, setSnapshotKey] = useState(null);
+  const key = `${card?.cardId ?? ''}:${raceNumber}`;
+  if (snapshotKey !== key) {
+    setSnapshotKey(key);
+    setCommitted(card?.races?.[raceNumber]?.text ?? '');
+    setBuilderText('');
+  }
 
   const text = joinText(committed, builderText);
   const preview = useMemo(
@@ -73,6 +96,7 @@ export default function RaceView({ payload, raceNumber, card, deviceId, onSaveCa
       passed: false,
     });
     setBuilderText('');
+    setCommitted(text);
     // The rolling backup (D152): a locked race is work that exists in exactly
     // one browser until a file leaves it, so every lock offers one.
     await onBackup?.(card.cardId);
@@ -82,6 +106,7 @@ export default function RaceView({ payload, raceNumber, card, deviceId, onSaveCa
   const pass = async () => {
     await writeRace({ text: '', tickets: [], lockedAt: new Date().toISOString(), passed: true });
     setBuilderText('');
+    setCommitted('');
     await onBackup?.(card.cardId);
     navigate('/');
   };
@@ -91,10 +116,19 @@ export default function RaceView({ payload, raceNumber, card, deviceId, onSaveCa
     // device has been graded or revealed, so no reported figure can move. The
     // moment the card reaches home, invariant 15's rules apply and a locked
     // race becomes delete-only.
+    //
+    // The locked text becomes the new snapshot: re-opening hands the race back
+    // as it was, with the builder empty and ready to add to it.
+    setCommitted(state?.text ?? '');
+    setBuilderText('');
     await writeRace({ lockedAt: null, tickets: [] });
   };
 
-  const discard = async () => { await writeRace({ text: '', tickets: [] }); setBuilderText(''); };
+  const discard = async () => {
+    setCommitted('');
+    setBuilderText('');
+    await writeRace({ text: '', tickets: [] });
+  };
 
   if (!race) {
     return (

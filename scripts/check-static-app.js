@@ -184,6 +184,33 @@ console.log('\n-- the Pages build carries the deployed base (D154) --');
     fs.existsSync(path.join(ROOT, 'static', 'public', 'payload.json')));
 }
 
+console.log('\n-- the offline shell ships and refuses to serve a stale race day (D155) --');
+{
+  const sw = fs.readFileSync(path.join(ROOT, 'dist-static', 'sw.js'), 'utf8');
+  check('sw.js is in the build output', sw.length > 0);
+  // The one strategy rule that must never be relaxed: a cached payload is not
+  // a stale page, it is the WRONG RACES, and every ticket built against it
+  // would be refused on import by D153's payloadHash check.
+  check('payload.json is network-first', /if \(isPayload\(url\)\) return networkFirst/.test(sw));
+  check('navigations are network-first', /request\.mode === 'navigate'[\s\S]{0,200}networkFirst/.test(sw));
+  check('hashed assets are cache-first (their names are content hashes)',
+    /if \(isHashedAsset\(url\)\) return cacheFirst/.test(sw));
+  check('old cache versions are purged on activate', /caches\.delete/.test(sw));
+  // Found live: Vite emits <script crossorigin>, so those requests carry an
+  // Origin header while the install-time cache.add() does not - and a server
+  // answering `Vary: Origin` then makes every lookup miss and the app fail to
+  // load offline with a full cache.
+  check('cache lookups ignore Vary', /ignoreVary:\s*true/.test(sw));
+  check('the hashed bundles are pre-warmed, so ONE online visit is enough',
+    /shellAssets/.test(sw) && /index\.html/.test(sw));
+
+  const main = fs.readFileSync(path.join(ROOT, 'static', 'src', 'main.jsx'), 'utf8');
+  check('it is registered in production builds only', /import\.meta\.env\.PROD/.test(main));
+  check('and registered relative to the document, not to the module',
+    /new URL\('sw\.js', document\.baseURI\)/.test(main),
+    'a worker registered from ./assets/ would take a scope excluding index.html');
+}
+
 fs.rmSync(tmp, { recursive: true, force: true });
 
 if (failures) {

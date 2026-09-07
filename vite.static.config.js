@@ -49,6 +49,14 @@ export default defineConfig({
     strictPort: true,
     fs: { allow: ['..'] },
   },
+  // `npm run preview:static` serves the BUILT output, which is the only way to
+  // exercise the D155 service worker: it registers in production builds only,
+  // and localhost is a secure context so registration behaves as it will on
+  // Pages. Its own port, so it never collides with the dev server above.
+  preview: {
+    port: Number(process.env.BETSHEET_STATIC_PREVIEW_PORT) || 5187,
+    strictPort: true,
+  },
   build: {
     outDir: '../dist-static',
     emptyOutDir: true,

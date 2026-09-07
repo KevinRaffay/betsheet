@@ -10,6 +10,7 @@
     "build": "vite build",
     "build:static": "vite build --config vite.static.config.js",
     "dev:static": "vite --config vite.static.config.js",
+    "preview:static": "vite preview --config vite.static.config.js",
     "dev": "node scripts/dev-preflight.js && concurrently -k -n vite,api -c cyan,magenta \"vite\" \"node scripts/dev-watch.js\"",
     "serve": "node server/index.js",
     "dev:clean": "node scripts/dev-clean.js",
