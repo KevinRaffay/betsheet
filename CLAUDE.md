@@ -279,7 +279,7 @@ things live code can break. **Invariant 4 went with the consensus removal
 | `shared/static-export.js` | the export document a phone hands home (D152) and its validation, shared by the browser writer and the home reader so they cannot drift. schemaVersion 3 and the card-trace-export vocabulary, but its OWN schema name: `trace`/`traceStatus`, `gradeSummary`/`results` cannot honestly exist on a device with no log files and no chart, and `cardId` is a device-namespaced STRING, not the integer row id. `llmInputs` is always `null`, never `[]`. |
 | `static/public/sw.js` | the offline shell (D155). **`payload.json` and navigations are NETWORK FIRST; only content-hashed assets are cache-first** - a payload one day old is not a stale page, it is the wrong races. Reads the hashed bundle names out of `index.html` at install so ONE online visit is enough, and every cache lookup passes `ignoreVary` (see Gotchas). |
 | `scripts/import-static-cards.js` + `scripts/check-static-import.js` | `npm run import-static-cards -- <path> [--yes]` (dry run by default): one export file or a directory of them, into the corpus. **Idempotency is load-bearing** - keyed on `cards.external_id` (migration 027), a re-import reports `already present` and writes nothing, which is what makes D152's rolling backup free and manual file transfer safe. Imported cards merge into the ordinary HUMAN bucket; `built_on` is fact, never a bucket. Re-parses the ticket TEXT through `persistHumanRace` (invariant 9 is not waived by the file) and re-stamps the DEVICE's lock times onto `human_race_state` (invariant 15 reads them; the import clock would be a lie). Seeds `strategy_templates` itself - it never boots the server. |
-| `.github/workflows/deploy-pages.yml` | the Pages deploy (D154), the repo's only workflow. Refuses to deploy without a valid `static/public/payload.json`, gates on `check-static-app`, and sets `BETSHEET_STATIC_BASE=/betsheet/`. **Cannot succeed until Pages is enabled** (Pro/Team on a private repo) - the header says so rather than leaving it to be discovered. |
+| `.github/workflows/deploy-pages.yml` | the Pages deploy (D154, fixed in D156), the repo's only workflow. Refuses to deploy without a valid `static/public/payload.json`, gates on `check-static-app`, and sets `BETSHEET_STATIC_BASE=/betsheet/`. **Pinned to node 24 and guarded against drift** - `better-sqlite3` requires >=22 and npm only WARNS on a mismatch, so a wrong runtime is a segfault, not an install error (see Gotchas). The `build` job asks GitHub nothing about Pages, so it goes green today; only `deploy` needs Pages enabled (Pro/Team on a private repo). |
 
 Planned homes (each arrives with its PR — keep this table honest as they
 land): the Equibase entries HTML ingest route and its UI, which wire up the
@@ -417,6 +417,7 @@ row words differently.
 
 | feature | state | notes |
 | --- | --- | --- |
+| Fix: the Pages workflow segfaulted on its first run - node 20 vs dependencies requiring 22+ (D156) | merged | branch `fix-pages-workflow-node` - `npm ci` only WARNS on an engine mismatch, so a wrong runtime installs a native binding for the wrong ABI and `better-sqlite3` segfaults on load (exit 139, no output). Pinned to node 24, `engines.node` declared, and a guard step that refuses a bad runtime before any check runs. Also dropped `actions/configure-pages`, whose outputs this build ignores and which fails when Pages is not enabled - the `build` job is now Pages-independent and goes green today. Full record: DELIVERABLES.md D156. |
 | Static Pages target: build HUMAN cards on a phone at the track, carry them home as files (D150-D155) | merged | branch `static-pages-target` - a build-only deploy of a card CONSTRUCTION surface: no corpus, no grading, no generation, no database. D150 the payload builder (hash covers the race day alone, so the home import can verify the entries have not moved). D151 the browser app, reusing `TicketBuilder`/`EntriesTable` rather than forking them, with LLM/OTR excluded structurally and proven against the built bundle. D152 export+restore as a pair, with a rolling backup that is free because D153's import dedupes. D153 the import, keyed on the new `cards.external_id` (migration 027), merging into the ordinary HUMAN bucket. D154 the Pages workflow. D155 the offline shell. **Archaeology first changed the design**: the named source the spec assumed (`emubets`/`drf`) does not exist - it is unscheduled requirement P-3.2 - and Kevin's call was to drop it from this scope. Browser and offline testing found five real bugs, all fixed and pinned. Full record per ID: DELIVERABLES.md D150-D155. |
 | LLM cards: capture generation inputs (prompt, response, notes, model, template version), not just outputs (D149) | merged | PR [#191](https://github.com/KevinRaffay/betsheet/pull/191), branch `llm-input-capture` - two cards generated from different analyst-notes payloads had no way to be reproduced or diffed, and one card's grade moved through six mid-session regenerations reconstructable only by timestamp-diffing. Widened `llm_card_requests` (migration 026, reused rather than a parallel table) with correlation id, prompt/notes hashes, a hash-derived template version, and request params; added `llm_request_sent`/`llm_response_received`/`race_regenerated` trace events; export bumped to `SCHEMA_VERSION` 3 with a top-level `llmInputs` block (`null`, never `[]`, when unknown), `?omitLlmInputs=1` for a shareable redacted form. Kevin's call before merge: regeneration keeps mutating in place, even on a graded card - no new card id, no follow-up scheduled. Full record: DELIVERABLES.md D149. |
 | LLM prompt fix: forbid "part-wheel" straight bets - their true combination count was never computed (D148) | merged | PR [#190](https://github.com/KevinRaffay/betsheet/pull/190) `llm-prompt-no-part-wheel` - a real generation's comma-separated list within one straight-bet position multiplied to 18 real combinations the model never computed. Fixed by forbidding the construction outright rather than teaching the math; the parser itself is unchanged (a human's own paste can still use a part-wheel). Full record: DELIVERABLES.md D148. |
@@ -667,6 +668,28 @@ it. Rules still in force:
   so the new value is in place before any child commits. Neither bug is
   reachable from a check script (they need a real render tree) and both were
   found by driving the app in a browser.
+- **A wrong Node version here is a SEGFAULT, not an install error** (D156).
+  `better-sqlite3@13` requires node `>=22` and `pdfjs-dist@6` `>=22.13`, and
+  **npm treats an engine mismatch as a WARNING** (`EBADENGINE`) unless
+  `engine-strict` is set - so `npm ci` reports success, installs a native
+  binding built for a different ABI, and the first `require` of it dies with
+  exit 139. Found on the Pages workflow's very first run, which pinned node 20
+  out of habit: `npm run check-static-app` crashed two seconds in having
+  printed no output at all, which reads like a broken check and is nothing of
+  the kind. `package.json` now declares `engines.node` and the workflow both
+  pins node 24 and asserts the running version against that field before any
+  check runs. **The local machine is node 24**, so nothing reproduces this
+  locally - it is CI-only by construction, which is exactly why the assertion
+  lives in the workflow.
+- **`MSYS_NO_PATHCONV=1` is needed for a slash-leading ENV VALUE too**, not
+  just for a slash-leading argument. Git Bash rewrote
+  `BETSHEET_STATIC_BASE=/betsheet/` into `/Program Files/Git/betsheet/` while
+  reproducing a CI build locally, producing asset URLs that would 404 on
+  Pages. `scripts/gh-api.js` already documents the argument half of this
+  (`/repos/x/y` arriving as a Windows path). CI runs bash on Linux and is
+  unaffected; only local reproduction needs the prefix. Node's own
+  `execFileSync({env})` bypasses the shell entirely, which is why
+  `check-static-app`'s Pages-base assertion was always correct.
 - **A service worker's cache lookups must pass `ignoreVary` here** (D155).
   Vite emits `<script crossorigin>` for its module bundle, so the browser
   sends those requests with an `Origin` header, while the worker's
