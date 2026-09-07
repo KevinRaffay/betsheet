@@ -543,6 +543,11 @@ label.btn.btn--primary { color: var(--color-accent-text); }
   margin-bottom: 8px;
   flex-wrap: wrap;
 }
+.llm-race-card__actions {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+}
 .modal__footer {
   flex: 0 0 auto;
   display: flex;
