@@ -1,5 +1,5 @@
 import React, { useEffect, useState } from 'react';
-import { deleteHumanTicket, getReplayDayRaces, lockHumanCard, previewHumanCard } from '../api.js';
+import { deleteHumanTicket, getReplayDayRaces, listCards, lockHumanCard, previewHumanCard } from '../api.js';
 import { clearDraft, loadDayDrafts, saveDraft } from '../drafts.js';
 import TicketBuilder from './TicketBuilder.jsx';
 import EntriesTable from './EntriesTable.jsx';
@@ -47,18 +47,22 @@ const money = (cents) => (cents == null ? '—' : cents % 100 === 0 ? `$${cents 
 // starts empty and emits '' on mount, so opening the race to build again
 // starts fresh rather than reloading the draft into it.
 //
-// D137: `cardName` is the caller's business, not this modal's - it is either
-// the name of the card `initialCardId` already resolves to (display only) or
-// the name typed for a brand-new one (`initialCardId` null), and is threaded
-// into every lockHumanCard call. The server only ever uses it on the call
-// that actually mints the card and ignores it on every later call to that
-// same card (D137, mirrors llm_model's frozen-at-creation rule), so passing
-// it unconditionally here is harmless.
+// D139: card identity - which human card this session builds onto, its
+// name, and "start a new one" - is resolved and managed ENTIRELY INSIDE this
+// modal, the same way LlmCardModal.jsx owns its own card/model identity
+// (D75/D76). D137 first tried putting the picker and name field in the
+// panel that opens this modal (CardsPanel.jsx / ReplayDayLanding.jsx); that
+// split management across two components for no reason a caller ever needed
+// to know which card id they were passing, so it is undone here - callers
+// pass only `dayId`, `bankrollCents` and `context`, nothing card-specific.
 export default function DayTicketBuilderModal({
-  dayId, cardId: initialCardId, cardName, bankrollCents, onClose, onCardChanged, context = 'replay',
+  dayId, bankrollCents, onClose, onCardChanged, context = 'replay',
 }) {
   const live = context === 'live';
-  const [cardId, setCardId] = useState(initialCardId ?? null);
+  const [cardId, setCardId] = useState(null);
+  const [cardNumber, setCardNumber] = useState(null);
+  const [cardName, setCardName] = useState(null); // the RESOLVED name of `cardId`, once one exists
+  const [newCardName, setNewCardName] = useState(''); // draft name, editable only while cardId is null
   const [races, setRaces] = useState(null);
   const [open, setOpen] = useState(() => new Set());
   const [textByRace, setTextByRace] = useState(() => new Map());
@@ -69,6 +73,20 @@ export default function DayTicketBuilderModal({
   const [progress, setProgress] = useState(null);
   const [results, setResults] = useState(null);
   const [error, setError] = useState(null);
+
+  // D139: resume the day's own latest human card on open - the same D98
+  // resume rule, now resolved HERE rather than by whichever panel opened
+  // this modal. Also the source of truth for `cardName`/`cardNumber` after
+  // any lock, so re-run it whenever a save might have minted or added to a
+  // card, not just on mount.
+  const loadCard = () => listCards(dayId).then((cards) => {
+    const human = cards.filter((c) => c.template === 'human').sort((a, b) => b.card_number - a.card_number);
+    const latest = human[0] ?? null;
+    setCardId(latest?.id ?? null);
+    setCardNumber(latest?.card_number ?? null);
+    setCardName(latest?.name ?? null);
+  }).catch(() => {});
+  useEffect(() => { loadCard(); }, [dayId]); // eslint-disable-line react-hooks/exhaustive-deps
 
   const reload = () => getReplayDayRaces(dayId, cardId)
     .then((d) => setRaces(d.races))
@@ -133,14 +151,14 @@ export default function DayTicketBuilderModal({
   // One race's save. Returns the (possibly newly minted) card id so the batch
   // loop below can thread it through - React state does not apply mid-loop,
   // which is the same reason LlmCardModal's handleRegenerateAll uses a local.
+  // `name` only takes effect on the call that mints the card (localCardId
+  // still null) - the server ignores it once a card already exists (D137,
+  // mirrors llm_model's frozen-at-creation rule) - so it is only ever the
+  // freshly-typed `newCardName`, never the already-resolved `cardName`.
   const saveRace = async (n, localCardId, localCorrelationId) => {
     const r = await lockHumanCard(
       dayId,
-      // `name` only takes effect on the call that mints the card (localCardId
-      // still null) - the server ignores it once a card already exists
-      // (D137, mirrors llm_model's frozen-at-creation rule), so passing it on
-      // every call is harmless and simpler than tracking "have we saved yet".
-      { race: n, text: textByRace.get(n) ?? '', bankrollCents, cardId: localCardId, name: cardName },
+      { race: n, text: textByRace.get(n) ?? '', bankrollCents, cardId: localCardId, name: localCardId ? undefined : (newCardName.trim() || null) },
       localCorrelationId,
     );
     return { cardId: r.cardId ?? localCardId, correlationId: r.correlationId ?? localCorrelationId };
@@ -153,6 +171,7 @@ export default function DayTicketBuilderModal({
       setCardId(r.cardId); setCorrelationId(r.correlationId);
       forgetDraft(n);
       await reload();
+      await loadCard();
       onCardChanged?.();
     } catch (e) { setError(String(e.message)); } finally { setBusy(false); }
   };
@@ -160,10 +179,13 @@ export default function DayTicketBuilderModal({
   const handlePass = async (n) => {
     setBusy(true); setError(null);
     try {
-      const r = await lockHumanCard(dayId, { race: n, pass: true, bankrollCents, cardId, name: cardName }, correlationId);
+      const r = await lockHumanCard(dayId, {
+        race: n, pass: true, bankrollCents, cardId, name: cardId ? undefined : (newCardName.trim() || null),
+      }, correlationId);
       setCardId(r.cardId ?? cardId);
       forgetDraft(n);
       await reload();
+      await loadCard();
       onCardChanged?.();
     } catch (e) { setError(String(e.message)); } finally { setBusy(false); }
   };
@@ -199,9 +221,29 @@ export default function DayTicketBuilderModal({
     setCardId(localCard); setCorrelationId(localCorr);
     setProgress(null); setResults(out);
     await reload();
+    await loadCard();
     onCardChanged?.();
     setBusy(false);
     return out;
+  };
+
+  // D139: stop resuming this day's latest human card so the next lock mints
+  // a brand-new one (D28 already allows this - the modal simply never
+  // exposed the path before, unlike LlmCardModal's "Start a New Card",
+  // D75). The old card is untouched, still visible in the Betting cards
+  // table. Deliberately does NOT clear textByRace/drafts: a draft is a
+  // property of (day, race), not of a card, so unsaved text a user typed
+  // survives switching which card it will eventually lock onto.
+  const handleStartNewCard = () => {
+    if (busy) return;
+    setCardId(null);
+    setCardNumber(null);
+    setCardName(null);
+    setNewCardName('');
+    setPreviewByRace(new Map());
+    setOpen(new Set());
+    setResults(null);
+    setError(null);
   };
 
   // Closing IS the commit (D103). A failure keeps the dialog open with its
@@ -236,6 +278,10 @@ export default function DayTicketBuilderModal({
     (r) => !r.locked && (textByRace.get(r.raceNumber) ?? '').trim(),
   ).length;
   const anyRevealed = (races ?? []).some((r) => r.revealed);
+  // The name to SHOW: the resolved name of an existing card, or whatever is
+  // being typed for a not-yet-minted one - never both at once, since typing
+  // is only possible while cardId is null.
+  const displayName = cardId ? cardName : (newCardName.trim() || null);
 
   return (
     <div className="modal-backdrop">
@@ -243,7 +289,7 @@ export default function DayTicketBuilderModal({
         <div className="modal__header">
           <h3>
             {live ? 'Build the card by hand' : 'Build tickets for the day'}
-            {cardName && <span className="dim"> — “{cardName}”</span>}
+            {displayName && <span className="dim"> — “{displayName}”</span>}
           </h3>
           <button className="modal__close" disabled={busy} onClick={handleClose} aria-label="Close">×</button>
         </div>
@@ -278,6 +324,35 @@ export default function DayTicketBuilderModal({
               Until then it is a card in progress, not a missing one.
             </p>
           )}
+
+          {/* D139: card identity lives here, not in the panel that opened
+              this modal - mirrors LlmCardModal's Model row + "Start a New
+              Card" (D75). Resuming an existing card shows its name (if any)
+              read-only, since a name is frozen at creation like llm_model;
+              a not-yet-minted card offers the name field instead. */}
+          <div className="formrow formrow--tight">
+            {cardId != null ? (
+              <>
+                <span className="dim">
+                  Building onto card #{cardNumber}{cardName ? ` — “${cardName}”` : ''}.
+                </span>
+                <button
+                  className="btn btn--sm" disabled={busy} onClick={handleStartNewCard}
+                  title="Start a brand-new human card instead of adding to this one - the current card stays in the Betting cards table"
+                >
+                  Start a New Card
+                </button>
+              </>
+            ) : (
+              <label>
+                New card's name (optional){' '}
+                <input
+                  className="in in--sm" value={newCardName} placeholder="e.g. Aggressive" disabled={busy}
+                  onChange={(e) => setNewCardName(e.target.value)}
+                />
+              </label>
+            )}
+          </div>
 
           {!races ? <p className="placeholder">Loading…</p> : (
             <div className="race-grid">
