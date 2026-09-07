@@ -1,6 +1,7 @@
 import React, { useEffect, useState } from 'react';
 import { FAILURE_MODE_WARNINGS } from '@shared/card-notices.js';
-import { deleteCard, getCard, getGrades, gradeCardApi, modelLabel } from '../api.js';
+import { deleteCard, getCard, getGrades, getLlmNotes, gradeCardApi, modelLabel } from '../api.js';
+import RaceNotes from './RaceNotes.jsx';
 
 const RESPONSIBLE_LINE =
   'Entertainment wagering with a pre-committed budget. No mid-card increases.';
@@ -43,11 +44,22 @@ export default function CardView({ cardId, onBack, onDeleted, embedded = false }
   // set rather than the open one so a race that appears later (a reload after
   // a regrade) is open without having to be added anywhere.
   const [collapsedRaces, setCollapsedRaces] = useState(() => new Set());
+  // Read-only, same data RaceDayView.jsx's per-race panel shows (D164) - the
+  // analyst notes entered via "Enter Analyst Notes" or the LLM generator's
+  // own notes fields (same `llm_notes` draft, D92), keyed by race number.
+  const [notesByRace, setNotesByRace] = useState(new Map());
 
   useEffect(() => {
     getCard(cardId).then(setCard).catch((e) => setError(String(e.message)));
     getGrades(cardId).then(setGradeData).catch(() => setGradeData(null));
   }, [cardId]);
+
+  useEffect(() => {
+    if (card?.race_day_id == null) return;
+    getLlmNotes(card.race_day_id)
+      .then((n) => setNotesByRace(new Map(Object.entries(n.byRace ?? {}).map(([k, v]) => [Number(k), v]))))
+      .catch(() => {}); // supplementary display only - a fetch failure here shouldn't block the sheet
+  }, [card?.race_day_id]);
 
   const handleGrade = async () => {
     setBusy(true);
@@ -273,6 +285,7 @@ export default function CardView({ cardId, onBack, onDeleted, embedded = false }
                 </tbody>
               </table>
             </details>
+            <RaceNotes note={notesByRace.get(a.race_number) ?? null} />
             {raceResults && <RaceResults d={raceResults} />}
             {raceTickets.length === 0
               ? <p className="dim">No tickets this race.</p>

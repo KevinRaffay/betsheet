@@ -4,6 +4,7 @@ import CardsPanel from './CardsPanel.jsx';
 import ResultsPanel from './ResultsPanel.jsx';
 import EquibaseOtrPanel from './EquibaseOtrPanel.jsx';
 import RaceDayNotesModal from './RaceDayNotesModal.jsx';
+import RaceNotes from './RaceNotes.jsx';
 import { entriesStaleness } from '@shared/staleness.js';
 
 // Read-only view of a stored race day - what actually landed in the
@@ -186,26 +187,7 @@ export default function RaceDayView({ id, onBack, onOpenCard }) {
             </tbody>
           </table>
           {race.wager_menu && <p className="dim wager">{race.wager_menu}</p>}
-          {(() => {
-            const note = notesByRace.get(race.number) ?? null;
-            const hasNote = Boolean(note?.text);
-            return (
-              <details className="race-notes">
-                <summary>Analyst Notes{hasNote ? '' : ' — none'}</summary>
-                {hasNote ? (
-                  <>
-                    <p className="notes-text">{note.text}</p>
-                    <p className="dim">
-                      {note.sourceLabel ? `Source: ${note.sourceLabel}` : 'Source: —'}
-                      {note.updatedAt ? ` · updated ${note.updatedAt}` : ''}
-                    </p>
-                  </>
-                ) : (
-                  <p className="dim">No analyst notes for this race.</p>
-                )}
-              </details>
-            );
-          })()}
+          <RaceNotes note={notesByRace.get(race.number) ?? null} />
         </details>
       ))}
     </section>
