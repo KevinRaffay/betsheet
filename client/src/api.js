@@ -72,6 +72,12 @@ export const deleteRaceDay = (id) =>
   fetch(`/api/race-days/${id}`, { method: 'DELETE' }).then(asJson);
 export const restoreRaceDay = (id) =>
   fetch(`/api/race-days/${id}/restore`, { method: 'POST' }).then(asJson);
+export const bulkDeleteRaceDays = (ids) =>
+  fetch('/api/race-days/bulk-delete', {
+    method: 'POST',
+    headers: { 'content-type': 'application/json' },
+    body: JSON.stringify({ ids }),
+  }).then(asJson);
 
 export function parseResultsText(text, correlationId) {
   return fetch('/api/parse/results-text', {
