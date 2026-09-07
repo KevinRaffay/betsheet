@@ -2,7 +2,7 @@
 // shape shared/card-engine.js produces, so a human ticket reads exactly
 // like an engine one on the sheet. Pure (browser + Node), never throws -
 // problems land in `warnings`, same contract as every other parser in the
-// codebase (shared/entries-parser.js, shared/picks-parser.js).
+// codebase (shared/parsers/equibase-entries.js, shared/parsers/equibase-otr.js).
 //
 // MUST STAY BROWSER-SAFE: client/src/components/TicketBuilder.jsx imports
 // this through the @shared vite alias for its live combo count and minimum
