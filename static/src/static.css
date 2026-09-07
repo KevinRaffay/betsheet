@@ -29,6 +29,19 @@
   .btn, .in, .pgm-chip { min-height: 40px; }
   .pgm-chip { padding: 6px 10px; }
 
+  /* HOUSE RULE (CLAUDE.md, Gotchas): a call to action must be reachable
+     without sideways scrolling on a phone. `overflow-x: auto` below keeps a
+     wide table from stretching the page, but it does so by pushing the
+     RIGHTMOST column out of sight - and in this app the rightmost column is
+     always the button (Build, Export, Forget). So the descriptive columns are
+     dropped at this width instead, leaving identity, state and the action.
+     Nothing is lost that the race screen does not show in full. */
+  .col-detail { display: none; }
+
+  /* Long generated ids (a device-namespaced card id) wrap rather than
+     setting a minimum table width that reintroduces the scroll. */
+  .grid code { overflow-wrap: anywhere; }
+
   /* Wide tables scroll inside themselves rather than widening the page. */
   .grid { display: block; overflow-x: auto; }
 
