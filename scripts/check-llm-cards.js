@@ -95,6 +95,19 @@ console.log('-- pure: buildLlmRaceUserPrompt --');
   // false for it. Now forbidden outright rather than taught the extra math.
   check('system prompt forbids comma-separated part-wheel positions in a straight bet (2026-09-07 fix #3)',
     SYSTEM_PROMPT.includes('EXACTLY ONE program number per position') && SYSTEM_PROMPT.includes('part-wheel'));
+  // D160 fix, part 1: a real generation boxed 4 horses in a trifecta box and
+  // priced it as if it had 4 x 3 = 12 combinations (the EXACTA box formula)
+  // instead of the correct 4 x 3 x 2 = 24 - the prompt's only worked example
+  // was for a 2-factor (exacta) box, with nothing anchoring the 3-factor case.
+  check('system prompt gives a trifecta-box worked example distinguishing it from the exacta-box formula (D160 fix)',
+    SYSTEM_PROMPT.includes('one MORE FACTOR than exacta box') && SYSTEM_PROMPT.includes('4 x 3 x 2 = 24')
+      && SYSTEM_PROMPT.includes('4 x 3 = 12'));
+  // D160 fix, part 2: a real generation wrote `trifecta | #6,#9,#3 | $3` -
+  // rationale said "50c box", but the <bet type> column said bare "trifecta"
+  // instead of "trifecta box", so the comma list read as one straight-bet leg
+  // needing 3 positions ("a trifecta needs 3 positions, got 1").
+  check('system prompt ties comma-separated selections to a bet type that says "box" (D160 fix)',
+    SYSTEM_PROMPT.includes('ONLY ever\n  legal under a box bet type'));
 }
 
 // ---------- analyst notes, pure (D92) ----------
