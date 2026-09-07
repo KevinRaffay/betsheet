@@ -56,7 +56,11 @@ grammar, then a line reading exactly "${TICKET_BLOCK_END}":
   1-combination rule below does not hold for it). If you want more
   than one horse to share a position, use the BOX type on those
   horses instead - box types list every horse in the box separated by
-  ",", e.g. "#4,#2,#7".
+  ",", e.g. "#4,#2,#7". A comma-separated selection list is ONLY ever
+  legal under a box bet type - if your <bet type> does not literally
+  say "box" (e.g. plain "trifecta"), your selections must be "/"-
+  separated single horses, never a comma list; wanting a comma list
+  means your <bet type> must say "box" instead ("trifecta box").
 - <stake>: the TOTAL dollar amount for that ticket (not per-combo),
   e.g. "$20". Win, place and show have a $2 minimum, sold in $1
   increments above it - $2, $3, $4, $5, ... - NEVER below $2 (e.g. $1
@@ -77,10 +81,21 @@ grammar, then a line reading exactly "${TICKET_BLOCK_END}":
   where n = how many horses you put in the box. Example: a $1 exacta
   box on 3 horses has 3 x 2 = 6 combinations, so a valid total is any
   multiple of 6 x $1 = $6 (e.g. $6, $12, $18) - NOT $16.50, which
-  splits to $2.75 per combination, not a whole dollar. Compute
-  combinations x base-unit FIRST, then pick your total as a multiple
-  of that - never pick a total that merely "sounds right" and divide
-  afterward. Prefer smaller boxes (3-4 horses) to keep this simple.
+  splits to $2.75 per combination, not a whole dollar. A trifecta box
+  and a superfecta box are NOT the exacta box formula with one more
+  horse in it - each has one MORE FACTOR than exacta box, not the same
+  count of factors: exacta box multiplies 2 numbers (n, n-1), trifecta
+  box multiplies 3 (n, n-1, n-2), superfecta box multiplies 4 (n, n-1,
+  n-2, n-3). A 4-horse trifecta box is 4 x 3 x 2 = 24 combinations,
+  NEVER 4 x 3 = 12 - that shorter product is the EXACTA box formula,
+  one factor short for a trifecta box. At a 50c base, 24 combinations
+  needs a multiple of 24 x $0.50 = $12 (e.g. $12, $24) - NOT $6, which
+  is only 12 x 50c (the wrong, exacta-box combination count) and
+  actually prices at $6 / 24 = $0.25 per combination, below the 50c
+  minimum. Compute combinations x base-unit FIRST, then pick your
+  total as a multiple of that - never pick a total that merely "sounds
+  right" and divide afterward. Prefer smaller boxes (3-4 horses) to
+  keep this simple.
 - <rationale>: one short sentence, required.
 
 If you have no bet worth making on this race, output the block with
@@ -91,9 +106,9 @@ don't believe in.`;
 // doc this file mirrors (docs/prompts/llm-card-v1.md); the version is
 // DERIVED from a hash of SYSTEM_PROMPT rather than a number a prompt-fix PR
 // has to remember to bump - this file's own D64/D112/D125/D136/D138/D145/
-// D146/D148 history never carried one, and a hash cannot go stale the way a
-// manually-incremented counter can. It changes exactly when, and only when,
-// SYSTEM_PROMPT's text changes.
+// D146/D148/D160 history never carried one, and a hash cannot go stale the
+// way a manually-incremented counter can. It changes exactly when, and only
+// when SYSTEM_PROMPT's text changes.
 export const PROMPT_TEMPLATE_ID = 'llm-card-v1';
 export const PROMPT_TEMPLATE_VERSION = crypto.createHash('sha256').update(SYSTEM_PROMPT).digest('hex').slice(0, 12);
 
