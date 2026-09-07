@@ -375,6 +375,77 @@ try {
   check('after reset: race-day ids restart at 1 (safe - the old logs went too)',
     freshSave.id === 1);
 
+  // ---- bulk delete (race-days list checkbox selection): skips graded days ----
+  //
+  // "Graded" for a whole day is deliberately the simple definition the user
+  // chose over the more granular per-card graded_tickets check: a day HAS
+  // RESULTS SAVED. Two fresh days from the same entries fixture; one gets
+  // real results saved on it (a minimal but genuine save through the real
+  // results endpoint, not a direct DB write, so the date/track matching this
+  // endpoint enforces is exercised too), the other stays ungraded.
+  const bulkA = await fetch(`${BASE}/api/race-days`, {
+    method: 'POST', headers: { 'content-type': 'application/json' },
+    body: JSON.stringify({ track: 'Del Mar', date: '2026-02-01', bankrollCents: 20000, perRaceMinCents: 500, races: parsed.races }),
+  }).then((r) => r.json());
+  const bulkB = await fetch(`${BASE}/api/race-days`, {
+    method: 'POST', headers: { 'content-type': 'application/json' },
+    body: JSON.stringify({ track: 'Del Mar', date: '2026-02-02', bankrollCents: 20000, perRaceMinCents: 500, races: parsed.races }),
+  }).then((r) => r.json());
+
+  const listBeforeGrading = await fetch(`${BASE}/api/race-days`).then((r) => r.json());
+  check('list: graded is false before any results are saved',
+    [bulkA.id, bulkB.id].every((id) => !listBeforeGrading.find((d) => d.id === id).graded));
+
+  await jpost2(`/api/race-days/${bulkB.id}/results`, {
+    track: 'Del Mar', date: '2026-02-02', sourceKind: 'paste',
+    races: [{ number: 1, results: [{ programNumber: '4', horseName: "Bit's Tiger Magic", finishPosition: 1, winCents: 500 }] }],
+  });
+
+  const listAfterGrading = await fetch(`${BASE}/api/race-days`).then((r) => r.json());
+  check('list: graded becomes true once race_results exist for the day',
+    Boolean(listAfterGrading.find((d) => d.id === bulkB.id).graded));
+  check('list: an ungraded sibling day still reports graded false',
+    !listAfterGrading.find((d) => d.id === bulkA.id).graded);
+
+  const bulkDeleteRes = await fetch(`${BASE}/api/race-days/bulk-delete`, {
+    method: 'POST', headers: { 'content-type': 'application/json' },
+    body: JSON.stringify({ ids: [bulkA.id, bulkB.id, 999999] }),
+  });
+  const bulkDeleteBody = await bulkDeleteRes.json();
+  check('bulk delete: 200 with a deleted/skipped shape',
+    bulkDeleteRes.status === 200 && Array.isArray(bulkDeleteBody.deleted) && Array.isArray(bulkDeleteBody.skipped),
+    JSON.stringify(bulkDeleteBody));
+  check('bulk delete: the ungraded day is deleted',
+    bulkDeleteBody.deleted.some((d) => d.id === bulkA.id));
+  check('bulk delete: the graded day is skipped with reason "graded", never deleted - ' +
+    'server-side and unconditional, not just a disabled checkbox',
+    bulkDeleteBody.skipped.some((s) => s.id === bulkB.id && s.reason === 'graded'));
+  check('bulk delete: a nonexistent id is skipped with reason "not_found", never a 500',
+    bulkDeleteBody.skipped.some((s) => s.id === 999999 && s.reason === 'not_found'));
+
+  const listAfterBulk = await fetch(`${BASE}/api/race-days`).then((r) => r.json());
+  check('bulk delete: the deleted day is gone from the default list; the graded day is still there',
+    !listAfterBulk.some((d) => d.id === bulkA.id) && listAfterBulk.some((d) => d.id === bulkB.id));
+
+  const deletedAfterBulk = await fetch(`${BASE}/api/race-days?deleted=1`).then((r) => r.json());
+  check('bulk delete: the deleted day is a soft delete, restorable from the deleted list',
+    deletedAfterBulk.some((d) => d.id === bulkA.id));
+
+  check('bulk delete: a non-array ids field -> 400',
+    (await fetch(`${BASE}/api/race-days/bulk-delete`, {
+      method: 'POST', headers: { 'content-type': 'application/json' }, body: JSON.stringify({ ids: 'nope' }),
+    })).status === 400);
+  check('bulk delete: an empty ids array -> 400',
+    (await fetch(`${BASE}/api/race-days/bulk-delete`, {
+      method: 'POST', headers: { 'content-type': 'application/json' }, body: JSON.stringify({ ids: [] }),
+    })).status === 400);
+
+  await new Promise((r) => setTimeout(r, 300));
+  const traceEventsBulk = fs.readFileSync(traceFile, 'utf8').split('\n').filter(Boolean).map((l) => JSON.parse(l));
+  check('bulk delete: the deleted day logs its own race_day_deleted trace event; the graded day never does',
+    traceEventsBulk.some((e) => e.event === 'race_day_deleted' && e.raceDayId === bulkA.id) &&
+    !traceEventsBulk.some((e) => e.event === 'race_day_deleted' && e.raceDayId === bulkB.id));
+
   // ---- track canonicalization (D35): every spelling collides on the code ----
   const spellingDate = '2026-01-01';
   const spellingPayload = (track) => ({

@@ -301,7 +301,8 @@ ingestRouter.get('/race-days', (req, res) => {
   const days = db.prepare(`
     SELECT rd.id, rd.track, rd.date, rd.bankroll_cents, rd.created_at, rd.deleted_at,
            COUNT(DISTINCT r.id) AS races,
-           COUNT(e.id) AS entries
+           COUNT(e.id) AS entries,
+           EXISTS(SELECT 1 FROM race_results rr WHERE rr.race_day_id = rd.id) AS graded
     FROM race_days rd
     LEFT JOIN races r ON r.race_day_id = rd.id
     LEFT JOIN entries e ON e.race_id = r.id
@@ -333,12 +334,11 @@ ingestRouter.get('/race-days/:id/deletion-preview', (req, res) => {
 // every default query. The decision-trace and fetch-audit LOG FILES are
 // deliberately untouched - a deleted day's history stays readable under
 // its correlation ids - and the deletion itself becomes a trace event.
-ingestRouter.delete('/race-days/:id', (req, res) => {
-  const db = getDb();
-  const day = db.prepare('SELECT * FROM race_days WHERE id = ?').get(req.params.id);
-  if (!day) return res.status(404).json({ error: 'No such race day.' });
-  if (day.deleted_at) return res.status(409).json({ error: 'Already deleted.' });
-
+// Shared by the single-day route below and the bulk-delete route further
+// down, so both log the exact same event shape under the day's OWN
+// correlation id (invariant 8) rather than a batch id that would mean
+// nothing to that day's own trace.
+function softDeleteRaceDay(db, day) {
   const counts = {
     races: db.prepare('SELECT COUNT(*) n FROM races WHERE race_day_id = ?').get(day.id).n,
     entries: db.prepare('SELECT COUNT(*) n FROM entries e JOIN races r ON r.id = e.race_id WHERE r.race_day_id = ?').get(day.id).n,
@@ -351,10 +351,7 @@ ingestRouter.delete('/race-days/:id', (req, res) => {
   const changes = db.prepare(
     "UPDATE race_days SET deleted_at = strftime('%Y-%m-%dT%H:%M:%SZ', 'now') WHERE id = ? AND deleted_at IS NULL",
   ).run(day.id).changes;
-  if (changes !== 1) {
-    log.error('race_day_delete_failed', { raceDayId: day.id, changes });
-    return res.status(500).json({ error: 'Delete did not persist; nothing was logged as deleted.' });
-  }
+  if (changes !== 1) return { ok: false, counts };
 
   const event = {
     correlationId: day.correlation_id,
@@ -365,7 +362,66 @@ ingestRouter.delete('/race-days/:id', (req, res) => {
   };
   traceLog.info('race_day_deleted', event);
   log.info('race_day_deleted', event);
+  return { ok: true, counts };
+}
+
+ingestRouter.delete('/race-days/:id', (req, res) => {
+  const db = getDb();
+  const day = db.prepare('SELECT * FROM race_days WHERE id = ?').get(req.params.id);
+  if (!day) return res.status(404).json({ error: 'No such race day.' });
+  if (day.deleted_at) return res.status(409).json({ error: 'Already deleted.' });
+
+  const { ok, counts } = softDeleteRaceDay(db, day);
+  if (!ok) {
+    log.error('race_day_delete_failed', { raceDayId: day.id });
+    return res.status(500).json({ error: 'Delete did not persist; nothing was logged as deleted.' });
+  }
   res.json({ ok: true, ...counts });
+});
+
+// Bulk delete from the race-days list (checkbox selection): one request,
+// many ids, each handled independently so one bad id can't block the rest
+// (the same posture server/entries-zip.js's Policy A batch save uses).
+// **Scoped to bulk-delete only** - the single-day route above is
+// deliberately untouched and still has no grading guard (user decision
+// 2026-09-07): a graded race day (one with saved results) is refused HERE,
+// server-side and unconditionally, regardless of what the client selected -
+// the disabled checkbox in the UI is a convenience, not the only guard,
+// the same "never trust a client-shaped payload" posture invariant 9 uses
+// elsewhere.
+ingestRouter.post('/race-days/bulk-delete', (req, res) => {
+  const db = getDb();
+  const ids = req.body?.ids;
+  if (!Array.isArray(ids) || ids.length === 0 || !ids.every((id) => Number.isInteger(id))) {
+    return res.status(400).json({ error: 'ids must be a non-empty array of integers.' });
+  }
+
+  const deleted = [];
+  const skipped = [];
+  for (const id of ids) {
+    const day = db.prepare('SELECT * FROM race_days WHERE id = ?').get(id);
+    if (!day) {
+      skipped.push({ id, reason: 'not_found' });
+      continue;
+    }
+    if (day.deleted_at) {
+      skipped.push({ id, track: day.track, date: day.date, reason: 'already_deleted' });
+      continue;
+    }
+    const graded = db.prepare('SELECT 1 FROM race_results WHERE race_day_id = ? LIMIT 1').get(day.id);
+    if (graded) {
+      skipped.push({ id, track: day.track, date: day.date, reason: 'graded' });
+      continue;
+    }
+    const { ok, counts } = softDeleteRaceDay(db, day);
+    if (!ok) {
+      log.error('race_day_delete_failed', { raceDayId: day.id });
+      skipped.push({ id, track: day.track, date: day.date, reason: 'write_failed' });
+      continue;
+    }
+    deleted.push({ id, track: day.track, date: day.date, ...counts });
+  }
+  res.json({ deleted, skipped });
 });
 
 ingestRouter.post('/race-days/:id/restore', (req, res) => {
