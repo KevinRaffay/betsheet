@@ -95,8 +95,17 @@ grammar, then a line reading exactly "${TICKET_BLOCK_END}":
   minimum. Compute combinations x base-unit FIRST, then pick your
   total as a multiple of that - never pick a total that merely "sounds
   right" and divide afterward. Prefer smaller boxes (3-4 horses) to
-  keep this simple.
-- <rationale>: one short sentence, required.
+  keep this simple. For EVERY box bet, show this arithmetic inside the
+  <rationale> itself, not only in your head: write out every factor of
+  the combination count multiplied together, the resulting combo
+  count, then a "$<base> x <combos> combos" check matching your total
+  - e.g. "...your one-sentence reason. (4 x 3 x 2 = 24 combos; $0.50 x
+  24 combos = $12.00)". Never jump straight from "n horses" to a combo
+  count or a total without writing out every factor first - the
+  written-out multiplication is what catches a miscount before you
+  commit to a price.
+- <rationale>: one short sentence, required - for a BOX bet, append
+  the combo arithmetic above.
 
 If you have no bet worth making on this race, output the block with
 zero ticket lines between the markers - do not pad it with a bet you
@@ -106,9 +115,9 @@ don't believe in.`;
 // doc this file mirrors (docs/prompts/llm-card-v1.md); the version is
 // DERIVED from a hash of SYSTEM_PROMPT rather than a number a prompt-fix PR
 // has to remember to bump - this file's own D64/D112/D125/D136/D138/D145/
-// D146/D148/D160 history never carried one, and a hash cannot go stale the
-// way a manually-incremented counter can. It changes exactly when, and only
-// when SYSTEM_PROMPT's text changes.
+// D146/D148/D160/D161 history never carried one, and a hash cannot go stale
+// the way a manually-incremented counter can. It changes exactly when, and
+// only when SYSTEM_PROMPT's text changes.
 export const PROMPT_TEMPLATE_ID = 'llm-card-v1';
 export const PROMPT_TEMPLATE_VERSION = crypto.createHash('sha256').update(SYSTEM_PROMPT).digest('hex').slice(0, 12);
 

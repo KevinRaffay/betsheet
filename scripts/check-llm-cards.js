@@ -108,6 +108,18 @@ console.log('-- pure: buildLlmRaceUserPrompt --');
   // needing 3 positions ("a trifecta needs 3 positions, got 1").
   check('system prompt ties comma-separated selections to a bet type that says "box" (D160 fix)',
     SYSTEM_PROMPT.includes('ONLY ever\n  legal under a box bet type'));
+  // D161: the SAME 4-horse trifecta box miscount recurred one race after D160
+  // merged, with the prompt already carrying D160's worked example (confirmed
+  // via prompt_template_version on the logged request) - a worked example
+  // alone wasn't enough. Escalation: require the model to show the combo
+  // arithmetic IN the <rationale> output, in a form ("$<base> x <combos>
+  // combos") that shared/parsers/human-picks.js's existing STAKE_CHECK_RE /
+  // parenthetical_mismatch cross-check (D84, for the teller grammar) already
+  // scans a ticket's trailing text for - so a model that states its own wrong
+  // arithmetic now surfaces a second, distinct warning naming the disagreement.
+  check('system prompt requires box bets to show combo arithmetic in the rationale (D161 fix)',
+    SYSTEM_PROMPT.includes('show this arithmetic inside the') && SYSTEM_PROMPT.includes('$<base> x <combos> combos')
+      && SYSTEM_PROMPT.includes('4 x 3 x 2 = 24 combos; $0.50 x'));
 }
 
 // ---------- analyst notes, pure (D92) ----------
