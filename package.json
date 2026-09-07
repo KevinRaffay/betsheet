@@ -4,6 +4,9 @@
   "private": true,
   "type": "module",
   "description": "Horse race betting card generator & strategy tracker: generate, grade, simulate.",
+  "engines": {
+    "node": ">=22.13.0"
+  },
   "scripts": {
     "start": "npm run build && node server/index.js",
     "start-qa": "npm run build && node -e \"process.env.BETSHEET_PORT ||= '8902'; import('./server/index.js')\"",

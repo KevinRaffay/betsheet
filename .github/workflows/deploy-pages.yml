@@ -14,8 +14,14 @@
 # THIS DEPLOY CANNOT WORK UNTIL PAGES IS ENABLED ON THE REPOSITORY, and on a
 # Free plan that means making the repository public (GitHub Pages from a
 # private repository requires Pro/Team). Until then the workflow is here,
-# correct, and will fail at the `deploy` job with a permissions error - which
-# is the honest state, rather than a pipeline that silently does nothing.
+# correct, and will fail at the `deploy` job - which is the honest state,
+# rather than a pipeline that silently does nothing.
+#
+# THE `build` JOB IS DELIBERATELY INDEPENDENT OF THAT. It installs, verifies
+# and builds without asking GitHub anything about Pages, so it goes green on
+# every push and gives a real CI signal today, months before a deploy can
+# succeed. Only `deploy` touches Pages. That is why there is no
+# `actions/configure-pages` step - see the note next to the artifact upload.
 #
 # NOTE, BEFORE ENABLING: a GitHub Pages site is PUBLICLY READABLE even when it
 # is built from a private repository (private Pages needs Enterprise Cloud).
@@ -61,12 +67,35 @@ jobs:
     steps:
       - uses: actions/checkout@v4
 
+      # 24, matching the machine the check suites are developed and run on,
+      # and the only line here that is not free to drift. `better-sqlite3@13`
+      # requires node >=22 and `pdfjs-dist@6` >=22.13 - and npm treats an
+      # engine mismatch as a WARNING, so `npm ci` "succeeds", installs a
+      # native binding built for a different ABI, and the first `require` of
+      # it SEGFAULTS. That is exactly how this workflow failed on its first
+      # run: exit 139 two seconds in, with no check output at all to say why.
+      # `engines.node` in package.json now declares the same floor.
       - uses: actions/setup-node@v4
         with:
-          node-version: 20
+          node-version: 24
           cache: npm
 
       - run: npm ci
+
+      - name: Node satisfies what the dependencies declare
+        # Belt and braces for the failure above: npm only warns, so this turns
+        # a wrong runtime into a one-line error instead of a segfault in a
+        # later step that looks like a broken check.
+        run: |
+          node --input-type=module -e "
+            import fs from 'node:fs';
+            const want = JSON.parse(fs.readFileSync('package.json', 'utf8')).engines?.node ?? '';
+            const floor = (want.match(/(\d+)\.(\d+)/) ?? [, '22', '13']).slice(1).map(Number);
+            const [major, minor] = process.versions.node.split('.').map(Number);
+            const ok = major > floor[0] || (major === floor[0] && minor >= floor[1]);
+            if (!ok) { console.error(\`::error::node \${process.version} is below the project's engines.node (\${want})\`); process.exit(1); }
+            console.log(\`node \${process.version} satisfies engines.node \${want}\`);
+          "
 
       - name: Refuse to deploy without a race day
         # An empty deploy is worse than no deploy: the app would load at the
@@ -98,8 +127,14 @@ jobs:
           BETSHEET_STATIC_BASE: /betsheet/
         run: npm run build:static
 
-      - uses: actions/configure-pages@v5
-
+      # NO `actions/configure-pages` step. Its only job is to report the Pages
+      # site's base path back to a static-site generator, and this build does
+      # not ask - `BETSHEET_STATIC_BASE` above sets the base explicitly, which
+      # is also what `check-static-app` asserts against. Keeping it would mean
+      # a step whose outputs are ignored, and which FAILS when Pages is not
+      # yet enabled - dragging the whole build job down with a deployment
+      # problem it has nothing to do with. Uploading the artifact needs no
+      # such call; only `deploy-pages` below genuinely requires Pages.
       - uses: actions/upload-pages-artifact@v3
         with:
           path: dist-static
