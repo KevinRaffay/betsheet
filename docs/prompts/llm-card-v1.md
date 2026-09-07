@@ -249,14 +249,29 @@ grammar, then a line reading exactly "<<<END TICKETS>>>":
   keep this simple. For EVERY box bet, show this arithmetic inside the
   <rationale> itself, not only in your head: write out every factor of
   the combination count multiplied together, the resulting combo
-  count, then a "$<base> x <combos> combos" check matching your total
-  - e.g. "...your one-sentence reason. (4 x 3 x 2 = 24 combos; $0.50 x
-  24 combos = $12.00)". Never jump straight from "n horses" to a combo
-  count or a total without writing out every factor first - the
-  written-out multiplication is what catches a miscount before you
+  count, then a "$<per-combo> x <combos> combos = $<total>" check -
+  e.g. "...your one-sentence reason. (4 x 3 x 2 = 24 combos; $0.50 x
+  24 combos = $12.00)". The "$<per-combo>" figure is what EACH
+  combination actually costs on THIS ticket, which equals the base
+  unit only when you price the box at its cheapest - a $24 total over
+  those same 24 combinations is "$1.00 x 24 combos = $24.00", never
+  "$0.50 x 24 combos = $24.00". Never jump straight from "n horses" to
+  a combo count or a total without writing out every factor first -
+  the written-out multiplication is what catches a miscount before you
   commit to a price.
+- The arithmetic you show IS the ticket's price, not a comment on it.
+  The "= $<total>" it ends in must be the same amount as that line's
+  <stake> column. Do the multiplication BEFORE you write the line and
+  put its product in <stake>; if you finish the arithmetic and find it
+  disagrees with the stake you had in mind, REWRITE THE WHOLE LINE
+  with the corrected total. Never leave the disagreement standing and
+  never narrate it in the <rationale> - "$6 is invalid, using $12
+  instead" is not a fix, because the <stake> column still reads $6 and
+  $6 is the only number that is actually bet. A <rationale> that
+  argues with its own <stake> column is a broken ticket, and the
+  ticket is refused on the <stake>.
 - <rationale>: one short sentence, required - for a BOX bet, append
-  the combo arithmetic above.
+  the combo arithmetic above, and nothing else.
 
 If you have no bet worth making on this race, output the block with
 zero ticket lines between the markers - do not pad it with a bet you
@@ -512,6 +527,44 @@ untouched, so no version bump.
   than ever given this is the second miscount on the same box type - the
   blocking validation in `shared/parsers/human-picks.js` remains the actual
   backstop regardless of what the model writes.
+- **2026-09-07: the shown arithmetic was right and the `<stake>` column was
+  not (D162).** Live bug report the same evening D161 merged: `BLOCKING:
+  Race 11: $0.25 per combo is below the $0.50 minimum for trifecta box.`
+  Traced to `llm_card_requests` id 314 (`claude-opus-5`, race day 262 race
+  11), whose `prompt_template_version` matches the POST-D161 hash, so it
+  read the show-your-work prompt. **D161 worked and the ticket still
+  failed**, which is what makes this a different defect rather than a third
+  recurrence: the line was
+  `trifecta box | #3,#10,#7,#4 | $6 | ... (4 x 3 x 2 = 24 combos; $0.50 x
+  24 combos = $12.00 - halved at 25c not allowed, so priced at $6 is
+  invalid; using $12 instead.)`. Every factor is written out, the combo
+  count is the correct 24, the product is the correct $12.00, and the model
+  even states in prose that $6 is invalid - but the `<stake>` column was
+  written BEFORE the arithmetic and was never revised, so `$6` is what the
+  parser reads and `$6 / 24 = $0.25` is what it refuses. The same response's
+  exacta box carried the mirror-image version (`$4` total with a
+  `"$1.00 x 2 combos = $4.00"` check whose own product is $2.00), which
+  surfaced the non-blocking `parenthetical_mismatch` D161 predicted. Root
+  shape of both: **D161 asked the model to show its work but never said the
+  shown work had to equal the `<stake>` column.** The column ORDER makes
+  this the natural failure - `<stake>` is emitted before `<rationale>`, so
+  "show your work" happens after the number is already committed, and a
+  model that catches its own slip has no way to fix it except by rewriting
+  the line. Fix, still prompt-only: the arithmetic is now stated to BE the
+  ticket's price rather than a comment on it - its `= $<total>` must be the
+  same amount as `<stake>`, the multiplication comes first and its product
+  is what gets written into `<stake>`, and a disagreement must be fixed by
+  rewriting the whole line, never by narrating the correction in the
+  `<rationale>` (that exact narration is quoted in the prompt as a
+  non-fix). Carries a second, latent fix found while reading the
+  cross-check: D161's `"$<base> x <combos> combos"` wording was wrong for
+  any box priced ABOVE the base unit, because `STAKE_CHECK_RE` compares the
+  stated figure against the ACTUAL per-combination cost - a legal $24 on 24
+  combos written as "$0.50 x 24 combos" would have raised a spurious
+  `parenthetical_mismatch`. The field is now named `$<per-combo>` and the
+  $24 case is spelled out. No parser, server, or schema change. **Not
+  claimed to be foolproof**, same caveat as every fix above; the blocking
+  validation is still the backstop, and it did its job here.
 
 ## Model selection (D75)
 
@@ -612,9 +665,10 @@ rather than a bucketing rule.
 
 **Deliberately a hash of `SYSTEM_PROMPT`, computed at module load, not a
 manually incremented number.** This file's own D64, D112, D125, D136, D138,
-D145, D146, D148, D160 and D161 fixes are ten PRs that edited the prompt and
-not one of them carried a version marker - a manually-bumped counter would
-have needed every one of those PRs to remember a step nothing enforced, the same failure
+D145, D146, D148, D160, D161 and D162 fixes are eleven PRs that edited the
+prompt and not one of them carried a version marker - a manually-bumped
+counter would have needed every one of those PRs to remember a step nothing
+enforced, the same failure
 mode `ENGINE_VERSION` and `cards.saw_classification` have each already hit in
 this codebase in other forms. A hash of the actual text cannot go stale that
 way: it changes exactly when, and only when, `SYSTEM_PROMPT` does.

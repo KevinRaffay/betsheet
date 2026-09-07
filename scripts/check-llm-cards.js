@@ -118,8 +118,21 @@ console.log('-- pure: buildLlmRaceUserPrompt --');
   // scans a ticket's trailing text for - so a model that states its own wrong
   // arithmetic now surfaces a second, distinct warning naming the disagreement.
   check('system prompt requires box bets to show combo arithmetic in the rationale (D161 fix)',
-    SYSTEM_PROMPT.includes('show this arithmetic inside the') && SYSTEM_PROMPT.includes('$<base> x <combos> combos')
+    SYSTEM_PROMPT.includes('show this arithmetic inside the') && SYSTEM_PROMPT.includes('$<per-combo> x <combos> combos')
       && SYSTEM_PROMPT.includes('4 x 3 x 2 = 24 combos; $0.50 x'));
+  // D162: D161's arithmetic requirement worked - request 314 wrote every
+  // factor out and reached the correct $12.00 - but the <stake> column still
+  // read $6, because <stake> is emitted BEFORE <rationale> and the model
+  // narrated the correction instead of rewriting the line. The prompt now
+  // binds the two: the arithmetic's product IS the stake.
+  check('system prompt binds the shown arithmetic to the <stake> column (D162 fix)',
+    SYSTEM_PROMPT.includes("The arithmetic you show IS the ticket's price")
+      && SYSTEM_PROMPT.includes('REWRITE THE WHOLE LINE'));
+  // D162, latent half: STAKE_CHECK_RE compares the stated figure against the
+  // ACTUAL per-combination cost, so naming that field "$<base>" was wrong for
+  // any box priced above the base unit.
+  check('system prompt names the per-combination cost, not the base unit, in the check (D162 fix)',
+    SYSTEM_PROMPT.includes('"$1.00 x 24 combos = $24.00"') && !SYSTEM_PROMPT.includes('$<base> x'));
 }
 
 // ---------- analyst notes, pure (D92) ----------
