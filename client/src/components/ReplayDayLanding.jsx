@@ -13,9 +13,12 @@ const STATUS_LABEL = (r) => (r.revealed ? 'Revealed' : r.pass ? 'Passed' : r.loc
 
 // Replay day landing (D62): the day's races at a glance before diving into
 // one blind - clicking a row opens that race in the same ReplayRaceView
-// this route used to jump straight into (always at race 1). Resolves the
-// day's own human card the same way ReplayRaceView does (D60) so PL shows
-// for whichever races are already revealed on a resumed playthrough.
+// this route used to jump straight into (always at race 1). Resumes the
+// day's own LATEST human card by default (D60), same as ReplayRaceView used
+// to resolve on its own - D137 lifts that resolution up here and hands it
+// down explicitly as `initialCardId`/`cardName`, and adds a picker so a day
+// with several human cards (D28 already allows it) can be viewed or added
+// to deliberately rather than always landing on the newest one.
 //
 // D95: once the day is CLOSED it also renders the final card itself - the
 // same CardView the /card/:id route renders, mounted `embedded` so it brings
@@ -34,13 +37,21 @@ export default function ReplayDayLanding({ dayId, onBack, onOpenStanding }) {
   const [selectedRace, setSelectedRace] = useState(null);
   const [refreshKey, setRefreshKey] = useState(0);
   const [building, setBuilding] = useState(false);
+  // D137: which human card this page is about. null follows the original
+  // D60 rule (resume the latest, whatever it currently is); a numeric id
+  // pins to that exact playthrough even once a newer one exists; 'new'
+  // deliberately starts another one instead (D28 already allows several
+  // human cards per day - this is what gives the user a way to reach for
+  // it, with an optional name, rather than always resuming the latest).
+  const [selectedHumanCard, setSelectedHumanCard] = useState(null);
+  const [newCardName, setNewCardName] = useState('');
 
-  // The day's LATEST human card is the one this page is about, the same
-  // resume rule ReplayRaceView follows (D60). A replayed day mints a new card
-  // rather than editing the old one (D28), so older playthroughs stay
-  // readable at their own /card/:id.
-  const card = humanCards?.[0] ?? null;
+  const humanCardsList = humanCards ?? [];
+  const effectiveSelection = selectedHumanCard ?? humanCardsList[0]?.id ?? 'new';
+  const startingNew = effectiveSelection === 'new';
+  const card = startingNew ? null : humanCardsList.find((c) => c.id === effectiveSelection) ?? null;
   const cardId = card?.id ?? null;
+  const cardName = startingNew ? (newCardName.trim() || null) : (card?.name ?? null);
 
   useEffect(() => {
     getRaceDay(dayId).then(setDayInfo).catch((e) => setError(String(e.message)));
@@ -68,12 +79,24 @@ export default function ReplayDayLanding({ dayId, onBack, onOpenStanding }) {
     getReplaySummary(cardId).then(setSummary).catch(() => {});
   }, [cardId, refreshKey]);
 
-  // Races may have been locked/revealed while playing - refresh the table
-  // on the way back instead of showing stale status.
-  const handleBackFromRace = () => { setSelectedRace(null); setRefreshKey((k) => k + 1); };
+  // Races may have been locked/revealed while playing - refresh the table on
+  // the way back instead of showing stale status, and drop back to "follow
+  // the latest" so a just-started new card (or a newly revealed one) shows
+  // up without the picker still pointing at 'new' or a now-stale id.
+  const handleBackFromRace = () => {
+    setSelectedRace(null);
+    setSelectedHumanCard(null);
+    setNewCardName('');
+    setRefreshKey((k) => k + 1);
+  };
 
   if (selectedRace != null) {
-    return <ReplayRaceView dayId={dayId} initialRace={selectedRace} onBack={handleBackFromRace} onOpenStanding={onOpenStanding} />;
+    return (
+      <ReplayRaceView
+        dayId={dayId} initialRace={selectedRace} initialCardId={cardId} cardName={cardName}
+        onBack={handleBackFromRace} onOpenStanding={onOpenStanding}
+      />
+    );
   }
 
   if (error) return <p className="notice notice--error">{error}</p>;
@@ -89,14 +112,56 @@ export default function ReplayDayLanding({ dayId, onBack, onOpenStanding }) {
           <button className="btn" onClick={onBack}>Back</button>
         </div>
       </div>
+      {humanCardsList.length > 0 && (
+        <div className="formrow formrow--tight">
+          <label>
+            Human card{' '}
+            <select
+              className="in in--sm" value={String(effectiveSelection)}
+              onChange={(e) => setSelectedHumanCard(e.target.value === 'new' ? 'new' : Number(e.target.value))}
+            >
+              {humanCardsList.map((c) => (
+                <option key={c.id} value={c.id}>#{c.card_number}{c.name ? ` — ${c.name}` : ''}</option>
+              ))}
+              <option value="new">+ Start a new card…</option>
+            </select>
+          </label>
+          {startingNew && (
+            <label>
+              Name (optional){' '}
+              <input
+                className="in in--sm" value={newCardName} placeholder="e.g. Aggressive"
+                onChange={(e) => setNewCardName(e.target.value)}
+              />
+            </label>
+          )}
+        </div>
+      )}
+      {humanCardsList.length === 0 && (
+        <div className="formrow formrow--tight">
+          <label>
+            New card's name (optional){' '}
+            <input
+              className="in in--sm" value={newCardName} placeholder="e.g. Aggressive"
+              onChange={(e) => setNewCardName(e.target.value)}
+            />
+          </label>
+        </div>
+      )}
       {building && (
         <DayTicketBuilderModal
           context="replay"
           dayId={dayId}
           cardId={cardId}
+          cardName={cardName}
           bankrollCents={dayInfo.bankroll_cents}
           onCardChanged={() => setRefreshKey((k) => k + 1)}
-          onClose={() => { setBuilding(false); setRefreshKey((k) => k + 1); }}
+          onClose={() => {
+            setBuilding(false);
+            setSelectedHumanCard(null);
+            setNewCardName('');
+            setRefreshKey((k) => k + 1);
+          }}
         />
       )}
       <table className="grid grid--click">
@@ -130,11 +195,11 @@ export default function ReplayDayLanding({ dayId, onBack, onOpenStanding }) {
         <>
           <div className="notice">
             <p>
-              <strong>Day closed.</strong> Final card #{card.card_number} · blindness{' '}
+              <strong>Day closed.</strong> Final card #{card.card_number}{card.name ? ` — “${card.name}”` : ''} · blindness{' '}
               <span className="chip chip--human">{blindnessLabel(summary.blindness)}</span>
               {humanCards.length > 1 && (
                 <span className="dim">
-                  {' '}· {humanCards.length - 1} earlier playthrough{humanCards.length > 2 ? 's' : ''} on this day, each its own card
+                  {' '}· {humanCards.length - 1} other human card{humanCards.length > 2 ? 's' : ''} on this day, each its own card - use the picker above to view another
                 </span>
               )}
             </p>

@@ -740,6 +740,48 @@ try {
     return sum.blindness === null && sum.closed === false && sum.anyRevealed === false;
   })());
 
+  // ---------- D137: optional card name, multiple human cards per day ----------
+  // A dedicated fixture day so these checks don't have to reason about the
+  // races/cards state every earlier section in this file left behind.
+  console.log('-- D137: optional card name --');
+  const nameDayCreated = await (await jpost('/api/race-days', { ...day, date: '2026-09-04' })).json();
+  const nameDayId = nameDayCreated.id;
+  check('a fourth fixture day saves for the naming checks', Number.isInteger(nameDayId), JSON.stringify(nameDayCreated));
+
+  const namedLockRes = await jpost(`/api/race-days/${nameDayId}/human-cards`, { race: 1, text: 'Win\t#2\t$25', name: '  Aggressive  ' });
+  const namedLocked = await namedLockRes.json();
+  check('a new card accepts an optional name', namedLockRes.status === 201 && Number.isInteger(namedLocked.cardId), JSON.stringify(namedLocked));
+  const namedCardId = namedLocked.cardId;
+  check('the name is stored trimmed', await (async () => {
+    const card = await jget(`/api/cards/${namedCardId}`);
+    return card.name === 'Aggressive';
+  })());
+  check('the name is returned by the day\'s card list too', await (async () => {
+    const cards = await jget(`/api/race-days/${nameDayId}/cards`);
+    return cards.find((c) => c.id === namedCardId)?.name === 'Aggressive';
+  })());
+  check('a name passed on a LATER call to the same card is ignored - frozen at creation (mirrors llm_model)', await (async () => {
+    await jpost(`/api/race-days/${nameDayId}/human-cards`, { race: 2, pass: true, cardId: namedCardId, name: 'Conservative' });
+    const card = await jget(`/api/cards/${namedCardId}`);
+    return card.name === 'Aggressive';
+  })());
+  check('a whitespace-only name is stored as NULL, never an empty string', await (async () => {
+    const r = await (await jpost(`/api/race-days/${nameDayId}/human-cards`, { race: 1, text: 'Win\t#4\t$15', name: '   ' })).json();
+    const card = await jget(`/api/cards/${r.cardId}`);
+    return card.name === null && r.cardId !== namedCardId;
+  })());
+  check('omitting name entirely is also NULL', await (async () => {
+    const r = await (await jpost(`/api/race-days/${nameDayId}/human-cards`, { race: 1, text: 'Win\t#3\t$25' })).json();
+    const card = await jget(`/api/cards/${r.cardId}`);
+    return card.name === null;
+  })());
+  check('the day now carries three independent human cards, one named (D28 already allows several)', await (async () => {
+    const cards = await jget(`/api/race-days/${nameDayId}/cards`);
+    const human = cards.filter((c) => c.template === 'human');
+    return human.length === 3 && human.filter((c) => c.name === 'Aggressive').length === 1
+      && human.filter((c) => c.name === null).length === 2;
+  })());
+
   console.log('-- no-version-bump identity --');
   const { ENGINE_VERSION } = await import('../shared/version.js');
   check('ENGINE_VERSION unchanged at lean-1.1', ENGINE_VERSION === 'lean-1.1', ENGINE_VERSION);

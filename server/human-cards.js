@@ -103,8 +103,14 @@ export function previewHumanRace(db, day, raceNumber, text, cardId) {
  * (409) a race already revealed on the named card - the D28 rule: start
  * a new card by omitting cardId. Re-parses `text` itself and refuses
  * (422) on any blocking warning; `pass: true` skips parsing entirely.
+ *
+ * `name` (D137) is optional and only ever used to mint a brand-new card -
+ * it is silently ignored when `cardId` is given, the same frozen-at-
+ * creation convention `llm_model` follows (invariant 14's spirit): a
+ * card's label never drifts mid-comparison. Blank/whitespace-only is
+ * stored as NULL, never as an empty string.
  */
-export function persistHumanRace(db, day, { race: raceNumber, text, pass = false, bankrollCents, cardId, correlationId }) {
+export function persistHumanRace(db, day, { race: raceNumber, text, pass = false, bankrollCents, cardId, name, correlationId }) {
   const { race, entries } = loadRace(db, day.id, raceNumber);
 
   let card = null;
@@ -167,12 +173,13 @@ export function persistHumanRace(db, day, { race: raceNumber, text, pass = false
       const cardNumber = db.prepare(
         'SELECT COALESCE(MAX(card_number), 0) + 1 AS n FROM cards WHERE race_day_id = ?',
       ).get(day.id).n;
+      const trimmedName = typeof name === 'string' && name.trim() ? name.trim() : null;
       const newCardId = db.prepare(`INSERT INTO cards
           (race_day_id, card_number, variant, strategy_template_id, bankroll_cents,
-           per_race_min_cents, status, correlation_id, consensus_completeness, engine_version)
-          VALUES (?, ?, 'default', ?, ?, ?, 'final', ?, 'HUMAN', 'human')`)
+           per_race_min_cents, status, correlation_id, consensus_completeness, engine_version, name)
+          VALUES (?, ?, 'default', ?, ?, ?, 'final', ?, 'HUMAN', 'human', ?)`)
         .run(day.id, cardNumber, templateIdFor(db, 'human'), bankrollCents ?? day.bankroll_cents,
-          day.per_race_min_cents ?? null, correlationId).lastInsertRowid;
+          day.per_race_min_cents ?? null, correlationId, trimmedName).lastInsertRowid;
       card = db.prepare('SELECT * FROM cards WHERE id = ?').get(newCardId);
     }
 
@@ -215,6 +222,7 @@ export function persistHumanRace(db, day, { race: raceNumber, text, pass = false
   if (isNewCard) {
     traceLog.info('card_generated', {
       correlationId, cardId: result.id, raceDayId: day.id, engineVersion: 'human', template: 'human',
+      name: result.name ?? null,
     });
   }
   for (const t of parsed.tickets) {
@@ -372,7 +380,7 @@ humanCardsRouter.post('/race-days/:id/human-cards', (req, res) => {
     const result = persistHumanRace(db, day, {
       race, text: req.body?.text ?? '', pass,
       bankrollCents: req.body?.bankrollCents != null ? Number(req.body.bankrollCents) : undefined,
-      cardId: req.body?.cardId, correlationId,
+      cardId: req.body?.cardId, name: req.body?.name, correlationId,
     });
     res.status(201).json(result);
   } catch (err) {

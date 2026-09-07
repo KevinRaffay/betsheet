@@ -181,11 +181,11 @@ export const previewHumanCard = (dayId, race, text, cardId, correlationId) =>
     headers: { 'content-type': 'application/json', ...(correlationId ? { 'x-correlation-id': correlationId } : {}) },
     body: JSON.stringify({ race, text, cardId }),
   }).then(asJson);
-export const lockHumanCard = (dayId, { race, text, pass, bankrollCents, cardId }, correlationId) =>
+export const lockHumanCard = (dayId, { race, text, pass, bankrollCents, cardId, name }, correlationId) =>
   fetch(`/api/race-days/${dayId}/human-cards`, {
     method: 'POST',
     headers: { 'content-type': 'application/json', ...(correlationId ? { 'x-correlation-id': correlationId } : {}) },
-    body: JSON.stringify({ race, text, pass, bankrollCents, cardId }),
+    body: JSON.stringify({ race, text, pass, bankrollCents, cardId, name }),
   }).then(asJson);
 // D103: delete ONE ticket from a locked, unrevealed race - the day builder's
 // remedy for a ticket it locked on close. Refused server-side once the race is

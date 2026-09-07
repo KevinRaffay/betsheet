@@ -20,7 +20,7 @@ export const cardsRouter = express.Router();
 cardsRouter.get('/race-days/:id/cards', (req, res) => {
   const db = getDb();
   const cards = db.prepare(`
-    SELECT c.id, c.card_number, c.variant, st.name AS template,
+    SELECT c.id, c.card_number, c.variant, c.name, st.name AS template,
            c.bankroll_cents, c.per_race_min_cents, c.engine_version, c.llm_model, c.notes_present,
            c.status, c.consensus_completeness, c.created_at,
            COUNT(t.id) AS tickets, COALESCE(SUM(t.cost_cents), 0) AS total_cents
