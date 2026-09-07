@@ -112,6 +112,7 @@ export default function CardView({ cardId, onBack, onDeleted, embedded = false }
           <h2>
             {card.track} — {card.date} · card #{card.card_number}
             {card.variant !== 'default' ? ` (${card.variant})` : ''}
+            {card.name ? ` — “${card.name}”` : ''}
           </h2>
           <div className="btnrow">
             <a className="btn" href={`/api/cards/${cardId}/export`}>Export JSON</a>

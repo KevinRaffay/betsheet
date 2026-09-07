@@ -46,8 +46,16 @@ const money = (cents) => (cents == null ? '—' : cents % 100 === 0 ? `$${cents 
 // the collapsed race card; TicketBuilder is a one-way text producer that
 // starts empty and emits '' on mount, so opening the race to build again
 // starts fresh rather than reloading the draft into it.
+//
+// D137: `cardName` is the caller's business, not this modal's - it is either
+// the name of the card `initialCardId` already resolves to (display only) or
+// the name typed for a brand-new one (`initialCardId` null), and is threaded
+// into every lockHumanCard call. The server only ever uses it on the call
+// that actually mints the card and ignores it on every later call to that
+// same card (D137, mirrors llm_model's frozen-at-creation rule), so passing
+// it unconditionally here is harmless.
 export default function DayTicketBuilderModal({
-  dayId, cardId: initialCardId, bankrollCents, onClose, onCardChanged, context = 'replay',
+  dayId, cardId: initialCardId, cardName, bankrollCents, onClose, onCardChanged, context = 'replay',
 }) {
   const live = context === 'live';
   const [cardId, setCardId] = useState(initialCardId ?? null);
@@ -128,7 +136,11 @@ export default function DayTicketBuilderModal({
   const saveRace = async (n, localCardId, localCorrelationId) => {
     const r = await lockHumanCard(
       dayId,
-      { race: n, text: textByRace.get(n) ?? '', bankrollCents, cardId: localCardId },
+      // `name` only takes effect on the call that mints the card (localCardId
+      // still null) - the server ignores it once a card already exists
+      // (D137, mirrors llm_model's frozen-at-creation rule), so passing it on
+      // every call is harmless and simpler than tracking "have we saved yet".
+      { race: n, text: textByRace.get(n) ?? '', bankrollCents, cardId: localCardId, name: cardName },
       localCorrelationId,
     );
     return { cardId: r.cardId ?? localCardId, correlationId: r.correlationId ?? localCorrelationId };
@@ -148,7 +160,7 @@ export default function DayTicketBuilderModal({
   const handlePass = async (n) => {
     setBusy(true); setError(null);
     try {
-      const r = await lockHumanCard(dayId, { race: n, pass: true, bankrollCents, cardId }, correlationId);
+      const r = await lockHumanCard(dayId, { race: n, pass: true, bankrollCents, cardId, name: cardName }, correlationId);
       setCardId(r.cardId ?? cardId);
       forgetDraft(n);
       await reload();
@@ -229,7 +241,10 @@ export default function DayTicketBuilderModal({
     <div className="modal-backdrop">
       <div className="modal" role="dialog" aria-modal="true" aria-label={live ? 'Build the card by hand' : 'Build tickets for the day'}>
         <div className="modal__header">
-          <h3>{live ? 'Build the card by hand' : 'Build tickets for the day'}</h3>
+          <h3>
+            {live ? 'Build the card by hand' : 'Build tickets for the day'}
+            {cardName && <span className="dim"> — “{cardName}”</span>}
+          </h3>
           <button className="modal__close" disabled={busy} onClick={handleClose} aria-label="Close">×</button>
         </div>
 

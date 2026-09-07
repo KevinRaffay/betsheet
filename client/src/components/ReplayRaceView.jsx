@@ -1,6 +1,6 @@
 import React, { useEffect, useState } from 'react';
 import {
-  blindnessLabel, closeReplayCard, getRaceDay, getReplayRace, getReplaySummary, listCards, lockHumanCard, previewHumanCard,
+  blindnessLabel, closeReplayCard, getRaceDay, getReplayRace, getReplaySummary, lockHumanCard, previewHumanCard,
   revealReplayRace,
 } from '../api.js';
 import TicketBuilder from './TicketBuilder.jsx';
@@ -22,11 +22,18 @@ const pct = (x) => (x == null ? '—' : `${x >= 0 ? '+' : ''}${(100 * x).toFixed
 // source writes a pick, and there is no engine whose read could be revealed.
 // What a race shows blind is now the entries, the wager menu and the
 // program's Bottom Line.
-export default function ReplayRaceView({ dayId, initialRace = 1, onBack, onOpenStanding }) {
+// `initialCardId` (D137) is which human card this race belongs to, decided
+// by ReplayDayLanding's own picker - null means "start a new card". It is
+// always passed explicitly rather than re-resolved here: ReplayRaceView is
+// fully unmounted and remounted on every landing<->race transition (see
+// ReplayDayLanding's `selectedRace != null` gate), so a fresh prop is
+// guaranteed on every entry and there is no case left where this view needs
+// to guess which card "the latest" means on its own.
+export default function ReplayRaceView({ dayId, initialRace = 1, initialCardId = null, cardName, onBack, onOpenStanding }) {
   const [raceNumber, setRaceNumber] = useState(initialRace);
   const [totalRaces, setTotalRaces] = useState(null);
   const [dayInfo, setDayInfo] = useState(null);
-  const [cardId, setCardId] = useState(null);
+  const [cardId, setCardId] = useState(initialCardId);
   const [correlationId, setCorrelationId] = useState(null);
   const [blind, setBlind] = useState(null);
   const [text, setText] = useState('');
@@ -38,16 +45,6 @@ export default function ReplayRaceView({ dayId, initialRace = 1, onBack, onOpenS
 
   useEffect(() => {
     getRaceDay(dayId).then((d) => { setDayInfo(d); setTotalRaces(d.races.length); }).catch((e) => setError(String(e.message)));
-    // Resume the day's own human card on a fresh visit (a different tab, a
-    // reload, or navigating back from Standing) - otherwise a closed day
-    // would show as never-played every time you return to it. The latest
-    // card_number wins; starting a genuinely new playthrough isn't a UI
-    // action yet, so there's nothing to disambiguate.
-    setCardId(null);
-    listCards(dayId).then((cards) => {
-      const human = cards.filter((c) => c.template === 'human').sort((a, b) => b.card_number - a.card_number)[0];
-      if (human) setCardId(human.id);
-    }).catch(() => {});
   }, [dayId]);
 
   const reload = () => getReplayRace(dayId, raceNumber, cardId).then(setBlind).catch((e) => setError(String(e.message)));
@@ -74,7 +71,7 @@ export default function ReplayRaceView({ dayId, initialRace = 1, onBack, onOpenS
   });
 
   const handleLock = withBusy(async () => {
-    const r = await lockHumanCard(dayId, { race: raceNumber, text, bankrollCents: dayInfo?.bankroll_cents, cardId }, correlationId);
+    const r = await lockHumanCard(dayId, { race: raceNumber, text, bankrollCents: dayInfo?.bankroll_cents, cardId, name: cardName }, correlationId);
     if (r.correlationId) setCorrelationId(r.correlationId);
     if (!cardId) setCardId(r.cardId);
     setPreview(null); setText(''); setEditing(false);
@@ -83,7 +80,7 @@ export default function ReplayRaceView({ dayId, initialRace = 1, onBack, onOpenS
   });
 
   const handlePass = withBusy(async () => {
-    const r = await lockHumanCard(dayId, { race: raceNumber, pass: true, bankrollCents: dayInfo?.bankroll_cents, cardId }, correlationId);
+    const r = await lockHumanCard(dayId, { race: raceNumber, pass: true, bankrollCents: dayInfo?.bankroll_cents, cardId, name: cardName }, correlationId);
     if (!cardId) setCardId(r.cardId);
     await reload();
   });
@@ -120,7 +117,7 @@ export default function ReplayRaceView({ dayId, initialRace = 1, onBack, onOpenS
       {error && <p className="notice notice--error">{error}</p>}
       <p className="dim">
         Bankroll {money(blind.bankrollCents)} · per-race min {money(blind.perRaceMinCents)}
-        {cardId && <> · card #{cardId} · running cost {money(blind.runningCardCostCents)}</>}
+        {cardId && <> · card #{cardId}{cardName ? ` (“${cardName}”)` : ''} · running cost {money(blind.runningCardCostCents)}</>}
       </p>
 
       {summary?.closed && (
