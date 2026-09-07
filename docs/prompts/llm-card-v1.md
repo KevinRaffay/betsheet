@@ -203,16 +203,19 @@ grammar, then a line reading exactly "<<<END TICKETS>>>":
   with "/", e.g. "#4 / #2" (4 to win, 2 to place). Box types list
   every horse in the box separated by ",", e.g. "#4,#2,#7".
 - <stake>: the TOTAL dollar amount for that ticket (not per-combo),
-  e.g. "$20". Every exacta/trifecta/superfecta - STRAIGHT or BOXED -
-  must price in whole multiples of that wager type's base unit shown
-  in the wager menu above, per combination. A STRAIGHT bet (one
-  specific finish order, e.g. "#4 / #2 / #7" for a trifecta) is always
-  1 combination, so its total must BE that multiple directly - a 50c
-  trifecta prices at $0.50, $1.00, $1.50, ... - NOT $0.75, which is 1.5
-  steps of 50c, not a whole one. For a BOX bet, the total must divide
-  EXACTLY and EVENLY across every combination the box produces, with
-  each combination's share a whole multiple of the base unit. The
-  number of combinations is 1 for a straight bet, and for a box:
+  e.g. "$20". Win, place and show have a $2 minimum, sold in $1
+  increments above it - $2, $3, $4, $5, ... - NEVER below $2 (e.g. $1
+  is refused as below the minimum). Every exacta/trifecta/superfecta -
+  STRAIGHT or BOXED - must price in whole multiples of that wager
+  type's base unit shown in the wager menu above, per combination. A
+  STRAIGHT bet (one specific finish order, e.g. "#4 / #2 / #7" for a
+  trifecta) is always 1 combination, so its total must BE that
+  multiple directly - a 50c trifecta prices at $0.50, $1.00, $1.50,
+  ... - NOT $0.75, which is 1.5 steps of 50c, not a whole one. For a
+  BOX bet, the total must divide EXACTLY and EVENLY across every
+  combination the box produces, with each combination's share a whole
+  multiple of the base unit. The number of combinations is 1 for a
+  straight bet, and for a box:
     exacta box:     n x (n-1)
     trifecta box:   n x (n-1) x (n-2)
     superfecta box: n x (n-1) x (n-2) x (n-3)
@@ -360,6 +363,20 @@ untouched, so no version bump.
   this exact failure ($0.75 vs the $0.50 step). No parser, server, or
   schema change - the validation was already correct; this only tells
   the model the rule it was missing.
+- **2026-09-07: win/place/show below the $2 minimum.** Live bug report:
+  `win | #4 | $1.00` - correctly BLOCKED by `shared/parsers/
+  human-picks.js` (`below_minimum`, `wagerLimitsFor`'s `minCents` check:
+  WPS types default to $2, and no printed wager menu can ever override
+  it - `shared/betmath.js`'s `MENU_PATTERNS` has no "Win" entry at all).
+  Root cause: the `<stake>` rule said nothing whatsoever about win/place/
+  show pricing - it jumped straight from the bet-type list to the
+  exotic-only divisibility math, so the model had no stated minimum to
+  respect for the three simplest bet types on the menu. Fix is
+  prompt-only, same posture as the two fixes above: the `<stake>` rule
+  now opens with the $2 minimum / $1 increment for win, place and show,
+  before the exotic rules. No parser, server, or schema change - the
+  validation was already correct; this only tells the model the rule it
+  was missing.
 
 ## Model selection (D75)
 
