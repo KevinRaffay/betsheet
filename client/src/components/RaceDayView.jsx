@@ -3,6 +3,7 @@ import { deleteRaceDay, deletionPreview, getRaceDay } from '../api.js';
 import CardsPanel from './CardsPanel.jsx';
 import ResultsPanel from './ResultsPanel.jsx';
 import EquibaseOtrPanel from './EquibaseOtrPanel.jsx';
+import RaceDayNotesModal from './RaceDayNotesModal.jsx';
 import { entriesStaleness } from '@shared/staleness.js';
 
 // Read-only view of a stored race day - what actually landed in the
@@ -23,6 +24,7 @@ export default function RaceDayView({ id, onBack, onOpenCard }) {
   // reload. The two in-panel modals don't need this: they're CardsPanel's
   // own children and call its `reload` directly.
   const [cardsVersion, setCardsVersion] = useState(0);
+  const [showNotesModal, setShowNotesModal] = useState(false);
 
   useEffect(() => {
     getRaceDay(id).then(setDay).catch((e) => setError(String(e.message)));
@@ -58,10 +60,17 @@ export default function RaceDayView({ id, onBack, onOpenCard }) {
       <div className="pagehead">
         <h2>{day.track} — {day.date}</h2>
         <div className="formrow formrow--tight">
+          {/* D159: notes are a race-day attribute (D92), so this is reachable
+              the moment entries are in - before any card exists - and writes
+              through the same draft store the LLM generator's own notes UI
+              reads and writes. */}
+          <button className="btn" onClick={() => setShowNotesModal(true)}>Enter Analyst Notes</button>
           <button className="btn btn--danger" disabled={busy} onClick={askDelete}>Delete race day</button>
           <button className="btn" onClick={onBack}>Back</button>
         </div>
       </div>
+
+      {showNotesModal && <RaceDayNotesModal dayId={day.id} onClose={() => setShowNotesModal(false)} />}
 
       {confirm && (
         <div className="notice notice--warn">
