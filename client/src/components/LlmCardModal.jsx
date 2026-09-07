@@ -463,6 +463,7 @@ export default function LlmCardModal({ dayId, onCardChanged, onClose }) {
               <div className="llm-race-grid">
                 {races.map((r) => {
                   const saved = ticketsByRace.get(r.number);
+                  const generatingThisRace = busy && openRace === r.number && !preview;
                   return (
                     <article className="llm-race-card" key={r.id}>
                       <div className="llm-race-card__header">
@@ -479,9 +480,21 @@ export default function LlmCardModal({ dayId, onCardChanged, onClose }) {
                             </span>
                           )}
                         </div>
-                        <button className="btn btn--sm" disabled={busy} onClick={() => handleGenerate(r.number)}>
-                          {saved ? 'Regenerate' : 'Generate'}
-                        </button>
+                        <div className="llm-race-card__actions">
+                          {/* Was rendered below the entries table and analyst notes,
+                              where a call that takes several seconds sat below the
+                              fold - moved beside the button that triggers it so the
+                              wait is visible without scrolling. */}
+                          {generatingThisRace && (
+                            <span className="llm-loading" role="status">
+                              <span className="spinner" aria-hidden="true" />
+                              Calling the model…
+                            </span>
+                          )}
+                          <button className="btn btn--sm" disabled={busy} onClick={() => handleGenerate(r.number)}>
+                            {saved ? 'Regenerate' : 'Generate'}
+                          </button>
+                        </div>
                       </div>
                       <EntriesTable entries={r.entries ?? []} />
                       <details className="race-bottom-line">
@@ -496,12 +509,6 @@ export default function LlmCardModal({ dayId, onCardChanged, onClose }) {
                         <div>
                           {errorRace === r.number && error && (
                             <p className="notice notice--error" role="alert">{error}</p>
-                          )}
-                          {busy && !preview && (
-                            <p className="llm-loading" role="status">
-                              <span className="spinner" aria-hidden="true" />
-                              Calling the model…
-                            </p>
                           )}
                           {preview && (
                             <div className="formrow">
