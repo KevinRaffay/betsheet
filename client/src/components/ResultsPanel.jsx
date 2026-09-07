@@ -1,15 +1,14 @@
 import React, { useEffect, useState } from 'react';
-import { getResults, parseResultsHtml, parseResultsPdf, parseResultsText, saveResults } from '../api.js';
+import { getResults, parseResultsPdf, saveResults } from '../api.js';
 
 const money = (cents) => (cents == null ? '' : `$${(cents / 100).toFixed(2)}`);
 
-// The results section of a stored race day: paste the Equibase chart text
-// or upload the chart PDF, review the READ-ONLY preview (invariant 9 -
-// corrections happen in the source, then re-parse), save. Saved results
-// replace the day's prior results; the chart provenance log appends.
+// The results section of a stored race day: upload the chart PDF, review
+// the READ-ONLY preview (invariant 9 - corrections happen in the source,
+// then re-upload), save. Saved results replace the day's prior results;
+// the chart provenance log appends.
 export default function ResultsPanel({ dayId }) {
   const [data, setData] = useState(null);
-  const [text, setText] = useState('');
   const [preview, setPreview] = useState(null);
   const [correlationId, setCorrelationId] = useState(null);
   const [busy, setBusy] = useState(false);
@@ -24,25 +23,11 @@ export default function ResultsPanel({ dayId }) {
     setError(null);
   };
 
-  const handleParseText = async () => {
-    setBusy(true);
-    try {
-      applyParse({ ...(await parseResultsText(text, correlationId)), sourceKind: 'paste' });
-    } catch (e) { setError(String(e.message)); } finally { setBusy(false); }
-  };
   const handlePdf = async (file) => {
     if (!file) return;
     setBusy(true);
     try {
       applyParse({ ...(await parseResultsPdf(file, correlationId)), sourceKind: 'pdf' });
-    } catch (e) { setError(String(e.message)); } finally { setBusy(false); }
-  };
-  // dmtc.com results page (D42): the second results source of record.
-  const handleHtml = async (file) => {
-    if (!file) return;
-    setBusy(true);
-    try {
-      applyParse({ ...(await parseResultsHtml(await file.text(), correlationId)), sourceKind: 'dmtc_html' });
     } catch (e) { setError(String(e.message)); } finally { setBusy(false); }
   };
   const handleSave = async () => {
@@ -56,7 +41,6 @@ export default function ResultsPanel({ dayId }) {
         races: preview.races,
       }, correlationId);
       setPreview(null);
-      setText('');
       await reload();
     } catch (e) { setError(String(e.message)); } finally { setBusy(false); }
   };
@@ -90,28 +74,13 @@ export default function ResultsPanel({ dayId }) {
         {error && <p className="notice notice--error">{error}</p>}
 
         <p className="dim">
-          {hasResults ? 'Replace results' : 'Ingest results'} — paste the Equibase chart, upload the chart PDF, or load the dmtc results page.
+          {hasResults ? 'Replace results' : 'Ingest results'} — upload the chart PDF.
         </p>
-        <label className="pastebox">
-          Paste the Equibase chart text
-          <textarea rows={6} value={text} onChange={(e) => setText(e.target.value)}
-            placeholder="Paste the full chart text here..." />
+        <label className="btn btn--primary">
+          {busy ? 'Parsing…' : 'Upload chart PDF'}
+          <input type="file" accept="application/pdf" style={{ display: 'none' }}
+            disabled={busy} onChange={(e) => handlePdf(e.target.files?.[0])} />
         </label>
-        <div className="formrow formrow--tight">
-          <button className="btn btn--primary" disabled={busy || !text.trim()} onClick={handleParseText}>
-            {busy ? 'Parsing…' : 'Parse pasted chart'}
-          </button>
-          <label className="btn">
-            {busy ? 'Parsing…' : 'Upload chart PDF'}
-            <input type="file" accept="application/pdf" style={{ display: 'none' }}
-              disabled={busy} onChange={(e) => handlePdf(e.target.files?.[0])} />
-          </label>
-          <label className="btn">
-            {busy ? 'Parsing…' : 'Upload dmtc results page (HTML)'}
-            <input type="file" accept=".html,.htm,text/html" style={{ display: 'none' }}
-              disabled={busy} onChange={(e) => handleHtml(e.target.files?.[0])} />
-          </label>
-        </div>
 
         {preview && (
           <>
@@ -127,7 +96,7 @@ export default function ResultsPanel({ dayId }) {
             </div>
             <p className="dim">
               Read-only preview of exactly what Save will store{hasResults ? ' (replacing the current results)' : ''}.
-              To correct something, fix the chart text and parse again.
+              To correct something, fix the chart and upload again.
             </p>
             {preview.warnings.length > 0 && (
               <div className="notice notice--warn">

@@ -51,18 +51,6 @@ export const saveEntriesZip = (file, { replace = false, bankrollCents, perRaceMi
   }).then(asJson);
 };
 
-export function parseEntriesText(text, correlationId) {
-  return fetch('/api/parse/entries-text', {
-    method: 'POST',
-    headers: {
-      'content-type': 'application/json',
-      ...(correlationId ? { 'x-correlation-id': correlationId } : {}),
-    },
-    body: JSON.stringify({ text }),
-  }).then(asJson);
-}
-
-
 export function saveRaceDay(payload, correlationId) {
   return fetch('/api/race-days', {
     method: 'POST',

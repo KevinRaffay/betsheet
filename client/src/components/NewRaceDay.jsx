@@ -1,22 +1,26 @@
 import React, { useState } from 'react';
-import { parseEntriesText, parseEquibaseEntries, saveRaceDay } from '../api.js';
+import { parseEquibaseEntries, saveRaceDay } from '../api.js';
 import ParsePreview from './ParsePreview.jsx';
 import BulkEntriesUpload from './BulkEntriesUpload.jsx';
 
-// The ingest screen: paste entries text, review the parse, then save. The
-// preview is READ-ONLY - it shows exactly what Save will write, warnings
-// first. To correct something, fix the pasted text and re-parse; the parser's
-// output is never hand-edited in place.
+// The ingest screen: get a saved Equibase entries page in - by file upload or
+// by pasting its HTML - review the parse, then save. The preview is
+// READ-ONLY - it shows exactly what Save will write, warnings first. To
+// correct something, fix the source (re-save the page, or paste it again) and
+// re-parse; the parser's output is never hand-edited in place.
 //
 // D116 added the Equibase entries page upload - the ingest path for any track
 // with no automated feed, and how a Kentucky Downs card gets made at all now
-// that Del Mar program ingestion is gone (D113). It is not a fetcher: the file
-// is one a person saved and chose to upload, and its markup is read in the
-// browser and posted as text. Invariant 6 is untouched.
+// that Del Mar program ingestion is gone (D113). It is not a fetcher: the
+// page is one a person saved and chose to bring in, whether by uploading the
+// file or by pasting its markup, and both read the file/paste in the browser
+// and post it as text. Invariant 6 is untouched.
 //
-// The pasted-entries path stays for now as the fallback for a page this
-// parser cannot read, and because a track whose page is not Equibase-shaped
-// still has to be enterable somehow.
+// The old plain-text entries-parser.js format (a different, non-Equibase
+// paste grammar) is retired: `parseEquibaseEntries` is the ONE parser for
+// both capture routes, since the server's own `/api/parse/equibase-entries`
+// route already accepts a saved file's markup OR pasted markup identically
+// (invariant 9 - same preview either way).
 export default function NewRaceDay({ onSaved, onCancel }) {
   const [track, setTrack] = useState('');
   const [date, setDate] = useState('');
@@ -69,8 +73,12 @@ export default function NewRaceDay({ onSaved, onCancel }) {
 
   const handleParseText = async () => {
     setBusy(true);
+    setError(null);
     try {
-      applyParse(await parseEntriesText(text, correlationId));
+      // A paste carries no file to read a last-modified time off, so the
+      // capture time is unknown rather than guessed - the same honesty rule
+      // staleness reporting already applies to a day with none on file.
+      applyParse(await parseEquibaseEntries(text, { correlationId }));
     } catch (e) {
       setError(String(e.message));
     } finally {
@@ -88,12 +96,10 @@ export default function NewRaceDay({ onSaved, onCancel }) {
         bankrollCents: Math.round(Number(bankroll || 0) * 100),
         perRaceMinCents: Math.round(Number(perRaceMin || 0) * 100),
         replace,
-        // Pasted text is the only surviving source, and 'program' is the
-        // schema's default value for it (the CHECK admits program /
-        // ml_sheet / both; the Equibase wiring adds its own).
-        // The parse says where it came from; 'program' is the schema default
-        // for the pasted-text path, which carries no source of its own.
-        entriesSource: parsed.entriesSource ?? 'program',
+        // Both capture routes (file upload and pasted HTML) run through the
+        // same parser now, so the parse always says 'equibase_html' - the
+        // fallback is only for a stray call with nothing parsed yet.
+        entriesSource: parsed.entriesSource ?? 'equibase_html',
         oddsCapturedAt,
         races: parsed.races,
         analysis: parsed.analysis,
@@ -161,12 +167,12 @@ export default function NewRaceDay({ onSaved, onCancel }) {
       {mode === 'single' && (
       <div className="ingest-inputs">
         <label className="pastebox">
-          Paste entries text (fallback - the Equibase upload is the main path)
+          Paste Equibase Entries HTML
           <textarea
             rows={8}
             value={text}
             onChange={(e) => setText(e.target.value)}
-            placeholder="Paste the track's daily entries page here..."
+            placeholder="Open the track's Equibase entries page, view source (or save it as HTML), and paste the markup here..."
           />
         </label>
         <div className="ingest-actions">
@@ -181,7 +187,7 @@ export default function NewRaceDay({ onSaved, onCancel }) {
             />
           </label>
           <button className="btn" disabled={busy || !text.trim()} onClick={handleParseText}>
-            {busy ? 'Parsing…' : 'Parse pasted text'}
+            {busy ? 'Parsing…' : 'Parse pasted HTML'}
           </button>
         </div>
       </div>
@@ -226,7 +232,8 @@ export default function NewRaceDay({ onSaved, onCancel }) {
           )}
           <p className="dim">
             Read-only preview of exactly what Save will store. To correct
-            something, fix the pasted text and parse again.
+            something, fix the source (re-save the page, or paste it again)
+            and parse again.
           </p>
 
           <ParsePreview parsed={parsed} />
