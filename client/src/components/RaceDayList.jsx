@@ -1,5 +1,12 @@
-import React, { useEffect, useState } from 'react';
-import { listRaceDays, resetAppApi, restoreRaceDay } from '../api.js';
+import React, { useEffect, useRef, useState } from 'react';
+import { bulkDeleteRaceDays, listRaceDays, resetAppApi, restoreRaceDay } from '../api.js';
+
+const SKIP_REASON_LABEL = {
+  graded: 'already graded',
+  already_deleted: 'already deleted',
+  not_found: 'no longer exists',
+  write_failed: 'delete did not persist',
+};
 
 export default function RaceDayList({ onOpen, onNew, onPL, onDistribution, onReplay, refreshKey }) {
   const [days, setDays] = useState(null);
@@ -8,6 +15,13 @@ export default function RaceDayList({ onOpen, onNew, onPL, onDistribution, onRep
   const [busy, setBusy] = useState(false);
   const [dateFilter, setDateFilter] = useState('');
   const [trackFilter, setTrackFilter] = useState('');
+  // Bulk-select (checkbox column, active-days view only). A graded day's
+  // checkbox is disabled in the table below, but that's a convenience -
+  // the server refuses to delete a graded day regardless of what gets sent.
+  const [selected, setSelected] = useState(() => new Set());
+  const [confirmBulk, setConfirmBulk] = useState(false);
+  const [bulkResult, setBulkResult] = useState(null);
+  const selectAllRef = useRef(null);
 
   const reload = (deleted = showDeleted) =>
     listRaceDays(deleted).then(setDays).catch((e) => setError(String(e.message)));
@@ -25,6 +39,23 @@ export default function RaceDayList({ onOpen, onNew, onPL, onDistribution, onRep
       .catch((e) => { if (!cancelled) setError(String(e.message)); });
     return () => { cancelled = true; };
   }, [refreshKey, showDeleted]);
+
+  // The checkbox column only exists in the active-days view - drop any
+  // selection when switching into (or out of) "Show deleted" rather than
+  // carrying stale ids nothing on screen can act on.
+  useEffect(() => {
+    setSelected(new Set());
+    setConfirmBulk(false);
+    setBulkResult(null);
+  }, [showDeleted]);
+
+  const toggleSelect = (id) => {
+    setSelected((prev) => {
+      const next = new Set(prev);
+      if (next.has(id)) next.delete(id); else next.add(id);
+      return next;
+    });
+  };
 
   const handleRestore = async (id) => {
     setBusy(true);
@@ -60,6 +91,44 @@ export default function RaceDayList({ onOpen, onNew, onPL, onDistribution, onRep
   const filteredDays = (days || []).filter(
     (d) => (!dateFilter || d.date === dateFilter) && (!trackFilter || d.track === trackFilter)
   );
+  // "Select all" only ever reaches ungraded rows CURRENTLY VISIBLE under the
+  // date/track filter - it must never reach into a row the filter is hiding.
+  const selectableIds = filteredDays.filter((d) => !d.graded).map((d) => d.id);
+  const allSelectableSelected = selectableIds.length > 0 && selectableIds.every((id) => selected.has(id));
+  const someSelectableSelected = selectableIds.some((id) => selected.has(id));
+
+  useEffect(() => {
+    if (selectAllRef.current) {
+      selectAllRef.current.indeterminate = someSelectableSelected && !allSelectableSelected;
+    }
+  }, [someSelectableSelected, allSelectableSelected]);
+
+  const toggleSelectAll = () => {
+    setSelected((prev) => {
+      const next = new Set(prev);
+      if (allSelectableSelected) selectableIds.forEach((id) => next.delete(id));
+      else selectableIds.forEach((id) => next.add(id));
+      return next;
+    });
+  };
+
+  const handleBulkDelete = async () => {
+    setBusy(true);
+    setError(null);
+    try {
+      const result = await bulkDeleteRaceDays([...selected]);
+      setBulkResult(result);
+      setSelected(new Set());
+      setConfirmBulk(false);
+      await reload();
+    } catch (e) {
+      setError(String(e.message));
+    } finally {
+      setBusy(false);
+    }
+  };
+
+  const selectedDays = (days || []).filter((d) => selected.has(d.id));
 
   return (
     <section>
@@ -72,10 +141,47 @@ export default function RaceDayList({ onOpen, onNew, onPL, onDistribution, onRep
           <button className="btn" onClick={() => setShowDeleted((v) => !v)}>
             {showDeleted ? 'Show active' : 'Show deleted'}
           </button>
+          {!showDeleted && (
+            <button
+              className="btn btn--danger"
+              disabled={selected.size === 0 || busy}
+              onClick={() => setConfirmBulk(true)}
+            >
+              Delete selected ({selected.size})
+            </button>
+          )}
           {!showDeleted && <button className="btn btn--primary" onClick={onNew}>New race day</button>}
         </div>
       </div>
       {error && <p className="notice notice--error">{error}</p>}
+      {confirmBulk && (
+        <div className="notice notice--warn">
+          <p>
+            <strong>Delete {selectedDays.length} race day{selectedDays.length === 1 ? '' : 's'}?</strong>
+            {' '}{selectedDays.map((d) => `${d.track} ${d.date}`).join(', ')}.
+            {' '}Each is a soft delete - restorable from "Show deleted" - and a graded day is
+            refused automatically even if it were somehow selected.
+          </p>
+          <div className="formrow formrow--tight">
+            <button className="btn btn--danger" disabled={busy} onClick={handleBulkDelete}>
+              Delete them
+            </button>
+            <button className="btn" disabled={busy} onClick={() => setConfirmBulk(false)}>Cancel</button>
+          </div>
+        </div>
+      )}
+      {bulkResult && (
+        <p className="notice">
+          Deleted {bulkResult.deleted.length} race day{bulkResult.deleted.length === 1 ? '' : 's'}.
+          {bulkResult.skipped.length > 0 && (
+            <>
+              {' '}{bulkResult.skipped.length} not deleted: {bulkResult.skipped.map((s) =>
+                `${s.track ? `${s.track} ${s.date}` : `#${s.id}`} (${SKIP_REASON_LABEL[s.reason] ?? s.reason})`,
+              ).join(', ')}.
+            </>
+          )}
+        </p>
+      )}
       {days && days.length > 0 && (
         <div className="formrow formrow--tight">
           <label>
@@ -117,7 +223,19 @@ export default function RaceDayList({ onOpen, onNew, onPL, onDistribution, onRep
         <table className={`grid ${showDeleted ? '' : 'grid--click'}`}>
           <thead>
             <tr>
-              <th>Date</th><th>Track</th><th>Races</th><th>Entries</th><th>Bankroll</th>
+              {!showDeleted && (
+                <th>
+                  <input
+                    ref={selectAllRef}
+                    type="checkbox"
+                    checked={allSelectableSelected}
+                    disabled={selectableIds.length === 0}
+                    onClick={(e) => e.stopPropagation()}
+                    onChange={toggleSelectAll}
+                  />
+                </th>
+              )}
+              <th>Date</th><th>Track</th><th>Races</th><th>Entries</th><th>Bankroll</th><th>Graded</th>
               <th>{showDeleted ? 'Deleted' : 'Stored'}</th>
               {showDeleted && <th></th>}
             </tr>
@@ -125,11 +243,24 @@ export default function RaceDayList({ onOpen, onNew, onPL, onDistribution, onRep
           <tbody>
             {filteredDays.map((d) => (
               <tr key={d.id} onClick={showDeleted ? undefined : () => onOpen(d.id)}>
+                {!showDeleted && (
+                  <td>
+                    <input
+                      type="checkbox"
+                      checked={selected.has(d.id)}
+                      disabled={Boolean(d.graded)}
+                      title={d.graded ? 'Graded race days cannot be bulk-deleted.' : undefined}
+                      onClick={(e) => e.stopPropagation()}
+                      onChange={() => toggleSelect(d.id)}
+                    />
+                  </td>
+                )}
                 <td>{d.date}</td>
                 <td>{d.track}</td>
                 <td>{d.races}</td>
                 <td>{d.entries}</td>
                 <td>{d.bankroll_cents != null ? `$${(d.bankroll_cents / 100).toFixed(0)}` : '—'}</td>
+                <td>{d.graded ? 'Yes' : '—'}</td>
                 <td className="dim">{showDeleted ? d.deleted_at : d.created_at}</td>
                 {showDeleted && (
                   <td>
