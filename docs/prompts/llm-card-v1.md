@@ -200,8 +200,14 @@ grammar, then a line reading exactly "<<<END TICKETS>>>":
   trifecta box, superfecta, superfecta box (case-insensitive).
 - <selections>: program numbers only, e.g. "#4". Straight bets
   (exacta/trifecta/superfecta, not boxed) separate finish positions
-  with "/", e.g. "#4 / #2" (4 to win, 2 to place). Box types list
-  every horse in the box separated by ",", e.g. "#4,#2,#7".
+  with "/", with EXACTLY ONE program number per position, e.g.
+  "#4 / #2" (4 to win, 2 to place) - NEVER a comma-separated list
+  within a single position ("#4,#9 / #2" is NOT a supported straight
+  ticket: it is a "part-wheel" with more than 1 combination, and the
+  1-combination rule below does not hold for it). If you want more
+  than one horse to share a position, use the BOX type on those
+  horses instead - box types list every horse in the box separated by
+  ",", e.g. "#4,#2,#7".
 - <stake>: the TOTAL dollar amount for that ticket (not per-combo),
   e.g. "$20". Win, place and show have a $2 minimum, sold in $1
   increments above it - $2, $3, $4, $5, ... - NEVER below $2 (e.g. $1
@@ -377,6 +383,29 @@ untouched, so no version bump.
   before the exotic rules. No parser, server, or schema change - the
   validation was already correct; this only tells the model the rule it
   was missing.
+- **2026-09-07: a "part-wheel" straight bet's true combination count was
+  never computed.** Live bug report: `trifecta | #1,#2,#3 / #4,#5,#6 /
+  #7,#8 | $6.00` - correctly BLOCKED by `shared/parsers/human-picks.js`
+  (`non_multiple_stake`: "$6.00 does not split evenly across 18
+  combos"). `shared/parsers/human-picks.js` treats a comma-separated
+  list WITHIN one "/"-separated position as alternatives - a "part-wheel"
+  - multiplying combinations across every position (3 x 3 x 2 = 18 here),
+  the same grammar a human's own pasted ticket can use. The prompt never
+  mentioned this construction at all, and worse, the `<stake>` rule's own
+  "a STRAIGHT bet ... is always 1 combination" claim (the 2026-09-07
+  base-unit fix above) was silently FALSE for it - the model had no way
+  to know a comma inside a straight bet's position changes the math
+  entirely. Fix is prompt-only, and different in kind from the three
+  fixes above: rather than teach the model to compute a part-wheel's
+  combination count (product of leg sizes), the `<selections>` rule now
+  forbids the construction outright - a straight bet takes EXACTLY ONE
+  program number per position, and wanting more than one horse to share
+  a position is what the BOX type is for. This also makes the
+  `<stake>` rule's "always 1 combination" claim categorically true again
+  rather than conditionally true. No parser, server, or schema change -
+  `shared/parsers/human-picks.js` still supports part-wheels for a
+  human's own paste, which can legitimately want one; only what this
+  prompt asks the MODEL to produce narrows.
 
 ## Model selection (D75)
 
