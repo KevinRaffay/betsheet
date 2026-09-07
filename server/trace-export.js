@@ -16,12 +16,93 @@ import { getLogger, readRecent } from './logging.js';
 
 const log = getLogger('app');
 
-export const SCHEMA_VERSION = 2;
+export const SCHEMA_VERSION = 3;
 
 export const exportRouter = express.Router();
 
-/** Build the export document for one card, or {error, status} if it can't. */
-export function buildCardExport(db, cardId) {
+/**
+ * D149: what an LLM card's generation calls CONSUMED (prompts, notes,
+ * responses), grouped by correlation id - one entry per Generate/
+ * Regenerate-All session that actually landed a ticket on this card.
+ *
+ * llm_card_requests rows normally carry this card's own id, but the very
+ * FIRST call for a brand-new card is logged before the card exists (see
+ * server/llm-cards.js's architecture comment) and is never back-filled with
+ * one - it stays findable by (race_day_id, correlation_id) instead, which is
+ * why the match below is an OR rather than a plain card_id equality.
+ *
+ * Returns null (never []) for a non-LLM card, or an LLM card with no
+ * matching rows at all - which is what every card exported at
+ * schemaVersion 2 or earlier looks like, since this capture did not exist
+ * yet. null means "unknown", not "no notes" / "no calls made".
+ */
+function buildLlmInputs(db, card) {
+  if (card.template !== 'llm') return null;
+  const rows = db.prepare(`
+    SELECT * FROM llm_card_requests
+    WHERE error IS NULL
+      -- correlation_id IS NOT NULL is the marker that this row was written
+      -- by the D149-aware insertRequestRow - a row from before migration 026
+      -- (or from before D149's code landed) can never carry one, which is
+      -- exactly the "unknown, not merely notes-free" case the null return
+      -- below exists for.
+      AND correlation_id IS NOT NULL
+      AND (
+        card_id = ?
+        OR (card_id IS NULL AND race_day_id = ? AND correlation_id = ?)
+      )
+    ORDER BY correlation_id, race_number, id
+  `).all(card.id, card.race_day_id, card.correlation_id);
+  if (!rows.length) return null;
+
+  const byCorrelation = new Map();
+  for (const r of rows) {
+    if (!byCorrelation.has(r.correlation_id)) byCorrelation.set(r.correlation_id, []);
+    byCorrelation.get(r.correlation_id).push(r);
+  }
+
+  const sha = (h) => (h ? `sha256:${h}` : null);
+  return [...byCorrelation.entries()].map(([correlationId, reqs]) => ({
+    correlationId,
+    races: reqs.map((r) => r.race_number),
+    // Uniform across one session in practice (one model/template per card
+    // session), taken from the first call rather than repeated per race.
+    model: reqs[0].model,
+    requestParams: reqs[0].request_params ? JSON.parse(reqs[0].request_params) : null,
+    promptTemplate: { id: reqs[0].prompt_template_id, version: reqs[0].prompt_template_version },
+    // Per-race detail, since each race is its OWN model call with its own
+    // prompt and response - collapsing them into one shared string per
+    // correlation id would misrepresent calls that never shared one.
+    requests: reqs.map((r) => ({
+      race: r.race_number,
+      promptHashes: { system: sha(r.system_prompt_hash), user: sha(r.user_prompt_hash) },
+      notes: r.notes_present ? {
+        raw: { race: r.notes_race_text, card: r.notes_card_text },
+        rendered: r.notes_rendered_text,
+        hash: sha(r.notes_hash),
+        chars: r.notes_char_count,
+      } : null,
+      systemPromptRendered: r.system_prompt_text,
+      promptRendered: r.prompt_text,
+      responseRaw: r.response_text,
+    })),
+  }));
+}
+
+/** Strips the heavy/verbatim text an --omit-llm-inputs export leaves out, keeping hashes/chars/template/race/model. */
+function redactLlmInputs(llmInputs) {
+  if (!llmInputs) return llmInputs;
+  return llmInputs.map((entry) => ({
+    ...entry,
+    requests: entry.requests.map(({ systemPromptRendered, promptRendered, responseRaw, notes, ...rest }) => ({
+      ...rest,
+      notes: notes ? { hash: notes.hash, chars: notes.chars } : null,
+    })),
+  }));
+}
+
+/** Build the export document for one card, or {error, status} if it can't. `omitLlmInputs` (D149) drops verbatim prompt/response/notes text, keeping only hashes/chars - the shareable form. */
+export function buildCardExport(db, cardId, { omitLlmInputs = false } = {}) {
   const card = db.prepare(`
     SELECT c.*, rd.track, rd.date, rd.deleted_at AS day_deleted_at, st.name AS template,
            COALESCE(c.per_race_min_cents, rd.per_race_min_cents) AS per_race_min_cents
@@ -206,6 +287,7 @@ export function buildCardExport(db, cardId) {
     tickets,
     gradeSummary,
     results: { finishers: results, exotics, scratches: resultScratches },
+    llmInputs: omitLlmInputs ? redactLlmInputs(buildLlmInputs(db, card)) : buildLlmInputs(db, card),
     traceStatus,
     trace: traceEvents,
   };
@@ -213,7 +295,8 @@ export function buildCardExport(db, cardId) {
 
 exportRouter.get('/cards/:id/export', (req, res) => {
   const db = getDb();
-  const out = buildCardExport(db, Number(req.params.id));
+  const omitLlmInputs = ['1', 'true'].includes(String(req.query.omitLlmInputs ?? '').toLowerCase());
+  const out = buildCardExport(db, Number(req.params.id), { omitLlmInputs });
   if (out.error) return res.status(out.status).json({ error: out.error });
   const name = `betsheet-${out.raceDay.track.replace(/\W+/g, '-').toLowerCase()}-${out.raceDay.date}-card${out.card.cardNumber}.json`;
   log.info('card_exported', {

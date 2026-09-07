@@ -488,3 +488,27 @@ response whose ticket block parses with blocking warnings (an invented
 program number, a scratched selection, a below-minimum stake) is not a
 hard failure: it previews exactly like a human's bad paste would, with
 the warnings shown and nothing saved until the block is empty of them.
+
+## Template identity is now recorded, not versioned (D149)
+
+`server/llm-prompt.js` exports `PROMPT_TEMPLATE_ID` (`'llm-card-v1'`, this
+doc's own filename) and `PROMPT_TEMPLATE_VERSION` - stamped onto every
+`llm_card_requests` row and carried through to the card export's `llmInputs`
+block, so a reproduction check can confirm which exact template rendered a
+stored prompt.
+
+This answers a different question than the "Not a version bump" note above
+does. That note is about `cards.engine_version`/invariant 14 - whether two
+CARDS can be pooled in P/L - and the answer stays no version axis exists,
+unchanged by this. `PROMPT_TEMPLATE_VERSION` instead answers "which build of
+this template produced THIS prompt", for a reproducibility/diffing check
+rather than a bucketing rule.
+
+**Deliberately a hash of `SYSTEM_PROMPT`, computed at module load, not a
+manually incremented number.** This file's own D64, D112, D125, D136, D138,
+D145, D146 and D148 fixes are eight PRs that edited the prompt and not one of
+them carried a version marker - a manually-bumped counter would have needed
+every one of those PRs to remember a step nothing enforced, the same failure
+mode `ENGINE_VERSION` and `cards.saw_classification` have each already hit in
+this codebase in other forms. A hash of the actual text cannot go stale that
+way: it changes exactly when, and only when, `SYSTEM_PROMPT` does.

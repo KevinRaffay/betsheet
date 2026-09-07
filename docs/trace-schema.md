@@ -7,8 +7,9 @@ decided X because Y — and it earned Z" for every dollar on the card
 (invariant 7).
 
 Versioning: the export document carries `export.schemaVersion` (currently
-**2**, `SCHEMA_VERSION` in `server/trace-export.js`; D111 bumped it from 1
-when `traceStatus` changed meaning - see below). Bump it whenever the
+**3**, `SCHEMA_VERSION` in `server/trace-export.js`; D111 bumped it from 1
+to 2 when `traceStatus` changed meaning, D149 bumped it from 2 to 3 for the
+new top-level `llmInputs` block - see below). Bump it whenever the
 shape of the export or the meaning of an event changes; adding a new event
 type is backward-compatible and does not bump it.
 
@@ -71,6 +72,16 @@ A human's pasted tickets, not the engine, produced these - no `inputs_snapshot`/
 | `human_ticket_deleted` | `cardId`, `raceDayId`, `race`, `ticketId`, `betType`, `tellerCall`, `costCents`, `raceRetired` | one ticket was deleted from a locked, unrevealed race (D103). Deliberately NOT a timestamp change: a delete leaves `human_race_state.picks_locked_at` alone, so the card's derived blindness (invariant 15) is the same before and after - which is why deleting is offered where editing is not. `raceRetired` marks the last ticket going, which also drops the race's allocation and its `human_race_state` row |
 | `human_race_locked` | `cardId`, `raceDayId`, `race`, `pass` | one race's picks were locked (or explicitly passed) on a human card - the timestamp this event's `ts` field carries is the same one written to `human_race_state.picks_locked_at`, the fact a later blindness computation (D55) is derived from |
 
+### LLM cards (D63, emitted by `server/llm-cards.js`, streamed under the calling session's correlationId)
+
+An LLM's own picks, not the engine, produced these - no `inputs_snapshot`/`rule_fired`/`allocation_decided` events exist, since `shared/card-engine.js` is never called. `card_generated`/`ticket_added` carry the same fields the Human cards section above documents (`template`/`engineVersion` are `'llm'`). D149 added the three events below to capture what a generation call CONSUMED as well as what it produced - previously only the prompt/response/notes on the `llm_card_requests` DB row recorded that, with nothing in the trace stream itself.
+
+| event | fields | meaning |
+| --- | --- | --- |
+| `llm_request_sent` | `correlationId`, `cardId` (null for a brand-new card's first race, same nullability `llm_card_requests.card_id` already has), `raceDayId`, `races` (always length 1 - this generator calls the model once per race, never once per day), `model`, `promptTemplate` (`{id, version}`), `promptHashes` (`{system, user}`, each `sha256:<hex>`), `notesHash`, `notesChars` | logged BEFORE the model answers - invariant 11's "every attempt visible" rule, one event earlier than the `llm_card_requests` row (which is only written once the outcome, success or failure, is also known) |
+| `llm_response_received` | `correlationId`, `cardId`, `raceDayId`, `responseChars`, `parsedTicketCount`, `parsedRaceCount` (0 on any hard failure, else 1), `parseErrors` (an API/network error message; `'no_ticket_block'` when the response had no parseable ticket block; else the `type` of every BLOCKING parse warning) | the outcome of the same call, whatever it was - a hard failure, an unparseable response, or a clean parse still gets one of these |
+| `race_regenerated` | `cardId`, `race`, `previousCorrelationId` (the most recent earlier successful request logged for this exact card+race - an approximation, since no ticket row is linked back to the request that produced it, but the append-only request log makes it a close one), `newCorrelationId`, `ticketsRemoved` | emitted whenever `persistLlmRace` REPLACES tickets already on file for a race (append-only per invariant 14's spirit at the ticket level: the DB row set is replaced, but this event keeps the fact that a replacement happened, and how many tickets it removed, discoverable without diffing `ticket_added` timestamps against the current ticket set) |
+
 ### Equibase Off to the Races (D71, emitted by `server/equibase-otr.js`, one correlationId per confirm call spanning all three cards)
 
 Equibase's printed sheet, not the engine, produced these - no `inputs_snapshot`/`rule_fired`/`allocation_decided` events exist, since `shared/card-engine.js` is never called. One confirm call always produces exactly three `card_generated` events (some-reward / higher-reward / both, D71's three variants) plus one `equibase_otr_ingested` summary event.
@@ -129,6 +140,7 @@ One self-contained JSON object per card:
 | `tickets` | the card as persisted, each with its `grade` (`outcome`, `returnedCents`, `plCents`, `note`, from the LATEST grade set - invariant 14 keeps older versions' sets in graded_tickets) or `grade: null` when the day has no results yet |
 | `gradeSummary` | costCents, returnedCents, plCents, outcomes — or null when ungraded |
 | `results` | the day's stored chart: `finishers` (with W/P/S prices in cents), `exotics` (per printed base), `scratches` |
+| `llmInputs` | (D149, schemaVersion 3) `null` for a non-LLM card, or an LLM card exported before this capture existed (schemaVersion 2 or earlier, or an LLM card with no matching `llm_card_requests` rows at all) - **`null` means "unknown", never "no notes were used."** Otherwise an array, one entry per correlation id that landed at least one ticket on this card: `{correlationId, races, model, requestParams, promptTemplate: {id, version}, requests: [{race, promptHashes: {system, user}, notes, systemPromptRendered, promptRendered, responseRaw}]}` - `requests` has one element per race (this generator calls the model once per race, so a shared correlation id can still cover several distinct prompts/responses, never one prompt for the whole group). `notes` is `null` when that race carried none, else `{raw: {race, card}, rendered, hash, chars}` - `raw` is what the human typed, `rendered` is the composed/sanitized/truncated text the model actually saw. `?omitLlmInputs=1` on the endpoint (or `--omit-llm-inputs` on the CLI) drops `systemPromptRendered`/`promptRendered`/`responseRaw` and `notes.raw`/`notes.rendered` from every entry, keeping only `notes.hash`/`notes.chars` alongside the always-kept `promptHashes`/`promptTemplate`/`race`/`model` - the shareable form for a card whose notes may carry someone else's copyrighted prose. |
 | `traceStatus` | `complete` (the card's `card_generated` event is present AND the log holds at least one `ticket_added` for every ticket on file), `partial` (some events lost — rotated past retention, or a foreign log dir), or `missing` (no generation events found at all — e.g. the card predates a factory reset of a different instance's logs). **D111 changed how this is computed** (schemaVersion 2): it used to read the lean engine's self-reported gap-free `seq` counter, and now cross-references the log against the DATABASE, which is both the stronger test and the only one still possible once the engine is gone. Consumers should weigh `partial`/`missing` exports accordingly; the DB-backed sections (tickets, grades, results) are always current. |
 | `trace` | every decision-trace event whose correlationId matches the card's or that carries this cardId, oldest first — generation, every grading pass, and any day events in the same session |
 

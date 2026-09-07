@@ -16,17 +16,23 @@
 // rule); nothing is saved to a card/ticket until the user confirms the
 // preview, exactly like D54's human flow.
 
+import crypto from 'node:crypto';
 import express from 'express';
 import { estimateTicketPayouts } from '../shared/betmath.js';
 import { parseHumanPicksText } from '../shared/parsers/human-picks.js';
-import { complete, hasKey, MODEL, SELECTABLE_MODELS } from './anthropic-client.js';
+import { complete, DEFAULT_REQUEST_PARAMS, hasKey, MODEL, SELECTABLE_MODELS } from './anthropic-client.js';
 import { getDb } from './db.js';
 import { loadNotesForRace, readNotes, writeNote } from './llm-notes.js';
 import { gradeAndPersist } from './grading.js';
 import { loadRace, scratchedProgramNumbersFor } from './human-cards.js';
 import { getLogger, newCorrelationId } from './logging.js';
-import { buildLlmRaceUserPrompt, buildSystemPrompt, extractNotesReport, extractTicketBlock } from './llm-prompt.js';
+import {
+  buildLlmRaceUserPrompt, buildSystemPrompt, extractNotesReport, extractTicketBlock,
+  PROMPT_TEMPLATE_ID, PROMPT_TEMPLATE_VERSION,
+} from './llm-prompt.js';
 import { templateIdFor } from './templates.js';
+
+const sha256 = (text) => crypto.createHash('sha256').update(String(text ?? '')).digest('hex');
 
 const traceLog = getLogger('decision-trace');
 const appLog = getLogger('app');
@@ -67,7 +73,10 @@ function racesRemaining(db, cardId, dayId, excludeRaceId) {
 }
 
 
-function insertRequestRow(db, { raceDayId, cardId, raceNumber, promptText, responseText, model, error, notes }) {
+function insertRequestRow(db, {
+  raceDayId, cardId, raceNumber, promptText, responseText, model, error, notes,
+  correlationId, systemPromptText, requestParams,
+}) {
   // D92: the notes snapshot rides along on the same insert. It is what makes
   // the log self-describing - the draft in llm_notes is mutable, so a later
   // read must not have to trust it to know what this call actually sent.
@@ -75,13 +84,21 @@ function insertRequestRow(db, { raceDayId, cardId, raceNumber, promptText, respo
     notes_present: 0, notes_race_text: null, notes_card_text: null, notes_source_label: null,
     notes_hash: null, notes_char_count: null, notes_entered_at: null, notes_post_result: 0,
   };
+  // D149: what the call CONSUMED, not just what it produced - see
+  // migration 026's own comment for why these ride on this row rather than
+  // a second table.
   return db.prepare(`
     INSERT INTO llm_card_requests (race_day_id, card_id, race_number, prompt_text, response_text, model, requested_at, error,
-      notes_present, notes_race_text, notes_card_text, notes_source_label, notes_hash, notes_char_count, notes_entered_at, notes_post_result)
-    VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+      notes_present, notes_race_text, notes_card_text, notes_source_label, notes_hash, notes_char_count, notes_entered_at, notes_post_result,
+      correlation_id, system_prompt_text, system_prompt_hash, user_prompt_hash, notes_rendered_text,
+      prompt_template_id, prompt_template_version, request_params)
+    VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
   `).run(raceDayId, cardId ?? null, raceNumber, promptText, responseText ?? null, model ?? null, now(), error ?? null,
     n.notes_present, n.notes_race_text, n.notes_card_text, n.notes_source_label,
-    n.notes_hash, n.notes_char_count, n.notes_entered_at, n.notes_post_result).lastInsertRowid;
+    n.notes_hash, n.notes_char_count, n.notes_entered_at, n.notes_post_result,
+    correlationId ?? null, systemPromptText ?? null, systemPromptText ? sha256(systemPromptText) : null,
+    sha256(promptText), notes?.composed ?? null,
+    PROMPT_TEMPLATE_ID, PROMPT_TEMPLATE_VERSION, JSON.stringify(requestParams ?? null)).lastInsertRowid;
 }
 
 /**
@@ -93,7 +110,9 @@ function insertRequestRow(db, { raceDayId, cardId, raceNumber, promptText, respo
  * (D75): overrides the server-configured default for this one call, so
  * the user can pick a model per generation in the LLM card modal.
  */
-export async function previewLlmRace(db, day, raceNumber, cardId, { stubResponseText, model: requestedModel, interactive = false } = {}) {
+export async function previewLlmRace(db, day, raceNumber, cardId, {
+  stubResponseText, model: requestedModel, interactive = false, correlationId,
+} = {}) {
   const { race, entries } = loadRace(db, day.id, raceNumber);
   const scratched = scratchedProgramNumbersFor(db, day.id, race, entries);
 
@@ -133,17 +152,33 @@ export async function previewLlmRace(db, day, raceNumber, cardId, { stubResponse
     notes: notes.prompt,
   });
 
+  const systemPromptText = buildSystemPrompt({ hasNotes: notes.present });
+
   let responseText = stubResponseText ?? null;
   let model = stubResponseText ? 'stub' : (requestedModel || MODEL);
+  let requestParams = DEFAULT_REQUEST_PARAMS;
   let callError = null;
+
+  // D149: the call is logged as SENT before we know whether it will
+  // succeed - invariant 11's "every attempt visible" rule, one event
+  // earlier than the request row itself (which is only written once we
+  // also know the outcome, below).
+  traceLog.info('llm_request_sent', {
+    correlationId, cardId: card?.id ?? null, raceDayId: day.id, races: [raceNumber], model,
+    promptTemplate: { id: PROMPT_TEMPLATE_ID, version: PROMPT_TEMPLATE_VERSION },
+    promptHashes: { system: `sha256:${sha256(systemPromptText)}`, user: `sha256:${sha256(userPrompt)}` },
+    notesHash: notes.snapshot?.notes_hash ?? null, notesChars: notes.snapshot?.notes_char_count ?? null,
+  });
+
   if (stubResponseText == null) {
     if (!hasKey()) {
       callError = 'ANTHROPIC_API_KEY is not set.';
     } else {
       try {
-        const result = await complete({ system: buildSystemPrompt({ hasNotes: notes.present }), user: userPrompt, model });
+        const result = await complete({ system: systemPromptText, user: userPrompt, model });
         responseText = result.text;
         model = result.model;
+        requestParams = result.requestParams;
       } catch (err) {
         callError = err.message;
       }
@@ -153,14 +188,25 @@ export async function previewLlmRace(db, day, raceNumber, cardId, { stubResponse
   const requestId = insertRequestRow(db, {
     raceDayId: day.id, cardId: card?.id, raceNumber, promptText: userPrompt,
     responseText, model, error: callError, notes,
+    correlationId, systemPromptText, requestParams,
   });
 
-  if (callError) throw new LlmCardError(502, `LLM call failed: ${callError}`);
+  if (callError) {
+    traceLog.info('llm_response_received', {
+      correlationId, cardId: card?.id ?? null, raceDayId: day.id, responseChars: 0, parsedTicketCount: 0,
+      parsedRaceCount: 0, parseErrors: [callError],
+    });
+    throw new LlmCardError(502, `LLM call failed: ${callError}`);
+  }
 
   const extracted = extractTicketBlock(responseText);
   if (!extracted) {
     const msg = 'Race %s: model response did not contain a parseable ticket block.'.replace('%s', raceNumber);
     db.prepare('UPDATE llm_card_requests SET error = ? WHERE id = ?').run(msg, requestId);
+    traceLog.info('llm_response_received', {
+      correlationId, cardId: card?.id ?? null, raceDayId: day.id, responseChars: responseText.length, parsedTicketCount: 0,
+      parsedRaceCount: 0, parseErrors: ['no_ticket_block'],
+    });
     throw new LlmCardError(502, msg);
   }
 
@@ -200,6 +246,12 @@ export async function previewLlmRace(db, day, raceNumber, cardId, { stubResponse
       });
     }
   }
+
+  traceLog.info('llm_response_received', {
+    correlationId, cardId: card?.id ?? null, raceDayId: day.id, responseChars: responseText.length,
+    parsedTicketCount: parsed.tickets.length, parsedRaceCount: 1,
+    parseErrors: parsed.warnings.filter((w) => w.blocking).map((w) => w.type),
+  });
 
   const cardCostCents = spentCents + parsed.raceCostCents;
   return {
@@ -267,6 +319,24 @@ export function persistLlmRace(db, day, { race: raceNumber, requestId, bankrollC
     }
   }
 
+  // D149: capture what a regeneration is about to REPLACE, before it's gone.
+  // Only meaningful when appending to an existing card - a brand-new card's
+  // first race has nothing to replace. previousCorrelationId is the most
+  // recent EARLIER successful request logged for this exact (card, race) -
+  // an approximation (nothing links a ticket row back to the request that
+  // produced it), but the append-only request log makes it a close one.
+  const existingTickets = card
+    ? db.prepare('SELECT id FROM tickets WHERE card_id = ? AND race_id = ?').all(card.id, race.id)
+    : [];
+  const previousCorrelationId = existingTickets.length
+    ? db.prepare(`
+        SELECT correlation_id FROM llm_card_requests
+        WHERE race_number = ? AND error IS NULL AND id < ?
+          AND (card_id = ? OR (card_id IS NULL AND race_day_id = ? AND correlation_id = ?))
+        ORDER BY id DESC LIMIT 1
+      `).get(raceNumber, Number(requestId), card.id, card.race_day_id, card.correlation_id)?.correlation_id ?? null
+    : null;
+
   let isNewCard = false;
   const result = db.transaction(() => {
     if (!card) {
@@ -320,6 +390,12 @@ export function persistLlmRace(db, day, { race: raceNumber, requestId, bankrollC
 
   if (isNewCard) {
     traceLog.info('card_generated', { correlationId, cardId: result.id, raceDayId: day.id, engineVersion: 'llm', template: 'llm', llmModel: result.llm_model });
+  }
+  if (existingTickets.length) {
+    traceLog.info('race_regenerated', {
+      cardId: result.id, raceDayId: day.id, race: raceNumber,
+      previousCorrelationId, newCorrelationId: correlationId, ticketsRemoved: existingTickets.length,
+    });
   }
   for (const t of parsed.tickets) {
     traceLog.info('ticket_added', {
@@ -411,6 +487,7 @@ llmCardsRouter.post('/race-days/:id/llm-cards/preview', async (req, res) => {
       // The ONE interactive caller. Nothing else passes this, so a batch path
       // that grows an LLM call later gets a notes-free prompt by default.
       interactive: true,
+      correlationId,
     });
     res.json({ correlationId, ...preview });
   } catch (err) {
