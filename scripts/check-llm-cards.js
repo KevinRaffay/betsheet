@@ -86,6 +86,15 @@ console.log('-- pure: buildLlmRaceUserPrompt --');
   // printed wager menu - see shared/betmath.js's MENU_PATTERNS).
   check('system prompt states the $2 win/place/show minimum and $1 increment (2026-09-07 fix #2)',
     SYSTEM_PROMPT.includes('Win, place and show have a $2 minimum') && SYSTEM_PROMPT.includes('$1\n  increments'));
+  // 2026-09-07 fix #3: a real generation wrote a "part-wheel" straight ticket
+  // (comma-separated alternatives within ONE position, e.g. "#1,#2,#3 /
+  // #4,#5,#6 / #7,#8") whose true combination count (product of leg sizes,
+  // 18 here) the model never computed - it just picked a flat total ($6)
+  // that happened not to divide evenly. The prompt never forbade this
+  // grammar, and the "always 1 combination" straight-bet claim was silently
+  // false for it. Now forbidden outright rather than taught the extra math.
+  check('system prompt forbids comma-separated part-wheel positions in a straight bet (2026-09-07 fix #3)',
+    SYSTEM_PROMPT.includes('EXACTLY ONE program number per position') && SYSTEM_PROMPT.includes('part-wheel'));
 }
 
 // ---------- analyst notes, pure (D92) ----------

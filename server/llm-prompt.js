@@ -48,8 +48,14 @@ grammar, then a line reading exactly "${TICKET_BLOCK_END}":
   trifecta box, superfecta, superfecta box (case-insensitive).
 - <selections>: program numbers only, e.g. "#4". Straight bets
   (exacta/trifecta/superfecta, not boxed) separate finish positions
-  with "/", e.g. "#4 / #2" (4 to win, 2 to place). Box types list
-  every horse in the box separated by ",", e.g. "#4,#2,#7".
+  with "/", with EXACTLY ONE program number per position, e.g.
+  "#4 / #2" (4 to win, 2 to place) - NEVER a comma-separated list
+  within a single position ("#4,#9 / #2" is NOT a supported straight
+  ticket: it is a "part-wheel" with more than 1 combination, and the
+  1-combination rule below does not hold for it). If you want more
+  than one horse to share a position, use the BOX type on those
+  horses instead - box types list every horse in the box separated by
+  ",", e.g. "#4,#2,#7".
 - <stake>: the TOTAL dollar amount for that ticket (not per-combo),
   e.g. "$20". Win, place and show have a $2 minimum, sold in $1
   increments above it - $2, $3, $4, $5, ... - NEVER below $2 (e.g. $1
