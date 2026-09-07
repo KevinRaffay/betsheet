@@ -10,42 +10,22 @@ import DayTicketBuilderModal from './DayTicketBuilderModal.jsx';
 // upload panel next door, and each of those writes its own tickets. The table
 // still shows Template and Variant because stored cards carry them, retired
 // lean-* rows included.
+//
+// D139: this panel does not know or care which human card "Build card by
+// hand" opens onto, or what it's named - DayTicketBuilderModal resolves and
+// manages that itself (resume the latest, or "Start a New Card" with an
+// optional name), the same way LlmCardModal owns its own card/model identity
+// without this panel's help. D137 first put a picker and a name field here;
+// that split card management across two components for no reason a caller
+// ever needed to pass a card id, so it was undone (D139) rather than kept.
 export default function CardsPanel({ dayId, bankrollCents, onOpenCard }) {
   const [cards, setCards] = useState(null);
   const [error, setError] = useState(null);
   const [showLlmModal, setShowLlmModal] = useState(false);
   const [showHandModal, setShowHandModal] = useState(false);
-  // D137: which human card "Build card by hand" opens. null follows D98's
-  // original rule (resume the latest, whatever it currently is); a numeric
-  // id pins to that exact card even once a newer one exists; the sentinel
-  // 'new' starts a brand-new one (D28 append-only already allows several
-  // human cards per day - this is what gives the user a deliberate way to
-  // reach for it instead of always resuming). A brand-new day has no human
-  // cards to pick among, so `effectiveSelection` falls through to 'new' on
-  // its own and the name input is all that shows.
-  const [selectedHumanCard, setSelectedHumanCard] = useState(null);
-  const [newCardName, setNewCardName] = useState('');
 
   const reload = () => listCards(dayId).then(setCards).catch((e) => setError(String(e.message)));
   useEffect(() => { reload(); }, [dayId]);
-
-  const humanCards = (cards ?? [])
-    .filter((c) => c.template === 'human')
-    .sort((a, b) => b.card_number - a.card_number);
-
-  const effectiveSelection = selectedHumanCard ?? humanCards[0]?.id ?? 'new';
-  const startingNew = effectiveSelection === 'new';
-  const resumedCard = startingNew ? null : humanCards.find((c) => c.id === effectiveSelection) ?? null;
-
-  // Closing the modal (whether it saved anything or not) drops back to
-  // "follow the latest" and clears the name draft, so the picker reflects
-  // whatever the day actually has on file the next time it's opened.
-  const handleModalClosed = () => {
-    setShowHandModal(false);
-    setSelectedHumanCard(null);
-    setNewCardName('');
-    reload();
-  };
 
   return (
     <section className="consensus">
@@ -60,42 +40,6 @@ export default function CardsPanel({ dayId, bankrollCents, onOpenCard }) {
           </button>
         </div>
       </div>
-      {humanCards.length > 0 && (
-        <div className="formrow formrow--tight">
-          <label>
-            Human card{' '}
-            <select
-              className="in in--sm" value={String(effectiveSelection)}
-              onChange={(e) => setSelectedHumanCard(e.target.value === 'new' ? 'new' : Number(e.target.value))}
-            >
-              {humanCards.map((c) => (
-                <option key={c.id} value={c.id}>#{c.card_number}{c.name ? ` — ${c.name}` : ''}</option>
-              ))}
-              <option value="new">+ Start a new card…</option>
-            </select>
-          </label>
-          {startingNew && (
-            <label>
-              Name (optional){' '}
-              <input
-                className="in in--sm" value={newCardName} placeholder="e.g. Aggressive"
-                onChange={(e) => setNewCardName(e.target.value)}
-              />
-            </label>
-          )}
-        </div>
-      )}
-      {humanCards.length === 0 && (
-        <div className="formrow formrow--tight">
-          <label>
-            New card's name (optional){' '}
-            <input
-              className="in in--sm" value={newCardName} placeholder="e.g. Aggressive"
-              onChange={(e) => setNewCardName(e.target.value)}
-            />
-          </label>
-        </div>
-      )}
       {error && <p className="notice notice--error">{error}</p>}
       {cards && cards.length > 0 && (
         <table className="grid grid--click">
@@ -128,11 +72,9 @@ export default function CardsPanel({ dayId, bankrollCents, onOpenCard }) {
         <DayTicketBuilderModal
           context="live"
           dayId={dayId}
-          cardId={resumedCard?.id ?? null}
-          cardName={startingNew ? (newCardName.trim() || null) : (resumedCard?.name ?? null)}
           bankrollCents={bankrollCents}
           onCardChanged={reload}
-          onClose={handleModalClosed}
+          onClose={() => { setShowHandModal(false); reload(); }}
         />
       )}
       {showLlmModal && (
