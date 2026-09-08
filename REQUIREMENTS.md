@@ -342,3 +342,17 @@ Follows D166's own flagged finding. Consolidation, not new capability.
 | A hand-typed ranking goes through the same validator the model's output does - a human cannot save a ranking the parser would refuse | D169 |
 | An odds box left empty means "the sheet showed no price", and the UI never suggests a price the sheet did not show | D169 |
 | **Still out of scope**: staking/ticket construction from tip picks, grading, and resolving D09 | - (later deliverables) |
+
+## TIPSHEET scoring (requested 2026-09-08)
+
+| requirement | deliverable |
+| --- | --- |
+| Tip picks are scored against saved results, so a source can be judged rather than just stored | D170 |
+| Scoring is rank-based and carries no money - nothing stakes a tip sheet, so a P/L figure would be invented | D170 |
+| A scratched top pick promotes the next live pick, and the substitution is reported | D170 |
+| An unplaced also-ran is a loss; a program number absent from the result is surfaced as a likely extraction misread, never silently scored a loss | D170 |
+| Anything unscorable returns NULL rather than zero, and unscored races are reported separately from the rate | D170 |
+| Every aggregate carries its `n`, every rate is NULL at n=0, and the UI cannot render a rate without its denominator | D170 |
+| Sources are never pooled - there is no combined "tipsheets" total (invariant 13) | D170 |
+| A soft-deleted race day leaves every scoring figure and returns on restore (invariant 12) | D170 |
+| **Still out of scope**: staking tip picks into a card (`shared/tipStaking.js`), and resolving D09 | - (later deliverables) |

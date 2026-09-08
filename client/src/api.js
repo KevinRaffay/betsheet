@@ -324,3 +324,7 @@ export const correctTipPicks = (tipId, picks, correlationId) =>
 
 export const deleteTipPicks = (tipId, correlationId) =>
   fetch(`/api/tip-picks/${tipId}`, { method: 'DELETE', headers: hdr(correlationId) }).then(asJson);
+
+/** TIPSHEET scoring (D170). Read-only; no money, no P/L, no engine version. */
+export const getDayTipScoring = (dayId, correlationId) =>
+  fetch(`/api/race-days/${dayId}/tip-scoring`, { headers: hdr(correlationId) }).then(asJson);
