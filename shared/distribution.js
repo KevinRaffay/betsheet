@@ -14,7 +14,17 @@
 // The flag (> 0.8) is driven by NET: on 2026-08-28 gross was 40% while net
 // was 77% - the gross figure hides refunds and small winners.
 
-export const BUCKET_ORDER = ['FULL', 'PARTIAL', 'PROGRAM_ONLY', 'ODDS_ONLY', 'HUMAN', 'LLM_GENERATED', 'EQB_OTR'];
+// D171: the ONE bucket order. server/pl.js imported its own copy until a
+// TIPSHEET card graded correctly and then vanished from P/L, because that copy
+// had never heard of the bucket. Four lists said what the buckets were; this is
+// now the only one that names them.
+export const BUCKET_ORDER = ['FULL', 'PARTIAL', 'PROGRAM_ONLY', 'ODDS_ONLY', 'HUMAN', 'LLM_GENERATED', 'EQB_OTR', 'TIPSHEET'];
+
+/** Display chip per bucket, shared by PLView and DistributionView. */
+export const BUCKET_CHIP = {
+  FULL: 'unanimous', PARTIAL: 'split', PROGRAM_ONLY: 'chaos', ODDS_ONLY: 'guess',
+  HUMAN: 'human', LLM_GENERATED: 'llm', EQB_OTR: 'equibase-otr', TIPSHEET: 'tipsheet',
+};
 export const DEPENDENCE_THRESHOLD = 0.8;
 
 /**

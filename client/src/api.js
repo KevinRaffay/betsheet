@@ -328,3 +328,14 @@ export const deleteTipPicks = (tipId, correlationId) =>
 /** TIPSHEET scoring (D170). Read-only; no money, no P/L, no engine version. */
 export const getDayTipScoring = (dayId, correlationId) =>
   fetch(`/api/race-days/${dayId}/tip-scoring`, { headers: hdr(correlationId) }).then(asJson);
+
+/** TIPSHEET staking (D171): preview the three variants, then write them. */
+export const previewTipCards = (dayId, sourceLabel, correlationId) =>
+  fetch(`/api/race-days/${dayId}/tip-cards/preview`, {
+    method: 'POST', headers: hdr(correlationId), body: JSON.stringify({ sourceLabel }),
+  }).then(asJson);
+
+export const saveTipCards = (dayId, sourceLabel, correlationId) =>
+  fetch(`/api/race-days/${dayId}/tip-cards`, {
+    method: 'POST', headers: hdr(correlationId), body: JSON.stringify({ sourceLabel }),
+  }).then(asJson);

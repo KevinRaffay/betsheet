@@ -94,7 +94,12 @@ console.log('-- migration 028: the tip_picks table --');
 console.log('-- no HUMAN / LLM / OTR schema was touched --');
 {
   const completeness = db.prepare("SELECT sql FROM sqlite_master WHERE name = 'cards'").get().sql;
-  check('cards.consensus_completeness gained no TIPSHEET value', !/TIPSHEET/.test(completeness));
+  // D166 promised EXTRACTION touched no card schema, and it did not: tip picks
+  // lived entirely in their own table. D171 then staked them into real
+  // tickets, which needs a bucket, so TIPSHEET is now a card value on purpose.
+  // The assertion is kept and INVERTED rather than deleted, because the thing
+  // worth guarding never changed - that the other buckets are undisturbed.
+  check('cards.consensus_completeness carries TIPSHEET (added by D171 staking)', /TIPSHEET/.test(completeness));
   check('cards still carries HUMAN, LLM_GENERATED and EQB_OTR', ['HUMAN', 'LLM_GENERATED', 'EQB_OTR'].every((b) => completeness.includes(b)));
   const tipCols = db.prepare('PRAGMA table_info(cards)').all().map((c) => c.name).filter((c) => /tip/i.test(c));
   check('cards gained no tip_* column', tipCols.length === 0, tipCols.join(','));
