@@ -626,6 +626,47 @@ Place | #1 | $20 | Safe.
     return n.cardNote === null && n.byRace['2'] != null;
   })());
 
+  // D167: llm_notes and tip_picks answer the same question ("who said this")
+  // and, after D166, did it with two vocabularies, two fallbacks and only one
+  // of them normalizing. One normalizer now serves both. The source label
+  // REACHES THE PROMPT, and LLM cards have no version axis, so the safety of
+  // turning normalization on here rests on it being INERT for the corpus -
+  // which is asserted, with a negative control proving the probe can fail.
+  {
+    const { normalizeSourceLabel, isNormalizedSourceLabel, NOTE_SOURCE_LABELS,
+      TIP_SOURCE_LABELS, NOTES_SOURCE_FALLBACK, TIP_SOURCE_FALLBACK } =
+      await import('../shared/source-labels.js');
+    const { normalizeSourceLabel: tipNormalize } = await import('../shared/tip-picks.js');
+
+    check('normalizing is INERT for every source_label in the real corpus',
+      ['llm', 'public-handicapper', 'user', null].every(isNormalizedSourceLabel));
+    check('  negative control: the probe CAN fail', !isNormalizedSourceLabel('Public Handicapper'));
+    check('every catalogue entry is already a fixed point',
+      [...NOTE_SOURCE_LABELS, ...TIP_SOURCE_LABELS].every(isNormalizedSourceLabel));
+    check('the two fallbacks stay DISTINCT - an unreadable sheet is not a personal opinion',
+      NOTES_SOURCE_FALLBACK === 'user' && TIP_SOURCE_FALLBACK === 'tipsheet-other'
+      && NOTES_SOURCE_FALLBACK !== TIP_SOURCE_FALLBACK);
+    check('tip_picks delegates rather than owning a second normalizer',
+      tipNormalize('Track Master') === normalizeSourceLabel('Track Master')
+      && tipNormalize('') === TIP_SOURCE_FALLBACK && normalizeSourceLabel('') === '');
+
+    // The write path itself, through the real endpoint.
+    check('a messily-typed label is normalized on the way in', await (async () => {
+      await putNote(3, 'Trainer is 0 for 30 here.', '  Public Handicapper  ');
+      const n = await getNotes();
+      return n.byRace['3']?.sourceLabel === 'public-handicapper';
+    })());
+    check('an empty label still stores NULL, never a fabricated one', await (async () => {
+      await putNote(4, 'Nothing to say.', '   ');
+      const row = notesDb().prepare(
+        'SELECT source_label FROM llm_notes WHERE race_day_id = ? AND race_number = 4').get(dayId);
+      return row && row.source_label === null;
+    })());
+    // Clean up so the notes-report assertions further down see what they expect.
+    await putNote(3, '   ');
+    await putNote(4, '   ');
+  }
+
   // Notes reach the model. Asserted on the ACTUAL logged prompt_text, the shape
   // that caught D68's `.table` bug - not on a hand-built object.
   const notedPreview = await (await jpost(`/api/race-days/${dayId}/llm-cards/preview`, {

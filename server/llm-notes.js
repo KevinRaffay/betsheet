@@ -16,7 +16,11 @@
 import crypto from 'node:crypto';
 import { NOTES_MAX_CHARS, sanitizeNotesForPrompt } from './llm-prompt.js';
 
-export const NOTES_SOURCE_FALLBACK = 'user';
+// D167: re-exported from the shared module rather than defined here, so the
+// notes fallback and the tip fallback sit side by side with the reason they
+// differ written down next to them.
+export { NOTES_SOURCE_FALLBACK } from '../shared/source-labels.js';
+import { NOTES_SOURCE_FALLBACK as READ_FALLBACK, normalizeSourceLabel } from '../shared/source-labels.js';
 const CARD_SCOPE_RACE_NUMBER = 0;
 const now = () => new Date().toISOString().replace(/\.\d+Z$/, 'Z');
 
@@ -44,6 +48,16 @@ export function writeNote(db, raceDayId, raceNumber, text, sourceLabel) {
     return null;
   }
   const ts = now();
+  // D167: normalized on the way IN, so llm_notes carries the same guarantee
+  // tip_picks does and grouping by source is exact rather than
+  // case-and-spacing dependent. This DOES reach the LLM prompt
+  // (llm-prompt.js renders source="..."), and LLM cards have no version axis -
+  // but it makes prompts MORE comparable, not less: Program and program
+  // currently render as two different prompts for one source, and after this
+  // they render as one. Provably INERT for every value in the real corpus
+  // (llm, public-handicapper, user, NULL), asserted by check-llm-cards
+  // with a negative control. An empty label still stores NULL, never a
+  // fabricated one - the fallback is applied at READ time, as it always was.
   db.prepare(`
     INSERT INTO llm_notes (race_day_id, race_number, notes_text, source_label, created_at, updated_at)
     VALUES (?, ?, ?, ?, ?, ?)
@@ -51,7 +65,7 @@ export function writeNote(db, raceDayId, raceNumber, text, sourceLabel) {
       notes_text = excluded.notes_text,
       source_label = excluded.source_label,
       updated_at = excluded.updated_at
-  `).run(raceDayId, raceNumber, String(text), sourceLabel || null, ts, ts);
+  `).run(raceDayId, raceNumber, String(text), normalizeSourceLabel(sourceLabel) || null, ts, ts);
   return db.prepare('SELECT * FROM llm_notes WHERE race_day_id = ? AND race_number = ?').get(raceDayId, raceNumber);
 }
 
@@ -77,7 +91,7 @@ export function loadNotesForRace(db, raceDayId, raceNumber) {
   }
 
   // One resolved label per call: the race's own, else the day's, else a default.
-  const sourceLabel = raceNote?.sourceLabel || cardNote?.sourceLabel || NOTES_SOURCE_FALLBACK;
+  const sourceLabel = raceNote?.sourceLabel || cardNote?.sourceLabel || READ_FALLBACK;
   const truncated = [];
   const compose = (note, scope) => {
     if (!note?.text) return null;
