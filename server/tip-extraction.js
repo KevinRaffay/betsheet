@@ -93,7 +93,7 @@ export function parseExtractionJson(text) {
  */
 export async function extractTipPicks({
   imagePath, imageBuffer, sourceHint = '', model = MODEL, stubResponse,
-  maxTokens = DEFAULT_REQUEST_PARAMS.maxTokens, temperature = 0,
+  maxTokens = DEFAULT_REQUEST_PARAMS.maxTokens, temperature = null,
 } = {}) {
   const buf = imageBuffer ?? (imagePath ? fs.readFileSync(imagePath) : null);
   if (!buf || !buf.length) {
@@ -112,8 +112,12 @@ export async function extractTipPicks({
     raw = String(stubResponse);
   } else {
     try {
-      // Temperature 0 by default: this is transcription, not generation - two
-      // reads of one screenshot disagreeing is a defect, not variety.
+      // temperature is OMITTED (null), not pinned to 0. Transcription would
+      // rather be deterministic, but claude-sonnet-5 rejects a non-default
+      // temperature outright (400, `temperature is deprecated for this model`)
+      // - found by this deliverable's own check run against a real screenshot.
+      // So determinism is not on offer here, and pretending otherwise by
+      // sending 0 just fails the call.
       const res = await complete({
         system: TIP_SYSTEM_PROMPT,
         user: [
