@@ -38,7 +38,7 @@ const expected = [
   'exotic_payoffs', 'fetch_attempts', 'graded_tickets', 'human_race_state', 'llm_card_requests', 'llm_notes', 'publishes',
   'race_days', 'race_results', 'races', 'result_charts', 'result_scratches',
   'schema_migrations', 'simulation_results', 'simulation_runs', 'sources',
-  'strategy_templates', 'tickets',
+  'strategy_templates', 'tickets', 'tip_picks',
 ];
 check('all expected tables exist',
   JSON.stringify(tables) === JSON.stringify(expected),
