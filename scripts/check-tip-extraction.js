@@ -234,6 +234,124 @@ console.log('-- a factory reset names tip_picks rather than cascading it silentl
   check('  and the rows are gone', db.prepare('SELECT COUNT(*) c FROM tip_picks').get().c === 0);
 }
 
+// ------------------------------------------------- the HTTP surface (D169)
+// A real server on its own database. The vision call is stubbed via
+// BETSHEET_TIP_TEST_MODE so the ROUTE contract - preview writes nothing, save
+// re-parses the ARCHIVED response rather than the client's payload, and
+// correcting is a separate recorded act - is verifiable without a paid call.
+
+console.log('-- routes: preview -> save -> correct -> delete (D169) --');
+{
+  const { spawn } = await import('node:child_process');
+  const PORT = 8910;
+  const BASE = `http://127.0.0.1:${PORT}`;
+  const srvDb = path.join(tmp, 'srv.sqlite');
+  const archive = path.join(tmp, 'tip-archive');
+  const server = spawn(process.execPath, [path.join(ROOT, 'server', 'index.js')], {
+    env: {
+      ...process.env,
+      BETSHEET_PORT: String(PORT),
+      BETSHEET_DB: srvDb,
+      BETSHEET_LOG_DIR: path.join(tmp, 'srv-logs'),
+      BETSHEET_TIP_ARCHIVE_DIR: archive,
+      BETSHEET_TIP_TEST_MODE: '1',
+      ANTHROPIC_API_KEY: '',   // the stub path must never need a key
+    },
+    stdio: ['ignore', 'pipe', 'pipe'],
+  });
+  let out = '';
+  server.stdout.on('data', (d) => { out += d; });
+  server.stderr.on('data', (d) => { out += d; });
+  const jpost = (u, b = {}, m = 'POST') => fetch(BASE + u, {
+    method: m, headers: { 'content-type': 'application/json' }, body: JSON.stringify(b),
+  });
+  const jget = (u) => fetch(BASE + u).then((r) => r.json());
+
+  const stub = (picks, source = 'TrackMaster') => JSON.stringify({ source_label: source, picks });
+  const THREE = [
+    { horse_no: '4', horse_name: 'Karazest', rank: 1 },
+    { horse_no: '6', horse_name: 'Union Roar', rank: 2 },
+    { horse_no: '2', horse_name: 'Fancy Feet', rank: 3 },
+  ];
+
+  try {
+    let up = false;
+    for (let i = 0; i < 50 && !up; i++) {
+      try { up = (await fetch(`${BASE}/api/health`)).ok; } catch { await new Promise((r) => setTimeout(r, 200)); }
+    }
+    check('server boots with BETSHEET_TIP_TEST_MODE=1 and no API key', up, out.slice(-300));
+
+    const dayRes = await jpost('/api/race-days', {
+      track: 'Del Mar', date: fixture.date, bankrollCents: 20000, perRaceMinCents: 500, races: fixture.races,
+    });
+    const srvDayId = (await dayRes.json()).id;
+    const png = PNG_1x1.toString('base64');
+
+    const pv = await (await jpost(`/api/race-days/${srvDayId}/tip-picks/preview`, {
+      race: 1, imageBase64: png, sourceHint: '', __stubResponse: stub(THREE),
+    })).json();
+    check('preview returns picks and a parseToken', pv.picks?.length === 3 && typeof pv.parseToken === 'string');
+    check('preview normalized the source off the response', pv.sourceLabel === 'trackmaster');
+    check('PREVIEW WROTE NOTHING (invariant 9)', (await jget(`/api/race-days/${srvDayId}/tip-picks`)).rows.length === 0);
+    check('the extraction was archived regardless', fs.existsSync(path.join(archive, `${pv.parseToken}.json`)));
+
+    // The save must re-parse the ARCHIVED response, so a client that lies
+    // about the picks changes nothing. Nothing in the save body carries picks.
+    const saved = await (await jpost(`/api/race-days/${srvDayId}/tip-picks`, {
+      race: 1, parseToken: pv.parseToken, picks: [{ horse_no: '99', horse_name: 'Injected', rank: 1 }],
+    })).json();
+    check('save re-parses the archive and IGNORES client-supplied picks',
+      saved.saved?.picks?.length === 3 && !JSON.stringify(saved.saved.picks).includes('Injected'));
+    check('a saved row starts UNEDITED - verbatim model output', saved.saved.edited === false && saved.saved.picksExtracted === null);
+
+    const badToken = await jpost(`/api/race-days/${srvDayId}/tip-picks`, { race: 1, parseToken: 'deadbeef' });
+    check('an unknown parseToken is refused 404', badToken.status === 404);
+
+    // Correcting: a separate, recorded act on a stored row.
+    const fixedPicks = [
+      { horse_no: '4', horse_name: 'Karazest', rank: 1 },
+      { horse_no: '6', horse_name: 'Union Roar', rank: 2 },
+      { horse_no: '7', horse_name: 'Last Candy', rank: 3, ml_odds: '9-2' },
+    ];
+    const corrected = await (await jpost(`/api/tip-picks/${saved.saved.id}`, { picks: fixedPicks }, 'PATCH')).json();
+    check('a correction is applied', corrected.saved?.picks?.[2]?.horse_no === '7');
+    check('  and normalized on the way in (9-2 -> 9/2)', corrected.saved.picks[2].ml_odds === '9/2');
+    check('  and MARKED as edited', corrected.saved.edited === true && typeof corrected.saved.editedAt === 'string');
+    check('  and the model ORIGINAL is preserved',
+      corrected.saved.picksExtracted?.[2]?.horse_no === '2');
+
+    // Editing twice must not overwrite the original with the previous edit.
+    const again = await (await jpost(`/api/tip-picks/${saved.saved.id}`, {
+      picks: [{ horse_no: '1', horse_name: 'Changed Again', rank: 1 }],
+    }, 'PATCH')).json();
+    check('a SECOND edit still keeps the FIRST extraction, not the last edit',
+      again.saved.picksExtracted?.length === 3 && again.saved.picksExtracted[2].horse_no === '2');
+
+    const badEdit = await jpost(`/api/tip-picks/${saved.saved.id}`, {
+      picks: [{ horse_no: '1', horse_name: 'A', rank: 1 }, { horse_no: '2', horse_name: 'B', rank: 1 }],
+    }, 'PATCH');
+    check('a hand-typed BROKEN ranking is refused 422, same validator as the model',
+      badEdit.status === 422);
+
+    const del = await jpost(`/api/tip-picks/${saved.saved.id}`, {}, 'DELETE');
+    check('a row can be deleted', del.status === 200
+      && (await jget(`/api/race-days/${srvDayId}/tip-picks`)).rows.length === 0);
+    check('the archived extraction SURVIVES the row deletion',
+      fs.existsSync(path.join(archive, `${pv.parseToken}.json`)));
+
+    const missing = await jpost(`/api/race-days/${srvDayId}/tip-picks/preview`, {
+      race: 99, imageBase64: png, __stubResponse: stub(THREE),
+    });
+    check('a race the day does not have is refused 404', missing.status === 404);
+    const notImage = await jpost(`/api/race-days/${srvDayId}/tip-picks/preview`, {
+      race: 1, imageBase64: Buffer.from('not an image').toString('base64'), __stubResponse: stub(THREE),
+    });
+    check('a non-image body is refused 400 before any model call', notImage.status === 400);
+  } finally {
+    server.kill();
+  }
+}
+
 // --------------------------------------------------------------- PHASE 2
 // Real screenshots, real model. Skipped without failing when either is
 // missing, because this half cannot be a build gate: there is no golden for

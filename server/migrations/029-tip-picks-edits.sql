@@ -1,0 +1,35 @@
+-- 029: human corrections to an extracted tip sheet (D169).
+--
+-- Two nullable columns, no table rebuild - nothing about an existing CHECK
+-- changes, and `tip_picks` has no children to cascade.
+--
+-- WHY THIS EXISTS AT ALL. Invariant 9 says a preview is read-only and
+-- corrections happen AT THE SOURCE - fix the pasted text, re-parse. A vision
+-- extraction has no such source: the input is a photograph, so there is
+-- nothing to correct and re-run, and a re-extraction is a paid call that may
+-- return the same misread. Meanwhile one wrong program number silently scores
+-- a tipsheet on picks it never made, which is worse than any hand-edit.
+--
+-- The resolution (user decision 2026-09-08) keeps invariant 9 LITERALLY TRUE
+-- rather than carving an exception out of it: the invariant governs the
+-- parse -> save path, and that path stays read-only. A save still stores
+-- exactly what the model said. Correcting is a SEPARATE, EXPLICIT, RECORDED
+-- act on an already-stored row - which is why the fact lives here in the
+-- schema instead of being a quiet overwrite.
+--
+-- The model's original parse, preserved the moment a human first changes it.
+-- NULL until then, deliberately: until someone edits, `picks` IS the
+-- extraction, and copying it into a second column on every row would be
+-- duplicated data that could drift. So `picks_extracted IS NULL` means
+-- "never touched by a human, `picks` is verbatim model output" - and once set
+-- it is never updated again, so it always holds the FIRST extraction rather
+-- than the previous edit. That makes extraction accuracy measurable after the
+-- fact: every edited row is a labelled example of what the model got wrong.
+ALTER TABLE tip_picks ADD COLUMN picks_extracted TEXT;
+
+-- When a human last corrected this row. NULL = pure model output.
+-- Kept alongside picks_extracted rather than derived from it so "was this
+-- corrected, and when" is a cheap query, and so a row corrected BACK to the
+-- model's original answer still reads as human-reviewed rather than
+-- reverting to looking untouched.
+ALTER TABLE tip_picks ADD COLUMN edited_at TEXT;

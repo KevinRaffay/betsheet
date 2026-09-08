@@ -284,3 +284,43 @@ export const getDistribution = (engineVersion, meet) => {
   const qs = q.toString();
   return fetch(`/api/distribution${qs ? `?${qs}` : ''}`).then(asJson);
 };
+
+// ---- TIPSHEET picks (D166 extraction, D169 review/correct) ----------------
+//
+// The IMAGE is read client-side and posted as base64 JSON, the same shape
+// parseEquibaseEntries uses for a saved page: the server never opens a file.
+// Preview and save are two calls because the save re-parses the ARCHIVED
+// model response rather than trusting anything the browser holds.
+
+const hdr = (correlationId) => ({
+  'content-type': 'application/json',
+  ...(correlationId ? { 'x-correlation-id': correlationId } : {}),
+});
+
+/** Preview an extraction. Writes nothing server-side (invariant 9). */
+export const previewTipPicks = (dayId, { race, imageBase64, sourceHint, model }, correlationId) =>
+  fetch(`/api/race-days/${dayId}/tip-picks/preview`, {
+    method: 'POST',
+    headers: hdr(correlationId),
+    body: JSON.stringify({ race, imageBase64, sourceHint, model, correlationId }),
+  }).then(asJson);
+
+/** Save a previewed extraction, by its parseToken. */
+export const saveTipPicks = (dayId, { race, parseToken, capturedAt }, correlationId) =>
+  fetch(`/api/race-days/${dayId}/tip-picks`, {
+    method: 'POST',
+    headers: hdr(correlationId),
+    body: JSON.stringify({ race, parseToken, capturedAt }),
+  }).then(asJson);
+
+export const listTipPicks = (dayId, correlationId) =>
+  fetch(`/api/race-days/${dayId}/tip-picks`, { headers: hdr(correlationId) }).then(asJson);
+
+/** Correct a STORED row - a separate recorded act, never a preview edit. */
+export const correctTipPicks = (tipId, picks, correlationId) =>
+  fetch(`/api/tip-picks/${tipId}`, {
+    method: 'PATCH', headers: hdr(correlationId), body: JSON.stringify({ picks }),
+  }).then(asJson);
+
+export const deleteTipPicks = (tipId, correlationId) =>
+  fetch(`/api/tip-picks/${tipId}`, { method: 'DELETE', headers: hdr(correlationId) }).then(asJson);

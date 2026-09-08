@@ -329,3 +329,16 @@ Follows D166's own flagged finding. Consolidation, not new capability.
 | `check-static-app` is out of scope inside a git worktree - not run, not worked around, and not treated as a gap in that branch's verification | D168 |
 | The static app's import surface, not a forced build, answers "could this change have moved the static bundle?" - and the list is re-derived rather than trusted | D168 |
 | A skipped check is stated plainly in the final message; a report never implies the suite ran clean when a script did not run | D168 |
+
+## Review and correct extracted tip picks (requested 2026-09-08)
+
+| requirement | deliverable |
+| --- | --- |
+| A tip-sheet screenshot can be uploaded, previewed and saved from the race-day page | D169 |
+| The preview is READ-ONLY and a save stores verbatim model output - invariant 9 stays literally true, because it governs the parse->save path | D169 |
+| The save re-parses the archived model RESPONSE rather than trusting the browser, since re-extracting would be a paid, non-deterministic call | D169 |
+| A misread can be corrected on the STORED row - a separate, explicit, recorded act, never an edit of the preview | D169 |
+| A correction preserves the model's FIRST extraction forever, so every corrected row is a labelled example of what the extraction got wrong | D169 |
+| A hand-typed ranking goes through the same validator the model's output does - a human cannot save a ranking the parser would refuse | D169 |
+| An odds box left empty means "the sheet showed no price", and the UI never suggests a price the sheet did not show | D169 |
+| **Still out of scope**: staking/ticket construction from tip picks, grading, and resolving D09 | - (later deliverables) |
