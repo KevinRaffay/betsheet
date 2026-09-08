@@ -288,3 +288,23 @@ HUMAN cards to the corpus and nothing in Phases 1-3 depends on it.
 | **Deferred, not built**: a scoped write-capable PAT in the browser committing cards to a branch. A write token on a phone carried around a racetrack is a materially different security posture than a page that can touch nothing | - (deferred by the spec) |
 | **Out of scope by the spec**: any read path against the corpus, consensus classification, chart parsing, automatic sync home, and authentication of any kind | - (non-goals) |
 | **Dropped from scope, user decision 2026-09-07**: a named source per HUMAN card (`emubets`/`drf`/`keeneland-tipsheet`). Archaeology found no such field exists - it is unscheduled requirement P-3.2 under "Card source model" above, and the only label a card carries is `cards.name` (D137) | - (see Card source model, P-3.2) |
+
+## TIPSHEET screenshot extraction (requested 2026-09-08)
+
+Scope doc: `Scope: TIPSHEET Screenshot Extraction`. Extraction only - the picks a
+third-party handicapping app publishes, read off a screenshot into structured rows.
+Nothing here stakes money, builds a ticket or grades anything.
+
+| requirement | deliverable |
+| --- | --- |
+| A screenshot of a third-party tip app becomes a structured, ranked pick list in a new `TIPSHEET` bucket, isolated from OTR/HUMAN/LLM and never pooled without an explicit choice | D166 |
+| `tip_picks` carries a ranked `picks` array separate from any eventual ticket, and has NO completeness field - odds are optional, not a completeness signal, and scoring for this bucket is rank-based | D166 |
+| Odds are captured in the fraction-string format `morningLineToDecimal` reads (so a tote-printed `9-2` becomes `9/2`), and are OMITTED rather than guessed when the screenshot does not show them | D166 |
+| Absence of odds is a normal tipsheet, never an extraction failure; a broken ranking IS a failure, because rank is the only signal this bucket has | D166 |
+| The model's unedited response and a hash of the image are kept, so a misread horse number is diagnosable later without re-running a paid call against an image that may be gone | D166 |
+| `source_label` is read from the visible UI chrome when possible, falling back to a passed-in hint, and normalized for grouping without refusing an app nobody has met yet | D166 |
+| Extraction never writes - persisting is a separate explicit call, so a future preview surface can show exactly what a save would store (invariant 9's shape) | D166 |
+| Verification runs against a throwaway SQLite DB and prints extracted picks for eyeball comparison against the source image | D166 |
+| **Out of scope by the spec**: staking/ticket construction from extracted picks (`shared/tipStaking.js`), any UI, grading, resolving D09, and auto-writing into the real corpus | - (later deliverables) |
+| **Answered by archaeology, nothing to build**: extending the `source_label` enum with `trackmaster`/`numberfire`. No such enum exists in the schema - it is unscheduled P-3.2 under "Card source model" above, the same stale premise D150-D155 met. Implemented as free TEXT plus a normalizing seed list in code | D166 |
+| **Flagged, deliberately not solved**: D09's three-source classification now faces a fourth bucket living in a separate table. A `tip_picks` row is not a card and no classifier reads it, so the question is open rather than answered by this schema | - (see D09) |

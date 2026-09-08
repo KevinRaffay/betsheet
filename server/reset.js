@@ -36,7 +36,7 @@ const WIPE_ORDER = [
   'cards', 'simulation_results', 'simulation_runs', 'strategy_templates',
   'consensus_picks', 'fetch_attempts', 'sources',
   'result_scratches', 'exotic_payoffs', 'race_results', 'result_charts',
-  'entries', 'races', 'llm_notes', 'race_days', 'backfill_queue',
+  'entries', 'races', 'llm_notes', 'tip_picks', 'race_days', 'backfill_queue',
 ];
 
 // The schema, not user data - it is what makes the fresh era the same shape.

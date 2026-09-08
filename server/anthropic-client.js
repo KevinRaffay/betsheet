@@ -54,6 +54,9 @@ export class AnthropicError extends Error {
   }
 }
 
+// `user` is normally a string. It may also be an ARRAY of Anthropic content
+// blocks - which is how server/tip-extraction.js (D166) sends an image
+// alongside its text - and passes straight through to the API either way.
 function buildMessages(user, prefill) {
   const messages = [{ role: 'user', content: user }];
   if (prefill) messages.push({ role: 'assistant', content: prefill });
@@ -91,7 +94,12 @@ export async function complete({
       body: JSON.stringify({
         model,
         max_tokens: maxTokens,
-        temperature,
+        // Newer models REJECT a non-default temperature outright - claude-sonnet-5
+        // answers `temperature is deprecated for this model` with a 400 for
+        // temperature 0, while the default 1 is still accepted. So `null` here
+        // means OMIT the field, which is the only way to call those models. Every
+        // existing caller passes a number and is byte-identical to before.
+        ...(temperature === null || temperature === undefined ? {} : { temperature }),
         system,
         messages: buildMessages(user, usePrefill ? prefill : ''),
       }),
