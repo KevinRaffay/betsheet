@@ -1,4 +1,4 @@
-// Strategy-template persistence: seed the three surviving templates into the
+// Strategy-template persistence: seed the surviving templates into the
 // strategy_templates table so cards can reference them by FK.
 //
 // This file used to seed shared/templates.js's 12 lean rule bundles as well,
@@ -22,11 +22,12 @@ import { getDb } from './db.js';
 
 export const templatesRouter = express.Router();
 
-/** The three card producers, as rows. Name -> description. */
+/** The card producers, as rows. Name -> description. */
 const TEMPLATE_ROWS = [
   ['human', 'Human-entered picks, typed or built race by race (D54/D55).'],
   ['llm', 'LLM-generated picks, one race at a time from entries and any notes (D63).'],
   ['equibase-otr', "Equibase's Off to the Races sheet, tickets taken verbatim (D71)."],
+  ['tipsheet', 'A third-party tip sheet, staked into tickets by variant (D171).'],
 ];
 
 export function seedTemplates(db) {

@@ -346,8 +346,8 @@ try {
     check('after reset: EVERY table is empty, not just the ones anyone thought to check',
       nonEmpty.length === 0, JSON.stringify(nonEmpty));
     const seeded = probe.prepare('SELECT name FROM strategy_templates ORDER BY name').all().map((r) => r.name);
-    check('after reset: strategy_templates holds exactly the three surviving producers, reseeded',
-      seeded.join(',') === 'equibase-otr,human,llm', seeded.join(','));
+    check('after reset: strategy_templates holds exactly the four producers, reseeded',
+      seeded.join(',') === 'equibase-otr,human,llm,tipsheet', seeded.join(','));
 
     // And the report has to name them all: a reset that destroys rows it does
     // not mention is not auditable, whatever the row counts say.

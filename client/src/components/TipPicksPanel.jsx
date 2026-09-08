@@ -1,7 +1,7 @@
 import { useEffect, useState } from 'react';
 import {
   previewTipPicks, saveTipPicks, listTipPicks, correctTipPicks, deleteTipPicks,
-  getDayTipScoring,
+  getDayTipScoring, previewTipCards, saveTipCards,
 } from '../api.js';
 
 // TIPSHEET picks on a stored day (D169): upload a screenshot of a tip app,
@@ -168,6 +168,7 @@ export default function TipPicksPanel({ dayId, races = [] }) {
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState(null);
   const [editing, setEditing] = useState(null);
+  const [staking, setStaking] = useState(null);
   const scoreFor = (id) => scoring?.races?.find((r) => r.id === id)?.score ?? null;
 
   const [scoring, setScoring] = useState(null);
@@ -303,6 +304,62 @@ export default function TipPicksPanel({ dayId, races = [] }) {
             One day only, so these counts are small by construction — read them as a tally, not a verdict.
           </p>
         </>
+      )}
+
+      {/* D171: stake a source's picks into three comparable cards. Preview
+          writes nothing; Save appends three cards, never edits earlier ones. */}
+      {[...new Set(rows.map((r) => r.sourceLabel))].map((src) => (
+        <div className="formrow" key={`stake-${src}`}>
+          <button type="button" className="btn btn--sm" disabled={busy}
+            onClick={async () => {
+              setBusy(true); setError(null);
+              try { setStaking(await previewTipCards(dayId, src)); }
+              catch (err) { setError(err.message); } finally { setBusy(false); }
+            }}>
+            Stake {src} into cards
+          </button>
+        </div>
+      ))}
+      {staking && (
+        <div className="tip-edit">
+          <p className="dim">
+            <strong>{staking.sourceLabel}</strong> — three cards, one per way of betting the same picks,
+            so backtesting can say which structure is worth it. Bankroll ${(staking.bankrollCents / 100).toFixed(2)}.
+            Nothing is written until you save.
+          </p>
+          <table className="grid">
+            <thead><tr><th>Variant</th><th>Tickets</th><th>Cost</th></tr></thead>
+            <tbody>
+              {staking.variants.map((v) => (
+                <tr key={v.variant}>
+                  <td>{v.label}</td>
+                  <td>{v.races.reduce((n, r) => n + r.tickets.length, 0)}</td>
+                  <td>${(v.costCents / 100).toFixed(2)}</td>
+                </tr>
+              ))}
+            </tbody>
+          </table>
+          {staking.variants.flatMap((v) => v.races.flatMap((r) => r.warnings.map((w) => ({ ...w, v: v.label, r: r.raceNo }))))
+            .filter((w) => w.blocking).length > 0 && (
+            <div className="notice notice--error">
+              <ul>
+                {staking.variants.flatMap((v) => v.races.flatMap((r) => r.warnings.filter((w) => w.blocking)
+                  .map((w, i) => <li key={`${v.variant}-${r.raceNo}-${i}`}>{v.label}, race {r.raceNo}: {w.message}</li>)))}
+              </ul>
+            </div>
+          )}
+          <div className="formrow">
+            <button type="button" className="btn" onClick={() => setStaking(null)} disabled={busy}>Discard</button>
+            <button type="button" className="btn btn--primary" disabled={busy}
+              onClick={async () => {
+                setBusy(true); setError(null);
+                try { await saveTipCards(dayId, staking.sourceLabel); setStaking(null); }
+                catch (err) { setError(err.message); } finally { setBusy(false); }
+              }}>
+              {busy ? 'Saving…' : 'Save three cards'}
+            </button>
+          </div>
+        </div>
       )}
 
       <h3>On file ({rows.length})</h3>

@@ -17,7 +17,8 @@ export const plRouter = express.Router();
 // degrading to a raw id the moment the picker stops offering them.
 const MODEL_LABEL = Object.fromEntries(KNOWN_MODELS.map((m) => [m.id, m.label]));
 
-const BUCKET_ORDER = ['FULL', 'PARTIAL', 'PROGRAM_ONLY', 'ODDS_ONLY', 'HUMAN', 'LLM_GENERATED', 'EQB_OTR'];
+// D171: imported, not redeclared - see shared/distribution.js for why.
+import { BUCKET_ORDER } from '../shared/distribution.js';
 
 // The running view: per-bucket totals + every graded card as a row, plus
 // the cards still waiting on results. Deliberately NO overall total.

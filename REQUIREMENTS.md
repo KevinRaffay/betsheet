@@ -356,3 +356,16 @@ Follows D166's own flagged finding. Consolidation, not new capability.
 | Sources are never pooled - there is no combined "tipsheets" total (invariant 13) | D170 |
 | A soft-deleted race day leaves every scoring figure and returns on restore (invariant 12) | D170 |
 | **Still out of scope**: staking tip picks into a card (`shared/tipStaking.js`), and resolving D09 | - (later deliverables) |
+
+## TIPSHEET staking (requested 2026-09-08)
+
+| requirement | deliverable |
+| --- | --- |
+| Tip picks become real tickets that the ordinary grader grades, with no special case | D171 |
+| Three variants per day, so backtesting picks the bet structure rather than a guess up front | D171 |
+| TIPSHEET is its own bucket and pools with nothing (invariant 13) | D171 |
+| Stakes are per-race shares of the bankroll, floored to whole dollars, and every stake is payable at a window | D171 |
+| A win bet on an 8/1+ pick carries matching place money, funded from the same budget | D171 |
+| Staking a source twice appends new cards rather than rewriting graded ones | D171 |
+| A preview writes nothing (invariant 9) | D171 |
+| **Dropped, with evidence**: the supplied draft's ML-vs-live-odds gap sizing. `entries.live_odds` is populated on 0 of 13,710 rows; the draft produced zero bets on both real tip sheets | - (needs a live-odds capture path first) |
