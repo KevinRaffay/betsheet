@@ -3,6 +3,7 @@ import { deleteRaceDay, deletionPreview, getLlmNotes, getRaceDay } from '../api.
 import CardsPanel from './CardsPanel.jsx';
 import ResultsPanel from './ResultsPanel.jsx';
 import EquibaseOtrPanel from './EquibaseOtrPanel.jsx';
+import TipPicksPanel from './TipPicksPanel.jsx';
 import RaceDayNotesModal from './RaceDayNotesModal.jsx';
 import RaceNotes from './RaceNotes.jsx';
 import { entriesStaleness } from '@shared/staleness.js';
@@ -129,6 +130,7 @@ export default function RaceDayView({ id, onBack, onOpenCard }) {
           card's bankroll. RaceDayView already holds the day, so pass it down
           rather than making CardsPanel fetch the day a second time. */}
       <CardsPanel key={cardsVersion} dayId={day.id} bankrollCents={day.bankroll_cents} onOpenCard={onOpenCard} />
+      <TipPicksPanel dayId={day.id} races={day.races ?? []} />
       <ResultsPanel dayId={day.id} />
       <EquibaseOtrPanel dayId={day.id} onSaved={() => setCardsVersion((v) => v + 1)} />
       {day.races.map((race) => (
