@@ -13,7 +13,10 @@ export const NOTES_MAX = { race: 4000, card: 2000 };
 // A datalist, not a <select>: the four canonical labels are one click away so
 // the source discipline the findings doc's H3 needs will hold in practice,
 // but an unexpected source is never blocked.
-export const SOURCE_SUGGESTIONS = ['program', 'public-handicapper', 'llm', 'own'];
+// D167: the vocabulary itself lives in shared/source-labels.js so the SERVER
+// can see the same list this datalist offers. Re-exported because several
+// components import SOURCE_SUGGESTIONS from here.
+export { NOTE_SOURCE_LABELS as SOURCE_SUGGESTIONS } from '@shared/source-labels.js';
 
 /**
  * One notes editor. Free text, capped only for the PROMPT (the server truncates

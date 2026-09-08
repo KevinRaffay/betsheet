@@ -308,3 +308,16 @@ Nothing here stakes money, builds a ticket or grades anything.
 | **Out of scope by the spec**: staking/ticket construction from extracted picks (`shared/tipStaking.js`), any UI, grading, resolving D09, and auto-writing into the real corpus | - (later deliverables) |
 | **Answered by archaeology, nothing to build**: extending the `source_label` enum with `trackmaster`/`numberfire`. No such enum exists in the schema - it is unscheduled P-3.2 under "Card source model" above, the same stale premise D150-D155 met. Implemented as free TEXT plus a normalizing seed list in code | D166 |
 | **Flagged, deliberately not solved**: D09's three-source classification now faces a fourth bucket living in a separate table. A `tip_picks` row is not a card and no classifier reads it, so the question is open rather than answered by this schema | - (see D09) |
+
+## One owner for `source_label` (requested 2026-09-08)
+
+Follows D166's own flagged finding. Consolidation, not new capability.
+
+| requirement | deliverable |
+| --- | --- |
+| "Who said this" is answered by ONE normalizer, shared by every table with a `source_label` column, so `llm_notes` and `tip_picks` cannot drift in the shape of a label | D167 |
+| The notes vocabulary is visible to the SERVER, not hard-coded in a client component where only the browser could see it | D167 |
+| A note's source label is normalized on write, so grouping by source is exact rather than case-and-spacing dependent - and provably inert for every value already in the corpus | D167 |
+| The two catalogues stay separate: a KIND of commentary (`public-handicapper`) and a named publisher (`trackmaster`) are two axes, and `trackmaster` belongs to that kind rather than sitting beside it | D167 |
+| The two fallbacks stay separate: a blank note is the user's own, while a tip sheet whose publisher could not be read is nobody's opinion | D167 |
+| **Deliberately NOT built**: P-3.2's `cards.source_label` / `source_label_other`. Still unscheduled, and card source remains derivable from three columns that already agree 1:1 - see "Card source model" above | - (P-3.2, still unscheduled) |

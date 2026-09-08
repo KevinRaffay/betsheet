@@ -10,52 +10,19 @@
 // is I/O; this is the contract that I/O has to meet.
 
 import { morningLineToDecimal } from './betmath.js';
+import { normalizeSourceLabel as normalizeAny, TIP_SOURCE_FALLBACK } from './source-labels.js';
 
-/**
- * The seed vocabulary for `source_label` - a CONSTANT, not a database CHECK.
- *
- * Deliberately not the `source_label` list in docs/requirements/card-source-
- * model.md P-3.2 (`emubets`, `drf`, `keeneland-tipsheet`, ...): that vocabulary
- * is unscheduled and exists nowhere in this schema, so there was no enum to
- * extend. This list is what the extraction prompt steers the model toward and
- * what `normalizeSourceLabel` snaps a close match to; an app nobody has met yet
- * still stores fine, under its own slug, rather than failing at a racetrack.
- */
-export const TIP_SOURCE_LABELS = [
-  'trackmaster',
-  'numberfire',
-  'equibase-tipsheet',
-  'tipsheet-other',
-];
+// The source-label vocabulary and normalizer moved to shared/source-labels.js
+// (D167), which is now the ONE place this codebase answers "who said this".
+// Re-exported here so every D166 import keeps working unchanged, and so a
+// reader of this file still sees what a tip source is - but there is exactly
+// one implementation, and `tip_picks` and `llm_notes` cannot drift apart in
+// the SHAPE of a label the way they had after D166.
+export { TIP_SOURCE_LABELS, TIP_SOURCE_FALLBACK } from './source-labels.js';
 
-/** What an unrecognizable source falls back to. Never guessed as a real app. */
-export const TIP_SOURCE_FALLBACK = 'tipsheet-other';
-
-const SOURCE_ALIASES = {
-  'track master': 'trackmaster', 'tm': 'trackmaster', 'trackmaster picks': 'trackmaster',
-  'number fire': 'numberfire', 'nf': 'numberfire',
-  'equibase': 'equibase-tipsheet', 'eqb': 'equibase-tipsheet',
-  'other': 'tipsheet-other', 'unknown': 'tipsheet-other', '': 'tipsheet-other',
-};
-
-/**
- * A free-text source name -> a stable slug for grouping.
- *
- * Snapping happens on the way IN rather than by refusing unknown labels,
- * because the alternative is losing a screenshot you are standing in front of.
- * An unrecognized name keeps its own slug (so it can be counted, and promoted
- * into the seed list later) - only genuinely empty input becomes the fallback.
- */
-export function normalizeSourceLabel(raw) {
-  const s = String(raw ?? '').trim().toLowerCase();
-  if (!s) return TIP_SOURCE_FALLBACK;
-  if (SOURCE_ALIASES[s]) return SOURCE_ALIASES[s];
-  const slug = s.replace(/[^a-z0-9]+/g, '-').replace(/^-+|-+$/g, '');
-  if (!slug) return TIP_SOURCE_FALLBACK;
-  if (TIP_SOURCE_LABELS.includes(slug)) return slug;
-  if (SOURCE_ALIASES[slug]) return SOURCE_ALIASES[slug];
-  return slug;
-}
+/** A tip sheet's own source, falling back to "publisher unreadable". */
+export const normalizeSourceLabel = (raw) =>
+  normalizeAny(raw, TIP_SOURCE_FALLBACK);
 
 /**
  * Odds as printed on a tip sheet -> the fraction string `morningLineToDecimal`
