@@ -369,3 +369,11 @@ Follows D166's own flagged finding. Consolidation, not new capability.
 | Staking a source twice appends new cards rather than rewriting graded ones | D171 |
 | A preview writes nothing (invariant 9) | D171 |
 | **Dropped, with evidence**: the supplied draft's ML-vs-live-odds gap sizing. `entries.live_odds` is populated on 0 of 13,710 rows; the draft produced zero bets on both real tip sheets | - (needs a live-odds capture path first) |
+
+## Fix: the LLM modal blanked the page (reported 2026-09-08)
+
+| requirement | deliverable |
+| --- | --- |
+| "Generate Card from LLM" opens the modal instead of blanking the page | D172 |
+| A module may not use a name it only re-exports - the blank-page class is caught by a check, not by a bug report | D172 |
+| That check normalizes CRLF, because this repo stores CRLF and JS `.` will not cross `\r` | D172 |

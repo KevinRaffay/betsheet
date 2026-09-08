@@ -14,9 +14,17 @@ export const NOTES_MAX = { race: 4000, card: 2000 };
 // the source discipline the findings doc's H3 needs will hold in practice,
 // but an unexpected source is never blocked.
 // D167: the vocabulary itself lives in shared/source-labels.js so the SERVER
-// can see the same list this datalist offers. Re-exported because several
-// components import SOURCE_SUGGESTIONS from here.
-export { NOTE_SOURCE_LABELS as SOURCE_SUGGESTIONS } from '@shared/source-labels.js';
+// can see the same list this datalist offers.
+//
+// IMPORTED and re-exported, NOT `export { X as Y } from '...'` - that form
+// creates no LOCAL binding, so `SOURCE_SUGGESTIONS` below was a ReferenceError
+// the moment NoteSourceDatalist rendered, which unmounted the React root and
+// blanked the whole page (D172). esbuild compiles a bare unresolved identifier
+// as a global, so `npm run build` stayed green and only a browser caught it.
+import { NOTE_SOURCE_LABELS } from '@shared/source-labels.js';
+
+/** Re-exported because several components import SOURCE_SUGGESTIONS from here. */
+export const SOURCE_SUGGESTIONS = NOTE_SOURCE_LABELS;
 
 /**
  * One notes editor. Free text, capped only for the PROMPT (the server truncates
