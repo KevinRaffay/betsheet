@@ -27,6 +27,10 @@
 // Drop sample screenshots in scratch/tip-samples/ (gitignored - they are
 // screenshots of someone else's app, and not ours to commit).
 
+// Phase 2 needs ANTHROPIC_API_KEY, and this repo's convention is a per-checkout
+// .env (see CLAUDE.md's scratch-environment note) loaded the way server/index.js
+// and vite.config.js load it. Phase 1 needs no key and is unaffected.
+import 'dotenv/config';
 import fs from 'node:fs';
 import os from 'node:os';
 import path from 'node:path';
