@@ -321,3 +321,11 @@ Follows D166's own flagged finding. Consolidation, not new capability.
 | The two catalogues stay separate: a KIND of commentary (`public-handicapper`) and a named publisher (`trackmaster`) are two axes, and `trackmaster` belongs to that kind rather than sitting beside it | D167 |
 | The two fallbacks stay separate: a blank note is the user's own, while a tip sheet whose publisher could not be read is nobody's opinion | D167 |
 | **Deliberately NOT built**: P-3.2's `cards.source_label` / `source_label_other`. Still unscheduled, and card source remains derivable from three columns that already agree 1:1 - see "Card source model" above | - (P-3.2, still unscheduled) |
+
+## HOUSE RULE: `check-static-app` in worktrees (2026-09-08)
+
+| requirement | deliverable |
+| --- | --- |
+| `check-static-app` is out of scope inside a git worktree - not run, not worked around, and not treated as a gap in that branch's verification | D168 |
+| The static app's import surface, not a forced build, answers "could this change have moved the static bundle?" - and the list is re-derived rather than trusted | D168 |
+| A skipped check is stated plainly in the final message; a report never implies the suite ran clean when a script did not run | D168 |

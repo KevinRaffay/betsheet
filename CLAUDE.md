@@ -341,7 +341,7 @@ npm run dev:static      # D151: the static app on vite :5186 (needs a payload bu
 npm run preview:static  # D155: serves the BUILT dist-static on :5187 - the only way to exercise the service worker (it registers in production builds only)
 npm run build:static    # D151: build dist-static (BETSHEET_STATIC_BASE sets the deploy sub-path)
 npm run check-static-payload  # D150: canonicalization, the 13 validation refusals, a real day, hash stability incl. a negative control
-npm run check-static-app      # D151+D154+D155: payload rows and DB rows parse IDENTICALLY, the built bundle ships no LLM/OTR/grading/API code (with a positive control), the Pages base, the service-worker strategies
+npm run check-static-app      # NOT RUNNABLE IN A WORKTREE - out of scope there by house rule (D168, see Gotchas); run it from the primary checkout. D151+D154+D155: payload rows and DB rows parse IDENTICALLY, the built bundle ships no LLM/OTR/grading/API code (with a positive control), the Pages base, the service-worker strategies
 npm run import-static-cards -- <path> [--yes]  # D153: import phone-built cards (dry run by default; a directory of rolling backups is one safe import)
 npm run check-static-import   # D153: migration 027, the same file imported three times producing ONE card, all four refusals, invariant 15's lock times
 npm run check-tip-extraction  # D166: TIPSHEET screenshot extraction - migration 028, the hyphen->slash odds conversion re-checked through morningLineToDecimal, absent odds omitted not fabricated, a broken ranking blocking, the stubbed round trip; phase 2 skips loudly without real screenshots in scratch/tip-samples/
@@ -425,6 +425,7 @@ row words differently.
 
 | feature | state | notes |
 | --- | --- | --- |
+| HOUSE RULE: `check-static-app` is out of scope in a git worktree (D168) | merged | PR [#206](https://github.com/KevinRaffay/betsheet/pull/206), branch `static-app-worktree-house-rule` - **user rule 2026-09-08**, prompted by D167 spending effort to make the check run inside a worktree via a `node_modules` junction. It worked, and was still wrong: the failure is structural (a worktree has no local `node_modules`; the script spawns an absolute vite path), it reproduces identically on `main`, and the static app imports only two files from `client/` - so its import list answers "could this have moved?" faster and more reliably than the build does. Rule is recorded in Gotchas and beside the command itself; the stray junction D167 created has been removed. Full record: DELIVERABLES.md D168. |
 | One owner for `source_label`: the two vocabularies D166 left behind, consolidated (D167) | merged | PR [#205](https://github.com/KevinRaffay/betsheet/pull/205), branch `source-label-consolidation` - user request to resolve the `source_label` question properly. After D166 the codebase answered "who said this" TWICE: `llm_notes` (vocabulary in a client `.jsx`, fallback `user`, **never normalized**) and `tip_picks` (vocabulary in `shared/`, fallback `tipsheet-other`, normalized). Same column name, same question, two catalogues, two fallbacks, one guarantee. New `shared/source-labels.js` owns the single normalizer; both catalogues live there **unmerged, because they answer different questions** (a KIND of commentary vs a named publisher); both fallbacks stay distinct for a documented reason. `writeNote` now normalizes - safe because it is provably inert for every value in the real corpus (`llm`, `public-handicapper`, `user`, NULL), asserted with a negative control. **P-3.2's `cards.source_label` was deliberately NOT built** - unscheduled, and `card-source-model.md`'s own archaeology says card source is derivable from three columns that already agree. Full record: DELIVERABLES.md D167. |
 | TIPSHEET: a third-party tip app's picks read off a screenshot (D166) | merged | PR [#204](https://github.com/KevinRaffay/betsheet/pull/204), branch `claude/tipsheet-screenshot-extraction-14fc5e` - **extraction only**: no ticket, no UI, no grading, and nothing written to the real corpus. A NEW `tip_picks` table (migration 028), not a widened `cards` - a tip row is a ranked opinion, so `consensus_completeness` gains no TIPSHEET value and `cards` is not rebuilt. **No completeness column, deliberately**: every tip row has one signal, its ranking. Archaeology answered the scope's own enum question with "there is no enum" - the `source_label` vocabulary is unscheduled P-3.2, the same stale premise D150-D155 met - and found the conversion this turns on: `morningLineToDecimal` cannot read the hyphenated `9-2` that tip apps actually print. **Real-screenshot verified**: both samples extracted exactly right, including reading the ACTIVE tab when both TrackMaster and NumberFire tabs are visible in each image. Found on the way: newer models reject a pinned `temperature` (see Gotchas) - LLM cards unaffected. Full record: DELIVERABLES.md D166. |
 | /card page: the same read-only Analyst Notes panel D164 put on /day (D165) | merged | PR [#203](https://github.com/KevinRaffay/betsheet/pull/203), branch `card-view-notes-panel` - user request to carry D164 onto the card sheet too. `CardView.jsx` now fetches the day's notes via `card.race_day_id` (already on the `GET /api/cards/:id` response) and renders one panel per race, right after Entries. D164's inline per-race markup was extracted into a shared `RaceNotes.jsx` (`RaceNotes({ note })`) used by both `RaceDayView.jsx` and `CardView.jsx`, rather than let a second hand-rolled copy exist - the same discipline as `EntriesTable.jsx`/`AnalystNotesEditor.jsx`. No schema/API/write-path change. Verification: presentation-only, `npm run build` green, browser-verified on a real LLM-generated card with a populated race note. Full record: DELIVERABLES.md D165. |
@@ -761,6 +762,29 @@ it. Rules still in force:
   and `npm run build` compiles it fine. When browser-verifying a dialog, assert
   the PAGE still rendered (`#root` still has children) - "the modal is gone" is
   also true when the app has crashed.
+- **`check-static-app` is OUT OF SCOPE in a git worktree - HOUSE RULE** (user
+  rule, 2026-09-08, D168). Do not run it, do not work around it, and do not
+  treat its absence as a gap in a worktree's verification. A worktree has no
+  `node_modules` of its own - module resolution walks UP to the parent
+  checkout, which is why `npm run build` and every other check work fine there
+  - while `scripts/check-static-app.js` spawns an ABSOLUTE
+  `<repo>/node_modules/vite/bin/vite.js` that therefore does not exist. It
+  fails identically on `main`, so a failure is never the branch's doing.
+  **The rule is about effort, not correctness**: D167 got it running by
+  creating a `node_modules` directory junction, which worked and was still the
+  wrong move - it spent real time, left a stray junction behind that could make
+  a later session think dependencies were installed locally, and bought
+  nothing. Check the static app's IMPORT SURFACE instead - it is a separate
+  Vite entry and reaches outside `static/` in exactly seven places (verified
+  2026-09-08, and the list is the thing to re-derive rather than trust):
+  `@client/components/TicketBuilder.jsx`, `@client/components/EntriesTable.jsx`,
+  `@client/styles.css`, `@shared/betmath.js`, `@shared/parsers/human-picks.js`,
+  `@shared/static-export.js`, `@shared/static-payload.js`. A change touching
+  none of those, nor `static/` itself, nor anything they transitively import,
+  provably cannot move the static bundle. When a change DOES touch them, run
+  the check from the primary checkout, where it works as designed. State plainly in the final message that it was skipped as
+  out of scope per this rule - never imply the suite ran clean when this one
+  did not run at all.
 - **A `.modal-backdrop` never closes its dialog on click - HOUSE RULE.** Only
   the header's × / Close button (and Escape, where a dialog offers it) may
   dismiss a modal. Found live 2026-09-06 on both of this app's modals: an
