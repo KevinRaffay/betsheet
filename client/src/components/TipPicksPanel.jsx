@@ -1,6 +1,7 @@
 import { useEffect, useState } from 'react';
 import {
   previewTipPicks, saveTipPicks, listTipPicks, correctTipPicks, deleteTipPicks,
+  getDayTipScoring,
 } from '../api.js';
 
 // TIPSHEET picks on a stored day (D169): upload a screenshot of a tip app,
@@ -22,6 +23,30 @@ const fileToBase64 = (file) => new Promise((resolve, reject) => {
 });
 
 const oddsOf = (p, key) => (key in p ? p[key] : '');
+
+/**
+ * A rate, always with its denominator, and a dash when there isn't one.
+ * "No figure without its n" is this project's oldest surviving discipline,
+ * and it is enforced here rather than trusted: a rate cannot reach the screen
+ * without the count it was computed from.
+ */
+const pct = (r, n) => (r === null || r === undefined || !n ? '—' : `${Math.round(r * 100)}% of ${n}`);
+
+/** How one race's picks did. Absent until results for that race are on file. */
+function ScoreLine({ score }) {
+  if (!score) return <p className="dim">Not scored yet — no results on file for this race.</p>;
+  const hit = score.win ? 'WON' : score.place ? 'ran 2nd' : score.show ? 'ran 3rd' : 'off the board';
+  return (
+    <p className="dim">
+      Top pick #{score.topPick.horseNo} {hit}
+      {score.topPickSubstituted && ' (promoted after a scratch)'}
+      {' · '}caught {score.top3Overlap} of the top 3
+      {score.winnerProgramNumber && ` · winner was #${score.winnerProgramNumber}`}
+      {score.unknownPicks.length > 0
+        && ` · ${score.unknownPicks.length} pick(s) not in the result: #${score.unknownPicks.join(', #')}`}
+    </p>
+  );
+}
 
 function PicksTable({ picks }) {
   const anyOdds = picks.some((p) => 'ml_odds' in p || 'live_odds' in p);
@@ -143,9 +168,14 @@ export default function TipPicksPanel({ dayId, races = [] }) {
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState(null);
   const [editing, setEditing] = useState(null);
+  const scoreFor = (id) => scoring?.races?.find((r) => r.id === id)?.score ?? null;
 
+  const [scoring, setScoring] = useState(null);
   const reload = async () => {
-    try { setRows((await listTipPicks(dayId)).rows); } catch (err) { setError(err.message); }
+    try {
+      setRows((await listTipPicks(dayId)).rows);
+      setScoring(await getDayTipScoring(dayId));
+    } catch (err) { setError(err.message); }
   };
   // The loader is called inside a block body: handing a promise-returning
   // function straight to useEffect stores the PROMISE as the cleanup, and
@@ -247,6 +277,34 @@ export default function TipPicksPanel({ dayId, races = [] }) {
         </div>
       )}
 
+      {scoring?.bySource?.length > 0 && (
+        <>
+          <p className="dim"><strong>How these sources have done on this day</strong></p>
+          <table className="grid">
+            <thead>
+              <tr><th>Source</th><th>Top pick won</th><th>Placed</th><th>Showed</th><th>Top 3 caught</th><th>Not scored</th></tr>
+            </thead>
+            <tbody>
+              {scoring.bySource.map((s2) => (
+                <tr key={s2.sourceLabel}>
+                  <td>{s2.sourceLabel}</td>
+                  <td>{pct(s2.winRate, s2.n)}</td>
+                  <td>{pct(s2.placeRate, s2.n)}</td>
+                  {/* Without a Show column a sheet whose pick ran 3rd reads as
+                      0% won / 0% placed, which is worse than what happened. */}
+                  <td>{pct(s2.showRate, s2.n)}</td>
+                  <td>{pct(s2.top3OverlapRate, s2.n)}</td>
+                  <td>{s2.unscored || '—'}</td>
+                </tr>
+              ))}
+            </tbody>
+          </table>
+          <p className="dim">
+            One day only, so these counts are small by construction — read them as a tally, not a verdict.
+          </p>
+        </>
+      )}
+
       <h3>On file ({rows.length})</h3>
       {rows.length === 0 && <p className="dim">No tip sheets read for this day yet.</p>}
       {rows.map((row) => (
@@ -270,6 +328,7 @@ export default function TipPicksPanel({ dayId, races = [] }) {
                   <PicksTable picks={row.picksExtracted} />
                 </details>
               )}
+              <ScoreLine score={scoreFor(row.id)} />
               <div className="formrow">
                 <button type="button" className="btn btn--sm btn--danger" onClick={() => remove(row)}>Delete</button>
                 <button type="button" className="btn btn--sm" onClick={() => setEditing(row.id)}>Correct</button>
