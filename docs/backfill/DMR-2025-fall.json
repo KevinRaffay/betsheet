@@ -1,9 +1,9 @@
 {
   "meet": "DMR-2025-fall",
   "lastRun": {
-    "runId": "51ef7e28-cd24-4e82-80e2-96ecd86262bd",
-    "from": "2025-10-31",
-    "to": "2025-11-30",
+    "runId": "90a70aa1-02ea-455e-a3c7-743ee7f12cd7",
+    "from": "2025-07-18",
+    "to": "2026-08-30",
     "meet": null,
     "dryRun": false,
     "regenerate": false,
@@ -11,8 +11,17 @@
     "template": "lean",
     "bankrollCents": 20000,
     "perRaceMinCents": 500,
-    "missingCalendars": [],
-    "missingIndex": [],
+    "missingCalendars": [
+      "2026-01",
+      "2026-02",
+      "2026-03",
+      "2026-04",
+      "2026-05",
+      "2026-06"
+    ],
+    "missingIndex": [
+      "2025-12"
+    ],
     "darkCalendars": [
       "2025-07",
       "2025-08",
@@ -22,32 +31,38 @@
       "2025-12"
     ],
     "tablesUsed": [
-      "C:\\repos\\betsheet\\data\\meets\\DMR-2025-summer.json",
-      "C:\\repos\\betsheet\\data\\meets\\DMR-2025-fall.json"
+      "C:\\repos\\betsheet-alt\\data\\meets\\DMR-2025-summer.json",
+      "C:\\repos\\betsheet-alt\\data\\meets\\DMR-2025-fall.json"
     ],
     "halted": null,
-    "startedAt": "2026-09-02T13:28:39.372Z",
-    "finishedAt": "2026-09-02T13:28:39.522Z",
+    "startedAt": "2026-09-05T06:41:50.263Z",
+    "finishedAt": "2026-09-05T06:43:08.855Z",
     "summary": {
-      "days": 14,
+      "days": 72,
       "byStatus": {
-        "resolved": 2,
-        "skipped": 12
+        "saved": 70,
+        "queued": 2
       },
       "warningsByType": {
+        "index_renumbered": 80,
+        "program_ml_disagreement": 114,
+        "unrecognized_mutuel": 100,
+        "owner_trainer_fused": 17,
+        "finish_order_conflict": 2,
+        "incomplete_entry": 59,
         "foreign_program (blocking)": 2
       },
       "plByBucket": {
         "PROGRAM_ONLY": {
-          "days": 12,
-          "wageredCents": 240000,
-          "effectiveWageredCents": 228800,
-          "returnedCents": 190930,
-          "plCents": -49070
+          "days": 70,
+          "wageredCents": 1400000,
+          "effectiveWageredCents": 1289300,
+          "returnedCents": 1207650,
+          "plCents": -192350
         }
       },
       "crossSource": {
-        "days": 0,
+        "days": 3,
         "disagreements": 0
       },
       "unexplainedRegressions": 0
@@ -57,12 +72,9 @@
     {
       "date": "2025-10-31",
       "meet": "DMR-2025-fall",
-      "correlationId": "8cc2d41d-8f1c-4548-ae03-15610ec56cca",
+      "correlationId": "451832fe-2ef9-4089-9fdb-999725ca16ba",
       "indexSource": "meet-table",
       "calendarRaces": null,
-      "status": "resolved",
-      "queueId": 1,
-      "note": "confirmed from the queue 2026-09-02T13:14:12Z - Breeders Cup day: the program URL serves the BC official program (foreign); saved sheet-only, ODDS_ONLY tier - no program analysis exists for this card; the saved day was later deleted - left out",
       "blocking": [
         {
           "type": "foreign_program",
@@ -70,17 +82,47 @@
           "source": "program"
         }
       ],
+      "nonBlocking": [
+        {
+          "type": "unrecognized_mutuel",
+          "race": 3,
+          "message": "Race 3: unrecognized wager \"Consolation Pick 3\" - stored as consolation_pick_3, never graded.",
+          "source": "results"
+        },
+        {
+          "type": "unrecognized_mutuel",
+          "race": 4,
+          "message": "Race 4: unrecognized wager \"Consolation Pick 3\" - stored as consolation_pick_3, never graded.",
+          "source": "results"
+        },
+        {
+          "type": "unrecognized_mutuel",
+          "race": 4,
+          "message": "Race 4: unrecognized wager \"Consolation Double\" - stored as consolation_double, never graded.",
+          "source": "results"
+        },
+        {
+          "type": "unrecognized_mutuel",
+          "race": 5,
+          "message": "Race 5: unrecognized wager \"Consolation Pick 3\" - stored as consolation_pick_3, never graded.",
+          "source": "results"
+        }
+      ],
+      "parsedRaces": 10,
+      "resultsRaces": 10,
+      "hasChart": false,
+      "entriesSource": "ml_sheet",
+      "status": "queued",
+      "queueId": 1,
+      "note": "1 blocking warning(s): the program is a foreign publication (not a Del Mar program) - the day would save sheet-only",
       "regression": null
     },
     {
       "date": "2025-11-01",
       "meet": "DMR-2025-fall",
-      "correlationId": "04d5b226-7fc1-4cfb-9eb9-8e66e0b3c711",
+      "correlationId": "245cc600-de5d-49ba-bb08-14929d3c2c51",
       "indexSource": "meet-table",
       "calendarRaces": null,
-      "status": "resolved",
-      "queueId": 2,
-      "note": "confirmed from the queue 2026-09-02T13:14:23Z - Breeders Cup day: the program URL serves the BC official program (foreign); saved sheet-only, ODDS_ONLY tier - no program analysis exists for this card; the saved day was later deleted - left out",
       "blocking": [
         {
           "type": "foreign_program",
@@ -88,12 +130,39 @@
           "source": "program"
         }
       ],
+      "nonBlocking": [
+        {
+          "type": "unrecognized_mutuel",
+          "race": 11,
+          "message": "Race 11: unrecognized wager \"Consolation Pick 3\" - stored as consolation_pick_3, never graded.",
+          "source": "results"
+        },
+        {
+          "type": "unrecognized_mutuel",
+          "race": 11,
+          "message": "Race 11: unrecognized wager \"Consolation Double\" - stored as consolation_double, never graded.",
+          "source": "results"
+        },
+        {
+          "type": "unrecognized_mutuel",
+          "race": 12,
+          "message": "Race 12: unrecognized wager \"Consolation Pick 3\" - stored as consolation_pick_3, never graded.",
+          "source": "results"
+        }
+      ],
+      "parsedRaces": 12,
+      "resultsRaces": 12,
+      "hasChart": false,
+      "entriesSource": "ml_sheet",
+      "status": "queued",
+      "queueId": 2,
+      "note": "1 blocking warning(s): the program is a foreign publication (not a Del Mar program) - the day would save sheet-only",
       "regression": null
     },
     {
       "date": "2025-11-02",
       "meet": "DMR-2025-fall",
-      "correlationId": "f8286a35-acf4-4894-a9a2-ad0c777bef68",
+      "correlationId": "67789d6c-587b-4dfe-90fa-078292aa4b7d",
       "indexSource": "meet-table",
       "calendarRaces": null,
       "blocking": [],
@@ -140,8 +209,8 @@
       "hasChart": false,
       "entriesSource": "both",
       "status": "saved",
-      "raceDayId": 59,
-      "cardId": 88,
+      "raceDayId": 32,
+      "cardId": 32,
       "completeness": "PROGRAM_ONLY",
       "engineVersion": "lean-1.1",
       "resultsSource": "dmtc_html",
@@ -165,14 +234,12 @@
       },
       "crossSource": null,
       "note": "5 non-blocking warning(s)",
-      "regression": null,
-      "lastSeenRunId": "f8286a35-acf4-4894-a9a2-ad0c777bef68",
-      "lastSeenStatus": "skipped"
+      "regression": null
     },
     {
       "date": "2025-11-07",
       "meet": "DMR-2025-fall",
-      "correlationId": "e778e914-9d25-43c2-8e4a-5d5160dfc146",
+      "correlationId": "45c1413e-7c87-476e-aae9-b1ece52abfde",
       "indexSource": "meet-table",
       "calendarRaces": null,
       "blocking": [],
@@ -225,8 +292,8 @@
       "hasChart": false,
       "entriesSource": "both",
       "status": "saved",
-      "raceDayId": 60,
-      "cardId": 89,
+      "raceDayId": 33,
+      "cardId": 33,
       "completeness": "PROGRAM_ONLY",
       "engineVersion": "lean-1.1",
       "resultsSource": "dmtc_html",
@@ -250,14 +317,12 @@
       },
       "crossSource": null,
       "note": "6 non-blocking warning(s)",
-      "regression": null,
-      "lastSeenRunId": "e778e914-9d25-43c2-8e4a-5d5160dfc146",
-      "lastSeenStatus": "skipped"
+      "regression": null
     },
     {
       "date": "2025-11-08",
       "meet": "DMR-2025-fall",
-      "correlationId": "10c2d4a3-8aa1-432e-b961-8fe45a0df587",
+      "correlationId": "b5d5b3c6-3c00-4c98-a1e9-b0405667d5ca",
       "indexSource": "meet-table",
       "calendarRaces": null,
       "blocking": [],
@@ -312,8 +377,8 @@
       "hasChart": false,
       "entriesSource": "both",
       "status": "saved",
-      "raceDayId": 61,
-      "cardId": 90,
+      "raceDayId": 34,
+      "cardId": 34,
       "completeness": "PROGRAM_ONLY",
       "engineVersion": "lean-1.1",
       "resultsSource": "dmtc_html",
@@ -337,14 +402,12 @@
       },
       "crossSource": null,
       "note": "7 non-blocking warning(s)",
-      "regression": null,
-      "lastSeenRunId": "10c2d4a3-8aa1-432e-b961-8fe45a0df587",
-      "lastSeenStatus": "skipped"
+      "regression": null
     },
     {
       "date": "2025-11-09",
       "meet": "DMR-2025-fall",
-      "correlationId": "85002ccb-2d38-447c-8f55-4c04f1dba9d3",
+      "correlationId": "140c147f-2ebb-41e4-9171-267ea2c346fc",
       "indexSource": "meet-table",
       "calendarRaces": null,
       "blocking": [],
@@ -395,8 +458,8 @@
       "hasChart": false,
       "entriesSource": "both",
       "status": "saved",
-      "raceDayId": 62,
-      "cardId": 91,
+      "raceDayId": 35,
+      "cardId": 35,
       "completeness": "PROGRAM_ONLY",
       "engineVersion": "lean-1.1",
       "resultsSource": "dmtc_html",
@@ -420,14 +483,12 @@
       },
       "crossSource": null,
       "note": "6 non-blocking warning(s)",
-      "regression": null,
-      "lastSeenRunId": "85002ccb-2d38-447c-8f55-4c04f1dba9d3",
-      "lastSeenStatus": "skipped"
+      "regression": null
     },
     {
       "date": "2025-11-14",
       "meet": "DMR-2025-fall",
-      "correlationId": "afd482f4-d6c1-437a-838e-cf1d7832883d",
+      "correlationId": "868fd711-c9a1-44f4-8cd4-c1d3bef45b7c",
       "indexSource": "meet-table",
       "calendarRaces": null,
       "blocking": [],
@@ -444,8 +505,8 @@
       "hasChart": false,
       "entriesSource": "both",
       "status": "saved",
-      "raceDayId": 63,
-      "cardId": 92,
+      "raceDayId": 36,
+      "cardId": 36,
       "completeness": "PROGRAM_ONLY",
       "engineVersion": "lean-1.1",
       "resultsSource": "dmtc_html",
@@ -469,14 +530,12 @@
       },
       "crossSource": null,
       "note": "1 non-blocking warning(s)",
-      "regression": null,
-      "lastSeenRunId": "afd482f4-d6c1-437a-838e-cf1d7832883d",
-      "lastSeenStatus": "skipped"
+      "regression": null
     },
     {
       "date": "2025-11-16",
       "meet": "DMR-2025-fall",
-      "correlationId": "7477b1fe-b80f-41e3-9b7d-4ac32555a9b4",
+      "correlationId": "09691b47-6e3f-4bc6-b516-8c9ca59bc2ad",
       "indexSource": "meet-table",
       "calendarRaces": null,
       "blocking": [],
@@ -547,8 +606,8 @@
       "hasChart": false,
       "entriesSource": "both",
       "status": "saved",
-      "raceDayId": 64,
-      "cardId": 93,
+      "raceDayId": 37,
+      "cardId": 37,
       "completeness": "PROGRAM_ONLY",
       "engineVersion": "lean-1.1",
       "resultsSource": "dmtc_html",
@@ -572,14 +631,12 @@
       },
       "crossSource": null,
       "note": "9 non-blocking warning(s)",
-      "regression": null,
-      "lastSeenRunId": "7477b1fe-b80f-41e3-9b7d-4ac32555a9b4",
-      "lastSeenStatus": "skipped"
+      "regression": null
     },
     {
       "date": "2025-11-22",
       "meet": "DMR-2025-fall",
-      "correlationId": "6b15366c-261d-41e6-aa6f-a587dade6bf1",
+      "correlationId": "cf2959b8-a06f-4140-b52d-1f9c53f0fabb",
       "indexSource": "meet-table",
       "calendarRaces": null,
       "blocking": [],
@@ -589,8 +646,8 @@
       "hasChart": false,
       "entriesSource": "both",
       "status": "saved",
-      "raceDayId": 65,
-      "cardId": 94,
+      "raceDayId": 38,
+      "cardId": 38,
       "completeness": "PROGRAM_ONLY",
       "engineVersion": "lean-1.1",
       "resultsSource": "dmtc_html",
@@ -614,14 +671,12 @@
       },
       "crossSource": null,
       "note": "clean parse",
-      "regression": null,
-      "lastSeenRunId": "6b15366c-261d-41e6-aa6f-a587dade6bf1",
-      "lastSeenStatus": "skipped"
+      "regression": null
     },
     {
       "date": "2025-11-23",
       "meet": "DMR-2025-fall",
-      "correlationId": "2136686f-3018-4772-8daf-7e635a6614b1",
+      "correlationId": "506f15bd-b7c5-4923-be98-aef9fc05f25e",
       "indexSource": "meet-table",
       "calendarRaces": null,
       "blocking": [],
@@ -670,8 +725,8 @@
       "hasChart": false,
       "entriesSource": "both",
       "status": "saved",
-      "raceDayId": 66,
-      "cardId": 95,
+      "raceDayId": 39,
+      "cardId": 39,
       "completeness": "PROGRAM_ONLY",
       "engineVersion": "lean-1.1",
       "resultsSource": "dmtc_html",
@@ -695,14 +750,12 @@
       },
       "crossSource": null,
       "note": "6 non-blocking warning(s)",
-      "regression": null,
-      "lastSeenRunId": "2136686f-3018-4772-8daf-7e635a6614b1",
-      "lastSeenStatus": "skipped"
+      "regression": null
     },
     {
       "date": "2025-11-24",
       "meet": "DMR-2025-fall",
-      "correlationId": "a3af43e7-b631-49a2-9b5b-ff625abd54b3",
+      "correlationId": "c98c6911-bd67-4f63-8628-8ee2b671d49f",
       "indexSource": "meet-table",
       "calendarRaces": null,
       "blocking": [],
@@ -751,8 +804,8 @@
       "hasChart": false,
       "entriesSource": "both",
       "status": "saved",
-      "raceDayId": 67,
-      "cardId": 96,
+      "raceDayId": 40,
+      "cardId": 40,
       "completeness": "PROGRAM_ONLY",
       "engineVersion": "lean-1.1",
       "resultsSource": "dmtc_html",
@@ -776,14 +829,12 @@
       },
       "crossSource": null,
       "note": "5 non-blocking warning(s)",
-      "regression": null,
-      "lastSeenRunId": "a3af43e7-b631-49a2-9b5b-ff625abd54b3",
-      "lastSeenStatus": "skipped"
+      "regression": null
     },
     {
       "date": "2025-11-28",
       "meet": "DMR-2025-fall",
-      "correlationId": "ff55d42b-448e-4e4b-b983-a018c27d278c",
+      "correlationId": "61d38b65-3794-4630-9726-fd8e776465d1",
       "indexSource": "meet-table",
       "calendarRaces": null,
       "blocking": [],
@@ -836,8 +887,8 @@
       "hasChart": false,
       "entriesSource": "both",
       "status": "saved",
-      "raceDayId": 68,
-      "cardId": 97,
+      "raceDayId": 41,
+      "cardId": 41,
       "completeness": "PROGRAM_ONLY",
       "engineVersion": "lean-1.1",
       "resultsSource": "dmtc_html",
@@ -861,14 +912,12 @@
       },
       "crossSource": null,
       "note": "6 non-blocking warning(s)",
-      "regression": null,
-      "lastSeenRunId": "ff55d42b-448e-4e4b-b983-a018c27d278c",
-      "lastSeenStatus": "skipped"
+      "regression": null
     },
     {
       "date": "2025-11-29",
       "meet": "DMR-2025-fall",
-      "correlationId": "67b073e7-9720-4543-9d4a-09bd29baa2d6",
+      "correlationId": "4011a0a3-ad99-4e9c-ac0c-97cdaf357b49",
       "indexSource": "meet-table",
       "calendarRaces": null,
       "blocking": [],
@@ -941,8 +990,8 @@
       "hasChart": false,
       "entriesSource": "both",
       "status": "saved",
-      "raceDayId": 69,
-      "cardId": 98,
+      "raceDayId": 42,
+      "cardId": 42,
       "completeness": "PROGRAM_ONLY",
       "engineVersion": "lean-1.1",
       "resultsSource": "dmtc_html",
@@ -966,14 +1015,12 @@
       },
       "crossSource": null,
       "note": "10 non-blocking warning(s)",
-      "regression": null,
-      "lastSeenRunId": "67b073e7-9720-4543-9d4a-09bd29baa2d6",
-      "lastSeenStatus": "skipped"
+      "regression": null
     },
     {
       "date": "2025-11-30",
       "meet": "DMR-2025-fall",
-      "correlationId": "a4943390-0309-4316-b0e5-ef9f61c8f8b5",
+      "correlationId": "9ddaaf19-bd8c-435e-8244-242321718d1d",
       "indexSource": "meet-table",
       "calendarRaces": null,
       "blocking": [],
@@ -1088,8 +1135,8 @@
       "hasChart": false,
       "entriesSource": "both",
       "status": "saved",
-      "raceDayId": 70,
-      "cardId": 99,
+      "raceDayId": 43,
+      "cardId": 43,
       "completeness": "PROGRAM_ONLY",
       "engineVersion": "lean-1.1",
       "resultsSource": "dmtc_html",
@@ -1113,9 +1160,7 @@
       },
       "crossSource": null,
       "note": "17 non-blocking warning(s)",
-      "regression": null,
-      "lastSeenRunId": "a4943390-0309-4316-b0e5-ef9f61c8f8b5",
-      "lastSeenStatus": "skipped"
+      "regression": null
     }
   ]
 }

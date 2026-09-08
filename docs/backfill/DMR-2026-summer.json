@@ -1,8 +1,8 @@
 {
   "meet": "DMR-2026-summer",
   "lastRun": {
-    "runId": "789049de-964c-44c3-9ec2-f6ae888fee87",
-    "from": "2026-07-17",
+    "runId": "90a70aa1-02ea-455e-a3c7-743ee7f12cd7",
+    "from": "2025-07-18",
     "to": "2026-08-30",
     "meet": null,
     "dryRun": false,
@@ -11,29 +11,54 @@
     "template": "lean",
     "bankrollCents": 20000,
     "perRaceMinCents": 500,
-    "missingCalendars": [],
+    "missingCalendars": [
+      "2026-01",
+      "2026-02",
+      "2026-03",
+      "2026-04",
+      "2026-05",
+      "2026-06"
+    ],
+    "missingIndex": [
+      "2025-12"
+    ],
+    "darkCalendars": [
+      "2025-07",
+      "2025-08",
+      "2025-09",
+      "2025-10",
+      "2025-11",
+      "2025-12"
+    ],
+    "tablesUsed": [
+      "C:\\repos\\betsheet-alt\\data\\meets\\DMR-2025-summer.json",
+      "C:\\repos\\betsheet-alt\\data\\meets\\DMR-2025-fall.json"
+    ],
     "halted": null,
-    "startedAt": "2026-09-02T12:00:24.656Z",
-    "finishedAt": "2026-09-02T12:00:47.718Z",
+    "startedAt": "2026-09-05T06:41:50.263Z",
+    "finishedAt": "2026-09-05T06:43:08.855Z",
     "summary": {
-      "days": 27,
+      "days": 72,
       "byStatus": {
-        "saved": 27
+        "saved": 70,
+        "queued": 2
       },
       "warningsByType": {
-        "program_ml_disagreement": 14,
-        "index_renumbered": 30,
-        "unrecognized_mutuel": 32,
-        "incomplete_entry": 14,
-        "owner_trainer_fused": 5
+        "index_renumbered": 80,
+        "program_ml_disagreement": 114,
+        "unrecognized_mutuel": 100,
+        "owner_trainer_fused": 17,
+        "finish_order_conflict": 2,
+        "incomplete_entry": 59,
+        "foreign_program (blocking)": 2
       },
       "plByBucket": {
         "PROGRAM_ONLY": {
-          "days": 27,
-          "wageredCents": 540000,
-          "effectiveWageredCents": 485800,
-          "returnedCents": 521490,
-          "plCents": -18510
+          "days": 70,
+          "wageredCents": 1400000,
+          "effectiveWageredCents": 1289300,
+          "returnedCents": 1207650,
+          "plCents": -192350
         }
       },
       "crossSource": {
@@ -47,7 +72,8 @@
     {
       "date": "2026-07-17",
       "meet": "DMR-2026-summer",
-      "correlationId": "56f51b37-03e0-4235-992a-5b515dfad7cc",
+      "correlationId": "36d9c620-d8b7-4e01-8e11-6fab63184eeb",
+      "indexSource": "calendar",
       "calendarRaces": 10,
       "blocking": [],
       "nonBlocking": [
@@ -73,8 +99,8 @@
       "hasChart": false,
       "entriesSource": "both",
       "status": "saved",
-      "raceDayId": 1,
-      "cardId": 30,
+      "raceDayId": 44,
+      "cardId": 44,
       "completeness": "PROGRAM_ONLY",
       "engineVersion": "lean-1.1",
       "resultsSource": "dmtc_html",
@@ -103,7 +129,8 @@
     {
       "date": "2026-07-18",
       "meet": "DMR-2026-summer",
-      "correlationId": "e6289431-526b-476f-9a70-ebd240a9b7bd",
+      "correlationId": "51cbb655-ce47-4801-8519-eadc8d92a83b",
+      "indexSource": "calendar",
       "calendarRaces": 11,
       "blocking": [],
       "nonBlocking": [
@@ -131,8 +158,8 @@
       "hasChart": false,
       "entriesSource": "both",
       "status": "saved",
-      "raceDayId": 2,
-      "cardId": 31,
+      "raceDayId": 45,
+      "cardId": 45,
       "completeness": "PROGRAM_ONLY",
       "engineVersion": "lean-1.1",
       "resultsSource": "dmtc_html",
@@ -161,7 +188,8 @@
     {
       "date": "2026-07-19",
       "meet": "DMR-2026-summer",
-      "correlationId": "70475a6f-c219-429c-bb14-75cedb6c27d1",
+      "correlationId": "bf349932-9214-444b-bc04-0c1ad5595d61",
+      "indexSource": "calendar",
       "calendarRaces": 11,
       "blocking": [],
       "nonBlocking": [
@@ -277,8 +305,8 @@
       "hasChart": false,
       "entriesSource": "both",
       "status": "saved",
-      "raceDayId": 3,
-      "cardId": 32,
+      "raceDayId": 46,
+      "cardId": 46,
       "completeness": "PROGRAM_ONLY",
       "engineVersion": "lean-1.1",
       "resultsSource": "dmtc_html",
@@ -307,7 +335,8 @@
     {
       "date": "2026-07-23",
       "meet": "DMR-2026-summer",
-      "correlationId": "fb13622a-2acc-47f0-a20c-f350cee690f6",
+      "correlationId": "ea6ab4be-ec92-40b0-a140-323abc76f7af",
+      "indexSource": "calendar",
       "calendarRaces": 8,
       "blocking": [],
       "nonBlocking": [],
@@ -316,8 +345,8 @@
       "hasChart": false,
       "entriesSource": "both",
       "status": "saved",
-      "raceDayId": 4,
-      "cardId": 33,
+      "raceDayId": 47,
+      "cardId": 47,
       "completeness": "PROGRAM_ONLY",
       "engineVersion": "lean-1.1",
       "resultsSource": "dmtc_html",
@@ -346,7 +375,8 @@
     {
       "date": "2026-07-24",
       "meet": "DMR-2026-summer",
-      "correlationId": "d518971d-f5c8-4a8c-a5d0-cc03e6744e18",
+      "correlationId": "2b144a01-a557-4894-9edb-ed69d8ca720e",
+      "indexSource": "calendar",
       "calendarRaces": 8,
       "blocking": [],
       "nonBlocking": [],
@@ -355,8 +385,8 @@
       "hasChart": false,
       "entriesSource": "both",
       "status": "saved",
-      "raceDayId": 5,
-      "cardId": 34,
+      "raceDayId": 48,
+      "cardId": 48,
       "completeness": "PROGRAM_ONLY",
       "engineVersion": "lean-1.1",
       "resultsSource": "dmtc_html",
@@ -385,7 +415,8 @@
     {
       "date": "2026-07-25",
       "meet": "DMR-2026-summer",
-      "correlationId": "b8e6fa6d-00fc-46f1-9caa-9847ad2b1f81",
+      "correlationId": "81a74466-daa8-4ffe-aafb-ae47eb60322c",
+      "indexSource": "calendar",
       "calendarRaces": 11,
       "blocking": [],
       "nonBlocking": [
@@ -421,8 +452,8 @@
       "hasChart": false,
       "entriesSource": "both",
       "status": "saved",
-      "raceDayId": 6,
-      "cardId": 35,
+      "raceDayId": 49,
+      "cardId": 49,
       "completeness": "PROGRAM_ONLY",
       "engineVersion": "lean-1.1",
       "resultsSource": "dmtc_html",
@@ -451,7 +482,8 @@
     {
       "date": "2026-07-26",
       "meet": "DMR-2026-summer",
-      "correlationId": "f75a267a-206c-4967-b7c0-0c304b2a9ed8",
+      "correlationId": "2bc8cc32-60a9-4b36-aa8c-ebc9f9e47428",
+      "indexSource": "calendar",
       "calendarRaces": 11,
       "blocking": [],
       "nonBlocking": [
@@ -467,8 +499,8 @@
       "hasChart": false,
       "entriesSource": "both",
       "status": "saved",
-      "raceDayId": 7,
-      "cardId": 36,
+      "raceDayId": 50,
+      "cardId": 50,
       "completeness": "PROGRAM_ONLY",
       "engineVersion": "lean-1.1",
       "resultsSource": "dmtc_html",
@@ -497,7 +529,8 @@
     {
       "date": "2026-07-30",
       "meet": "DMR-2026-summer",
-      "correlationId": "9982d492-1674-4bed-8ed2-3de4c6d30402",
+      "correlationId": "521c88aa-4886-41f3-b5ac-9360dbfac0f4",
+      "indexSource": "calendar",
       "calendarRaces": 8,
       "blocking": [],
       "nonBlocking": [
@@ -529,8 +562,8 @@
       "hasChart": false,
       "entriesSource": "both",
       "status": "saved",
-      "raceDayId": 8,
-      "cardId": 37,
+      "raceDayId": 51,
+      "cardId": 51,
       "completeness": "PROGRAM_ONLY",
       "engineVersion": "lean-1.1",
       "resultsSource": "dmtc_html",
@@ -559,7 +592,8 @@
     {
       "date": "2026-07-31",
       "meet": "DMR-2026-summer",
-      "correlationId": "934854de-5b92-4fba-aeb7-f3beb5f22c01",
+      "correlationId": "7d048da2-66a1-400e-9c67-d27d0ba7b1fc",
+      "indexSource": "calendar",
       "calendarRaces": 8,
       "blocking": [],
       "nonBlocking": [
@@ -599,8 +633,8 @@
       "hasChart": false,
       "entriesSource": "both",
       "status": "saved",
-      "raceDayId": 9,
-      "cardId": 38,
+      "raceDayId": 52,
+      "cardId": 52,
       "completeness": "PROGRAM_ONLY",
       "engineVersion": "lean-1.1",
       "resultsSource": "dmtc_html",
@@ -629,7 +663,8 @@
     {
       "date": "2026-08-01",
       "meet": "DMR-2026-summer",
-      "correlationId": "f4fd2d77-9956-4095-a556-c7be9757d31d",
+      "correlationId": "4e87fa3f-b337-4e53-8c0c-94515f849c87",
+      "indexSource": "calendar",
       "calendarRaces": 11,
       "blocking": [],
       "nonBlocking": [
@@ -661,8 +696,8 @@
       "hasChart": false,
       "entriesSource": "both",
       "status": "saved",
-      "raceDayId": 10,
-      "cardId": 39,
+      "raceDayId": 53,
+      "cardId": 53,
       "completeness": "PROGRAM_ONLY",
       "engineVersion": "lean-1.1",
       "resultsSource": "dmtc_html",
@@ -691,7 +726,8 @@
     {
       "date": "2026-08-02",
       "meet": "DMR-2026-summer",
-      "correlationId": "231c930a-04f4-4539-9de2-d31d9687b4dc",
+      "correlationId": "1effaa6c-3feb-4bcb-b790-c831db119b89",
+      "indexSource": "calendar",
       "calendarRaces": 10,
       "blocking": [],
       "nonBlocking": [
@@ -725,8 +761,8 @@
       "hasChart": false,
       "entriesSource": "both",
       "status": "saved",
-      "raceDayId": 11,
-      "cardId": 40,
+      "raceDayId": 54,
+      "cardId": 54,
       "completeness": "PROGRAM_ONLY",
       "engineVersion": "lean-1.1",
       "resultsSource": "dmtc_html",
@@ -755,7 +791,8 @@
     {
       "date": "2026-08-06",
       "meet": "DMR-2026-summer",
-      "correlationId": "6a6e5dc0-402d-4a41-bef3-b0a0c5b09f33",
+      "correlationId": "fa5fa394-023c-486b-9bb6-135f44969233",
+      "indexSource": "calendar",
       "calendarRaces": 8,
       "blocking": [],
       "nonBlocking": [],
@@ -764,8 +801,8 @@
       "hasChart": false,
       "entriesSource": "both",
       "status": "saved",
-      "raceDayId": 12,
-      "cardId": 41,
+      "raceDayId": 55,
+      "cardId": 55,
       "completeness": "PROGRAM_ONLY",
       "engineVersion": "lean-1.1",
       "resultsSource": "dmtc_html",
@@ -794,7 +831,8 @@
     {
       "date": "2026-08-07",
       "meet": "DMR-2026-summer",
-      "correlationId": "5aa6b4fa-1cf2-4b40-97e7-77fdfc23e306",
+      "correlationId": "8af7ff2a-4c5c-4368-8540-9147622e6277",
+      "indexSource": "calendar",
       "calendarRaces": 8,
       "blocking": [],
       "nonBlocking": [
@@ -824,8 +862,8 @@
       "hasChart": false,
       "entriesSource": "both",
       "status": "saved",
-      "raceDayId": 13,
-      "cardId": 42,
+      "raceDayId": 56,
+      "cardId": 56,
       "completeness": "PROGRAM_ONLY",
       "engineVersion": "lean-1.1",
       "resultsSource": "dmtc_html",
@@ -854,7 +892,8 @@
     {
       "date": "2026-08-08",
       "meet": "DMR-2026-summer",
-      "correlationId": "2c8114da-1cf7-43cb-8a41-f445ae810636",
+      "correlationId": "a3bd0f5f-b00f-4f59-b9fd-b2f8911d925f",
+      "indexSource": "calendar",
       "calendarRaces": 10,
       "blocking": [],
       "nonBlocking": [
@@ -906,8 +945,8 @@
       "hasChart": false,
       "entriesSource": "both",
       "status": "saved",
-      "raceDayId": 14,
-      "cardId": 43,
+      "raceDayId": 57,
+      "cardId": 57,
       "completeness": "PROGRAM_ONLY",
       "engineVersion": "lean-1.1",
       "resultsSource": "dmtc_html",
@@ -936,7 +975,8 @@
     {
       "date": "2026-08-09",
       "meet": "DMR-2026-summer",
-      "correlationId": "a57d269e-1481-4a91-bf5e-f53798216ec7",
+      "correlationId": "085f2704-a3e9-4d85-ad3b-f1c5863f6910",
+      "indexSource": "calendar",
       "calendarRaces": 9,
       "blocking": [],
       "nonBlocking": [
@@ -952,8 +992,8 @@
       "hasChart": false,
       "entriesSource": "both",
       "status": "saved",
-      "raceDayId": 15,
-      "cardId": 44,
+      "raceDayId": 58,
+      "cardId": 58,
       "completeness": "PROGRAM_ONLY",
       "engineVersion": "lean-1.1",
       "resultsSource": "dmtc_html",
@@ -982,7 +1022,8 @@
     {
       "date": "2026-08-13",
       "meet": "DMR-2026-summer",
-      "correlationId": "700977a5-c5be-4fe4-aae3-9956520dad39",
+      "correlationId": "78d38a41-3587-4048-8983-30d6bca13e4d",
+      "indexSource": "calendar",
       "calendarRaces": 8,
       "blocking": [],
       "nonBlocking": [
@@ -1004,8 +1045,8 @@
       "hasChart": false,
       "entriesSource": "both",
       "status": "saved",
-      "raceDayId": 16,
-      "cardId": 45,
+      "raceDayId": 59,
+      "cardId": 59,
       "completeness": "PROGRAM_ONLY",
       "engineVersion": "lean-1.1",
       "resultsSource": "dmtc_html",
@@ -1034,7 +1075,8 @@
     {
       "date": "2026-08-14",
       "meet": "DMR-2026-summer",
-      "correlationId": "0039eafb-2dc2-488f-95c3-e50f86852254",
+      "correlationId": "1c3d7bfb-d945-48b4-8791-3633bafd5031",
+      "indexSource": "calendar",
       "calendarRaces": 8,
       "blocking": [],
       "nonBlocking": [],
@@ -1043,8 +1085,8 @@
       "hasChart": false,
       "entriesSource": "both",
       "status": "saved",
-      "raceDayId": 17,
-      "cardId": 46,
+      "raceDayId": 60,
+      "cardId": 60,
       "completeness": "PROGRAM_ONLY",
       "engineVersion": "lean-1.1",
       "resultsSource": "dmtc_html",
@@ -1073,7 +1115,8 @@
     {
       "date": "2026-08-15",
       "meet": "DMR-2026-summer",
-      "correlationId": "491e2dde-87fd-4b42-ba13-8b5d36e96168",
+      "correlationId": "75dd15ba-a944-48c8-8841-823c2ca240ed",
+      "indexSource": "calendar",
       "calendarRaces": 10,
       "blocking": [],
       "nonBlocking": [
@@ -1133,8 +1176,8 @@
       "hasChart": false,
       "entriesSource": "both",
       "status": "saved",
-      "raceDayId": 18,
-      "cardId": 47,
+      "raceDayId": 61,
+      "cardId": 61,
       "completeness": "PROGRAM_ONLY",
       "engineVersion": "lean-1.1",
       "resultsSource": "dmtc_html",
@@ -1163,7 +1206,8 @@
     {
       "date": "2026-08-16",
       "meet": "DMR-2026-summer",
-      "correlationId": "c3f78cc1-022c-4b54-9a71-5516f2e307bb",
+      "correlationId": "c7bb59ad-48e7-43da-9fbd-16150f6679c6",
+      "indexSource": "calendar",
       "calendarRaces": 10,
       "blocking": [],
       "nonBlocking": [
@@ -1205,8 +1249,8 @@
       "hasChart": false,
       "entriesSource": "both",
       "status": "saved",
-      "raceDayId": 19,
-      "cardId": 48,
+      "raceDayId": 62,
+      "cardId": 62,
       "completeness": "PROGRAM_ONLY",
       "engineVersion": "lean-1.1",
       "resultsSource": "dmtc_html",
@@ -1235,7 +1279,8 @@
     {
       "date": "2026-08-20",
       "meet": "DMR-2026-summer",
-      "correlationId": "9d5f7f59-1171-4c7e-be39-2de60cf30875",
+      "correlationId": "1fd381a2-cbf0-43c3-a884-3e9c84d5ed17",
+      "indexSource": "calendar",
       "calendarRaces": 8,
       "blocking": [],
       "nonBlocking": [
@@ -1281,8 +1326,8 @@
       "hasChart": false,
       "entriesSource": "both",
       "status": "saved",
-      "raceDayId": 20,
-      "cardId": 49,
+      "raceDayId": 63,
+      "cardId": 63,
       "completeness": "PROGRAM_ONLY",
       "engineVersion": "lean-1.1",
       "resultsSource": "dmtc_html",
@@ -1324,7 +1369,8 @@
     {
       "date": "2026-08-21",
       "meet": "DMR-2026-summer",
-      "correlationId": "0ed6d57b-2301-47a6-b4db-b3ac0aa4635a",
+      "correlationId": "103809b2-4ad7-45fc-b420-5bfe41f77c8b",
+      "indexSource": "calendar",
       "calendarRaces": 8,
       "blocking": [],
       "nonBlocking": [
@@ -1376,8 +1422,8 @@
       "hasChart": false,
       "entriesSource": "both",
       "status": "saved",
-      "raceDayId": 21,
-      "cardId": 50,
+      "raceDayId": 64,
+      "cardId": 64,
       "completeness": "PROGRAM_ONLY",
       "engineVersion": "lean-1.1",
       "resultsSource": "dmtc_html",
@@ -1419,7 +1465,8 @@
     {
       "date": "2026-08-22",
       "meet": "DMR-2026-summer",
-      "correlationId": "ad5cc7b4-dddd-4153-a37a-50bcc541c8c7",
+      "correlationId": "1bb966d0-a058-4e24-95ca-c67a5e38cf95",
+      "indexSource": "calendar",
       "calendarRaces": 11,
       "blocking": [],
       "nonBlocking": [
@@ -1447,8 +1494,8 @@
       "hasChart": false,
       "entriesSource": "both",
       "status": "saved",
-      "raceDayId": 22,
-      "cardId": 51,
+      "raceDayId": 65,
+      "cardId": 65,
       "completeness": "PROGRAM_ONLY",
       "engineVersion": "lean-1.1",
       "resultsSource": "dmtc_html",
@@ -1490,7 +1537,8 @@
     {
       "date": "2026-08-23",
       "meet": "DMR-2026-summer",
-      "correlationId": "eae0a86c-5037-4b31-bb69-daffe1b05790",
+      "correlationId": "d127fd46-48b7-46fc-a206-c66ce80009cc",
+      "indexSource": "calendar",
       "calendarRaces": 9,
       "blocking": [],
       "nonBlocking": [
@@ -1524,8 +1572,8 @@
       "hasChart": false,
       "entriesSource": "both",
       "status": "saved",
-      "raceDayId": 23,
-      "cardId": 52,
+      "raceDayId": 66,
+      "cardId": 66,
       "completeness": "PROGRAM_ONLY",
       "engineVersion": "lean-1.1",
       "resultsSource": "dmtc_html",
@@ -1567,7 +1615,8 @@
     {
       "date": "2026-08-27",
       "meet": "DMR-2026-summer",
-      "correlationId": "fd5a176d-d5c0-48f6-9af5-2298ba737349",
+      "correlationId": "24e7f046-01fa-479d-898d-e81b414632d6",
+      "indexSource": "calendar",
       "calendarRaces": 8,
       "blocking": [],
       "nonBlocking": [
@@ -1585,8 +1634,8 @@
       "hasChart": false,
       "entriesSource": "both",
       "status": "saved",
-      "raceDayId": 24,
-      "cardId": 53,
+      "raceDayId": 67,
+      "cardId": 67,
       "completeness": "PROGRAM_ONLY",
       "engineVersion": "lean-1.1",
       "resultsSource": "dmtc_html",
@@ -1628,7 +1677,8 @@
     {
       "date": "2026-08-28",
       "meet": "DMR-2026-summer",
-      "correlationId": "2f15a8c9-a6ed-4081-b647-c4e1606fa856",
+      "correlationId": "56446e75-bb31-4f68-8d3b-2274ebed98fd",
+      "indexSource": "calendar",
       "calendarRaces": 8,
       "blocking": [],
       "nonBlocking": [
@@ -1644,8 +1694,8 @@
       "hasChart": true,
       "entriesSource": "both",
       "status": "saved",
-      "raceDayId": 25,
-      "cardId": 54,
+      "raceDayId": 68,
+      "cardId": 68,
       "completeness": "PROGRAM_ONLY",
       "engineVersion": "lean-1.1",
       "resultsSource": "dmtc_html",
@@ -1691,7 +1741,8 @@
     {
       "date": "2026-08-29",
       "meet": "DMR-2026-summer",
-      "correlationId": "bb5d8437-c68b-40a2-8394-b6aa0a9ae35e",
+      "correlationId": "2c5dd8c9-f898-45ef-b272-6eaae36eb4bd",
+      "indexSource": "calendar",
       "calendarRaces": 10,
       "blocking": [],
       "nonBlocking": [
@@ -1713,8 +1764,8 @@
       "hasChart": true,
       "entriesSource": "both",
       "status": "saved",
-      "raceDayId": 26,
-      "cardId": 55,
+      "raceDayId": 69,
+      "cardId": 69,
       "completeness": "PROGRAM_ONLY",
       "engineVersion": "lean-1.1",
       "resultsSource": "dmtc_html",
@@ -1760,7 +1811,8 @@
     {
       "date": "2026-08-30",
       "meet": "DMR-2026-summer",
-      "correlationId": "7e4b1621-e9b9-40ca-8938-f3af8ac84ffc",
+      "correlationId": "dc378578-d2f6-47c8-8ca4-65210db19cb3",
+      "indexSource": "calendar",
       "calendarRaces": 10,
       "blocking": [],
       "nonBlocking": [
@@ -1790,8 +1842,8 @@
       "hasChart": true,
       "entriesSource": "both",
       "status": "saved",
-      "raceDayId": 27,
-      "cardId": 56,
+      "raceDayId": 70,
+      "cardId": 70,
       "completeness": "PROGRAM_ONLY",
       "engineVersion": "lean-1.1",
       "resultsSource": "dmtc_html",

@@ -1,12 +1,13 @@
 # Backfill report: DMR-2025-summer
 
-Last run 9f79ef77-e3ab-4364-9647-1d85ab5bd95c (2026-09-02T12:42:19.208Z .. 2026-09-02T12:42:45.545Z), range 2025-07-18..2025-09-07, engine lean-1.1, template lean, bankroll $200.00 / min $5.00.
+Last run 90a70aa1-02ea-455e-a3c7-743ee7f12cd7 (2026-09-05T06:41:50.263Z .. 2026-09-05T06:43:08.855Z), range 2025-07-18..2026-08-30, engine lean-1.1, template lean, bankroll $200.00 / min $5.00.
 
 ## Summary
 
 - Days: 31 - saved 31
 - Cross-source (dmtc vs Equibase): 0 day(s) checked, 0 ticket disagreement(s)
 - Regression line: 0 unexplained difference(s)
+- Calendars NOT archived: 2026-01, 2026-02, 2026-03, 2026-04, 2026-05, 2026-06 (fetch with --what calendar)
 
 ### Warnings by type
 
