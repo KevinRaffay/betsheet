@@ -26,6 +26,19 @@ export const parseEquibaseEntries = (html, { oddsCapturedAt = null, correlationI
     body: JSON.stringify({ html, oddsCapturedAt }),
   }).then(asJson);
 
+// Live Apify entries pull (Phase 3/4 building blocks, UI flow decided
+// 2026-09-09): ONE track, ONE date - the server makes the actual paid call
+// (the browser never holds APIFY_TOKEN), returning the same preview shape
+// parseEquibaseEntries does, so NewRaceDay.jsx's existing preview/save UI
+// needs no special-casing for this source. COSTS REAL MONEY EVERY CALL -
+// there is no cheaper preview of a live source than actually calling it.
+export const pullApifyEntries = (track, date, correlationId) =>
+  fetch('/api/parse/equibase-apify-entries', {
+    method: 'POST',
+    headers: { 'content-type': 'application/json', ...(correlationId ? { 'x-correlation-id': correlationId } : {}) },
+    body: JSON.stringify({ track, date }),
+  }).then(asJson);
+
 // Bulk entries zip. The FILE is posted as a raw application/zip body rather
 // than read in the browser: a day's decompressed HTML is 15-17MB against the
 // 10mb JSON limit, while the archive itself is about 2MB. Posted twice, once

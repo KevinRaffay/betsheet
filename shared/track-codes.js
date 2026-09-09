@@ -96,6 +96,18 @@ const lettersOnly = (s) => String(s ?? '').toUpperCase().replace(/[^A-Z]/g, '');
  * case) so every comparison - the one-day-per-track+date rule, the results
  * chart mismatch refusal - can key on it.
  */
+/**
+ * Every track this codebase has personally seen in a real captured page -
+ * NOT an exhaustive Equibase master list (an unregistered track still saves
+ * fine via canonicalizeTrack's derived-code fallback). For a UI suggestion
+ * list (a `<datalist>`, never a hard dropdown - the same "suggest, don't
+ * restrict" shape `shared/source-labels.js`'s own suggestions already use),
+ * not a validation source.
+ */
+export function listTracks() {
+  return REGISTRY.map(({ code, display }) => ({ code, display }));
+}
+
 export function canonicalizeTrack(raw) {
   const key = lettersOnly(raw);
   const trimmed = String(raw ?? '').trim();

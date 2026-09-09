@@ -9,6 +9,7 @@ import path from 'node:path';
 import { fileURLToPath, URL } from 'node:url';
 import { getLogger } from './logging.js';
 import { ingestRouter } from './ingest.js';
+import { equibaseApifyEntriesRouter } from './equibase-apify-entries.js';
 import { entriesZipRouter } from './entries-zip.js';
 import { cardsRouter } from './cards.js';
 import { humanCardsRouter } from './human-cards.js';
@@ -77,6 +78,7 @@ app.get('/api/health', (_req, res) => {
 });
 
 app.use('/api', ingestRouter);
+app.use('/api', equibaseApifyEntriesRouter);
 app.use('/api', entriesZipRouter);
 app.use('/api', cardsRouter);
 app.use('/api', humanCardsRouter);
