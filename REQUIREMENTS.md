@@ -404,3 +404,15 @@ Follows D166's own flagged finding. Consolidation, not new capability.
 | The other variants are reported beside it as a breakdown that is never added to the total | D175 |
 | A graded card shows its P/L on the day view, from the same grade set /api/pl reports, agreeing to the cent | D175 |
 | An ungraded card shows a dash, never $0 - not-graded-yet and broke-even are different facts | D175 |
+
+## Manual tip-pick entry (requested 2026-09-08)
+
+| requirement | deliverable |
+| --- | --- |
+| Tip picks can be typed per race instead of photographed, with no API call | D176 |
+| A horse can be ranked in several tipsheets at once, because real sheets overlap | D176 |
+| Typed picks produce the identical payload extraction did - same validator, same writer, same rows | D176 |
+| Horse names come from the race day, never the client; no odds are invented from the morning line | D176 |
+| Clearing every rank in a column removes that sheet from the race, with no second verb for it | D176 |
+| The dialog edits what is already there rather than starting blank | D176 |
+| **Split out**: removing the screenshot path entirely | D177 |

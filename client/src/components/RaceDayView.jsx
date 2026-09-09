@@ -1,9 +1,10 @@
 import React, { useEffect, useState } from 'react';
-import { deleteRaceDay, deletionPreview, getLlmNotes, getRaceDay } from '../api.js';
+import { deleteRaceDay, deletionPreview, getLlmNotes, getRaceDay, listTipPicks } from '../api.js';
 import CardsPanel from './CardsPanel.jsx';
 import ResultsPanel from './ResultsPanel.jsx';
 import EquibaseOtrPanel from './EquibaseOtrPanel.jsx';
 import TipPicksPanel from './TipPicksPanel.jsx';
+import TipPicksEntryModal from './TipPicksEntryModal.jsx';
 import RaceDayNotesModal from './RaceDayNotesModal.jsx';
 import RaceNotes from './RaceNotes.jsx';
 import { entriesStaleness } from '@shared/staleness.js';
@@ -29,6 +30,11 @@ export default function RaceDayView({ id, onBack, onOpenCard }) {
   // own children and call its `reload` directly.
   const [cardsVersion, setCardsVersion] = useState(0);
   const [showNotesModal, setShowNotesModal] = useState(false);
+  // D176: which race's tip-pick dialog is open, and a counter that remounts
+  // TipPicksPanel when it saves - the same wire D173 had to add for staking.
+  const [tipRace, setTipRace] = useState(null);
+  const [tipVersion, setTipVersion] = useState(0);
+  const [tipRows, setTipRows] = useState([]);
   // Read-only: the analyst notes entered via "Enter Analyst Notes" / the LLM
   // generator's own notes fields (same `llm_notes` draft, D92), keyed by race
   // number so each race's collapsible panel below can look itself up.
@@ -42,6 +48,19 @@ export default function RaceDayView({ id, onBack, onOpenCard }) {
     .then((n) => setNotesByRace(new Map(Object.entries(n.byRace ?? {}).map(([k, v]) => [Number(k), v]))))
     .catch(() => {}); // supplementary display only - a fetch failure here shouldn't block the page
   useEffect(() => { loadNotes(); }, [id]); // eslint-disable-line react-hooks/exhaustive-deps
+
+  // D176: the race's existing tip picks, so the entry dialog opens EDITING
+  // what is already there rather than blank. Refetched on tipVersion so a save
+  // is reflected without a reload. `cancelled` guards the documented
+  // stale-response race (Gotchas): two loads in flight have no ordering
+  // guarantee, and the cleanup must be a FUNCTION, never a promise.
+  useEffect(() => {
+    let cancelled = false;
+    listTipPicks(id)
+      .then((r) => { if (!cancelled) setTipRows(r.rows ?? []); })
+      .catch(() => {}); // supplementary - a failure here must not blank the page
+    return () => { cancelled = true; };
+  }, [id, tipVersion]);
 
   const askDelete = async () => {
     setBusy(true);
@@ -132,7 +151,18 @@ export default function RaceDayView({ id, onBack, onOpenCard }) {
           card's bankroll. RaceDayView already holds the day, so pass it down
           rather than making CardsPanel fetch the day a second time. */}
       <CardsPanel key={cardsVersion} dayId={day.id} bankrollCents={day.bankroll_cents} onOpenCard={onOpenCard} />
-      <TipPicksPanel dayId={day.id} races={day.races ?? []} onSaved={() => setCardsVersion((v) => v + 1)} />
+      {tipRace && (
+        <TipPicksEntryModal
+          dayId={day.id}
+          race={tipRace}
+          entries={tipRace.entries ?? []}
+          existing={tipRows.filter((r) => r.raceNo === tipRace.number)}
+          onClose={() => setTipRace(null)}
+          onSaved={() => setTipVersion((v) => v + 1)}
+        />
+      )}
+
+      <TipPicksPanel key={tipVersion} dayId={day.id} races={day.races ?? []} onSaved={() => setCardsVersion((v) => v + 1)} />
       <ResultsPanel dayId={day.id} />
       <EquibaseOtrPanel dayId={day.id} onSaved={() => setCardsVersion((v) => v + 1)} />
       {day.races.map((race) => (
@@ -166,6 +196,14 @@ export default function RaceDayView({ id, onBack, onOpenCard }) {
             })()}
           </summary>
           {race.conditions && <p className="conditions">{race.conditions}</p>}
+          {/* D176: tip picks are typed here, per race, rather than
+              photographed - three horses and three ranks is faster to enter
+              than to screenshot, and costs no API call. */}
+          <div className="formrow">
+            <button type="button" className="btn btn--sm" onClick={() => setTipRace(race)}>
+              Enter tipsheet picks
+            </button>
+          </div>
           <table className="grid">
             <thead>
               <tr><th>#</th><th>PP</th><th>Horse</th><th>Jockey</th><th>Trainer</th><th>Wt</th><th>M/L</th><th>Rank</th></tr>

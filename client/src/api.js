@@ -353,3 +353,12 @@ export const plMoney = (cents) => (cents == null ? '—'
 
 /** The class that colours it. `null` (nothing graded) is dim, not a loss. */
 export const plClass = (cents) => (cents == null ? 'dim' : cents >= 0 ? 'pl--pos' : 'pl--neg');
+
+/**
+ * Manual tip picks for one race (D176). Same payload as extraction produced,
+ * through the same validator and writer - typed instead of photographed.
+ */
+export const saveManualTipPicks = (dayId, { race, sheets }, correlationId) =>
+  fetch(`/api/race-days/${dayId}/tip-picks/manual`, {
+    method: 'POST', headers: hdr(correlationId), body: JSON.stringify({ race, sheets }),
+  }).then(asJson);
