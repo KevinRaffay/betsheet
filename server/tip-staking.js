@@ -1,9 +1,12 @@
 // TIPSHEET staking API (D171): turn stored tip picks into graded cards.
 //
 // Writes THREE cards per run, one per variant, in ONE transaction - the D71
-// shape. Append-only: a second run mints three NEW cards rather than editing
-// the old ones, so a card's grade is never rewritten under it (invariant 14's
-// spirit, even though a TIPSHEET card has no version axis of its own).
+// shape. **ONE card per (race day, source, variant)** (D174): a tip sheet
+// arrives race by race, and D171's append-only rule turned that into three
+// more near-duplicate cards on every stake. A re-stake now REUSES the card and
+// recomputes it whole, the way human-cards.js and llm-cards.js accumulate
+// races onto one card. Re-staking a graded card regrades it - warned, never
+// blocked (D149's call for LLM regeneration, D140's for human cards).
 //
 // Bucket TIPSHEET, engine_version 'tipsheet' - never pooling with EQB_OTR,
 // HUMAN, LLM_GENERATED or any lean-* version (invariant 13).
@@ -14,6 +17,7 @@ import { getLogger, newCorrelationId } from './logging.js';
 import { parseWagerMenu, estimateTicketPayouts } from '../shared/betmath.js';
 import { stakeTipRace, TIP_VARIANTS, TIP_VARIANT_LABEL } from '../shared/tip-staking.js';
 import { perRaceBankrollCents } from './llm-cards.js';
+import { normalizeSourceLabel } from '../shared/source-labels.js';
 
 const traceLog = getLogger('decision-trace');
 const now = () => new Date().toISOString().replace(/\.\d+Z$/, 'Z');
@@ -74,10 +78,46 @@ export function planTipCards(db, dayId, sourceLabel, bankrollCents) {
   });
 }
 
-/** Write the three cards. Append-only, one transaction. */
+/** The one card for this (day, source, variant), if it exists. */
+export function existingTipCard(db, dayId, sourceLabel, variant) {
+  return db.prepare(`
+    SELECT id, card_number FROM cards
+     WHERE race_day_id = ? AND consensus_completeness = 'TIPSHEET'
+       AND tip_source_label = ? AND variant = ?
+     ORDER BY card_number DESC LIMIT 1
+  `).get(dayId, normalizeSourceLabel(sourceLabel), variant);
+}
+
+const cardIsGraded = (db, cardId) =>
+  db.prepare('SELECT 1 FROM graded_tickets g JOIN tickets t ON t.id = g.ticket_id WHERE t.card_id = ? LIMIT 1')
+    .get(cardId) !== undefined;
+
+/**
+ * Write ONE card per (race day, source, variant), in one transaction.
+ *
+ * **Not append-only** (D174, changing D171). A tip sheet arrives race by race,
+ * so staking after each race used to mint three MORE cards every time and a
+ * day ended up with a dozen near-duplicates instead of one card per way of
+ * betting one source. Now an existing card for the same (day, source, variant)
+ * is REUSED, matching how `human-cards.js` and `llm-cards.js` accumulate races
+ * onto one card rather than multiplying cards.
+ *
+ * A reuse REPLACES every ticket on the card rather than appending the new
+ * race's, and that is not a shortcut - it is required for the card to stay
+ * coherent. The per-race budget is `bankroll / races-with-picks`, so adding a
+ * fourth race changes the stake on races 1-3 too. Appending would leave three
+ * races priced for a three-race card sitting beside one priced for four.
+ *
+ * Replacing tickets on a GRADED card cascades their grades away and the card
+ * regrades - a reported P/L figure moves, with no in-app way back. That is
+ * warned about, never blocked, which is the call D149 made for LLM
+ * regeneration and D140 for locking onto a graded human card. `graded` comes
+ * back per card so the UI can say so before the user commits.
+ */
 export function persistTipCards(db, day, sourceLabel, bankrollCents, correlationId) {
   const plans = planTipCards(db, day.id, sourceLabel, bankrollCents);
   const templateId = db.prepare("SELECT id FROM strategy_templates WHERE name = 'tipsheet'").get()?.id ?? null;
+  const source = normalizeSourceLabel(sourceLabel);
   const ts = now();
 
   const write = db.transaction(() => {
@@ -87,19 +127,41 @@ export function persistTipCards(db, day, sourceLabel, bankrollCents, correlation
     const made = [];
 
     for (const plan of plans) {
-      const cardId = db.prepare(`INSERT INTO cards
-          (race_day_id, card_number, variant, strategy_template_id, bankroll_cents,
-           per_race_min_cents, status, correlation_id, consensus_completeness,
-           created_at, engine_version, name)
-          VALUES (?, ?, ?, ?, ?, NULL, 'final', ?, 'TIPSHEET', ?, 'tipsheet', ?)`)
-        .run(day.id, cardNumber, plan.variant, templateId, bankrollCents,
-          correlationId, ts, `${sourceLabel} — ${plan.label}`).lastInsertRowid;
+      const existing = existingTipCard(db, day.id, source, plan.variant);
+      const name = `${source} — ${plan.label}`;
+      let cardId;
+      let regraded = false;
 
-      traceLog.info('card_generated', {
-        correlationId, cardId, raceDayId: day.id, variant: plan.variant,
-        bucket: 'TIPSHEET', engineVersion: 'tipsheet', sourceLabel,
-        bankrollCents, perRaceCents: plan.perRaceCents,
-      });
+      if (existing) {
+        cardId = existing.id;
+        regraded = cardIsGraded(db, cardId);
+        const removed = db.prepare('SELECT COUNT(*) c FROM tickets WHERE card_id = ?').get(cardId).c;
+        // graded_tickets cascades from tickets - the same thing the LLM
+        // regeneration path does when it replaces a race.
+        db.prepare('DELETE FROM tickets WHERE card_id = ?').run(cardId);
+        db.prepare('DELETE FROM allocations WHERE card_id = ?').run(cardId);
+        db.prepare('UPDATE cards SET bankroll_cents = ?, name = ?, correlation_id = ? WHERE id = ?')
+          .run(bankrollCents, name, correlationId, cardId);
+        traceLog.info('card_restaked', {
+          correlationId, cardId, raceDayId: day.id, variant: plan.variant,
+          sourceLabel: source, ticketsRemoved: removed, wasGraded: regraded,
+          bankrollCents, perRaceCents: plan.perRaceCents,
+        });
+      } else {
+        cardId = db.prepare(`INSERT INTO cards
+            (race_day_id, card_number, variant, strategy_template_id, bankroll_cents,
+             per_race_min_cents, status, correlation_id, consensus_completeness,
+             created_at, engine_version, name, tip_source_label)
+            VALUES (?, ?, ?, ?, ?, NULL, 'final', ?, 'TIPSHEET', ?, 'tipsheet', ?, ?)`)
+          .run(day.id, cardNumber, plan.variant, templateId, bankrollCents,
+            correlationId, ts, name, source).lastInsertRowid;
+        cardNumber += 1;
+        traceLog.info('card_generated', {
+          correlationId, cardId, raceDayId: day.id, variant: plan.variant,
+          bucket: 'TIPSHEET', engineVersion: 'tipsheet', sourceLabel: source,
+          bankrollCents, perRaceCents: plan.perRaceCents,
+        });
+      }
 
       let seq = 0;
       for (const race of plan.perRace) {
@@ -129,8 +191,12 @@ export function persistTipCards(db, day, sourceLabel, bankrollCents, correlation
                     VALUES (?, ?, ?, 'TIPSHEET', 'tipsheet_staking', NULL)`)
           .run(cardId, race.raceId, raceCost);
       }
-      made.push({ cardId, variant: plan.variant, label: plan.label, costCents: plan.costCents });
-      cardNumber += 1;
+      made.push({
+        cardId, variant: plan.variant, label: plan.label, costCents: plan.costCents,
+        // `reused` is what the UI needs to say "updated" rather than "created",
+        // and `regraded` warns that a reported P/L figure just moved.
+        reused: Boolean(existing), regraded,
+      });
     }
     return made;
   });
@@ -164,14 +230,22 @@ tipStakingRouter.post('/race-days/:id/tip-cards/preview', wrap((req, res) => {
   res.json({
     sourceLabel: source,
     bankrollCents: bankroll,
-    variants: plans.map((p) => ({
-      variant: p.variant, label: p.label, costCents: p.costCents, perRaceCents: p.perRaceCents,
-      races: p.perRace.map((r) => ({
-        raceNo: r.raceNo,
-        tickets: r.tickets.map((t) => ({ betType: t.betType, tellerCall: t.tellerCall, costCents: t.costCents, estMinCents: t.estMinCents ?? null, estMaxCents: t.estMaxCents ?? null, rationale: t.rationale })),
-        warnings: r.warnings,
-      })),
-    })),
+    variants: plans.map((p) => {
+      // What Save will DO to each card, so the UI can say "update" rather than
+      // "create" and warn before a graded card's P/L moves under it.
+      const existing = existingTipCard(db, day.id, source, p.variant);
+      return {
+        variant: p.variant, label: p.label, costCents: p.costCents, perRaceCents: p.perRaceCents,
+        existingCardId: existing?.id ?? null,
+        willUpdate: Boolean(existing),
+        willRegrade: Boolean(existing) && cardIsGraded(db, existing.id),
+        races: p.perRace.map((r) => ({
+          raceNo: r.raceNo,
+          tickets: r.tickets.map((t) => ({ betType: t.betType, tellerCall: t.tellerCall, costCents: t.costCents, estMinCents: t.estMinCents ?? null, estMaxCents: t.estMaxCents ?? null, rationale: t.rationale })),
+          warnings: r.warnings,
+        })),
+      };
+    }),
   });
 }));
 

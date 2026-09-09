@@ -384,3 +384,13 @@ Follows D166's own flagged finding. Consolidation, not new capability.
 | --- | --- |
 | Cards written by the tip-staking panel appear in the Betting cards table without a page reload | D173 |
 | Every sibling of `CardsPanel` that writes a card carries the `onSaved` wire, and the code says so rather than naming one sibling | D173 |
+
+## One tipsheet card per source (requested 2026-09-08)
+
+| requirement | deliverable |
+| --- | --- |
+| A tip sheet produces ONE card per variant per day, covering every race that has picks - not a fresh set on every stake | D174 |
+| Staking again after another race's picks arrive updates those cards and re-prices every race, because the per-race budget depends on the race count | D174 |
+| A different source still gets its own cards - two tip apps are two opinions (invariant 13) | D174 |
+| Re-staking a graded card is warned about before it happens, never silently, and never blocked | D174 |
+| Duplicates already created are folded by an explicit dry-run script that refuses to delete a graded card | D174 |

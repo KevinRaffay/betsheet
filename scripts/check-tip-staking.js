@@ -122,6 +122,32 @@ console.log('-- migration 030: the cards REBUILD keeps every child row --');
     idx.some((i) => i.name === 'idx_cards_external_id' && i.unique === 1));
   check('foreign keys are intact after the rebuild', db.prepare('PRAGMA foreign_key_check').all().length === 0);
 
+  // D174: migration 031 backfills tip_source_label from the name D171 wrote.
+  // The exact statement is exercised, not a paraphrase of it.
+  {
+    const cols = db.prepare('PRAGMA table_info(cards)').all().map((c) => c.name);
+    check('cards.tip_source_label exists (migration 031)', cols.includes('tip_source_label'));
+    check('the (day, source, variant) lookup is indexed',
+      db.prepare("SELECT name FROM pragma_index_list('cards')").all().some((i) => i.name === 'idx_cards_tip_source'));
+
+    db.prepare(`INSERT INTO cards (race_day_id, card_number, variant, bankroll_cents, correlation_id,
+        consensus_completeness, engine_version, name)
+        VALUES (?, 8001, 'win-only', 100, 'bf', 'TIPSHEET', 'tipsheet', 'trackmaster — Win on the top pick')`).run(dayId);
+    // A card whose name has no separator must be left alone, not guessed at.
+    db.prepare(`INSERT INTO cards (race_day_id, card_number, variant, bankroll_cents, correlation_id,
+        consensus_completeness, engine_version, name)
+        VALUES (?, 8002, 'win-only', 100, 'bf', 'TIPSHEET', 'tipsheet', 'no separator here')`).run(dayId);
+    db.prepare(`UPDATE cards SET tip_source_label = substr(name, 1, instr(name, ' — ') - 1)
+       WHERE consensus_completeness = 'TIPSHEET' AND tip_source_label IS NULL
+         AND name IS NOT NULL AND instr(name, ' — ') > 1`).run();
+    const back = db.prepare('SELECT card_number, tip_source_label FROM cards WHERE card_number IN (8001, 8002)').all();
+    check('the backfill recovers the source from a D171 name',
+      back.find((r) => r.card_number === 8001)?.tip_source_label === 'trackmaster');
+    check('  and leaves a non-matching name NULL rather than guessing',
+      back.find((r) => r.card_number === 8002)?.tip_source_label === null);
+    db.prepare('DELETE FROM cards WHERE card_number IN (8001, 8002)').run();
+  }
+
   const ok = (bucket) => { try { db.prepare(`INSERT INTO cards (race_day_id, card_number, bankroll_cents, correlation_id, consensus_completeness, engine_version) VALUES (?, ?, 100, 'x', ?, 'x')`).run(dayId, Math.floor(Math.random() * 1e6), bucket); return true; } catch { return false; } };
   check('TIPSHEET is now an accepted bucket', ok('TIPSHEET'));
   check('every pre-existing bucket still is',
@@ -185,12 +211,57 @@ console.log('-- the endpoints: preview writes nothing, save writes three cards -
       after.every((c) => c.engine_version === 'tipsheet'));
     check('  three distinct variants', new Set(after.map((c) => c.variant)).size === 3);
 
-    // Append-only: a second run must not rewrite the first three.
+    // D174: ONE card per (day, source, variant). A tip sheet arrives race by
+    // race, so re-staking must REUSE the same three cards, not mint three more.
     const again = await (await jpost(`/api/race-days/${dayId}/tip-cards`, { sourceLabel: 'trackmaster' })).json();
     const all = await jget(`/api/race-days/${dayId}/cards`);
-    check('a second run APPENDS three more, never edits the first three',
-      again.cards.length === 3 && all.length === 6
-      && !again.cards.some((c) => saved.cards.some((s) => s.cardId === c.cardId)));
+    check('re-staking REUSES the same three cards, it does not append (D174)',
+      again.cards.length === 3 && all.length === 3
+      && again.cards.every((c) => saved.cards.some((s) => s.cardId === c.cardId)));
+    check('  and reports that it updated rather than created',
+      again.cards.every((c) => c.reused === true));
+
+    // Adding a race must re-price EVERY race: the per-race budget is
+    // bankroll / races-with-picks, so a 2-race card and a 3-race card cannot
+    // share stakes. This is why a re-stake replaces rather than appends.
+    const beforePerRace = (await (await jpost(`/api/race-days/${dayId}/tip-cards/preview`, { sourceLabel: 'trackmaster' })).json())
+      .variants[0].perRaceCents;
+    {
+      const db3 = new Database(srvDb);
+      insertTipPicks(db3, { raceDayId: dayId, raceNo: 3, sourceLabel: 'trackmaster',
+        picks: [{ horse_no: '1', horse_name: 'A', rank: 1 }, { horse_no: '2', horse_name: 'B', rank: 2 }] });
+      db3.close();
+    }
+    const grown = await (await jpost(`/api/race-days/${dayId}/tip-cards/preview`, { sourceLabel: 'trackmaster' })).json();
+    check('adding a third race re-prices the whole card, not just the new race',
+      grown.variants[0].perRaceCents < beforePerRace,
+      `${beforePerRace} -> ${grown.variants[0].perRaceCents}`);
+    check('  and preview says the save will UPDATE the existing cards',
+      grown.variants.every((v) => v.willUpdate === true && v.existingCardId != null));
+
+    await jpost(`/api/race-days/${dayId}/tip-cards`, { sourceLabel: 'trackmaster' });
+    const stillThree = await jget(`/api/race-days/${dayId}/cards`);
+    check('after a third race is staked there are STILL three cards', stillThree.length === 3);
+    {
+      const db4 = new Database(srvDb);
+      const races = db4.prepare(`SELECT COUNT(DISTINCT t.race_id) n FROM tickets t
+        JOIN cards c ON c.id = t.card_id WHERE c.race_day_id = ? AND c.variant = 'win-only'`).get(dayId).n;
+      db4.close();
+      check('  and that one card now covers all THREE races', races === 3, `covers ${races}`);
+    }
+
+    // A DIFFERENT source is a different opinion: its own three cards.
+    {
+      const db5 = new Database(srvDb);
+      insertTipPicks(db5, { raceDayId: dayId, raceNo: 1, sourceLabel: 'numberfire',
+        picks: [{ horse_no: '2', horse_name: 'B', rank: 1 }, { horse_no: '1', horse_name: 'A', rank: 2 }] });
+      db5.close();
+    }
+    await jpost(`/api/race-days/${dayId}/tip-cards`, { sourceLabel: 'numberfire' });
+    const bothSources = await jget(`/api/race-days/${dayId}/cards`);
+    check('a second SOURCE gets its own three cards, never merged into the first',
+      bothSources.length === 6
+      && new Set(bothSources.map((c) => c.name?.split(' — ')[0])).size === 2);
 
     // Grading: a TIPSHEET card must be graded by the ORDINARY grader, with no
     // special case - which is the whole point of staking into real tickets.
@@ -211,6 +282,34 @@ console.log('-- the endpoints: preview writes nothing, save writes three cards -
       && grades.grades.every((g) => g.engine_version === 'tipsheet'), JSON.stringify(grades).slice(0, 160));
     check('  and the winning top pick actually returned money',
       grades.grades.some((g) => g.outcome === 'win' && g.returned_cents > 0));
+
+    // Re-staking a GRADED card regrades it. Warned, never blocked (D149/D140).
+    {
+      const dbg = new Database(srvDb);
+      const graded = dbg.prepare(`SELECT c.id FROM cards c JOIN tickets t ON t.card_id = c.id
+        JOIN graded_tickets g ON g.ticket_id = t.id WHERE c.race_day_id = ? LIMIT 1`).get(dayId);
+      dbg.close();
+      if (graded) {
+        const pv2 = await (await jpost(`/api/race-days/${dayId}/tip-cards/preview`, { sourceLabel: 'trackmaster' })).json();
+        check('preview WARNS that a graded card will be regraded',
+          pv2.variants.some((v) => v.willRegrade === true),
+          JSON.stringify(pv2.variants.map((v) => [v.variant, v.willUpdate, v.willRegrade])));
+        const re = await (await jpost(`/api/race-days/${dayId}/tip-cards`, { sourceLabel: 'trackmaster' })).json();
+        check('  and the save reports it, rather than blocking',
+          re.cards.some((c) => c.regraded === true));
+        // The old grades went with the old tickets (graded_tickets cascades),
+        // so the card is ungraded until it is graded again - and it must grade
+        // cleanly, which is the whole reason replacing is safe to allow.
+        const dbu = new Database(srvDb);
+        const stillGraded = dbu.prepare(`SELECT COUNT(*) c FROM graded_tickets g
+          JOIN tickets t ON t.id = g.ticket_id JOIN cards c ON c.id = t.card_id
+          WHERE c.race_day_id = ?`).get(dayId).c;
+        dbu.close();
+        check('  the stale grades went with the replaced tickets', stillGraded === 0);
+        const regrade = await jpost(`/api/cards/${saved.cards[0].cardId}/grade`, {});
+        check('  and the re-staked card grades again cleanly', regrade.status === 200 || regrade.status === 201);
+      }
+    }
 
     // Bucket isolation: TIPSHEET must not pool with anything (invariant 13).
     const pl = await jget('/api/pl?engineVersion=all');
