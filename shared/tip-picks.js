@@ -2,7 +2,7 @@
 // app extracts to, and the normalization/validation that shape must survive.
 //
 // PURE and browser-safe - no `node:` import, ever. It is imported by
-// server/tip-extraction.js today and is the module a future review/edit UI
+// server/tip-picks.js today and is the module the manual entry dialog (D176)
 // would validate with, so the browser and the server can never disagree about
 // what a well-formed pick list is.
 //

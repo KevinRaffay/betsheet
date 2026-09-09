@@ -27,7 +27,7 @@ const check = (name, ok, detail = '') => {
 
 const { openDb } = await import('../server/db.js');
 const { insertRaceDay } = await import('../server/ingest.js');
-const { insertTipPicks } = await import('../server/tip-extraction.js');
+const { insertTipPicks } = await import('../server/tip-picks.js');
 const { scoreTipRace, aggregateTipScores, byTipSource } = await import('../shared/tip-scoring.js');
 
 console.log('-- pure: what a single race scores to --');

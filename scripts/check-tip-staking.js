@@ -180,7 +180,7 @@ console.log('-- the endpoints: preview writes nothing, save writes three cards -
     check('server boots', up, out.slice(-300));
 
     const Database = (await import('better-sqlite3')).default;
-    const { insertTipPicks } = await import('../server/tip-extraction.js');
+    const { insertTipPicks } = await import('../server/tip-picks.js');
     const fixture = JSON.parse(fs.readFileSync(
       path.join(ROOT, 'tests', 'fixtures', 'days', 'delmar-2026-08-30.entries.json'), 'utf8'));
     const dayId = (await (await jpost('/api/race-days', {

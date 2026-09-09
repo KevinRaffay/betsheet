@@ -1,71 +1,38 @@
-// TIPSHEET picks: the HTTP surface and the human-correction path (D169).
+// TIPSHEET picks: the HTTP surface, manual entry, and the correction path.
 //
-// D166 built extraction and a writer but no routes at all. This adds them,
-// plus the one thing D166 explicitly deferred: a way to review what the model
-// read and correct it when it read wrong.
+// D166-D169 read these picks off a SCREENSHOT with a vision call. D177 removed
+// that: it was slow, cost an API call per race, and a tip sheet is three horses
+// and three ranks - faster to type (D176) than to photograph. What that removal
+// deleted is the vision half only; the shape of the data, its validator, its
+// writer and everything downstream are untouched, which is why scoring (D170)
+// and staking (D171) needed no change at all.
 //
-// INVARIANT 9 IS INTACT, NOT EXCEPTED. The invariant governs the parse -> save
-// path: a preview writes nothing and is READ-ONLY, and `confirm` never trusts
-// the client's picks - it re-reads the ARCHIVED model response and re-parses
-// it server-side, exactly as server/equibase-otr.js re-reads archived PDF
-// bytes. What it cannot do is re-run the extraction, because that is a paid,
-// non-deterministic call: so the archived artifact here is the model's OWN
-// RESPONSE, and re-parsing it is the deterministic step confirm repeats.
+// The `raw_extraction` / `model` / `image_sha256` COLUMNS survive on purpose.
+// Rows extracted before the removal carry real values there, dropping a column
+// needs a table rebuild, and a shipped migration is immutable regardless. They
+// are simply NULL on everything typed since - which makes provenance readable
+// without a flag anyone has to maintain.
 //
-// Correcting is a SEPARATE, later, recorded act on a stored row (migration
-// 029), never an edit of the preview - which is what keeps the invariant
-// literally true rather than carved out. See that migration for the reasoning.
+// INVARIANT 9 IS INTACT, AND NOW TRIVIALLY SO. It governs the parse -> save
+// path; there is no parse left. Manual entry still runs every typed ranking
+// through the SAME `validateTipPicks` a model's output used to face, so a
+// person cannot save a ranking the parser would have refused. Correcting a
+// stored row (migration 029) remains a separate, recorded act.
 
-import fs from 'node:fs';
-import path from 'node:path';
-import crypto from 'node:crypto';
 import express from 'express';
-import { fileURLToPath, URL } from 'node:url';
 import { getDb } from './db.js';
 import { validateTipPicks, hasBlocking } from '../shared/tip-picks.js';
 import { normalizeSourceLabel } from '../shared/source-labels.js';
-import {
-  extractTipPicks, insertTipPicks, tipPicksForDay, parseExtractionJson, detectMediaType,
-} from './tip-extraction.js';
+
 import { getLogger, newCorrelationId } from './logging.js';
 
 const traceLog = getLogger('decision-trace');
-const ROOT = fileURLToPath(new URL('../', import.meta.url));
-const sha256 = (buf) => crypto.createHash('sha256').update(buf).digest('hex');
 const now = () => new Date().toISOString();
 
 export const tipPicksRouter = express.Router();
 
 class TipPicksError extends Error {
   constructor(status, message) { super(message); this.status = status; }
-}
-
-const EXT = { 'image/png': 'png', 'image/jpeg': 'jpg', 'image/webp': 'webp', 'image/gif': 'gif' };
-
-const archiveDir = () => process.env.BETSHEET_TIP_ARCHIVE_DIR
-  || path.join(ROOT, 'data', 'archive', 'tip-picks');
-
-/**
- * Archive one extraction: the image bytes AND the model's response, keyed by
- * the image's own sha256 so a re-upload of the same screenshot is idempotent.
- *
- * The `.json` sidecar is what `confirm` re-reads. Keeping the image too costs
- * little and is what makes a disputed row re-checkable months later against
- * the picture it came from - which the row's own `image_sha256` then matches.
- */
-function archiveExtraction(hash, imageBytes, mediaType, payload) {
-  const dir = archiveDir();
-  fs.mkdirSync(dir, { recursive: true });
-  const img = path.join(dir, `${hash}.${EXT[mediaType] ?? 'bin'}`);
-  if (!fs.existsSync(img)) fs.writeFileSync(img, imageBytes);
-  fs.writeFileSync(path.join(dir, `${hash}.json`), JSON.stringify(payload, null, 2));
-  return img;
-}
-
-function readArchivedExtraction(hash) {
-  const file = path.join(archiveDir(), `${hash}.json`);
-  if (!fs.existsSync(file)) return null;
-  try { return JSON.parse(fs.readFileSync(file, 'utf8')); } catch { return null; }
 }
 
 function loadDay(db, id) {
@@ -83,22 +50,14 @@ function requireRace(db, day, raceNo) {
   return n;
 }
 
-/** Decode a base64 image posted as JSON. The browser reads the file, not us. */
-function decodeImage(body) {
-  const raw = String(body?.imageBase64 ?? '').replace(/^data:[^;]+;base64,/, '');
-  if (!raw) throw new TipPicksError(400, 'imageBase64 is required.');
-  let buf;
-  try { buf = Buffer.from(raw, 'base64'); } catch { throw new TipPicksError(400, 'imageBase64 is not valid base64.'); }
-  if (!buf.length) throw new TipPicksError(400, 'The image is empty.');
-  const mediaType = detectMediaType(buf);
-  if (!mediaType) throw new TipPicksError(400, 'Unrecognized image format (expected PNG, JPEG, WebP or GIF).');
-  return { buf, mediaType };
-}
-
 const shapeRow = (r) => ({
   id: r.id, raceNo: r.race_no, bucket: r.bucket, sourceLabel: r.source_label,
   picks: r.picks, picksExtracted: r.picks_extracted ? JSON.parse(r.picks_extracted) : null,
   edited: Boolean(r.edited_at), editedAt: r.edited_at, capturedAt: r.captured_at,
+  // Legacy audit columns from the screenshot era (D166-D169, removed in D177).
+  // Kept, and still reported, because rows extracted before the removal carry
+  // real values here - dropping them would destroy that record, and a migration
+  // is immutable anyway. NULL on every row typed since.
   model: r.model, imageSha256: r.image_sha256, createdAt: r.created_at,
 });
 
@@ -108,97 +67,6 @@ const wrap = (fn) => async (req, res) => {
     throw err;
   }
 };
-
-/**
- * PREVIEW. Calls the model, archives the image and the response, returns what
- * a save WOULD store - and PERSISTS NOTHING (invariant 9).
- */
-tipPicksRouter.post('/race-days/:id/tip-picks/preview', wrap(async (req, res) => {
-  const db = getDb();
-  const day = loadDay(db, req.params.id);
-  const raceNo = requireRace(db, day, req.body?.race);
-  const { buf, mediaType } = decodeImage(req.body);
-  const hash = sha256(buf);
-  const correlationId = req.body?.correlationId || newCorrelationId();
-
-  const result = await extractTipPicks({
-    imageBuffer: buf, sourceHint: req.body?.sourceHint ?? '',
-    ...(req.body?.model ? { model: req.body.model } : {}),
-    // Check-script-only escape hatch, same shape as BETSHEET_LLM_TEST_MODE in
-    // server/llm-cards.js: a canned response travels the exact preview/save
-    // path a real call would, so the route contract is verifiable without a
-    // paid vision call. Never set this outside a check script.
-    stubResponse: process.env.BETSHEET_TIP_TEST_MODE === '1' ? req.body?.__stubResponse : undefined,
-  });
-
-  // Archived REGARDLESS of outcome - a failed read is exactly the case worth
-  // being able to look at later (invariant 11's spirit).
-  archiveExtraction(hash, buf, mediaType, {
-    raceDayId: day.id, raceNo, hash, mediaType, model: result.model,
-    sourceHint: req.body?.sourceHint ?? '', raw: result.raw, ok: result.ok,
-    error: result.error ?? null, extractedAt: now(), correlationId,
-  });
-  traceLog.info('tip_extraction_attempted', {
-    correlationId, raceDayId: day.id, raceNo, imageSha256: hash,
-    model: result.model, ok: result.ok, error: result.error ?? null,
-    pickCount: result.picks.length,
-  });
-
-  if (!result.ok) throw new TipPicksError(422, result.error);
-  res.json({
-    parseToken: hash, correlationId, raceNo, sourceLabel: result.sourceLabel,
-    model: result.model, picks: result.picks, warnings: result.warnings,
-    blocking: hasBlocking(result.warnings), imageSha256: hash,
-    existing: shapeRowOrNull(db, day.id, raceNo, result.sourceLabel),
-  });
-}));
-
-function shapeRowOrNull(db, dayId, raceNo, sourceLabel) {
-  const row = db.prepare(
-    'SELECT * FROM tip_picks WHERE race_day_id = ? AND race_no = ? AND source_label = ?',
-  ).get(dayId, raceNo, normalizeSourceLabel(sourceLabel));
-  return row ? { id: row.id, edited: Boolean(row.edited_at) } : null;
-}
-
-/**
- * SAVE. Re-reads the ARCHIVED response and re-parses it here - the client's
- * own picks are never trusted, the same discipline confirmEquibaseOtr applies
- * to archived PDF bytes.
- */
-tipPicksRouter.post('/race-days/:id/tip-picks', wrap(async (req, res) => {
-  const db = getDb();
-  const day = loadDay(db, req.params.id);
-  const raceNo = requireRace(db, day, req.body?.race);
-  const parseToken = String(req.body?.parseToken ?? '');
-  if (!parseToken) throw new TipPicksError(400, 'parseToken (from the preview) is required.');
-
-  const archived = readArchivedExtraction(parseToken);
-  if (!archived) throw new TipPicksError(404, 'No archived extraction for that parseToken - preview again before saving.');
-  if (!archived.ok || !archived.raw) throw new TipPicksError(422, 'That extraction failed and cannot be saved.');
-
-  const { data, error } = parseExtractionJson(archived.raw);
-  if (error) throw new TipPicksError(422, error);
-  const { picks, warnings } = validateTipPicks(data?.picks);
-  if (hasBlocking(warnings)) {
-    throw new TipPicksError(422, `The extraction has blocking warnings: ${
-      warnings.filter((w) => w.blocking).map((w) => w.message).join('; ')}`);
-  }
-  const sourceLabel = normalizeSourceLabel(data?.source_label || archived.sourceHint);
-
-  insertTipPicks(db, {
-    raceDayId: day.id, raceNo, sourceLabel, picks,
-    capturedAt: req.body?.capturedAt ?? null, rawExtraction: archived.raw,
-    model: archived.model, imageSha256: parseToken,
-  });
-  const row = db.prepare(
-    'SELECT * FROM tip_picks WHERE race_day_id = ? AND race_no = ? AND source_label = ?',
-  ).get(day.id, raceNo, sourceLabel);
-  traceLog.info('tip_picks_saved', {
-    correlationId: archived.correlationId ?? null, raceDayId: day.id, raceNo,
-    tipPicksId: row.id, sourceLabel, pickCount: picks.length, imageSha256: parseToken,
-  });
-  res.status(201).json({ saved: shapeRow({ ...row, picks }) });
-}));
 
 /** Read one day's tip picks back. */
 tipPicksRouter.get('/race-days/:id/tip-picks', wrap(async (req, res) => {
@@ -353,3 +221,36 @@ tipPicksRouter.post('/race-days/:id/tip-picks/manual', wrap(async (req, res) => 
   write();
   res.status(201).json({ raceNo, sheets: results, correlationId });
 }));
+
+/**
+ * Persist one race's picks for one source. The ONE writer, used by manual
+ * entry (D176) and by the check scripts.
+ *
+ * Re-extracting the same (day, race, source) REPLACES: a second screenshot of
+ * one app's picks for one race is a correction, not a second opinion. Both
+ * `raw_extraction` rows cannot be kept under that UNIQUE, which is the
+ * deliberate trade - the audit answer to "what did the model see last" is the
+ * one worth keeping while this is still extraction-only.
+ */
+export function insertTipPicks(db, {
+  raceDayId, raceNo, sourceLabel, picks, capturedAt = null,
+  rawExtraction = null, model = null, imageSha256 = null,
+}) {
+  return db.prepare(`
+    INSERT INTO tip_picks (race_day_id, race_no, bucket, source_label, picks,
+      captured_at, raw_extraction, model, image_sha256, created_at)
+    VALUES (?, ?, 'TIPSHEET', ?, ?, ?, ?, ?, ?, ?)
+    ON CONFLICT (race_day_id, race_no, source_label) DO UPDATE SET
+      picks = excluded.picks, captured_at = excluded.captured_at,
+      raw_extraction = excluded.raw_extraction, model = excluded.model,
+      image_sha256 = excluded.image_sha256, created_at = excluded.created_at
+  `).run(raceDayId, raceNo, normalizeSourceLabel(sourceLabel),
+    JSON.stringify(picks), capturedAt, rawExtraction, model, imageSha256, now());
+}
+
+/** Read one day's tip picks back, JSON decoded. The ONE reader. */
+export function tipPicksForDay(db, raceDayId) {
+  return db.prepare('SELECT * FROM tip_picks WHERE race_day_id = ? ORDER BY race_no, source_label')
+    .all(raceDayId)
+    .map((r) => ({ ...r, picks: JSON.parse(r.picks) }));
+}

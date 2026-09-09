@@ -1,7 +1,7 @@
 // Source labels (D167): the ONE place this codebase answers "who said this".
 //
 // PURE and browser-safe - no `node:` import, ever. Imported by the server
-// (llm-notes, tip-extraction) and by the client (AnalystNotesEditor), which is
+// (llm-notes, tip-picks) and by the client (AnalystNotesEditor), which is
 // the whole point: before this module the notes vocabulary lived in a .jsx and
 // the server could not see, enforce or even name it.
 //

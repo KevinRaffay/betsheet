@@ -55,8 +55,10 @@ export class AnthropicError extends Error {
 }
 
 // `user` is normally a string. It may also be an ARRAY of Anthropic content
-// blocks - which is how server/tip-extraction.js (D166) sends an image
-// alongside its text - and passes straight through to the API either way.
+// blocks - an image alongside text - which passes straight through to the API.
+// D166 used that for tip-sheet screenshots; D177 removed the last caller, so
+// nothing sends images today. The three lines are kept because they are the
+// whole of the support and cost nothing, not because something needs them.
 function buildMessages(user, prefill) {
   const messages = [{ role: 'user', content: user }];
   if (prefill) messages.push({ role: 'assistant', content: prefill });
