@@ -481,6 +481,7 @@ picked up.
 | Field-level comparison correctly treats "1" and 1 as the same value (real parsers disagree on type, not just content) and never confuses a structural coverage gap with an actual value disagreement | D191 |
 | A parser with no matching file for the requested track/date is reported unavailable for that comparison run, never fatal to it | D191 |
 | Every comparison performed lands in one ledger so a trend across many race days, not one anecdotal run, is what any future default-parser proposal is based on | D191 |
+| A real comparison, for a genuinely matched track/date pair, has actually been run - not just a synthetic proof of the diff mechanics - and every finding it produced is explained rather than left as unexplained noise | D194 (Del Mar, 2026-09-07: a two-token weight field, a per-run medication gap, scratched-horse odds handling, and a claim-price convention difference - none a parser defect) |
 | Every parser's real cost is tracked per run, including the ones that aren't billed in dollars, and an Apify actor's cost comes from its own billed-run API rather than its advertised rate | - (not scheduled) |
 | `source_parser_id` provenance is queryable per race day without cross-referencing `ingest_runs` by timestamp | - (not scheduled) |
 | Switching the default parser is always a manual decision informed by the comparison evidence, never automatic | - (not scheduled) |

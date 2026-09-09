@@ -15,8 +15,13 @@ parsers' fixtures (finding 13). Two real bugs surfaced WHILE building and
 verifying it, both fixed in the same deliverable rather than shipped and
 found later (findings 14 and 15). **D192** (2026-09-09) then made
 `equibase-apify-parseforge` handle a second, leaner real capture from the
-same actor (findings 16, 17) — the fixture gap finding 13 named is still
-open; a second Apify sample for a different date doesn't close it. M-4 and
+same actor (findings 16, 17) — the fixture gap finding 13 named was still
+open at that point. **D194** (2026-09-09) then closed it: the user supplied
+a real Equibase HTML page for Del Mar, 2026-09-07 - matching the track and
+date of the already-committed leaner Apify fixture from D192 - giving this
+codebase its first genuinely matched track/date pair through both
+registered parsers. The real comparison ran, found real (not synthetic)
+mismatches, and is now a permanent regression fixture (finding 18). M-4 and
 M-5 remain specified but not scheduled. Filed 2026-09-09 from an
 externally-drafted scope.
 **The internal `D1`–`D5` labels the incoming scope used are renamed
@@ -212,20 +217,24 @@ asked for. **This parser's `parse()` is real and fully verified against
 real data; its `toPayload` is deliberately inert until that migration
 exists** - which is M-5's scope, not this one's.
 
-**13. There is no real captured pair of the SAME track and date through
-both registered parsers.** The HTML fixtures cover Del Mar/Lethbridge
-(2026-09-06), Woodbine (2026-09-07) and Thistledown (2026-09-10); the Apify
-fixture covers Horseshoe Indianapolis and Kentucky Downs (2026-09-09) - zero
-overlap. `scripts/compare-parsers.js` (M-3) is verified two ways instead:
-`shared/parsers/compare.js`'s diff logic is unit-tested against hand-built
-synthetic parses engineered to exercise every code path at once
-(`scripts/check-compare-parsers.js`), and the CLI's file-discovery and
-"parser unavailable" reporting is exercised against the REAL fixture
-directories, which correctly report each side unavailable for every
-combination actually available today (there being no overlap is not a
-defect in the tool - it is what the tool is supposed to say when it's
-true). A genuinely matched real pair is what would let a comparison run
-count toward the decision rule's sample size; none exists yet.
+**13. RESOLVED by D194.** There was no real captured pair of the SAME track
+and date through both registered parsers when M-3 was built: the HTML
+fixtures covered Del Mar/Lethbridge (2026-09-06), Woodbine (2026-09-07) and
+Thistledown (2026-09-10); the Apify fixture covered Horseshoe Indianapolis
+and Kentucky Downs (2026-09-09) - zero overlap. `scripts/compare-parsers.js`
+(M-3) was verified two ways instead: `shared/parsers/compare.js`'s diff
+logic unit-tested against hand-built synthetic parses engineered to
+exercise every code path at once (`scripts/check-compare-parsers.js`), and
+the CLI's file-discovery and "parser unavailable" reporting exercised
+against the REAL fixture directories, which correctly reported each side
+unavailable for every combination available at the time (that being the
+honest, designed-for outcome, not a defect). The user then supplied a real
+HTML page for Del Mar, 2026-09-07 - matching D192's leaner Apify fixture's
+track and date exactly - and the real comparison ran for the first time,
+with real findings now permanently protected as a regression fixture
+(finding 18). A synthetic-only diff shape assertion could never have
+caught what that real run found (finding 18's field-by-field breakdown),
+which is the whole reason this gap mattered.
 
 **14. Passing `context.track`/`context.date` as "hints" to `parse()` during
 discovery is not safe for every parser - found live while first testing
@@ -292,6 +301,48 @@ result or silently do nothing - the honest outcome finding 13 already
 described, now confirmed to generalize: closing this gap needs a same
 TRACK-AND-DATE pair specifically, and a second Apify sample for a
 different date doesn't shrink it.
+
+**18. The first real comparison ran (D194, Del Mar 2026-09-07) and every
+finding it produced has a real, characterized explanation - none was a
+parser defect.** Race count matched (11/11) and every horse matched by
+name in both directions (0 missing either way) - the strongest possible
+confirmation that both parsers are reading the same real card correctly.
+82 entry-level field mismatches broke down into exactly four explained
+groups, each now a permanent assertion in `scripts/check-compare-parsers.js`:
+- **weight (3)**: NOT a scraper typo. The real Equibase page itself prints
+  a footnoted horse's weight as TWO tokens with no separator ("117 5" -
+  base weight, then a separate allowance figure) - which is exactly what
+  the Apify actor's own "1175" data-quality glitch (flagged since D190)
+  turns out to be: it concatenates the two printed numbers into one,
+  because it has no delimiter to split on. This corrects the earlier
+  framing of that glitch as noise in the source; it is a genuine two-part
+  printed field neither parser currently separates back out.
+- **medication (73)**: exactly finding 16's predicted false-positive,
+  now measured for real - this Apify capture has no medication field at
+  all (D192's leaner variant), so a per-run gap that `fieldsNotProvided`
+  correctly does NOT mask as structural shows up as 73 real value
+  mismatches. Confirms finding 16's design call was right (widening
+  `fieldsNotProvided` would have HIDDEN this, not fixed it) while showing
+  the real cost of that choice in noise, honestly, rather than papering
+  over it.
+- **morningLine / morningLineDecimal (8 each)**: every one is a SCRATCHED
+  horse. The HTML parser nulls a scratch's odds fields; this Apify capture
+  retains whatever it last read. Which convention is more useful is a
+  real, open question - not resolved here, and not this comparison's job
+  to resolve, only to surface.
+- **claimPrice (20)**: an optional-claiming horse NOT entered to be
+  claimed. The page prints `"$0"` for it; the Apify capture (correctly,
+  by its own field semantics - `horseClaimingPrice` is only ever present
+  when `enteredToBeClaimed: true`) reports `null`. Both encode "not
+  entered to claim," as two different literal values - not a disagreement
+  about the underlying fact.
+
+Both parsers' post-position-gap findings agreed EXACTLY (races 3, 5, 10 -
+each a real scratch, never a numbering disagreement between the two
+independent sources), and neither reported a double-space name artifact on
+this real day. `scripts/check-equibase-entries.js` gained a permanent
+assertion for the weight-token finding directly against the real page
+(`Rejoiceful`'s weight reads `"117 5"`), independent of the Apify side.
 
 ---
 

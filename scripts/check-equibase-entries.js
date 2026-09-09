@@ -299,6 +299,52 @@ console.log('\n-- the wrong page, diagnosed rather than shrugged at (D121) --');
       .warnings.some((x) => x.type === 'no_races'));
 }
 
+console.log('\n-- a second real Del Mar day (2026-09-07), the one that finally closed M-3\'s fixture gap --');
+// D193: the user supplied this page directly, matching the track/date of
+// an already-committed equibase-apify-parseforge fixture - the first time
+// this codebase has had a real, genuinely matched track/date pair through
+// both registered parsers. Hand-counted independently before comparing.
+const FIXTURE2 = path.join(DIR, 'DMR090726USA-EQB.view-source.html');
+const GOLDEN2 = path.join(DIR, 'DMR090726USA-EQB.expected.json');
+const html2 = fs.readFileSync(FIXTURE2, 'latin1');
+const out2 = parseEquibaseEntriesHtml(html2);
+check('track reads Del Mar', out2.track === 'Del Mar', out2.track);
+check('date is normalised to ISO', out2.date === '2026-09-07', out2.date);
+check('finds all 11 races', out2.races.length === 11, out2.races.length);
+check('no warnings on a clean real page', out2.warnings.length === 0, JSON.stringify(out2.warnings));
+
+// Hand-counted directly from the raw file's own printed entry rows and
+// scratch bars (not from the parser), independently of the Apify fixture
+// for the same day, before the two were ever compared.
+const EXPECTED2 = { 1: [10, 0], 2: [13, 1], 3: [11, 2], 4: [9, 0], 5: [12, 4], 6: [7, 0], 7: [14, 2], 8: [10, 0], 9: [10, 0], 10: [13, 2], 11: [14, 2] };
+for (const race of out2.races) {
+  const [entries, scratches] = EXPECTED2[race.number];
+  check(`race ${race.number} has ${entries} entries`, race.entries.length === entries, race.entries.length);
+  check(`race ${race.number} has ${scratches} scratch(es)`,
+    race.entries.filter((e) => e.scratched).length === scratches);
+}
+
+// D193's own finding: what the Apify actor renders as a single number like
+// "1175" is the printed page's WEIGHT cell concatenating a base weight with
+// a separate allowance figure with no separator between them - not a typo
+// and not the actor inventing a digit. The HTML parser (reading the same
+// cell the page actually prints) keeps them as two space-separated tokens.
+const rejoiceful = out2.races[0].entries.find((e) => e.horseName?.startsWith('Rejoiceful'));
+check('the page really does print the weight as two tokens, not one clean number - the source of the Apify "1175" glitch, not a scraper typo',
+  rejoiceful?.weight === '117 5', rejoiceful?.weight);
+
+if (writeGolden) {
+  fs.writeFileSync(GOLDEN2, `${JSON.stringify(out2, null, 2)}\n`);
+  console.log(`  wrote ${path.relative(ROOT, GOLDEN2)} - audit the diff before committing it`);
+} else if (!fs.existsSync(GOLDEN2)) {
+  check('second golden exists', false, 'run with --write-golden and audit it');
+} else {
+  const expected2 = JSON.parse(fs.readFileSync(GOLDEN2, 'utf8'));
+  check('second-fixture parse matches its audited golden exactly',
+    JSON.stringify(out2) === JSON.stringify(expected2),
+    'run --write-golden and read the diff before accepting it');
+}
+
 console.log('\n-- golden --');
 if (writeGolden) {
   fs.writeFileSync(GOLDEN, `${JSON.stringify(out, null, 2)}\n`);
