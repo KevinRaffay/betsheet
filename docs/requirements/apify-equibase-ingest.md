@@ -1,9 +1,10 @@
 # Apify Equibase ingestion: entries + results, minimum friction
 
-**Status: SPECIFIED, NOT SCHEDULED.** Reconciled 2026-09-09 against an
+**Status: PARTIALLY SCHEDULED.** Reconciled 2026-09-09 against an
 externally-drafted scope doc (`apify-equibase-ingest-scope.md`, written
 without repo access) and against this repo's own same-day prior art (D188-
-D193). Deliverable IDs get claimed when a phase below is picked up.
+D193). **Phase 1 is delivered as D195.** Remaining phases' deliverable IDs
+get claimed when picked up.
 **Explicitly out of scope, per user instruction**: scheduling, backfilling,
 backtesting, and anything touching the `legacy` branch (the D43/D44 PDF
 backfill pipeline for DMR-2026-summer etc.). **User framing that governs
@@ -136,18 +137,35 @@ explicitly not decided here - out of scope, not merely deferred.
 
 ## Coding plan
 
-**Phase 1 - schema: real provenance values, fail forward.**
-Schema-rebuild migrations (CHECK constraints can't be ALTERed) adding
-`'equibase_apify'` to both `race_days.entries_source` (migration 024's
-successor) and `result_charts.source_kind` (migration 010's successor),
-following migration 010's own rebuild-and-copy template. In the same pass,
-fix `server/ingest.js`'s `ENTRIES_SOURCES` gate from silent-coercion-to-
-`'program'` to an explicit 422 refusal naming the invalid value - the
-`getParser(id)`-style "refuse and name every valid option" convention
-already used elsewhere in this codebase, never applied here until now.
-Verified against a `VACUUM INTO` copy of the corpus per the usual rebuild
-discipline, without the extra caution the "real corpus" framing would
-otherwise demand.
+**Phase 1 - schema: real provenance values, fail forward. DELIVERED AS D195.**
+Migration 033 (`-- betsheet:schema-rebuild`) adds `'equibase_apify'` to both
+`race_days.entries_source` and `result_charts.source_kind` in one file - both
+rebuilds, both adding the identical value for the identical reason, neither
+depending on the other. `server/ingest.js`'s `ENTRIES_SOURCES` gate is fixed
+in the same pass: hoisted to module scope (exported, so `insertRaceDay` and
+the `/race-days` route's own validation share one list rather than two that
+could drift), and changed from silently coercing an unlisted value to
+`'program'` to refusing it - an omitted value still defaults to `'program'`
+(every pre-D115 ingest path relies on that), but a present, unrecognized one
+now throws from `insertRaceDay` (matching `getParser`'s own "refuse and name
+every valid option" idiom) and gets a clean 400 from the `/race-days` route's
+existing `problems`-array validation, rather than an uncaught 500 - no new
+error class needed, matching this file's own style. **Verified against a
+freshly-migrated temp database**, not a `VACUUM INTO` of "the real corpus" -
+no live corpus file exists in this environment, and per the user's own
+framing the corpus is disposable, so the usual extra caution CLAUDE.md
+reserves for a `race_days` rebuild is appropriately relaxed to the standard
+check-suite discipline rather than skipped. `npm run check-schema` gained
+four new assertions (both new CHECK values accepted, both tables' invalid-
+value refusal still holds); the full regression sweep (`check-ingest`,
+`check-equibase-entries`, `check-equibase-apify-parseforge`,
+`check-equibase-apify-results`, `check-entries-zip`, `check-grading`,
+`check-module-bindings`, `build`) is green. **A pre-existing, unrelated
+failure was found and isolated, not fixed**: `check-pl` has 4 failures
+(an LLM-card scenario in its own test setup) that reproduce identically
+against the pre-Phase-1 baseline (confirmed via a stashed before/after
+run) - not caused by this migration, out of scope for it, flagged
+separately.
 
 **Phase 2 - wire the two already-verified parsers to real saves.**
 `apifyParseforgeToPayload` stops throwing and produces `insertRaceDay`'s

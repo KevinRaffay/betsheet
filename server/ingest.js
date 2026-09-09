@@ -22,6 +22,28 @@ const traceLog = getLogger('decision-trace');
 
 export const ingestRouter = express.Router();
 
+// This allowlist is the SECOND gate, and both are load-bearing: the column
+// carries its own CHECK, and this array must name every value the CHECK
+// allows - adding a source means editing a migration (033's successor) AND
+// this array, never one of them. Module-scoped (not re-declared per call)
+// so insertRaceDay's own gate and the /race-days route's validation can
+// never drift into two different lists.
+export const ENTRIES_SOURCES = ['program', 'ml_sheet', 'both', 'equibase_html', 'equibase_apify'];
+
+// An omitted entriesSource defaults to 'program' (every ingest path that
+// predates D115 relies on this); a PRESENT-but-unrecognized value is
+// REFUSED rather than silently coerced to 'program' - the coercion this
+// used to do was the bug (D190/D192's "finding 8": a typo or an
+// unregistered source's provenance quietly filed under the wrong bucket,
+// corrupting invariant 13's isolation without a trace).
+function resolveEntriesSource(value) {
+  if (value == null) return 'program';
+  if (!ENTRIES_SOURCES.includes(value)) {
+    throw new Error(`Unknown entriesSource "${value}". Valid values: ${ENTRIES_SOURCES.join(', ')}`);
+  }
+  return value;
+}
+
 // D116: a race day from a manually saved Equibase entries page - the ingest
 // path for any track with no automated feed, and the reason a Kentucky Downs
 // card is possible at all now that Del Mar program ingestion is gone.
@@ -124,12 +146,7 @@ const toInt = (v) => (v === null || v === undefined || v === '' ? null : Math.ro
 // (program panel letters, Bottom Line fallback, ML sheet header, ...) it
 // arrived with.
 export function insertRaceDay(db, payload, correlationId) {
-  // This allowlist is the SECOND gate, and both are load-bearing: the column
-  // carries its own CHECK, and a value missing from this line is silently
-  // coerced to 'program' rather than refused - so adding a source means
-  // editing a migration AND this array, never one of them.
-  const ENTRIES_SOURCES = ['program', 'ml_sheet', 'both', 'equibase_html'];
-  const entriesSource = ENTRIES_SOURCES.includes(payload.entriesSource) ? payload.entriesSource : 'program';
+  const entriesSource = resolveEntriesSource(payload.entriesSource);
   const bottomLineByRace = new Map((payload.analysis ?? [])
     .filter((chunk) => chunk && Number.isInteger(chunk.race) && chunk.text)
     .map((chunk) => [chunk.race, String(chunk.text)]));
@@ -235,6 +252,9 @@ ingestRouter.post('/race-days', (req, res) => {
   if (!p.track || typeof p.track !== 'string') problems.push('track is required');
   if (!/^\d{4}-\d{2}-\d{2}$/.test(p.date ?? '')) problems.push('date must be yyyy-mm-dd');
   if (!Array.isArray(p.races) || p.races.length === 0) problems.push('at least one race is required');
+  if (p.entriesSource != null && !ENTRIES_SOURCES.includes(p.entriesSource)) {
+    problems.push(`entriesSource "${p.entriesSource}" is not recognized. Valid values: ${ENTRIES_SOURCES.join(', ')}`);
+  }
   for (const r of p.races ?? []) {
     if (!Number.isInteger(r.number)) problems.push(`race number missing on a race`);
     if (!Array.isArray(r.entries)) problems.push(`race ${r.number}: entries missing`);
