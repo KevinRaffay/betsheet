@@ -33,9 +33,14 @@ export const equibaseApifyEntriesRouter = express.Router();
 // response shape) without ever making a real, billed call. A real request
 // never passes `client`.
 export async function previewApifyEntries({ track, date }, client) {
-  const items = await fetchEntries({ raceDate: date, tracks: [track] }, client);
+  const { items, runId } = await fetchEntries({ raceDate: date, tracks: [track] }, client);
   const parsed = parseApifyParseforgeDataset(JSON.stringify(items));
-  return { ...parsed, entriesSource: 'equibase_apify', oddsCapturedAt: new Date().toISOString() };
+  // apifyRunId rides on the return value so the route below can log it
+  // (D204) - stripped before the HTTP response, since it is a diagnostic
+  // detail of THIS call, not part of the entries-preview shape
+  // /api/parse/equibase-entries already defines and NewRaceDay.jsx saves
+  // straight through.
+  return { ...parsed, entriesSource: 'equibase_apify', oddsCapturedAt: new Date().toISOString(), apifyRunId: runId };
 }
 
 equibaseApifyEntriesRouter.post('/parse/equibase-apify-entries', async (req, res) => {
@@ -47,10 +52,11 @@ equibaseApifyEntriesRouter.post('/parse/equibase-apify-entries', async (req, res
   }
 
   try {
-    const parsed = await previewApifyEntries({ track, date });
+    const { apifyRunId, ...parsed } = await previewApifyEntries({ track, date });
     log.info('parse_completed', {
       correlationId,
       kind: 'equibase_apify_entries',
+      apifyRunId,
       track: parsed.track,
       date: parsed.date,
       races: parsed.races.length,

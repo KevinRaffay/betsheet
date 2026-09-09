@@ -64,6 +64,7 @@ const trackList = args.tracks ? args.tracks.split(',').map((t) => t.trim()).filt
 // and no token needed - see pull-apify-entries.js's own header for why
 // this is a real feature, not just a test seam.
 let items;
+let runId = null;
 if (args.fixture) {
   items = JSON.parse(fs.readFileSync(args.fixture, 'utf8'));
   console.log(`Replaying ${items.length} row(s) from ${args.fixture} (no live call).\n`);
@@ -73,8 +74,10 @@ if (args.fixture) {
     process.exit(2);
   }
   console.log(`Calling Apify (parseforge/equibase-scraper, resultType=results, includeWagers=true, date=${args.date}${trackList.length ? `, tracks=${trackList.join(',')}` : ', tracks=all'}) - this costs real money.`);
-  items = await fetchResults({ raceDate: args.date, tracks: trackList });
-  console.log(`Received ${items.length} row(s).\n`);
+  // D204: see pull-apify-entries.js's identical comment - runId lets a
+  // suspicious row count be checked against the actor's own run.
+  ({ items, runId } = await fetchResults({ raceDate: args.date, tracks: trackList }));
+  console.log(`Received ${items.length} row(s) - Apify run ${runId} (https://console.apify.com/actors/runs/${runId}).\n`);
 }
 
 // --tracks filters here too, not just on the live call - see
@@ -159,7 +162,7 @@ for (const r of results) {
 }
 
 if (args.writeReport) {
-  fs.writeFileSync(args.writeReport, JSON.stringify({ date: args.date, tracks: trackList, results }, null, 2));
+  fs.writeFileSync(args.writeReport, JSON.stringify({ date: args.date, tracks: trackList, apifyRunId: runId, results }, null, 2));
   console.log(`\nWrote full report: ${args.writeReport}`);
 }
 

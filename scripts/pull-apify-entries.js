@@ -90,6 +90,7 @@ const trackList = args.tracks ? args.tracks.split(',').map((t) => t.trim()).filt
 // posture every other ingest path in this codebase takes), and how this
 // script is verified without ever spending real money.
 let items;
+let runId = null;
 if (args.fixture) {
   items = JSON.parse(fs.readFileSync(args.fixture, 'utf8'));
   console.log(`Replaying ${items.length} row(s) from ${args.fixture} (no live call).\n`);
@@ -99,8 +100,14 @@ if (args.fixture) {
     process.exit(2);
   }
   console.log(`Calling Apify (parseforge/equibase-scraper, resultType=entries, date=${args.date}${trackList.length ? `, tracks=${trackList.join(',')}` : ', tracks=all'}) - this costs real money.`);
-  items = await fetchEntries({ raceDate: args.date, tracks: trackList });
-  console.log(`Received ${items.length} row(s).\n`);
+  // D204: runId is printed and written to --write-report so a row-count
+  // that looks wrong (a large-field track undercounted, Kentucky Downs
+  // 2026-09-09) can be checked directly at
+  // https://console.apify.com/actors/runs/<runId> instead of guessing
+  // whether the actor's own scrape was short or something downstream
+  // dropped rows.
+  ({ items, runId } = await fetchEntries({ raceDate: args.date, tracks: trackList }));
+  console.log(`Received ${items.length} row(s) - Apify run ${runId} (https://console.apify.com/actors/runs/${runId}).\n`);
 }
 
 // Group by each row's own track, mirroring the parser's own fallback (the
@@ -185,7 +192,7 @@ for (const r of results) {
 }
 
 if (args.writeReport) {
-  fs.writeFileSync(args.writeReport, JSON.stringify({ date: args.date, tracks: trackList, results }, null, 2));
+  fs.writeFileSync(args.writeReport, JSON.stringify({ date: args.date, tracks: trackList, apifyRunId: runId, results }, null, 2));
   console.log(`\nWrote full report: ${args.writeReport}`);
 }
 

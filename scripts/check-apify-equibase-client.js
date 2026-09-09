@@ -97,22 +97,24 @@ const realEntryRow = {
   programNumber: '1', horse: 'Test Horse', morningLineOdds: '3/1',
 };
 const entriesForRoundTrip = fakeClient([realEntryRow]);
-const rawEntries = await fetchEntries({ raceDate: '2026-09-09', tracks: ['DMR'] }, entriesForRoundTrip);
+const { items: rawEntries, runId: entriesRunId } = await fetchEntries({ raceDate: '2026-09-09', tracks: ['DMR'] }, entriesForRoundTrip);
 const parsedEntries = parseApifyParseforgeDataset(JSON.stringify(rawEntries));
 check('a live-fetched entries item parses through the real parser with no reshaping',
   parsedEntries.track === 'Del Mar' && parsedEntries.races[0]?.entries[0]?.horseName === 'Test Horse',
   JSON.stringify(parsedEntries));
+check('D204: returns the actor run id alongside items, for a caller to log', entriesRunId === 'run1');
 
 const realResultRow = {
   rowType: 'result', trackCode: 'DMR', trackName: 'Del Mar', raceDate: '2026-09-09', raceNumber: 1,
   finishPosition: 1, programNumber: '1', horse: 'Test Horse', winPayoff: 5.4,
 };
 const resultsForRoundTrip = fakeClient([realResultRow]);
-const rawResults = await fetchResults({ raceDate: '2026-09-09', tracks: ['DMR'] }, resultsForRoundTrip);
+const { items: rawResults, runId: resultsRunId } = await fetchResults({ raceDate: '2026-09-09', tracks: ['DMR'] }, resultsForRoundTrip);
 const parsedResults = parseApifyResultsDataset(JSON.stringify(rawResults));
 check('a live-fetched results item parses through the real parser with no reshaping',
   parsedResults.track === 'Del Mar' && parsedResults.races[0]?.results[0]?.winCents === 540,
   JSON.stringify(parsedResults));
+check('D204: fetchResults also returns the run id', resultsRunId === 'run1');
 
 if (failures) {
   console.error(`\ncheck-apify-equibase-client: ${failures} failure(s)`);
