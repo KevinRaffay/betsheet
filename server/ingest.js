@@ -164,25 +164,24 @@ export function insertRaceDay(db, payload, correlationId) {
       toInt(race.claimingPriceCents), race.wagerMenu ?? null,
       bottomLineByRace.get(race.number) ?? null,
     );
-    // D122: a race can carry MORE THAN ONE horse with no printed program
-    // number - two scratches in one race is ordinary, and it broke 10 of 91
-    // real Equibase days outright: both became 'SCR', collided on
-    // UNIQUE(race_id, program_number), and the whole day's insert failed. The
-    // fix is uniqueness, not renaming: the first numberless entry in a race is
-    // still plain 'SCR', so the common single-scratch case is byte-identical
-    // to every row already stored, and only the second onward is suffixed.
-    let numberless = 0;
-    const placeholder = () => {
-      numberless += 1;
-      return numberless === 1 ? 'SCR' : `SCR-${numberless}`;
-    };
+    // D180: a scratched horse can have NO printed program number - Equibase
+    // replaces the number and post-position cells with a colspan SCR marker -
+    // and since migration 032 the column is NULLABLE, so that fact is stored
+    // as NULL rather than as the literal 'SCR'.
+    //
+    // This is what D122's 'SCR' / 'SCR-2' / 'SCR-3' placeholders existed to
+    // work around: they collided on UNIQUE(race_id, program_number) whenever a
+    // race scratched two horses, which broke 10 of 91 real days outright.
+    // SQLite's UNIQUE permits any number of NULLs, so the collision is now
+    // impossible rather than suffixed around - and the stored value no longer
+    // depends on the order rows happen to be parsed in, which 'SCR-2' did.
     for (const e of race.entries) {
       // A scratched horse can have no number printed at all; the column is
       // NOT NULL, so mark it visibly rather than dropping the horse.
       const equipment = [e.equipment, e.equipmentChange].filter(Boolean).join('; ') || null;
       insertEntry.run(
         raceInfo.lastInsertRowid,
-        e.programNumber ?? placeholder(),
+        e.programNumber ?? null,
         toInt(e.postPosition), e.horseName ?? '(unnamed)',
         e.morningLine ?? null, e.morningLineDecimal ?? null,
         e.jockey ?? null, e.trainer ?? null, toInt(e.weight), equipment,

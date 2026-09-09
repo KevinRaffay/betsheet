@@ -448,3 +448,12 @@ Scope and archaeology: `docs/requirements/llm-baseline-inputs.md`.
 | Assertions about removed prompt content are inverted, not deleted, so re-adding a dead field is deliberate | D178 |
 | **Rejected on evidence**: stripping program numbers from the prompt. 0.1% error rate over 3,190 references, both failures traced to a data defect, ~2.5% token saving, and it would trade a non-blocking name check for a blocking one | - (analysed, not built) |
 | **Found, not fixed**: 150 entries across 15 days carry `SCR`/`SCR-2` as a program number | - (own deliverable) |
+
+## A program-less scratch has no program number (fixed 2026-09-08)
+
+| requirement | deliverable |
+| --- | --- |
+| A scratched horse whose number Equibase does not print is stored NULL, not a placeholder | D180 |
+| Two program-less scratches in one race need no suffix and no parse-order dependence | D180 |
+| A ticket cannot name a scratched, numberless horse - the scratch guard keys on the number, so a NULL must be refused earlier | D180 |
+| **Corrected**: D178's claim that the placeholder corrupted two LLM generations. Re-measured on the selections column, 0 of 3,156 references were wrong | D180 |

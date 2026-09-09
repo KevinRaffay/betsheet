@@ -355,7 +355,12 @@ export function buildLlmRaceUserPrompt({
     // ingestion D113 deleted - 0 of 574 entries on an active day carry either,
     // so they rendered nothing but cost a branch and a promise in the system
     // prompt. The morning line is what an entry actually has.
-    lines.push(`#${e.programNumber} ${stripParens(e.horseName)}${e.scratched ? ' (SCRATCHED)' : ''} - ML ${e.morningLine ?? '?'}`);
+    // D180: a scratched horse can have NO program number - Equibase replaces
+    // the cell with an SCR marker - so it is stored NULL and must not render
+    // as "#null". The horse is still listed, because knowing it is out is
+    // worth something to the read; it just carries no number to bet with.
+    const tag = e.programNumber == null ? '(SCR)' : `#${e.programNumber}`;
+    lines.push(`${tag} ${stripParens(e.horseName)}${e.scratched ? ' (SCRATCHED)' : ''} - ML ${e.morningLine ?? '?'}`);
   }
   // D178: the PROGRAM BOTTOM LINE block went with the same D113 removal -
   // 0 of 49 races on an active day carry one, so the branch could never fire.

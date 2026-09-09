@@ -182,6 +182,17 @@ function resolveToken(token, entries, race, warnings) {
     warnings.push({ type: 'unknown_program', blocking: true, race, message: `Race ${race}: no entry matching "${token}".` });
     return null;
   }
+  // D180: a scratched horse can have NO program number at all. Returning it
+  // would put a null selection on a ticket, and the scratch guard downstream
+  // keys on the NUMBER (`scratched.has(pgm)`), so a null would slip past it -
+  // the one way a scratched horse could still have been bet.
+  if (entry.program_number == null) {
+    warnings.push({
+      type: 'unknown_program', blocking: true, race,
+      message: `Race ${race}: "${token}" was scratched and has no program number to bet.`,
+    });
+    return null;
+  }
   return entry.program_number;
 }
 
