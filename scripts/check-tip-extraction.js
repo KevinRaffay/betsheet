@@ -101,8 +101,14 @@ console.log('-- no HUMAN / LLM / OTR schema was touched --');
   // worth guarding never changed - that the other buckets are undisturbed.
   check('cards.consensus_completeness carries TIPSHEET (added by D171 staking)', /TIPSHEET/.test(completeness));
   check('cards still carries HUMAN, LLM_GENERATED and EQB_OTR', ['HUMAN', 'LLM_GENERATED', 'EQB_OTR'].every((b) => completeness.includes(b)));
+  // D166 promised extraction added no card column, and it did not. D171 staked
+  // tip picks into real cards and D174 gave those cards an identity so a
+  // re-stake finds them again, so exactly ONE tip_* column exists now, on
+  // purpose. Pinned to that one rather than deleted, so a THIRD column would
+  // still have to be a deliberate act.
   const tipCols = db.prepare('PRAGMA table_info(cards)').all().map((c) => c.name).filter((c) => /tip/i.test(c));
-  check('cards gained no tip_* column', tipCols.length === 0, tipCols.join(','));
+  check('cards carries exactly one tip_* column, tip_source_label (D174)',
+    tipCols.length === 1 && tipCols[0] === 'tip_source_label', tipCols.join(','));
 }
 
 console.log('-- odds normalize into the format morningLineToDecimal reads --');

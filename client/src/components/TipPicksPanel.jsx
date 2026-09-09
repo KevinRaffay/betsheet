@@ -333,14 +333,32 @@ export default function TipPicksPanel({ dayId, races = [], onSaved = () => {} })
             so backtesting can say which structure is worth it. Bankroll ${(staking.bankrollCents / 100).toFixed(2)}.
             Nothing is written until you save.
           </p>
+          {/* D174: ONE card per source per variant. Re-staking after another
+              race's picks arrive UPDATES those cards - it does not add three
+              more - and re-prices every race, since the per-race budget is
+              the bankroll split across the races that have picks. */}
+          {staking.variants.some((v) => v.willUpdate) && (
+            <p className="notice">
+              This source already has cards on this day. Saving <strong>updates</strong> them to cover every race
+              with picks — it does not add three more — and re-prices every race, because the per-race budget is
+              the bankroll split across the races that have picks.
+            </p>
+          )}
+          {staking.variants.some((v) => v.willRegrade) && (
+            <p className="notice notice--warn">
+              Some of those cards are already <strong>graded</strong>. Saving replaces their tickets, so their
+              grades are discarded and a reported P/L figure will move. There is no way back from here.
+            </p>
+          )}
           <table className="grid">
-            <thead><tr><th>Variant</th><th>Tickets</th><th>Cost</th></tr></thead>
+            <thead><tr><th>Variant</th><th>Tickets</th><th>Cost</th><th>Card</th></tr></thead>
             <tbody>
               {staking.variants.map((v) => (
                 <tr key={v.variant}>
                   <td>{v.label}</td>
                   <td>{v.races.reduce((n, r) => n + r.tickets.length, 0)}</td>
                   <td>${(v.costCents / 100).toFixed(2)}</td>
+                  <td>{v.willUpdate ? `updates #${v.existingCardId}${v.willRegrade ? ' (graded)' : ''}` : 'new'}</td>
                 </tr>
               ))}
             </tbody>
@@ -362,7 +380,7 @@ export default function TipPicksPanel({ dayId, races = [], onSaved = () => {} })
                 try { await saveTipCards(dayId, staking.sourceLabel); setStaking(null); onSaved(); }
                 catch (err) { setError(err.message); } finally { setBusy(false); }
               }}>
-              {busy ? 'Saving…' : 'Save three cards'}
+              {busy ? 'Saving…' : staking.variants.some((v) => v.willUpdate) ? 'Update three cards' : 'Save three cards'}
             </button>
           </div>
         </div>
