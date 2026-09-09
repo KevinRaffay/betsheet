@@ -4,16 +4,18 @@ import { TIP_SOURCE_LABELS } from '@shared/source-labels.js';
 
 // Manual tip-pick entry for ONE race (D176).
 //
-// The grid is horse ROWS by tipsheet COLUMNS, each cell a rank dropdown. That
-// shape is not cosmetic: a horse routinely appears in several sheets at
-// different ranks - in the two real screenshots this project extracted, two of
-// the three horses did (Karazest was TrackMaster 1 and NumberFire 2). A single
-// tipsheet dropdown per horse row could not express that at all.
+// The grid is horse ROWS by tipsheet COLUMNS, each cell three toggle buttons
+// (D185; it was a rank dropdown until then). That shape is not cosmetic: a
+// horse routinely appears in several sheets at different ranks - in the two
+// real screenshots this project extracted, two of the three horses did
+// (Karazest was TrackMaster 1 and NumberFire 2). A single tipsheet dropdown
+// per horse row could not express that at all.
 //
 // Ranks are 1-3 per sheet and each rank is used at most once per sheet, which
-// the UI enforces by removing a rank from the other dropdowns in that column -
+// the UI enforces by MOVING a rank off whichever horse held it in that column -
 // the server validates it again regardless, through the same validateTipPicks
-// a model's output passes.
+// a model's output passes. D185 kept that rule exactly and changed only the
+// control: clicking a lit button clears it, clicking any other takes the rank.
 //
 // HOUSE RULE: `.modal-backdrop` carries NO click handler. An accidental click
 // outside must never discard typed picks.
@@ -103,8 +105,9 @@ export default function TipPicksEntryModal({ dayId, race, entries = [], existing
 
         {error && <p className="notice notice--error">{error}</p>}
         <p className="dim">
-          Rank up to three horses per tip sheet. A horse can appear in several sheets at different ranks.
-          Clearing every rank in a column removes that sheet from this race.
+          Click 1, 2 or 3 to rank a horse for a tip sheet; click the same button again to clear it.
+          A horse can appear in several sheets at different ranks. Clearing every rank in a column
+          removes that sheet from this race.
         </p>
 
         <div className="formrow">
@@ -142,14 +145,31 @@ export default function TipPicksEntryModal({ dayId, race, entries = [], existing
                 <td className="col-detail dim">{e.morning_line || '—'}</td>
                 {columns.map((s) => (
                   <td key={s}>
-                    <select
-                      className="in in--sm" value={rankOf(s, e.program_number)}
-                      aria-label={`${s} rank for ${e.horse_name}`}
-                      onChange={(ev) => setRank(s, e.program_number, ev.target.value)}
-                    >
-                      <option value="">—</option>
-                      {RANKS.map((r) => <option key={r} value={r}>{r}</option>)}
-                    </select>
+                    {/* D185: three toggle buttons, not a dropdown. Every rank
+                        is one click from anywhere, and the whole column can be
+                        read at a glance - a <select> hid the current value
+                        behind a control that had to be opened to be trusted.
+                        `aria-pressed` carries the on/off state, so the button
+                        reports the same thing to a screen reader that the fill
+                        reports to the eye. */}
+                    <div className="rankpick" role="group" aria-label={`${s} rank for ${e.horse_name}`}>
+                      {RANKS.map((r) => {
+                        const on = rankOf(s, e.program_number) === r;
+                        return (
+                          <button
+                            key={r} type="button"
+                            className={on ? 'btn btn--sm btn--primary' : 'btn btn--sm'}
+                            aria-pressed={on}
+                            title={on ? `Clear rank ${r} for ${e.horse_name}` : `${s} rank ${r} for ${e.horse_name}`}
+                            // Clicking the ON button clears it; clicking any
+                            // other MOVES that rank off whoever held it, which
+                            // is `setRank`'s existing exclusion rule reused
+                            // rather than a second copy of it.
+                            onClick={() => setRank(s, e.program_number, on ? '' : r)}
+                          >{r}</button>
+                        );
+                      })}
+                    </div>
                   </td>
                 ))}
               </tr>

@@ -318,6 +318,14 @@ label.btn.btn--primary { color: var(--color-accent-text); }
 /* One source's picks within a race - several sheets can rank the same race,
    so each needs its own visible block rather than a run-on table. */
 .tip-source { margin: 8px 0 12px; }
+
+/* D185: the rank picker in the tip-sheet entry grid - three toggle buttons per
+   cell, replacing a dropdown. Sized down from `.btn--sm` so three fit a narrow
+   column without stretching the table (the house rule in Gotchas is that a
+   wide table pushes the action column out of reach). The lit state is plain
+   `.btn--primary`, so "chosen" looks the same here as everywhere else. */
+.rankpick { display: flex; gap: 4px; }
+.rankpick .btn { width: 26px; padding: 2px 0; text-align: center; }
 .notes-text { white-space: pre-wrap; max-width: 110ch; margin: 6px 0 0; font-size: 13px; line-height: 1.45; }
 
 /* ---- consensus panel ---- */
