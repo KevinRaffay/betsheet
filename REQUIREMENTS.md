@@ -484,3 +484,17 @@ picked up.
 | Every parser's real cost is tracked per run, including the ones that aren't billed in dollars, and an Apify actor's cost comes from its own billed-run API rather than its advertised rate | - (not scheduled) |
 | `source_parser_id` provenance is queryable per race day without cross-referencing `ingest_runs` by timestamp | - (not scheduled) |
 | Switching the default parser is always a manual decision informed by the comparison evidence, never automatic | - (not scheduled) |
+
+## Equibase results ingest via Apify (scoped 2026-09-09)
+
+Full specification, with what checking a real sample against the code found:
+[docs/requirements/equibase-apify-results-ingest.md](docs/requirements/equibase-apify-results-ingest.md).
+Specified but NOT scheduled - deliverable IDs get claimed when the work is
+picked up.
+
+| Requirement | Deliverables |
+| --- | --- |
+| A second results source (an Apify JSON export, same actor family as D190's entries parser) parses to the same canonical shape `saveResults` already consumes, so no change to results persistence is needed for the parser itself | - (not scheduled) |
+| Scratches are derived by diffing the day's saved entries against this source's finisher list, since the source names no scratches at all - without it, a ticket on a scratched horse would grade as a loss instead of the refund invariant 1 requires | - (not scheduled) |
+| A per-race gap in the source (e.g. a missing final time) is reported as a warning, never silently rendered blank | - (not scheduled) |
+| The parser is built and verified standalone before `result_charts.source_kind`'s CHECK constraint is extended to accept it - the same order D190 followed for `entries_source`, migration decided separately from the parser | - (not scheduled) |
