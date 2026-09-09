@@ -457,3 +457,25 @@ Scope and archaeology: `docs/requirements/llm-baseline-inputs.md`.
 | Two program-less scratches in one race need no suffix and no parse-order dependence | D180 |
 | A ticket cannot name a scratched, numberless horse - the scratch guard keys on the number, so a NULL must be refused earlier | D180 |
 | **Corrected**: D178's claim that the placeholder corrupted two LLM generations. Re-measured on the selections column, 0 of 3,156 references were wrong | D180 |
+
+## Multi-parser, multi-track/day entries ingestion (scoped 2026-09-09)
+
+Full specification, with what checking it against the code found - including
+that the incoming scope's cited "prior evaluation" of three Apify actors and
+its cited `D-scope-race-day-notes-entry.md` do not exist anywhere in this
+repository:
+[docs/requirements/multi-parser-entries-ingest.md](docs/requirements/multi-parser-entries-ingest.md).
+Specified but NOT scheduled - deliverable IDs get claimed when the work is
+picked up.
+
+| Requirement | Deliverables |
+| --- | --- |
+| Entries parsers are pluggable adapters to one canonical payload shape, chosen per run via `--parser`, instead of the one hardcoded HTML parser - the shape already matches what `insertRaceDay` consumes | - (not scheduled) |
+| An unknown `--parser` value is a hard error naming valid ids, never a silent fallback to default | - (not scheduled) |
+| One command pulls a full day's slate across every track racing, each pulled and parsed independently so one track's failure doesn't abort the run | - (not scheduled) |
+| Every ingest run lands in one ledger (`ingest_runs`) that a later comparison and cost report both read from | - (not scheduled) |
+| A challenger parser is compared against the HTML parser as the trusted baseline - never symmetric peer comparison - on the "label everything, conclude nothing until n is stated" rule already governing this corpus | - (not scheduled) |
+| Every parser's real cost is tracked per run, including the ones that aren't billed in dollars, and an Apify actor's cost comes from its own billed-run API rather than its advertised rate | - (not scheduled) |
+| `source_parser_id` provenance is queryable per race day without cross-referencing `ingest_runs` by timestamp | - (not scheduled) |
+| Switching the default parser is always a manual decision informed by the comparison evidence, never automatic | - (not scheduled) |
+| **Open question, not resolved here**: whether automated per-day track discovery belongs in this local-only, invariant-6 app at all, since it would be the first automated outbound fetch since D113 deleted the crawler | - (undecided) |
