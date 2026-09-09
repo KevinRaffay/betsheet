@@ -118,10 +118,14 @@ check('post time is always null (this source never prints one)', ind.races.every
 check('live odds are always null on every entry', ind.races.every((r) => r.entries.every((e) => e.liveOdds === null && e.liveOddsDecimal === null)));
 check('also-eligible is always false (no field for it in this source)', ind.races.every((r) => r.entries.every((e) => e.alsoEligible === false)));
 
-console.log('\n-- not wired to any save path, deliberately --');
-let threw = false;
-try { apifyParseforgeToPayload(ind, new Date().toISOString(), new Set()); } catch { threw = true; }
-check('toPayload refuses rather than silently mislabeling entries_source', threw);
+console.log('\n-- toPayload: wired to insertRaceDay\'s real shape (D195/D196) --');
+const capturedAt = '2026-09-09T12:00:00.000Z';
+const payload = apifyParseforgeToPayload(ind, capturedAt);
+check('entriesSource is the real provenance value, not a placeholder', payload.entriesSource === 'equibase_apify');
+check('track/date pass through unmodified', payload.track === ind.track && payload.date === ind.date);
+check('oddsCapturedAt is the capturedAt argument, not invented', payload.oddsCapturedAt === capturedAt);
+check('races pass through by reference - no reshaping, since parse() already matches insertRaceDay\'s shape',
+  payload.races === ind.races);
 
 console.log('\n-- malformed input never throws (the same contract every parser here holds) --');
 check('non-JSON input returns a blocking warning, not an exception',

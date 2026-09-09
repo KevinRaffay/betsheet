@@ -508,13 +508,13 @@ repo's own same-day prior art (D188-D193):
 [docs/requirements/apify-equibase-ingest.md](docs/requirements/apify-equibase-ingest.md).
 Explicitly out of scope per user instruction: scheduling, backfilling,
 backtesting, and the `legacy` branch's PDF backfill pipeline. Phase 1 is
-delivered as **D195**; remaining phases' deliverable IDs get claimed when
-picked up.
+delivered as **D195**, Phase 2 as **D196**; remaining phases' deliverable
+IDs get claimed when picked up.
 
 | Requirement | Deliverables |
 | --- | --- |
 | `race_days.entries_source` and `result_charts.source_kind` gain a real `equibase_apify` CHECK value each (schema-rebuild migration), and `server/ingest.js`'s silent coercion of an unlisted `entriesSource` to `'program'` is fixed to an explicit refusal in the same pass | D195 |
-| Both already-built, real-sample-verified Apify parsers (D190/D192 entries, D193 results) are wired to real saves - `toPayload`/`apifyResultsToPayload` stop throwing once the schema accepts their provenance value; neither parser's own `parse()` changes | - (not scheduled) |
+| Both already-built, real-sample-verified Apify parsers (D190/D192 entries, D193 results) are wired to real saves - the entries parser's `toPayload` stops throwing once the schema accepts its provenance value; the results parser needed no adapter function at all once built (its output already matches `saveResults`'s shape); neither parser's own `parse()` changes. The same finding-8-class silent-fallback bug found and fixed in `server/results.js`'s `SOURCE_KINDS` in the same pass | D196 |
 | BetSheet calls Apify's API directly, on demand only, no scheduling of any kind - a deliberate, documented second exception to invariant 6 (the mobile surface is the first), resolved 2026-09-09 in favor of minimum friction over manual-file consistency | - (not scheduled) |
-| A results-side CLI/ingestion path exists for the first time - today `saveResults` is reachable only from the UI's paste/PDF route | - (not scheduled) |
+| A results-side ingestion path exists beyond the UI's paste/PDF route - a day-scoped preview route now exists (`server/equibase-apify-results.js`); a CLI script (Phase 4) does not yet | D196 (route); CLI script not scheduled |
 | The actor stays `parseforge/equibase-scraper`, not the incoming doc's recommended `getascraper` - three real verified samples already exist against parseforge and zero against getascraper, and this codebase doesn't build adapters without a captured real sample | - (decided, not built) |

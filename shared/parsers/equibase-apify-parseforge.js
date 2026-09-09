@@ -220,21 +220,21 @@ export function parseApifyParseforgeDataset(rawInput, context = {}) {
   return { track, date, races, warnings };
 }
 
-// NOT WIRED TO ANY SAVE PATH (deliberately). insertRaceDay's
-// `entries_source` CHECK constraint (migration 024) has no value for an
-// Apify-sourced day - only 'program', 'ml_sheet', 'both', 'equibase_html'
-// - and a value missing from that list is silently coerced to 'program'
-// (M-1's finding 8) rather than refused. Adding a value needs a
-// schema-rebuild migration verified against a VACUUM INTO copy of the real
-// corpus (CLAUDE.md's own caution for this exact table), which is M-5's
-// scope, not this parser's. Throwing here turns a silent mislabel into a
-// loud, unmissable failure until that migration exists.
-export function apifyParseforgeToPayload() {
-  throw new Error(
-    'equibase-apify-parseforge: toPayload is not wired to a real save path yet - '
-    + "insertRaceDay's entries_source CHECK constraint has no value for an Apify-sourced "
-    + "day (finding 8 / M-5), and passing an unlisted value would silently mislabel it as "
-    + "'program' rather than refuse. Extend the schema (a rebuild migration, matching "
-    + 'migration 024\'s own precedent) before wiring this parser into any save path.',
-  );
+// WIRED TO A REAL SAVE PATH (D195/Phase 2, `docs/requirements/
+// apify-equibase-ingest.md`). `race_days.entries_source`'s CHECK constraint
+// (migration 033) now admits `'equibase_apify'`, the finding-8 silent-
+// coercion bug is fixed in `server/ingest.js`, and `parse()`'s own output
+// already matches `insertRaceDay`'s consumed shape field-for-field (the
+// registry's own header comment established this at M-1) - so unlike
+// `equibaseHtmlToPayload`, there is no reshaping to do here, only the two
+// fields `parse()` cannot supply itself: which provenance value this is,
+// and when the capture was taken.
+export function apifyParseforgeToPayload(parsed, capturedAt) {
+  return {
+    track: parsed.track,
+    date: parsed.date,
+    entriesSource: 'equibase_apify',
+    oddsCapturedAt: capturedAt,
+    races: parsed.races,
+  };
 }
