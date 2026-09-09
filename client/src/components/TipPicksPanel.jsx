@@ -159,7 +159,13 @@ function CorrectRow({ row, onDone, onCancel }) {
   );
 }
 
-export default function TipPicksPanel({ dayId, races = [] }) {
+/**
+ * `onSaved` remounts the sibling CardsPanel (D173). Staking writes THREE cards
+ * that CardsPanel cannot know about - it self-fetches on mount - so without
+ * this the cards appear only after a page reload, exactly the defect D142
+ * fixed for the Equibase OTR panel.
+ */
+export default function TipPicksPanel({ dayId, races = [], onSaved = () => {} }) {
   const [rows, setRows] = useState([]);
   const [race, setRace] = useState(races[0]?.number ?? 1);
   const [sourceHint, setSourceHint] = useState('');
@@ -353,7 +359,7 @@ export default function TipPicksPanel({ dayId, races = [] }) {
             <button type="button" className="btn btn--primary" disabled={busy}
               onClick={async () => {
                 setBusy(true); setError(null);
-                try { await saveTipCards(dayId, staking.sourceLabel); setStaking(null); }
+                try { await saveTipCards(dayId, staking.sourceLabel); setStaking(null); onSaved(); }
                 catch (err) { setError(err.message); } finally { setBusy(false); }
               }}>
               {busy ? 'Saving…' : 'Save three cards'}

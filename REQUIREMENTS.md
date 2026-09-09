@@ -377,3 +377,10 @@ Follows D166's own flagged finding. Consolidation, not new capability.
 | "Generate Card from LLM" opens the modal instead of blanking the page | D172 |
 | A module may not use a name it only re-exports - the blank-page class is caught by a check, not by a bug report | D172 |
 | That check normalizes CRLF, because this repo stores CRLF and JS `.` will not cross `\r` | D172 |
+
+## Fix: staked cards needed a reload (reported 2026-09-08)
+
+| requirement | deliverable |
+| --- | --- |
+| Cards written by the tip-staking panel appear in the Betting cards table without a page reload | D173 |
+| Every sibling of `CardsPanel` that writes a card carries the `onSaved` wire, and the code says so rather than naming one sibling | D173 |
