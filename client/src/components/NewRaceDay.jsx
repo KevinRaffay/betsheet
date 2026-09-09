@@ -1,7 +1,14 @@
 import React, { useState } from 'react';
-import { parseEquibaseEntries, saveRaceDay } from '../api.js';
+import { parseEquibaseEntries, pullApifyEntries, saveRaceDay } from '../api.js';
+import { listTracks } from '@shared/track-codes.js';
 import ParsePreview from './ParsePreview.jsx';
 import BulkEntriesUpload from './BulkEntriesUpload.jsx';
+
+// Suggestions only, never a restriction (the same "suggest, don't restrict"
+// shape AnalystNotesEditor.jsx's own source datalist already uses) - the
+// registry is every track this codebase has personally seen, not an
+// exhaustive Equibase list, so an unlisted track must still type freely.
+const TRACK_SUGGESTIONS = listTracks();
 
 // The ingest screen: get a saved Equibase entries page in - by file upload or
 // by pasting its HTML - review the parse, then save. The preview is
@@ -86,6 +93,23 @@ export default function NewRaceDay({ onSaved, onCancel }) {
     }
   };
 
+  // Live, on-demand Apify pull (docs/requirements/apify-equibase-ingest.md).
+  // Unlike the paste/upload handlers above, track and date are REQUIRED
+  // up front here - there is no document to auto-detect them from, and
+  // this call costs real money every time, so the button stays disabled
+  // until both are typed in (checked below, not just relied on server-side).
+  const handleApifyPull = async () => {
+    setBusy(true);
+    setError(null);
+    try {
+      applyParse(await pullApifyEntries(track.trim(), date, correlationId));
+    } catch (e) {
+      setError(String(e.message));
+    } finally {
+      setBusy(false);
+    }
+  };
+
   const handleSave = async (replace = false) => {
     setBusy(true);
     setError(null);
@@ -127,7 +151,13 @@ export default function NewRaceDay({ onSaved, onCancel }) {
 
       <div className="formrow">
         <label>Track
-          <input value={track} onChange={(e) => setTrack(e.target.value)} placeholder="Enter track name..." />
+          <input
+            value={track} onChange={(e) => setTrack(e.target.value)}
+            placeholder="Enter track name..." list="track-suggestions"
+          />
+          <datalist id="track-suggestions">
+            {TRACK_SUGGESTIONS.map((t) => <option key={t.code} value={t.display} />)}
+          </datalist>
         </label>
         <label>Date
           <input type="date" value={date} onChange={(e) => setDate(e.target.value)} />
@@ -153,15 +183,39 @@ export default function NewRaceDay({ onSaved, onCancel }) {
         >
           A day&rsquo;s board (zip)
         </button>
+        <button
+          className={`btn ${mode === 'apify' ? 'btn--primary' : ''}`}
+          onClick={() => setMode('apify')}
+        >
+          Live pull (Apify)
+        </button>
         <span className="dim">
-          {mode === 'single'
-            ? 'One saved Equibase entries page becomes one race day.'
-            : 'One zip of saved entries pages becomes every race day it holds.'}
+          {mode === 'single' && 'One saved Equibase entries page becomes one race day.'}
+          {mode === 'bulk' && 'One zip of saved entries pages becomes every race day it holds.'}
+          {mode === 'apify' && 'Calls Apify live for the Track and Date above - costs real money every time.'}
         </span>
       </div>
 
       {mode === 'bulk' && (
         <BulkEntriesUpload onSaved={onSaved} bankroll={bankroll} perRaceMin={perRaceMin} />
+      )}
+
+      {mode === 'apify' && (
+        <div className="ingest-inputs">
+          <p className="notice notice--warn">
+            Pulling live from Apify (parseforge/equibase-scraper) costs real money every time this
+            runs, whether or not you go on to save. Fill in Track and Date above, then pull.
+          </p>
+          <div className="ingest-actions">
+            <button
+              className="btn btn--primary"
+              disabled={busy || !track.trim() || !date}
+              onClick={handleApifyPull}
+            >
+              {busy ? 'Calling Apify…' : 'Pull entries from Apify'}
+            </button>
+          </div>
+        </div>
       )}
 
       {mode === 'single' && (
@@ -212,7 +266,8 @@ export default function NewRaceDay({ onSaved, onCancel }) {
               {' '}<span className="dim">
                 · {parsed.entriesSource === 'both' ? 'ML sheet (record) + program (analysis)'
                   : parsed.entriesSource === 'ml_sheet' ? 'ML sheet only - no program analysis (ODDS_ONLY)'
-                    : 'program only'}
+                    : parsed.entriesSource === 'equibase_apify' ? 'Apify (live pull)'
+                      : 'program only'}
                 {parsed.fetchedFrom ? ` · fetched from ${parsed.fetchedFrom}` : ''}
               </span>
             </h3>
