@@ -1,5 +1,7 @@
 import React, { useEffect, useState } from 'react';
-import { getResults, parseResultsPdf, saveResults } from '../api.js';
+import {
+  getResults, parseResultsPdf, pullApifyResults, saveResults,
+} from '../api.js';
 
 const money = (cents) => (cents == null ? '' : `$${(cents / 100).toFixed(2)}`);
 
@@ -28,6 +30,16 @@ export default function ResultsPanel({ dayId }) {
     setBusy(true);
     try {
       applyParse({ ...(await parseResultsPdf(file, correlationId)), sourceKind: 'pdf' });
+    } catch (e) { setError(String(e.message)); } finally { setBusy(false); }
+  };
+  // Live, on-demand Apify pull (D206) - the day's own track/date are already
+  // on file, so unlike the entries side's Apify flow, nothing needs typing
+  // in: one click. The server makes the actual paid call.
+  const handleApifyPull = async () => {
+    setBusy(true);
+    setError(null);
+    try {
+      applyParse(await pullApifyResults(dayId, correlationId));
     } catch (e) { setError(String(e.message)); } finally { setBusy(false); }
   };
   const handleSave = async () => {
@@ -74,13 +86,22 @@ export default function ResultsPanel({ dayId }) {
         {error && <p className="notice notice--error">{error}</p>}
 
         <p className="dim">
-          {hasResults ? 'Replace results' : 'Ingest results'} — upload the chart PDF.
+          {hasResults ? 'Replace results' : 'Ingest results'} — upload the chart PDF, or pull live from Apify.
         </p>
-        <label className="btn btn--primary">
-          {busy ? 'Parsing…' : 'Upload chart PDF'}
-          <input type="file" accept="application/pdf" style={{ display: 'none' }}
-            disabled={busy} onChange={(e) => handlePdf(e.target.files?.[0])} />
-        </label>
+        <div className="ingest-actions">
+          <label className="btn btn--primary">
+            {busy ? 'Parsing…' : 'Upload chart PDF'}
+            <input type="file" accept="application/pdf" style={{ display: 'none' }}
+              disabled={busy} onChange={(e) => handlePdf(e.target.files?.[0])} />
+          </label>
+          <button className="btn" disabled={busy} onClick={handleApifyPull}>
+            {busy ? 'Calling Apify…' : 'Pull results from Apify'}
+          </button>
+        </div>
+        <p className="notice notice--warn">
+          Pulling live from Apify (parseforge/equibase-scraper) costs real money every time this
+          runs, whether or not you go on to save.
+        </p>
 
         {preview && (
           <>

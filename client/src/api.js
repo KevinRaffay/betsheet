@@ -124,6 +124,20 @@ export const saveResults = (dayId, payload, correlationId) =>
     body: JSON.stringify(payload),
   }).then(asJson);
 
+// Live, on-demand Apify results pull (D206), the results sibling of
+// pullApifyEntries above. Day-scoped, unlike the entries side: the day's
+// track/date are already on file, so nothing needs typing in - the server
+// makes the actual paid call and returns the same preview shape
+// parseResultsPdf/parseResultsText do, so ResultsPanel's existing
+// preview/save UI needs no special-casing for this source. COSTS REAL
+// MONEY EVERY CALL - there is no cheaper preview of a live source than
+// actually calling it.
+export const pullApifyResults = (dayId, correlationId) =>
+  fetch(`/api/race-days/${dayId}/results-apify/pull`, {
+    method: 'POST',
+    headers: { 'content-type': 'application/json', ...(correlationId ? { 'x-correlation-id': correlationId } : {}) },
+  }).then(asJson);
+
 export const getResults = (dayId) =>
   fetch(`/api/race-days/${dayId}/results`).then(asJson);
 

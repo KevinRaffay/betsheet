@@ -9,10 +9,22 @@
 // `POST /race-days/:id/results` route to save, unchanged - `parse()`'s
 // output already matches `saveResults`'s `p` shape exactly, so no new save
 // route is needed here, only the new parse step.
+//
+// D206 adds a SECOND preview route, `.../results-apify/pull`, the results
+// sibling of `server/equibase-apify-entries.js`'s UI-triggered live pull
+// (D202) - out of `docs/requirements/apify-equibase-ingest.md`'s original
+// four-phase CLI-only scope, same as D202 was for entries. Unlike the
+// entries side, no track/date needs typing in: the day already exists by
+// the time results are pulled, so its own `track`/`date` columns are what
+// the live call uses - one click, no form. MAKES THE LIVE CALL itself (the
+// browser holds no APIFY_TOKEN); COSTS REAL MONEY EVERY CALL, even as a
+// preview - invariant 9 still holds, there is just no cheaper way to
+// preview a live source than to actually call it.
 
 import express from 'express';
 import { getDb } from './db.js';
 import { parseApifyResultsDataset } from '../shared/parsers/equibase-apify-results.js';
+import { fetchResults } from './apifyEquibase.js';
 import { getLogger, newCorrelationId } from './logging.js';
 
 const log = getLogger('app');
@@ -65,4 +77,50 @@ equibaseApifyResultsRouter.post('/race-days/:id/results-apify/preview', (req, re
     warnings: parsed.warnings.length,
   });
   res.json({ correlationId, ...parsed, sourceKind: 'equibase_apify' });
+});
+
+// Exported (not just the route handler) so a check script can inject a fake
+// Apify client - matching `equibase-apify-entries.js`'s `previewApifyEntries`
+// seam exactly - and verify this file's own logic (the day's own track/date
+// feeding the call, entriesByRace derivation, response shape) without ever
+// making a real, billed call. A real request never passes `client`.
+export async function pullApifyResults(db, day, client) {
+  const { items, runId } = await fetchResults({ raceDate: day.date, tracks: [day.track] }, client);
+  const entriesByRace = entriesByRaceFor(db, day.id);
+  const parsed = parseApifyResultsDataset(JSON.stringify(items), { entriesByRace });
+  // apifyRunId rides on the return value for the route below to log (D204's
+  // precedent) - stripped before the HTTP response, since it is a
+  // diagnostic detail of THIS call, not part of the results-preview shape
+  // the `.../preview` route above and the existing `/results` save route
+  // already define.
+  return { ...parsed, sourceKind: 'equibase_apify', apifyRunId: runId };
+}
+
+equibaseApifyResultsRouter.post('/race-days/:id/results-apify/pull', async (req, res) => {
+  const correlationId = req.get('x-correlation-id') || newCorrelationId();
+  const db = getDb();
+  const day = db.prepare('SELECT id, track, date, deleted_at FROM race_days WHERE id = ?').get(Number(req.params.id));
+  if (!day) return res.status(404).json({ error: 'No such race day.' });
+  if (day.deleted_at) {
+    return res.status(410).json({ error: 'This race day is deleted. Restore it before pulling results.' });
+  }
+
+  try {
+    const { apifyRunId, ...parsed } = await pullApifyResults(db, day);
+    log.info('parse_completed', {
+      correlationId,
+      kind: 'results_apify_pull',
+      apifyRunId,
+      track: parsed.track,
+      date: parsed.date,
+      races: parsed.races.length,
+      finishers: parsed.races.reduce((a, r) => a + r.results.length, 0),
+      scratchesDerived: parsed.races.reduce((a, r) => a + r.scratches.length, 0),
+      warnings: parsed.warnings.length,
+    });
+    res.json({ correlationId, ...parsed });
+  } catch (err) {
+    log.warn('parse_failed', { correlationId, kind: 'results_apify_pull', error: String(err?.message ?? err) });
+    res.status(422).json({ error: String(err?.message ?? err) });
+  }
 });
