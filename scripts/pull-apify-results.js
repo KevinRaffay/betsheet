@@ -145,7 +145,7 @@ for (const code of [...byTrack.keys()].sort()) {
   const saveBody = await saveRes.json();
   if (saveRes.status === 201) {
     row.status = 'saved';
-    row.detail = `${saveBody.results} finisher(s), ${saveBody.exotics} exotic payoff(s), ${saveBody.scratches} scratch(es), ${saveBody.gradedCards} card(s) graded`;
+    row.detail = `${saveBody.results} finisher(s), ${saveBody.exotics} exotic payoff(s), ${saveBody.scratches} scratch(es), ${saveBody.gradedCards.length} card(s) graded`;
   } else {
     row.status = 'failed';
     row.detail = saveBody.error ?? `HTTP ${saveRes.status}`;
