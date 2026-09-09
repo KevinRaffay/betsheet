@@ -1,5 +1,5 @@
 import React, { useEffect, useState } from 'react';
-import { listCards, modelLabel } from '../api.js';
+import { listCards, modelLabel, plMoney, plClass } from '../api.js';
 import LlmCardModal from './LlmCardModal.jsx';
 import DayTicketBuilderModal from './DayTicketBuilderModal.jsx';
 
@@ -46,7 +46,7 @@ export default function CardsPanel({ dayId, bankrollCents, onOpenCard }) {
           <thead>
             <tr>
               <th>#</th><th>Name</th><th>Template</th><th>Variant</th><th>Engine</th><th>Bankroll</th><th>Per-race min</th>
-              <th>Bucket</th><th>Tickets</th><th>Day total</th><th>Generated</th>
+              <th>Bucket</th><th>Tickets</th><th>Day total</th><th>P/L</th><th>Generated</th>
             </tr>
           </thead>
           <tbody>
@@ -62,6 +62,14 @@ export default function CardsPanel({ dayId, bankrollCents, onOpenCard }) {
                 <td>{c.consensus_completeness}</td>
                 <td>{c.tickets}</td>
                 <td>${(c.total_cents / 100).toFixed(0)}</td>
+                {/* D175: P/L here once the card is graded, so a result is
+                    readable where the cards are. An UNGRADED card shows a dash,
+                    never $0 - "not graded yet" and "broke even" are different
+                    facts, and the same distinction shared/tip-scoring.js makes
+                    by returning null rather than zero. */}
+                <td className={c.graded ? plClass(c.pl_cents) : 'dim'}>
+                  {c.graded ? plMoney(c.pl_cents) : '—'}
+                </td>
                 <td className="dim">{c.created_at}</td>
               </tr>
             ))}

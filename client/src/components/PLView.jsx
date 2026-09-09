@@ -1,13 +1,11 @@
 import React, { useEffect, useState } from 'react';
-import { getDayPL, getPL, modelLabel } from '../api.js';
+import { getDayPL, getPL, modelLabel, plMoney, plClass } from '../api.js';
 
 const money = (cents) => (cents == null ? '—'
   : cents % 100 === 0 ? `$${cents / 100}` : `$${(cents / 100).toFixed(2)}`);
-const signed = (cents) => (
-  <span className={cents >= 0 ? 'pl--pos' : 'pl--neg'}>
-    {cents >= 0 ? '+' : '−'}{money(Math.abs(cents))}
-  </span>
-);
+// D175: format and colour come from api.js so the day view renders a P/L
+// figure identically - a second local copy is how the two screens drift.
+const signed = (cents) => <span className={plClass(cents)}>{plMoney(cents)}</span>;
 const roi = (plCents, costCents) =>
   (costCents > 0 ? `${plCents >= 0 ? '+' : ''}${(100 * plCents / costCents).toFixed(1)}%` : '—');
 
@@ -127,6 +125,41 @@ export default function PLView({ onBack, onOpenCard, onOpenDay }) {
                       <td>{money(m.returnedCents)}</td>
                       <td>{signed(m.plCents)}</td>
                       <td>{roi(m.plCents, m.costCents)}</td>
+                    </tr>
+                  ))}
+                </tbody>
+              </table>
+            </details>
+          )}
+
+          {/* D175: the TIPSHEET bucket TOTAL above counts one variant per
+              (day, source), because the three are mutually exclusive - three
+              ways to bet the same picks, only one of which is ever real money.
+              Summing them reported three times the money that could have been
+              staked. This is the comparison the split exists for, and it is
+              deliberately NOT added to the total. */}
+          {data.buckets.find((b) => b.completeness === 'TIPSHEET')?.byVariant?.length > 1 && (
+            <details className="race" open>
+              <summary>TIPSHEET by variant - three ways to bet the same picks, only one of which you would actually place</summary>
+              <p className="dim">
+                The bucket total above counts <strong>{data.buckets.find((b) => b.completeness === 'TIPSHEET').headlineVariant}</strong> only.
+                These rows are alternatives to compare, not bets that were placed together — adding them up would
+                report money no bankroll could have staked.
+              </p>
+              <table className="grid">
+                <thead>
+                  <tr><th>Variant</th><th>Cards</th><th>Tickets</th><th>Wagered</th><th>Returned</th><th>P/L</th><th>ROI (wagered)</th></tr>
+                </thead>
+                <tbody>
+                  {data.buckets.find((b) => b.completeness === 'TIPSHEET').byVariant.map((v) => (
+                    <tr key={v.variant}>
+                      <td>{v.variant}{v.headline && <span className="tag tag--gold">counted</span>}</td>
+                      <td>{v.cards}</td>
+                      <td>{v.tickets}</td>
+                      <td>{money(v.costCents)}</td>
+                      <td>{money(v.returnedCents)}</td>
+                      <td>{signed(v.plCents)}</td>
+                      <td>{roi(v.plCents, v.costCents)}</td>
                     </tr>
                   ))}
                 </tbody>

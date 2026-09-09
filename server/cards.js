@@ -45,7 +45,17 @@ cardsRouter.get('/race-days/:id/cards', (req, res) => {
            (SELECT COUNT(*) FROM human_race_state h
              WHERE h.card_id = c.id AND h.results_revealed_at IS NOT NULL) AS revealed_races,
            EXISTS(SELECT 1 FROM graded_tickets gt JOIN tickets gtt ON gtt.id = gt.ticket_id
-                   WHERE gtt.card_id = c.id) AS graded
+                   WHERE gtt.card_id = c.id) AS graded,
+           -- D175: the day view shows P/L once a card is graded, so a result
+           -- is readable where the cards are without a trip to /pl. Correlated
+           -- subqueries rather than another JOIN: joining grades alongside the
+           -- LEFT JOIN on tickets would risk changing what COUNT(t.id) counts.
+           -- graded_tickets_latest is the LATEST grade set per ticket, the same
+           -- view /api/pl reports from, so the two screens cannot disagree.
+           (SELECT SUM(g.pl_cents) FROM graded_tickets_latest g
+              JOIN tickets gt2 ON gt2.id = g.ticket_id WHERE gt2.card_id = c.id) AS pl_cents,
+           (SELECT SUM(g.returned_cents) FROM graded_tickets_latest g
+              JOIN tickets gt2 ON gt2.id = g.ticket_id WHERE gt2.card_id = c.id) AS returned_cents
     FROM cards c
     LEFT JOIN strategy_templates st ON st.id = c.strategy_template_id
     LEFT JOIN tickets t ON t.card_id = c.id
