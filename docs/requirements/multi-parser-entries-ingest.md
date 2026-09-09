@@ -1,9 +1,12 @@
 # Multi-parser, multi-track/day entries ingestion
 
 **Status: PARTIALLY SCHEDULED.** M-1 is delivered as **D188** (`shared/
-parsers/registry.js` + `--parser` on the batch harness); M-2 through M-5
-remain specified but not scheduled — no deliverable ID is claimed for any of
-them until picked up. Filed 2026-09-09 from an externally-drafted scope.
+parsers/registry.js` + `--parser` on the batch harness). M-2 is delivered as
+**D189** (`scripts/pull-race-day.js`) — **with no live fetching at all**, a
+user decision made explicitly before building it (2026-09-09): see finding 9
+below. M-3 through M-5 remain specified but not scheduled — no deliverable
+ID is claimed for any of them until picked up. Filed 2026-09-09 from an
+externally-drafted scope.
 **The internal `D1`–`D5` labels the incoming scope used are renamed
 `M-1`–`M-5` below** — this repo's own convention (see `docs/requirements/
 card-source-model.md`'s `S-1..S-3`) is that a requirements doc never mints
@@ -111,6 +114,29 @@ value distinct from `entries_source`, decide whether `source_parser_id`
 questions today and should not silently drift into two ways of saying "which
 parser wrote this").
 
+**9. M-2, read literally, asks for exactly what invariant 6 forbids.** The
+incoming scope's `pull-race-day.js` "resolves which tracks are racing on a
+given day" from "the Equibase entries index page's 'Today' column" and then
+"pulls" each track "through whichever parser + fetch method that parser
+needs." That is an automated fetch — of the index page at minimum, and of
+each track's own page if a parser's "fetch method" means going and getting
+it. This codebase's invariant 6 is unambiguous and repeated in CLAUDE.md's
+Gotchas verbatim: *"Equibase blocks scripted fetching. Confirmed. Don't
+retry cleverly; the paste/PDF path is the design, not a fallback."* D113
+deleted every fetcher, HTTP client and robots.txt checker that existed for
+this reason. **Asked before building, not decided unilaterally**: the user
+chose "no live fetching — files only," matching every other ingest path's
+manual-upload posture. `pull-race-day.js` therefore takes a `--dir` flag (not
+in the incoming scope at all — it exists only because live fetching does
+not) pointing at a directory of already-saved per-track pages, the same way
+`batch-import-equibase-entries.js` already works; "which tracks are racing"
+is answered by which files are present for the requested date, never a
+network request. The `equibase-daily-entries` skill (browser automation, not
+a scripted HTTP client — a person's own browser session, the same posture
+every other manual-capture path in this codebase already has) remains the
+way such a directory gets populated; this script does not populate one
+itself.
+
 ---
 
 ## Suggested shape, renumbered from the incoming scope
@@ -128,22 +154,30 @@ when**: the existing Del Mar HTML fixture runs through `--parser
 equibase-html` unchanged, and the report JSON names the parser used. Both
 confirmed — see DELIVERABLES.md D188.
 
-**M-2** (was D2) — `pull-race-day.js` orchestration + `ingest_runs` ledger.
-Resolves which tracks race on a date from Equibase's entries index page,
-pulls each independently through its own parser + fetch method, and never
-lets one track's failure abort the run — matching the non-fatal philosophy
-`batch-import-equibase-entries.js` already applies per-file. **This
-orchestration layer is itself a new outbound fetch** (the index page, plus
-whatever each per-track source needs) that invariant 6 does not currently
-have a home for: every existing ingest path in this codebase takes a file a
-person already saved, and `server/source-audit.js`'s own note is that
-"nothing in this codebase fetches anything automatically any more... because
-there is no fetcher to need [robots.txt/timeout/UA guards]." If M-2
-introduces the first automated fetch since D113 deleted the crawler, it
-inherits invariant 6's stated fallback rule in full — robots.txt checked
-before every request, manual paste as the fallback for a resisting source —
-and that guard needs to be built, not assumed absent because nothing nearby
-has one today.
+**M-2** (was D2) — *Delivered as D189, with no live fetching (finding 9;
+user decision 2026-09-09).* `scripts/pull-race-day.js <date> --dir
+<directory> [--tracks CODE1,CODE2] [--parser id] [--per-track-parser
+CODE=id,...] [--write-report path.json]`. Every file under `--dir` is
+parsed to learn its own track and date; a file whose date doesn't match is
+out of scope for that run, not an error. Omitting `--tracks` pulls every
+track the directory holds for the requested date — the closest this
+codebase can honestly get to "every track racing that day" without an
+index-page fetch. One track's failure (no file found, a blocking warning, a
+`--per-track-parser` id whose `sourceKind` isn't `html` — file discovery here
+only scans HTML pages, since only one parser exists) never aborts the run.
+Writes to a brand-new throwaway temp-directory SQLite database, same
+SAFE-BY-CONSTRUCTION posture as `batch-import-equibase-entries.js`; a
+lightweight read-back check (day + race count) catches a broken run.
+`ingest_runs` is a JSON-lines ledger at `data/ingest_runs.jsonl` (gitignored,
+local operational data), not a table — a table would live inside the
+per-run throwaway DB and be deleted with it, defeating the entire point of
+"the substrate M-3 and M-4 both read from," which needs to persist ACROSS
+runs. **Done when**: `pull-race-day.js 2026-09-09` with no other flags pulls
+every track the directory holds for that date through the default parser
+and appends one `ingest_runs` row per track; `--tracks` limits the run to
+named tracks, reporting a requested-but-absent one as `failed` rather than
+silently omitting it. Both confirmed against the real 5-file fixture
+directory — see DELIVERABLES.md D189.
 
 **M-3** (was D3) — parser comparison, against the HTML parser as baseline
 (never symmetric peer comparison), on the same "label everything, conclude
@@ -170,14 +204,10 @@ already does. Can land any time after M-1.
    URL/run id) before M-3/M-4 treat its numbers as a baseline rather than a
    fresh measurement — the exact discipline this file's own Findings section
    already enforces on every stored corpus figure.
-2. **Does M-2's per-track, per-day auto-discovery fetch belong in this
-   local-only, invariant-6 app at all**, or should "which tracks are racing
-   today" stay a manually-supplied `--tracks` list forever, keeping the
-   whole scope inside the existing "a person handed BetSheet a file" posture?
-   The scope's own `--tracks` flag already makes the manual-list path
-   available; the open question is only whether the auto-discovery default
-   should exist, given it is the one piece of this scope that doesn't fit
-   any ingest path in the codebase today.
+2. **RESOLVED 2026-09-09**: no live fetching, ever — see finding 9 and
+   M-2's delivered shape above. `pull-race-day.js` orchestrates over a
+   `--dir` of already-saved files; "which tracks are racing" is answered by
+   which files are present for the date, never a network request.
 3. **Where do Apify credentials live** if M-4's `cost_source: "apify_api"`
    path is ever exercised — this doc, like the incoming scope, treats that
    as its own small prerequisite task, not something to improvise here.

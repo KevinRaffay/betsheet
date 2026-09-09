@@ -472,10 +472,10 @@ picked up.
 | --- | --- |
 | Entries parsers are pluggable adapters to one canonical payload shape, chosen per run via `--parser`, instead of the one hardcoded HTML parser - the shape already matches what `insertRaceDay` consumes | D188 (M-1) |
 | An unknown `--parser` value is a hard error naming valid ids, never a silent fallback to default | D188 (M-1) |
-| One command pulls a full day's slate across every track racing, each pulled and parsed independently so one track's failure doesn't abort the run | - (not scheduled) |
-| Every ingest run lands in one ledger (`ingest_runs`) that a later comparison and cost report both read from | - (not scheduled) |
+| One command pulls a full day's slate across every track racing, each pulled and parsed independently so one track's failure doesn't abort the run - from a directory of already-saved pages, never a live fetch (user decision 2026-09-09: invariant 6 stands, no automated outbound request of any kind) | D189 (M-2) |
+| A requested-but-missing track is reported as a failed row, never silently dropped from the run's output (invariant 11) | D189 (M-2) |
+| Every ingest run lands in one ledger (`data/ingest_runs.jsonl`, JSON-lines rather than a table - a table inside the per-run throwaway DB would be deleted with it) that a later comparison and cost report both read from | D189 (M-2) |
 | A challenger parser is compared against the HTML parser as the trusted baseline - never symmetric peer comparison - on the "label everything, conclude nothing until n is stated" rule already governing this corpus | - (not scheduled) |
 | Every parser's real cost is tracked per run, including the ones that aren't billed in dollars, and an Apify actor's cost comes from its own billed-run API rather than its advertised rate | - (not scheduled) |
 | `source_parser_id` provenance is queryable per race day without cross-referencing `ingest_runs` by timestamp | - (not scheduled) |
 | Switching the default parser is always a manual decision informed by the comparison evidence, never automatic | - (not scheduled) |
-| **Open question, not resolved here**: whether automated per-day track discovery belongs in this local-only, invariant-6 app at all, since it would be the first automated outbound fetch since D113 deleted the crawler | - (undecided) |
