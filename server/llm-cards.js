@@ -166,6 +166,7 @@ export async function previewLlmRace(db, day, raceNumber, cardId, {
       + 'Clear the notes for this day, or run this race from the LLM card modal.');
   }
 
+  const baseline = loadBaselineForRace(db, day.id, raceNumber);
   const totalRaces = raceNumbersFor(db, day.id).length;
   const userPrompt = buildLlmRaceUserPrompt({
     raceNumber, totalRaces, track: day.track, date: day.date,
@@ -176,9 +177,13 @@ export async function previewLlmRace(db, day, raceNumber, cardId, {
     })),
     bankroll: { perRaceCents, remainingCents, racesRemaining: remaining },
     notes: notes.prompt,
+    baseline,
   });
 
-  const systemPromptText = buildSystemPrompt({ hasNotes: notes.present });
+  const systemPromptText = buildSystemPrompt({
+    hasNotes: notes.present,
+    hasBaseline: baseline.tipsheets.length > 0 || baseline.otrTickets.length > 0,
+  });
 
   let responseText = stubResponseText ?? null;
   let model = stubResponseText ? 'stub' : (requestedModel || MODEL);
@@ -561,3 +566,44 @@ llmCardsRouter.get('/cards/:id/llm-requests', (req, res) => {
     notesPresent: Boolean(r.notes_present), notesEnteredAt: r.notes_entered_at,
   })));
 });
+
+/**
+ * What the day's OTHER sources already think about this race (D179).
+ *
+ * Two shapes, deliberately not merged: tip sheets are a ranked pick list,
+ * Equibase's Off to the Races is a set of printed TICKETS. D74's reason still
+ * holds - OTR prints a show pick, a win pick and unranked box mentions, never
+ * a ranked 3rd pick, so flattening it into ranks would invent one.
+ *
+ * OTR is read from the `both` VARIANT, verified as the only one carrying all
+ * four printed tickets (`some-reward` and `higher-reward` each hold half).
+ *
+ * Returns empty arrays rather than null when there is nothing: an absent
+ * baseline must render no block at all, so the prompt for a race without one
+ * stays byte-identical to what it always was.
+ */
+export function loadBaselineForRace(db, raceDayId, raceNumber) {
+  const tipsheets = db.prepare(
+    'SELECT source_label, picks FROM tip_picks WHERE race_day_id = ? AND race_no = ? ORDER BY source_label',
+  ).all(raceDayId, raceNumber)
+    .map((r) => ({ sourceLabel: r.source_label, picks: JSON.parse(r.picks) }));
+
+  // ONE card, not every matching one. OTR ingest is APPEND-ONLY (D71), so a
+  // re-uploaded sheet leaves several `both` cards on the day and joining them
+  // all would render the same sheet two or three times over. The newest is the
+  // current sheet.
+  const otrCard = db.prepare(`
+    SELECT id FROM cards
+     WHERE race_day_id = ? AND consensus_completeness = 'EQB_OTR' AND variant = 'both'
+     ORDER BY card_number DESC LIMIT 1
+  `).get(raceDayId);
+  const otrTickets = otrCard ? db.prepare(`
+    SELECT t.teller_call AS tellerCall
+      FROM tickets t
+      JOIN races r ON r.id = t.race_id
+     WHERE t.card_id = ? AND r.number = ?
+     ORDER BY t.sequence
+  `).all(otrCard.id, raceNumber) : [];
+
+  return { tipsheets, otrTickets };
+}
