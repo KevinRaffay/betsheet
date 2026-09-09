@@ -58,6 +58,7 @@ check('resultType is entries, date mapped from the date argument', client.calls[
 check('parses through the real parser - track/date/entry survive', preview.track === 'Del Mar' && preview.date === '2026-09-09' && preview.races[0]?.entries[0]?.horseName === 'UI Test Horse');
 check('entriesSource is equibase_apify - the route\'s own addition, not the parser\'s', preview.entriesSource === 'equibase_apify');
 check('oddsCapturedAt is a fresh timestamp (this call\'s own capture time)', new Date(preview.oddsCapturedAt).getTime() >= before);
+check('D204: apifyRunId rides on the return value for the route to log (never a real one here)', preview.apifyRunId === 'run1');
 
 console.log('\n-- the real Express route: request validation, safe because nothing is called yet --');
 // `server/index.js` loads `dotenv/config` itself, and this repo's own .env

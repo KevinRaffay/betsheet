@@ -8,14 +8,19 @@
 // `server/anthropic-client.js` is under `server/` and not `shared/`. Kept
 // deliberately dumb: no reshaping, no parsing - `shared/parsers/
 // equibase-apify-parseforge.js` and `equibase-apify-results.js` already do
-// that from a raw JSON STRING, so `fetchEntries`/`fetchResults` return the
-// actor's raw dataset items and the CALLER `JSON.stringify`s them back into
-// that exact contract, preserving both parsers' golden-tested input shape
-// exactly rather than inventing a second calling convention for a live
-// source. Swapping actors later (this codebase's own comparison discipline,
-// `docs/requirements/multi-parser-entries-ingest.md`) is a change to
-// `ACTOR_ID` and the input shape below, not to any caller of these two
-// functions.
+// that from a raw JSON STRING, so `fetchEntries`/`fetchResults` return
+// `{ items, runId }` - `items` is the actor's raw dataset, unreshaped, and
+// the CALLER `JSON.stringify`s it back into that exact contract, preserving
+// both parsers' golden-tested input shape exactly rather than inventing a
+// second calling convention for a live source. `runId` (D204) names the
+// exact Apify run that produced `items`, for a caller to log - Kentucky
+// Downs, 2026-09-09, undercounted a 14-race card as 9 on one live pull and
+// 2 on another, and there was no way to check the actor's own run in
+// Apify's console to see whether ITS scrape was already short, since
+// nothing here recorded which run it even was. Swapping actors later (this
+// codebase's own comparison discipline, `docs/requirements/
+// multi-parser-entries-ingest.md`) is a change to `ACTOR_ID` and the input
+// shape below, not to any caller of these two functions.
 //
 // The actor's real input schema, read from its own live Store page
 // (2026-09-09, not the guessed `dataMode`/`trackCodes` names an earlier,
@@ -44,6 +49,14 @@ const ACTOR_ID = 'parseforge/equibase-scraper';
 // a person running a CLI script (Phase 4), never a check script. A real
 // caller never passes it; `getApifyClient()` still throws its own clear
 // error when APIFY_TOKEN is unset.
+// Returns { items, runId } rather than bare items - D204's own live pull
+// (Kentucky Downs, 2026-09-09) undercounted a large field (9 of 14 real
+// races, on TWO separate live pulls that returned different, both-wrong
+// counts) with no way to tell whether the actor's own scrape was
+// incomplete or something downstream dropped rows. `runId` names the
+// exact Apify run a caller's log line came from, so that question is
+// answerable from https://console.apify.com/actors/runs/<runId> without
+// re-running (and re-paying for) the call.
 async function runActor(input, client) {
   const c = client ?? getApifyClient();
   const run = await c.actor(ACTOR_ID).call(input);
@@ -54,7 +67,7 @@ async function runActor(input, client) {
     );
   }
   const { items } = await c.dataset(run.defaultDatasetId).listItems();
-  return items;
+  return { items, runId: run.id };
 }
 
 export function fetchEntries({ raceDate, tracks, ...rest } = {}, client) {
