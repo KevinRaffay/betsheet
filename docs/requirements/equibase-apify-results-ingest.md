@@ -1,6 +1,8 @@
 # Equibase results ingest via Apify
 
-**Status: SPECIFIED, NOT SCHEDULED.** Filed 2026-09-09 from a real sample the
+**Status: SPECIFIED, NOT SCHEDULED.** Finding A's scratch-derivation question
+is RESOLVED (2026-09-09, user decision: assume scratched) - see below. Filed
+2026-09-09 from a real sample the
 user supplied directly (`dataset_equibase-scraper_2026-09-09_18-11-18-089.json`,
 Del Mar 2026-09-07, 106 finisher rows across 11 races - never fetched by this
 codebase, invariant 6 untouched). **Identified by field shape, not filename**:
@@ -71,12 +73,22 @@ that never finished and is never named as a scratch is indistinguishable,
 from this source alone, from a horse that never existed. Fed to `saveResults`
 as-is, a ticket on a horse this source doesn't mention would grade as a plain
 `loss`, not the `refund` invariant 1's own worked example requires (win money
-on a longshot that never ran is a refund, not a loss). This is fixable - diff
-the day's already-saved `entries` program numbers against this race's
-finisher list to derive the missing scratch set - but it means this source
-can never stand alone: it depends on entries already being ingested for the
-same race day (through whichever entries path was used) before its results
-are safe to save.
+on a longshot that never ran is a refund, not a loss).
+
+**RESOLVED 2026-09-09 (user decision): assume scratched.** Any program number
+present in the day's saved `entries` for a race but absent from this source's
+finisher list for that race is treated as scratched - there is no
+"unaccounted for, not scratched" state. This is safe specifically **because
+entries are always ingested before results** for every race day this
+codebase handles (invariant of the workflow itself, not just this source):
+the diff has a real, already-saved entries list to run against, never a
+guess. This does NOT need a database at parse time - the pure parser takes
+the day's known entry program numbers per race as a `context` input (the
+caller already has them, from whichever entries path populated the day) and
+computes each race's `scratchedPgms` as `entries minus finishers`, the same
+way `context.trackCode` already lets a caller supply what the source itself
+can't. A day whose entries were never ingested is out of scope for this
+source - it cannot run standalone, by design.
 
 **B. `finalTime` is absent for exactly 2 of the day's 11 races** (races 3 and
 7 - checked: every row in each of those two races lacks the field, not a
@@ -120,12 +132,13 @@ A new pure parser, `shared/parsers/equibase-apify-results.js`, following
 `context.trackCode`/date selection with a named refusal on ambiguity - the
 one real sample is already single-track/single-day, so this is precautionary
 rather than exercised), producing `{track, date, races}` in `saveResults`'s
-own shape rather than inventing a new one. Finding A means scratch
-derivation cannot live in the pure parser alone without a database - either
-the parser accepts an optional per-race set of known entry program numbers
-as an input (kept pure, caller supplies it) or a thin server-side step does
-the diff after parsing, before the result reaches `saveResults`. A new
-preview route (e.g. `POST /api/parse/results-apify-json`) would return the
+own shape rather than inventing a new one. Per finding A's resolution, the
+parser takes the day's known entry program numbers per race as a `context`
+input and derives `scratchedPgms` itself (`entries minus finishers`) -
+stays pure, no database access, the caller (which already loaded the day's
+entries to build the request) supplies the one thing the source itself
+can't provide. A new preview route (e.g. `POST /api/parse/results-apify-json`)
+would return the
 same preview shape the paste/PDF/dmtc paths already return, keeping
 invariant 9 (preview first, confirm to save) intact; `saveResults` itself
 needs no change beyond `SOURCE_KINDS` gaining an entry once finding E's
@@ -133,14 +146,14 @@ migration exists.
 
 ## Decisions the operator owns
 
-1. **Scratch derivation: pure-parser input parameter, or a server-side
-   post-step?** The pure-parser path keeps this parser's "no DB access, unit
-   testable in isolation" contract identical to every other file under
-   `shared/parsers/`; the server-side path keeps the diff logic beside
-   `saveResults`'s existing also-ran name-resolution code (`server/
-   results.js:66-73`), which already does a similar entries lookup for a
-   different reason (the dmtc page's also-rans arrive by name, not number).
-   Whoever picks this up should look at that existing code before choosing.
+1. **RESOLVED 2026-09-09**: assume scratched. A program number in the day's
+   entries but absent from this source's finishers is scratched, no other
+   state exists - safe because entries are always ingested before results,
+   never a guess. The parser takes the entries program numbers as a
+   `context` input and derives `scratchedPgms` itself, keeping the "no DB
+   access" contract every `shared/parsers/*` file holds (`context.trackCode`
+   already established the same pattern: the caller supplies what the
+   source can't).
 2. **When does the `result_charts.source_kind` migration happen?** Finding E
    means this parser can be built and verified with `toPayload`-style refusal
    before any save path exists, the same order D190 followed for entries.

@@ -495,6 +495,6 @@ picked up.
 | Requirement | Deliverables |
 | --- | --- |
 | A second results source (an Apify JSON export, same actor family as D190's entries parser) parses to the same canonical shape `saveResults` already consumes, so no change to results persistence is needed for the parser itself | - (not scheduled) |
-| Scratches are derived by diffing the day's saved entries against this source's finisher list, since the source names no scratches at all - without it, a ticket on a scratched horse would grade as a loss instead of the refund invariant 1 requires | - (not scheduled) |
+| Scratches are derived by diffing the day's saved entries against this source's finisher list, since the source names no scratches at all - without it, a ticket on a scratched horse would grade as a loss instead of the refund invariant 1 requires. **RESOLVED**: assume scratched, since entries are always ingested before results | - (not scheduled) |
 | A per-race gap in the source (e.g. a missing final time) is reported as a warning, never silently rendered blank | - (not scheduled) |
 | The parser is built and verified standalone before `result_charts.source_kind`'s CHECK constraint is extended to accept it - the same order D190 followed for `entries_source`, migration decided separately from the parser | - (not scheduled) |
