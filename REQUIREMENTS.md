@@ -475,7 +475,7 @@ picked up.
 | One command pulls a full day's slate across every track racing, each pulled and parsed independently so one track's failure doesn't abort the run - from a directory of already-saved pages, never a live fetch (user decision 2026-09-09: invariant 6 stands, no automated outbound request of any kind) | D189 (M-2) |
 | A requested-but-missing track is reported as a failed row, never silently dropped from the run's output (invariant 11) | D189 (M-2) |
 | Every ingest run lands in one ledger (`data/ingest_runs.jsonl`, JSON-lines rather than a table - a table inside the per-run throwaway DB would be deleted with it) that a later comparison and cost report both read from | D189 (M-2) |
-| A challenger parser is compared against the HTML parser as the trusted baseline - never symmetric peer comparison - on the "label everything, conclude nothing until n is stated" rule already governing this corpus | - (not scheduled) |
+| A challenger parser is compared against the HTML parser as the trusted baseline - never symmetric peer comparison - on the "label everything, conclude nothing until n is stated" rule already governing this corpus | - (ON HOLD, user decision 2026-09-09: needs a second registered parser first, which does not exist) |
 | Every parser's real cost is tracked per run, including the ones that aren't billed in dollars, and an Apify actor's cost comes from its own billed-run API rather than its advertised rate | - (not scheduled) |
 | `source_parser_id` provenance is queryable per race day without cross-referencing `ingest_runs` by timestamp | - (not scheduled) |
 | Switching the default parser is always a manual decision informed by the comparison evidence, never automatic | - (not scheduled) |

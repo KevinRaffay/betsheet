@@ -4,9 +4,12 @@
 parsers/registry.js` + `--parser` on the batch harness). M-2 is delivered as
 **D189** (`scripts/pull-race-day.js`) — **with no live fetching at all**, a
 user decision made explicitly before building it (2026-09-09): see finding 9
-below. M-3 through M-5 remain specified but not scheduled — no deliverable
-ID is claimed for any of them until picked up. Filed 2026-09-09 from an
-externally-drafted scope.
+below. **M-3 is explicitly ON HOLD** (user decision 2026-09-09, see
+"Decisions the operator owns" #4 below) until a second real parser is
+registered — it is fundamentally a comparison, and there is exactly one
+registered parser (M-1's own deliberate scope). M-4 and M-5 remain specified
+but not scheduled. No deliverable ID is claimed for M-3 through M-5 until
+picked up. Filed 2026-09-09 from an externally-drafted scope.
 **The internal `D1`–`D5` labels the incoming scope used are renamed
 `M-1`–`M-5` below** — this repo's own convention (see `docs/requirements/
 card-source-model.md`'s `S-1..S-3`) is that a requirements doc never mints
@@ -179,11 +182,26 @@ named tracks, reporting a requested-but-absent one as `failed` rather than
 silently omitting it. Both confirmed against the real 5-file fixture
 directory — see DELIVERABLES.md D189.
 
-**M-3** (was D3) — parser comparison, against the HTML parser as baseline
-(never symmetric peer comparison), on the same "label everything, conclude
-nothing until n is stated" discipline `docs/decisions/
-2026-09-05-simulator-pivot.md` already states for this codebase. Depends on
-M-1 (≥2 registered parsers) and M-2's `ingest_runs` ledger.
+**M-3** (was D3) — *ON HOLD, user decision 2026-09-09.* Parser comparison,
+against the HTML parser as baseline (never symmetric peer comparison), on
+the same "label everything, conclude nothing until n is stated" discipline
+`docs/decisions/2026-09-05-simulator-pivot.md` already states for this
+codebase. Depends on M-1 (≥2 registered parsers) and M-2's `ingest_runs`
+ledger. **The dependency is not met**: M-1 deliberately registered exactly
+one parser (finding 7 - no a11y-tree or Apify adapter has a verified sample
+to build against), so there is nothing real for M-3 to compare against yet,
+and the incoming scope's own done-when ("correctly identifies the known
+getascraper name-spacing bug," "correctly lists claimingPrice/medication/
+scratched as parseforge-only fields") cannot be satisfied without those
+adapters existing. Asked before building anything (a comparison harness that
+can only ever compare the baseline against itself would prove nothing);
+the user chose to hold M-3 entirely rather than build unproven infrastructure
+or a rushed second parser just to have something to diff against. **M-3
+also inherits M-2's fetch question** - its own spec says it "fetches (or
+reuses cached raw input for) the same track/date" - so whenever M-3 is
+picked up, it needs a `--dir`-style input the same way `pull-race-day.js`
+does, not a live request, unless a future decision says otherwise.
+Revisit once a second parser is registered with a real, verified sample.
 
 **M-4** (was D4) — cost tracking per `ingest_runs` row, real Apify-billed
 amounts pulled from the actor's own run-details API rather than its
@@ -211,6 +229,12 @@ already does. Can land any time after M-1.
 3. **Where do Apify credentials live** if M-4's `cost_source: "apify_api"`
    path is ever exercised — this doc, like the incoming scope, treats that
    as its own small prerequisite task, not something to improvise here.
+4. **RESOLVED 2026-09-09**: M-3 is on hold until a second real parser is
+   registered — see M-3's shape above. Asked before building an unproven
+   comparison harness or rushing a second parser just to exercise it; the
+   user chose to hold rather than either. Whichever parser gets registered
+   next (a11y-tree, per finding 7, or an Apify actor, per decision #1 above)
+   is what un-blocks M-3, not a separate decision of its own.
 
 ## What this doc does not cover
 
