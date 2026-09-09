@@ -10,11 +10,9 @@ const TICKET_BLOCK_START = '<<<TICKETS>>>';
 const TICKET_BLOCK_END = '<<<END TICKETS>>>';
 
 export const SYSTEM_PROMPT = `You are an expert horse racing handicapper. You will be given ONE race
-from a printed program - the entries, the morning line, program
-handicapper rankings, and (if available) the program's own Bottom Line
-analysis - plus the consensus picks already gathered from external
-sources for this race. Analyze the race and propose betting tickets
-against a fixed bankroll for THIS RACE ONLY.
+- the entries and the morning line - and sometimes analyst notes.
+Analyze the race and propose betting tickets against a fixed bankroll
+for THIS RACE ONLY.
 
 Rules:
 - Only bet horses that appear in the entries below, by their exact
@@ -291,8 +289,8 @@ const dollars = (cents) => (cents / 100).toFixed(2);
 
 /**
  * Builds the per-race user prompt. `race`: {number, surface, distance,
- * raceType, postTime, wagerMenu, bottomLineText}. `entries`:
- * [{programNumber, horseName, morningLine, programRank, bestBet,
+ * raceType, postTime, wagerMenu}. `entries`:
+ * [{programNumber, horseName, morningLine,
  * scratched}]. `bankroll`: {perRaceCents, remainingCents, racesRemaining}.
  *
  * D112 removed the CONSENSUS section along with consensus itself. This is a
@@ -309,7 +307,7 @@ const dollars = (cents) => (cents / 100).toFixed(2);
  * Same prompt-comparability note as above applies.
  */
 export function buildLlmRaceUserPrompt({
-  raceNumber, totalRaces, track, date, race, entries, bottomLineText, bankroll, notes,
+  raceNumber, totalRaces, track, date, race, entries, bankroll, notes,
 }) {
   const lines = [];
   lines.push(`RACE ${raceNumber} of ${totalRaces} - ${track}, ${date}`);
@@ -319,21 +317,14 @@ export function buildLlmRaceUserPrompt({
   lines.push('');
   lines.push('ENTRIES');
   for (const e of entries) {
-    const bits = [`ML ${e.morningLine ?? '?'}`];
-    if (e.programRank != null) bits.push(`program rank ${e.programRank}`);
-    if (e.bestBet) bits.push('BEST BET');
-    lines.push(`#${e.programNumber} ${stripParens(e.horseName)}${e.scratched ? ' (SCRATCHED)' : ''} - ${bits.join(', ')}`);
+    // D178: `programRank` and `bestBet` came from the Del Mar program, whose
+    // ingestion D113 deleted - 0 of 574 entries on an active day carry either,
+    // so they rendered nothing but cost a branch and a promise in the system
+    // prompt. The morning line is what an entry actually has.
+    lines.push(`#${e.programNumber} ${stripParens(e.horseName)}${e.scratched ? ' (SCRATCHED)' : ''} - ML ${e.morningLine ?? '?'}`);
   }
-  if (bottomLineText) {
-    lines.push('');
-    lines.push('PROGRAM BOTTOM LINE');
-    lines.push(bottomLineText);
-  }
-  // Analyst notes go LAST (D92): after ENTRIES so the roster is already in
-  // context for the "names beat numbers" rule, and at the boundary of the
-  // prompt where untrusted content sits adjacent to nothing it can
-  // impersonate. Omitted entirely when absent - never
-  // "<analyst_notes>none</analyst_notes>" (the D74 OTR precedent).
+  // D178: the PROGRAM BOTTOM LINE block went with the same D113 removal -
+  // 0 of 49 races on an active day carry one, so the branch could never fire.
   const noteBlock = (scope, note) => {
     if (!note?.text) return;
     lines.push('');
