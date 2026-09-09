@@ -9,7 +9,8 @@ import TipStakingPanel from './TipStakingPanel.jsx';
 import RaceTipPicks from './RaceTipPicks.jsx';
 import TipPicksEntryModal from './TipPicksEntryModal.jsx';
 import RaceDayNotesModal from './RaceDayNotesModal.jsx';
-import RaceNotes from './RaceNotes.jsx';
+import RaceNotesEditor from './RaceNotesEditor.jsx';
+import { NoteSourceDatalist } from './AnalystNotesEditor.jsx';
 import { entriesStaleness } from '@shared/staleness.js';
 
 // Read-only view of a stored race day - what actually landed in the
@@ -43,17 +44,26 @@ export default function RaceDayView({ id, onBack, onOpenCard }) {
   const [tipVersion, setTipVersion] = useState(0);
   const [tipRows, setTipRows] = useState([]);
   const [tipScoring, setTipScoring] = useState(null);
-  // Read-only: the analyst notes entered via "Enter Analyst Notes" / the LLM
-  // generator's own notes fields (same `llm_notes` draft, D92), keyed by race
-  // number so each race's collapsible panel below can look itself up.
+  // The day's analyst notes (same `llm_notes` draft, D92), keyed by race
+  // number so each race's own panel can look itself up. D184: these are now
+  // EDITABLE in place - the panel below is `RaceNotesEditor`, not the
+  // read-only `RaceNotes` - so this map is both the display source and what a
+  // save refetches into.
   const [notesByRace, setNotesByRace] = useState(new Map());
+  // Whether the day's results are already on file. Carried down to every
+  // race's editor so the not-blind warning appears where a note is actually
+  // typed, which since D184 is the race panel rather than the day dialog.
+  const [notesPostResult, setNotesPostResult] = useState(false);
 
   useEffect(() => {
     getRaceDay(id).then(setDay).catch((e) => setError(String(e.message)));
   }, [id]);
 
   const loadNotes = () => getLlmNotes(id)
-    .then((n) => setNotesByRace(new Map(Object.entries(n.byRace ?? {}).map(([k, v]) => [Number(k), v]))))
+    .then((n) => {
+      setNotesByRace(new Map(Object.entries(n.byRace ?? {}).map(([k, v]) => [Number(k), v])));
+      setNotesPostResult(Boolean(n.postResult));
+    })
     .catch(() => {}); // supplementary display only - a fetch failure here shouldn't block the page
   useEffect(() => { loadNotes(); }, [id]); // eslint-disable-line react-hooks/exhaustive-deps
 
@@ -112,12 +122,17 @@ export default function RaceDayView({ id, onBack, onOpenCard }) {
           {/* D159: notes are a race-day attribute (D92), so this is reachable
               the moment entries are in - before any card exists - and writes
               through the same draft store the LLM generator's own notes UI
-              reads and writes. */}
-          <button className="btn" onClick={() => setShowNotesModal(true)}>Enter Analyst Notes</button>
+              reads and writes. D184: WHOLE-DAY note only; a race's own note is
+              typed in that race's panel. */}
+          <button className="btn" onClick={() => setShowNotesModal(true)}>Day Analyst Notes</button>
           <button className="btn btn--danger" disabled={busy} onClick={askDelete}>Delete race day</button>
           <button className="btn" onClick={onBack}>Back</button>
         </div>
       </div>
+
+      {/* The source datalist is referenced by id from every race's notes
+          editor, so it is rendered ONCE for the page rather than per race. */}
+      <NoteSourceDatalist />
 
       {showNotesModal && (
         <RaceDayNotesModal dayId={day.id} onClose={() => { setShowNotesModal(false); loadNotes(); }} />
@@ -248,7 +263,16 @@ export default function RaceDayView({ id, onBack, onOpenCard }) {
             </tbody>
           </table>
           {race.wager_menu && <p className="dim wager">{race.wager_menu}</p>}
-          <RaceNotes note={notesByRace.get(race.number) ?? null} />
+          {/* D184: a note about THIS race is typed here, under the house
+              rule that a race-specific input belongs in the Race UI. The
+              day-level dialog now writes the whole-day note only. */}
+          <RaceNotesEditor
+            dayId={day.id}
+            raceNumber={race.number}
+            note={notesByRace.get(race.number) ?? null}
+            postResult={notesPostResult}
+            onSaved={loadNotes}
+          />
           {/* D182: a tip sheet is an opinion about THIS race, so it sits
               beside this race's notes rather than in a day-level list. D176's
               entry dialog is opened from inside the panel. */}
