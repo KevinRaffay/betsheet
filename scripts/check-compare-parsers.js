@@ -1,19 +1,27 @@
 // Verification for shared/parsers/compare.js (M-3).
 //
-// PURE unit cases against HAND-BUILT synthetic parses, not real fixtures -
-// unlike check-equibase-entries.js / check-equibase-apify-parseforge.js,
-// there is no real captured pair of the SAME track/date through both
-// registered parsers to diff (docs/requirements/
-// multi-parser-entries-ingest.md's own note on this). The diff MACHINERY
-// is fully testable without one: every code path below is deliberately
-// engineered into the synthetic baseline/challenger pair, then
-// scripts/compare-parsers.js is exercised separately against the real
-// fixture directories to prove the orchestration (file discovery, honest
-// "parser unavailable" reporting) end to end.
+// PURE unit cases against HAND-BUILT synthetic parses first - every code
+// path is deliberately engineered into one synthetic baseline/challenger
+// pair, which stays even now that a real pair exists, because a synthetic
+// case can assert BOTH directions of a code path (a mismatch that SHOULD
+// fire and one that SHOULDN'T) in one deliberate fixture; a real day only
+// ever shows what that day happened to contain.
+//
+// D193 (2026-09-09) then closed the fixture gap this file used to note:
+// the user supplied a real Equibase HTML page for Del Mar, 2026-09-07,
+// matching an already-committed equibase-apify-parseforge fixture for the
+// same day - the first genuinely matched track/date pair through both
+// registered parsers. That real comparison is asserted below too, against
+// numbers independently derived from the real CLI run before being
+// hardcoded here (not copied from a first passing run).
 //
 // Run: npm run check-compare-parsers
 
+import fs from 'node:fs';
+import path from 'node:path';
+import { fileURLToPath, URL } from 'node:url';
 import { compareParsedDays } from '../shared/parsers/compare.js';
+import { getParser } from '../shared/parsers/registry.js';
 
 let failures = 0;
 function check(name, ok, detail = '') {
@@ -123,6 +131,59 @@ const swapped = compareParsedDays(challenger, baseline, {
 const swappedRace1 = swapped.perRace.find((r) => r.number === 1);
 check('missing-in-baseline/missing-in-challenger invert correctly when the roles swap',
   swappedRace1.missingInChallenger.includes('Horse D') && swappedRace1.missingInBaseline.includes('Horse B'));
+
+console.log('\n-- the first genuinely real comparison (Del Mar, 2026-09-07) --');
+const ROOT = fileURLToPath(new URL('../', import.meta.url));
+const htmlParser = getParser('equibase-html');
+const apifyParser = getParser('equibase-apify-parseforge');
+const realHtml = fs.readFileSync(path.join(ROOT, 'tests', 'fixtures', 'equibase-entries', 'DMR090726USA-EQB.view-source.html'), 'latin1');
+const realApify = fs.readFileSync(path.join(ROOT, 'tests', 'fixtures', 'equibase-apify', 'parseforge-dmr-2026-09-07.json'), 'utf8');
+const realHtmlParsed = htmlParser.parse(realHtml);
+const realApifyParsed = apifyParser.parse(realApify, { trackCode: 'DMR' });
+const real = compareParsedDays(realHtmlParsed, realApifyParsed, {
+  baselineFieldsNotProvided: htmlParser.fieldsNotProvided,
+  challengerFieldsNotProvided: apifyParser.fieldsNotProvided,
+});
+
+check('both real parsers agree on all 11 races for the same real day',
+  real.raceCountMatch && real.baselineRaceCount === 11 && real.challengerRaceCount === 11);
+check('every horse matches by name in both directions - zero missing either way',
+  real.perRace.every((r) => r.missingInChallenger.length === 0 && r.missingInBaseline.length === 0));
+check('postTime is the one baseline-only field, as expected', real.baselineOnlyFields.length === 1 && real.baselineOnlyFields[0] === 'postTime');
+
+const realFieldCounts = {};
+for (const r of real.perRace) {
+  for (const m of r.entryMismatches) for (const f of m.mismatches) realFieldCounts[f.field] = (realFieldCounts[f.field] ?? 0) + 1;
+}
+// Real findings, independently derived from the real CLI run before being
+// hardcoded here - not a first-pass copy:
+//   weight (3): the source's own page prints weight as TWO tokens with no
+//     separator on a footnoted horse ("117 5") - what the Apify parser's
+//     "1175" data-quality warning turns out to actually be, not a scraper
+//     typo (see shared/parsers/equibase-apify-parseforge.js's own header).
+//   medication (73): this Apify capture has none at all (D192's leaner
+//     variant) while the real page carries a real code on most entries -
+//     a PER-RUN gap correctly NOT masked by fieldsNotProvided (finding 16),
+//     now visible as real noise rather than a hypothetical one.
+//   morningLine/morningLineDecimal (8 each): every one is a SCRATCHED
+//     horse - the HTML parser nulls a scratch's odds, this Apify capture
+//     keeps whatever it last saw. Which convention is "right" is a real,
+//     open question this comparison exists to surface, not resolve here.
+//   claimPrice (20): an optional-claiming horse NOT entered to be claimed
+//     - the page prints "$0" for it, this Apify capture reports null.
+//     Both encode "not entered," as two different literal values.
+check('exactly 3 real weight-token mismatches (the page prints two space-separated numbers, not a typo)',
+  realFieldCounts.weight === 3, realFieldCounts.weight);
+check('exactly 73 medication mismatches - this capture has none at all, a per-run gap correctly left undiffed as coverage but diffed as value',
+  realFieldCounts.medication === 73, realFieldCounts.medication);
+check('exactly 8 morningLine and 8 morningLineDecimal mismatches, all on scratched horses',
+  realFieldCounts.morningLine === 8 && realFieldCounts.morningLineDecimal === 8);
+check('exactly 20 claimPrice mismatches ("$0" vs null for a not-entered-to-claim horse)',
+  realFieldCounts.claimPrice === 20, realFieldCounts.claimPrice);
+check('no double-space name artifacts on this real day, on either side', real.dataQuality.doubleSpaceNames.length === 0);
+check('post-position gaps agree exactly between the two independent sources (races 3, 5, 10 - each a real scratch, not a numbering disagreement)',
+  new Set(real.dataQuality.postPositionGaps.map((g) => g.race)).size === 3
+  && real.dataQuality.postPositionGaps.every((g) => [3, 5, 10].includes(g.race)));
 
 if (failures) {
   console.error(`\ncheck-compare-parsers: ${failures} failure(s)`);
