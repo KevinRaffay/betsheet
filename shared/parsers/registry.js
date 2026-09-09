@@ -1,10 +1,13 @@
 // M-1 (docs/requirements/multi-parser-entries-ingest.md): the registry of
-// entries-ingest parsers. `equibase-html` (today's `equibase-entries.js`) is
-// the only real entry - the HTML parser stays the default for all real
-// ingestion until a comparison process (M-3, not built) says otherwise.
-// Adding a challenger parser (an accessibility-tree dump, an Apify actor's
-// JSON) means adding an entry here, never a call-site special case - the
-// same shape `shared/track-codes.js` already uses for track spellings.
+// entries-ingest parsers. `equibase-html` (today's `equibase-entries.js`)
+// is the DEFAULT and stays that way for all real ingestion until a
+// comparison process (M-3) says otherwise - a second entry existing does
+// not change that. `equibase-apify-parseforge` is the second, added once a
+// real verified sample existed to build it against (see that module's own
+// header). Adding a further challenger parser (an accessibility-tree dump,
+// another Apify actor's JSON) means adding an entry here, never a
+// call-site special case - the same shape `shared/track-codes.js` already
+// uses for track spellings.
 //
 // Every entry's `parse(rawInput, context)` returns the shape
 // `server/ingest.js`'s `insertRaceDay` consumes almost field-for-field
@@ -37,6 +40,7 @@
 // vendor invoice.
 
 import { parseEquibaseEntriesHtml } from './equibase-entries.js';
+import { parseApifyParseforgeDataset, apifyParseforgeToPayload } from './equibase-apify-parseforge.js';
 
 const moneyToCents = (s) => {
   const m = String(s ?? '').match(/[\d,.]+/);
@@ -111,6 +115,25 @@ export const PARSER_REGISTRY = {
     fieldsNotProvided: [],
     parse: parseEquibaseEntriesHtml,
     toPayload: equibaseHtmlToPayload,
+  },
+  // The second registered parser (unblocks M-3's own "needs >=2 registered
+  // parsers" dependency). NOT the default - the HTML parser stays default
+  // for all real ingestion until a comparison process says otherwise (M-1's
+  // stated rule). `costModel` is deliberately a placeholder: the "prior
+  // evaluation"'s specific dollar figures for this actor are not verifiable
+  // anywhere in this repository (docs/requirements/
+  // multi-parser-entries-ingest.md, finding 5) and must not be repeated as
+  // fact - a real number belongs here only once M-4 (cost tracking, not
+  // built) or Apify's own actor page supplies one.
+  'equibase-apify-parseforge': {
+    id: 'equibase-apify-parseforge',
+    label: 'Apify actor: parseforge/equibase-scraper',
+    isDefault: false,
+    sourceKind: 'apify',
+    costModel: { type: 'per-action', actions: {} },
+    fieldsNotProvided: ['postTime', 'liveOdds', 'liveOddsDecimal', 'alsoEligible'],
+    parse: parseApifyParseforgeDataset,
+    toPayload: apifyParseforgeToPayload,
   },
 };
 
