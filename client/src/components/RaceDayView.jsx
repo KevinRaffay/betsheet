@@ -20,8 +20,10 @@ export default function RaceDayView({ id, onBack, onOpenCard }) {
   const [error, setError] = useState(null);
   const [confirm, setConfirm] = useState(null); // deletion-preview counts
   const [busy, setBusy] = useState(false);
-  // Bumped when a sibling of CardsPanel (currently just the Equibase OTR
-  // upload) writes cards CardsPanel has no way to know about on its own -
+  // Bumped when a SIBLING of CardsPanel writes cards CardsPanel has no way to
+  // know about on its own - the Equibase OTR upload (D142) and the tip-sheet
+  // staking panel (D173). Any future sibling that writes a card needs the same
+  // `onSaved` wire, or its cards appear only after a page reload -
   // CardsPanel self-fetches on mount, so remounting it via `key` is the
   // reload. The two in-panel modals don't need this: they're CardsPanel's
   // own children and call its `reload` directly.
@@ -130,7 +132,7 @@ export default function RaceDayView({ id, onBack, onOpenCard }) {
           card's bankroll. RaceDayView already holds the day, so pass it down
           rather than making CardsPanel fetch the day a second time. */}
       <CardsPanel key={cardsVersion} dayId={day.id} bankrollCents={day.bankroll_cents} onOpenCard={onOpenCard} />
-      <TipPicksPanel dayId={day.id} races={day.races ?? []} />
+      <TipPicksPanel dayId={day.id} races={day.races ?? []} onSaved={() => setCardsVersion((v) => v + 1)} />
       <ResultsPanel dayId={day.id} />
       <EquibaseOtrPanel dayId={day.id} onSaved={() => setCardsVersion((v) => v + 1)} />
       {day.races.map((race) => (
