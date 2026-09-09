@@ -34,6 +34,7 @@
 // their own trackCode client-side and handled as independent race days -
 // one track's blocking warnings or save failure never stops the others.
 
+import 'dotenv/config';
 import fs from 'node:fs';
 import { hasToken } from '../server/apifyClient.js';
 import { fetchEntries } from '../server/apifyEquibase.js';
