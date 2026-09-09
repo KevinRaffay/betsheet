@@ -29,3 +29,22 @@ from `trackName` when `trackCode` is absent, and inferring scratch status
 from a missing `programNumber` (reported via a `scratch_status_inferred`
 warning naming every horse it applied to, never silent) when `isScratched`
 is absent. **Never regenerate either file** — neither can be re-requested.
+
+`apify-results-dmr-2026-09-07.json` — a real Apify dataset export the user
+supplied directly (not fetched — invariant 6), from the same `equibase-
+scraper` naming family but scraped in a RESULTS mode: every row carries
+`rowType: "result"`, `finishPosition` and payoff fields, unlike the entries
+mode above. A prior file from the identical naming convention, supplied the
+same session, turned out to carry no results at all (see docs/requirements/
+equibase-apify-results-ingest.md's header) — the naming convention alone
+does not identify what an export of this kind contains; the fields do.
+
+106 finisher rows, 11 races, one track (Del Mar `DMR`) for 2026-09-07 — the
+same day as `parseforge-dmr-2026-09-07.json` above, but this file is the
+RESULTS side of that day, from a separate scrape. `scripts/
+check-equibase-apify-results.js` hand-counts the same way: per-race
+finisher counts, the two races (3 and 7) missing `finalTime` entirely, the
+`exoticWagers` array's one-row-per-race placement (the winner's row only),
+and the payout/wager-type conversions, re-derived independently from the raw
+file rather than trusted from the parser's own output. **Never regenerate
+this file** — same reasoning as the file above.

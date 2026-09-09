@@ -1,7 +1,13 @@
 # Equibase results ingest via Apify
 
-**Status: SPECIFIED, NOT SCHEDULED.** Finding A's scratch-derivation question
-is RESOLVED (2026-09-09, user decision: assume scratched) - see below. Filed
+**Status: PARTIALLY SCHEDULED.** Finding A's scratch-derivation question is
+RESOLVED (2026-09-09, user decision: assume scratched) - see below. The
+parser itself (`shared/parsers/equibase-apify-results.js`) is delivered as
+**D193** (D192 is a different, unrelated deliverable that claimed that ID
+concurrently the same day - see DELIVERABLES.md), built and verified
+standalone against the real sample. Wiring a
+save path and finding E's `result_charts.source_kind` migration remain NOT
+SCHEDULED - deliberately, per finding E's own recommendation. Filed
 2026-09-09 from a real sample the
 user supplied directly (`dataset_equibase-scraper_2026-09-09_18-11-18-089.json`,
 Del Mar 2026-09-07, 106 finisher rows across 11 races - never fetched by this
