@@ -61,10 +61,19 @@ async function waitForHealth() {
 // the fixture-replay cases (irrelevant - --fixture skips the token check
 // entirely) and explicitly clears it in the one case that tests the
 // no-fixture, no-token refusal, so a real call is structurally impossible
-// from this check no matter what.
+// from this check no matter what. Both scripts load `dotenv/config`
+// themselves (they are standalone processes, not the already-running
+// server) - deleting APIFY_TOKEN from the spawned env is NOT enough on its
+// own once a real .env file exists, because dotenv fills in only the keys
+// missing from process.env by reading the FILE straight off disk,
+// regardless of what was stripped here; DOTENV_CONFIG_PATH is pointed at a
+// path that cannot exist so the real .env is never found by the child.
 function runCli(script, args, { clearToken = false } = {}) {
   const env = { ...process.env, BETSHEET_PORT: String(PORT) };
-  if (clearToken) delete env.APIFY_TOKEN;
+  if (clearToken) {
+    delete env.APIFY_TOKEN;
+    env.DOTENV_CONFIG_PATH = path.join(tmp, 'no-such-env-file');
+  }
   try {
     const stdout = execFileSync(process.execPath, [path.join(ROOT, 'scripts', script), ...args], { env, encoding: 'utf8' });
     return { code: 0, stdout };
