@@ -24,6 +24,8 @@ const DIR = path.join(ROOT, 'tests', 'fixtures', 'equibase-apify');
 const FIXTURE = path.join(DIR, 'parseforge-ind-kd-2026-09-09.json');
 const GOLDEN_IND = path.join(DIR, 'parseforge-ind-2026-09-09.expected.json');
 const GOLDEN_KD = path.join(DIR, 'parseforge-kd-2026-09-09.expected.json');
+const LEAN_FIXTURE = path.join(DIR, 'parseforge-dmr-2026-09-07.json');
+const LEAN_GOLDEN = path.join(DIR, 'parseforge-dmr-2026-09-07.expected.json');
 const writeGolden = process.argv.slice(2).includes('--write-golden');
 
 let failures = 0;
@@ -128,18 +130,62 @@ check('a JSON object (not an array) is refused the same way',
   parseApifyParseforgeDataset('{}').warnings[0]?.type === 'not_an_array');
 check('an empty array is refused as no races', parseApifyParseforgeDataset('[]').warnings[0]?.type === 'no_races');
 
+console.log('\n-- a second real sample, a LEANER variant of the same source (Del Mar, 2026-09-07) --');
+// No rowType, no trackCode, no isScratched, no medication anywhere in this
+// file - verified field-by-field to be a strict subset of the first
+// sample's keys, and carrying the same class of weight glitch (an extra
+// digit), which is why this is treated as the same source in a different
+// capture mode rather than a new registry entry.
+const leanRaw = fs.readFileSync(LEAN_FIXTURE, 'utf8');
+const leanRawRows = JSON.parse(leanRaw);
+check('the fixture really has no rowType/trackCode/isScratched/medication anywhere (sanity check on the raw file)',
+  !leanRawRows.some((r) => 'rowType' in r || 'trackCode' in r || 'isScratched' in r || 'medication' in r));
+
+const dmr = parseApifyParseforgeDataset(leanRaw); // no context - only one track in this file
+check('resolves the track from trackName alone (no trackCode field exists)', dmr.track === 'Del Mar', dmr.track);
+check('date reads through unmodified', dmr.date === '2026-09-07', dmr.date);
+check('finds all 11 races', dmr.races.length === 11, dmr.races.length);
+
+// Hand-counted directly from the raw JSON (rows per race, minus the
+// program-less rows treated as scratches) - independent of the parser.
+const EXPECTED_DMR = { 1: [10, 0], 2: [13, 1], 3: [11, 2], 4: [9, 0], 5: [12, 4], 6: [7, 0], 7: [14, 2], 8: [10, 0], 9: [10, 0], 10: [13, 2], 11: [14, 2] };
+for (const race of dmr.races) {
+  const [entries, scratches] = EXPECTED_DMR[race.number];
+  check(`DMR race ${race.number} has ${entries} entries`, race.entries.length === entries, race.entries.length);
+  check(`DMR race ${race.number} has ${scratches} inferred scratch(es)`,
+    race.entries.filter((e) => e.scratched).length === scratches);
+}
+check('DMR total entries across all races is 123 (the whole file, one track)',
+  dmr.races.reduce((a, r) => a + r.entries.length, 0) === 123);
+
+const inferredWarning = dmr.warnings.find((w) => w.type === 'scratch_status_inferred');
+check('every inferred scratch is named in one summary warning, not per-row noise',
+  inferredWarning?.horses.length === 13, inferredWarning?.horses.length);
+check('a normal active entry is NOT flagged as inferred (only the true scratches are)',
+  !inferredWarning.horses.some((h) => h.horse === 'Rejoiceful'));
+
+const dmrWeightWarnings = dmr.warnings.filter((w) => w.type === 'implausible_weight');
+check('flags exactly the 3 real weight glitches in this file (1175, 1165, 1175), non-blocking',
+  dmrWeightWarnings.length === 3 && dmrWeightWarnings.every((w) => w.blocking === false));
+
+check('medication comes back null (a per-run gap, not reclassified as structurally absent)',
+  dmr.races.every((r) => r.entries.every((e) => e.medication === null)));
+
 console.log('\n-- golden --');
 if (writeGolden) {
   fs.writeFileSync(GOLDEN_IND, `${JSON.stringify(ind, null, 2)}\n`);
   fs.writeFileSync(GOLDEN_KD, `${JSON.stringify(kd, null, 2)}\n`);
-  console.log(`  wrote ${path.relative(ROOT, GOLDEN_IND)} and ${path.relative(ROOT, GOLDEN_KD)} - audit the diff before committing`);
-} else if (!fs.existsSync(GOLDEN_IND) || !fs.existsSync(GOLDEN_KD)) {
+  fs.writeFileSync(LEAN_GOLDEN, `${JSON.stringify(dmr, null, 2)}\n`);
+  console.log(`  wrote ${path.relative(ROOT, GOLDEN_IND)}, ${path.relative(ROOT, GOLDEN_KD)} and ${path.relative(ROOT, LEAN_GOLDEN)} - audit the diff before committing`);
+} else if (!fs.existsSync(GOLDEN_IND) || !fs.existsSync(GOLDEN_KD) || !fs.existsSync(LEAN_GOLDEN)) {
   check('goldens exist', false, 'run with --write-golden and audit them');
 } else {
   const expectedInd = JSON.parse(fs.readFileSync(GOLDEN_IND, 'utf8'));
   const expectedKd = JSON.parse(fs.readFileSync(GOLDEN_KD, 'utf8'));
+  const expectedDmr = JSON.parse(fs.readFileSync(LEAN_GOLDEN, 'utf8'));
   check('IND parse matches the audited golden exactly', JSON.stringify(ind) === JSON.stringify(expectedInd));
   check('KD parse matches the audited golden exactly', JSON.stringify(kd) === JSON.stringify(expectedKd));
+  check('the leaner DMR parse matches the audited golden exactly', JSON.stringify(dmr) === JSON.stringify(expectedDmr));
 }
 
 if (failures) {
