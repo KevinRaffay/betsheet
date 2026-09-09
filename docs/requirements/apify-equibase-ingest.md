@@ -1,12 +1,14 @@
 # Apify Equibase ingestion: entries + results, minimum friction
 
-**Status: PARTIALLY SCHEDULED.** Reconciled 2026-09-09 against an
-externally-drafted scope doc (`apify-equibase-ingest-scope.md`, written
-without repo access) and against this repo's own same-day prior art (D188-
-D193). **Phase 1 is delivered as D195, Phase 2 as D196, Phase 3 as D197** -
-both parsers can now genuinely save data, and BetSheet can now call
-Apify's own API on demand. Phases 4-5 (CLI scripts, further verification)
-remain not scheduled; deliverable IDs get claimed when picked up.
+**Status: COMPLETE.** Reconciled 2026-09-09 against an externally-drafted
+scope doc (`apify-equibase-ingest-scope.md`, written without repo access)
+and against this repo's own same-day prior art (D188-D193). **Phase 1
+delivered as D195, Phase 2 as D196, Phase 3 as D197, Phase 4 as D198** - a
+full live entries -> results ingestion workflow now exists, end to end, on
+demand, minimum friction: `npm run pull-apify-entries -- <date> [--yes]`
+then `npm run pull-apify-results -- <date> [--yes]`. Phase 5 needed no
+separate deliverable - its planned coverage was already satisfied by
+D196/D197's own verification (see Phase 4's own notes below).
 **Explicitly out of scope, per user instruction**: scheduling, backfilling,
 backtesting, and anything touching the `legacy` branch (the D43/D44 PDF
 backfill pipeline for DMR-2026-summer etc.). **User framing that governs
@@ -317,33 +319,84 @@ Also proves the round trip this file exists for: a fake live-fetched item,
 `JSON.stringify`'d back through the real, golden-verified parsers,
 produces the identical parse a real file-based fixture would.
 
-**Phase 4 - CLI scripts, one for entries and one for results.**
-A new script (not a `pull-race-day.js` retrofit - that script's design is
-built around scanning a `--dir` of already-saved files, a fundamentally
-different input model from a live API call) takes `--date` and optional
-`--tracks`, calls `fetchEntries`, parses, previews, and on confirmation
-saves through the now-unblocked `toPayload` path - one command in place of
-"run the actor externally, download a file, run a separate ingest command."
-A sibling for results does the same against `fetchResults`, additionally
-loading the day's already-saved `entries` (per the resolved scratch-
-derivation design: entries are always ingested first) to build
-`context.entriesByRace` before calling `parseApifyResultsDataset`. Both
-follow this repo's preview-then-confirm discipline (invariant 9) even
-though the trigger is a CLI, not a UI - a `--yes` flag confirms, its absence
-prints the preview and warnings and saves nothing, matching D43's own
-policy-A shape rather than inventing a new confirmation convention.
+**Phase 4 - CLI scripts, one for entries and one for results. DELIVERED
+AS D198.** `scripts/pull-apify-entries.js` / `scripts/pull-apify-results.js`
+take `<YYYY-MM-DD>` and optional `--tracks`, call `fetchEntries`/
+`fetchResults`, preview, and on `--yes` save - one command in place of "run
+the actor externally, download a file, run a separate ingest command."
 
-**Phase 5 - verification.**
-`scripts/check-apify-equibase-ingest.js`, temp-DB convention (matching
-`check-ingest.js`/`check-equibase-otr.js`): parses the three existing real
-fixtures through the now-real `toPayload` path (no live API call in the
-check - the fixtures already exist and are frozen), verifies `insertRaceDay`
-/ `saveResults` accept the `equibase_apify` provenance value, round-trips a
-read-back, and asserts the entries-then-results scratch-derivation sequence
-end to end (save entries, save results, confirm the right program numbers
-land in `result_scratches`). The live API wrapper functions
-(`fetchEntries`/`fetchResults`) are verified by mocking the Apify client
-boundary, never by making a real billed call from a check script.
+**One design point the plan got wrong, caught before writing any code**:
+"saves through the now-unblocked `toPayload` path" implicitly assumed
+direct DB writes, the way `pull-race-day.js` and `batch-import-equibase-
+entries.js` do. Checked against those two scripts directly: both write to
+a **THROWAWAY temp database, structurally never `data/betsheet.sqlite`**,
+because they are validation harnesses proving a parser+writer combination
+works, not real ingestion paths - the real path for every existing source
+is the UI, through the running server. Phase 4's whole point is a REAL
+ingestion path with minimum friction, so the correct precedent is instead
+`scripts/backfill-payout-estimates.js`/`reformat-teller-calls.js` (dry-run
+by default, `--yes` writes, operating on the real corpus) - but even those
+call `insertRaceDay`/`saveResults` directly against `getDb()`, and doing
+that here would mean reimplementing the HTTP route's own conflict
+detection (409/`--replace`), structural validation (D195's `entriesSource`
+check) and superseded-day tracing, or silently bypassing them. Both scripts
+instead talk to the **actual running server over HTTP**, exactly like a
+browser client - reusing that logic unchanged rather than reimplementing or
+risking drift from it. This does mean the server must already be running
+(checked via `/api/health`, a clear error if not) - a reasonable cost for a
+tool whose target user already has BetSheet running to use it.
+
+Both talk to the day-scoped results preview route (D196) and the existing
+save routes unchanged; the results script looks up the day genuinely
+saved for a track/date (from `GET /api/race-days`) rather than assuming
+one exists, skipping a track with that reason when it doesn't - the
+resolved entries-first dependency, enforced by lookup rather than trusted.
+Both follow invariant 9 (preview first, warnings shown, explicit
+confirmation) via `--yes`; its absence previews and saves nothing.
+
+**A second addition beyond the plan, genuinely useful rather than a test
+seam bolted on**: both scripts accept `--fixture path.json`, replaying an
+already-downloaded dataset export (from the Apify console's own UI, or a
+previous run's `--write-report`) through the identical preview/save path
+with no live call and no token needed - the same "someone already has a
+file" posture every other ingest path in this codebase already takes. This
+is also how both scripts are verified without ever spending real money.
+
+**A real bug found by that verification before it could ever reach a live,
+billed call**: `pull-apify-results.js`'s first draft read the results-save
+response as `saveBody.counts.results` - `saveResults`'s actual response
+shape spreads its counts at the TOP level (`{correlationId, results,
+exotics, scratches, gradedCards}`), so this would have crashed on every
+real save, discovered only because a real end-to-end run against real
+fixture data was possible without spending anything to find out. Fixed
+before this ever ran against the paid API.
+
+**VERIFIED, never with a real billed call**: new `scripts/
+check-pull-apify-cli.js` boots a real temp server and runs BOTH scripts as
+real child processes against it (not their internals in isolation) using
+`--fixture` against the same two real, same-day fixtures D196 verified
+server-side. Confirms: preview-only saves nothing; `--yes` saves with the
+real provenance value and the real hand-counted totals (123 entries/11
+races; 106 finishers, 4 real race-11 scratches); a re-run without
+`--replace` reports a conflict rather than duplicating; `--replace`
+overwrites (onto a NEW id - invariant 12, ids are never reused - not the
+one the check had cached, a bug in the CHECK caught and fixed the same
+way); the results script's day-dependency guard fires with the real reason
+for a track genuinely missing its entries; no server or no
+token-and-no-`--fixture` both refuse before any network activity. Full
+regression sweep green: `check-apify-equibase-client`,
+`check-apify-equibase-ingest`, `check-equibase-apify-parseforge`,
+`check-equibase-apify-results`, `check-schema`, `check-ingest`,
+`check-module-bindings`, `build`.
+
+**Phase 5, as originally scoped, turned out to already be satisfied by
+D196/D197's own verification** - re-read against what actually shipped:
+temp-DB, real-fixture, `toPayload`-path, scratch-derivation-sequence
+coverage is exactly `scripts/check-apify-equibase-ingest.js` (D196); mocked
+Apify-client-boundary coverage is exactly `scripts/
+check-apify-equibase-client.js` (D197). Nothing separate was needed beyond
+D198's own CLI-specific check above. Not claimed as its own deliverable -
+there was no remaining gap for one to close.
 
 ## Decisions the operator owns (not resolved here)
 

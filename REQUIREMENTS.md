@@ -507,9 +507,10 @@ Full specification, reconciling an externally-drafted scope doc against this
 repo's own same-day prior art (D188-D193):
 [docs/requirements/apify-equibase-ingest.md](docs/requirements/apify-equibase-ingest.md).
 Explicitly out of scope per user instruction: scheduling, backfilling,
-backtesting, and the `legacy` branch's PDF backfill pipeline. Phase 1 is
-delivered as **D195**, Phase 2 as **D196**, Phase 3 as **D197**; remaining
-phases' deliverable IDs get claimed when picked up.
+backtesting, and the `legacy` branch's PDF backfill pipeline. **All four
+phases delivered - D195, D196, D197, D198.** Phase 5 needed no separate
+deliverable; its planned coverage was already satisfied by D196/D197's own
+verification.
 
 | Requirement | Deliverables |
 | --- | --- |
@@ -518,5 +519,7 @@ phases' deliverable IDs get claimed when picked up.
 | BetSheet calls Apify's API directly, on demand only, no scheduling of any kind - a deliberate, documented second exception to invariant 6 (the mobile surface is the first), resolved 2026-09-09 in favor of minimum friction over manual-file consistency | D197 |
 | The client lives under `server/`, not `shared/` as originally planned - a file holding an API token has no business in this codebase's browser-safe zone, the same reason `anthropic-client.js` was never there either | D197 |
 | The actor's real input schema (`resultType`/`tracks`/`date`) is read from its own live Store page, not assumed from an earlier scope doc's guessed names for a different actor; `includeWagers` defaults to true since every real results sample this codebase verified against needed it on, and the actor's own default is off | D197 |
-| A results-side ingestion path exists beyond the UI's paste/PDF route - a day-scoped preview route now exists (`server/equibase-apify-results.js`); a CLI script (Phase 4) does not yet | D196 (route); CLI script not scheduled |
+| A results-side ingestion path exists beyond the UI's paste/PDF route - a day-scoped preview route (`server/equibase-apify-results.js`) plus a CLI script that talks to it | D196 (route), D198 (CLI) |
+| One command pulls entries or results for a date (optionally filtered by track), previews, and saves on `--yes` through the REAL running server - not a throwaway validation DB, and not a duplicated copy of the route's own conflict/validation logic | D198 |
+| An already-downloaded dataset export can be replayed through the identical preview/save path with no live call and no token (`--fixture`) - genuinely useful on its own, and how both CLI scripts are verified without spending real money | D198 |
 | The actor stays `parseforge/equibase-scraper`, not the incoming doc's recommended `getascraper` - three real verified samples already exist against parseforge and zero against getascraper, and this codebase doesn't build adapters without a captured real sample | - (decided, not built) |
