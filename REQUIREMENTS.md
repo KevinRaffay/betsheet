@@ -507,12 +507,13 @@ Full specification, reconciling an externally-drafted scope doc against this
 repo's own same-day prior art (D188-D193):
 [docs/requirements/apify-equibase-ingest.md](docs/requirements/apify-equibase-ingest.md).
 Explicitly out of scope per user instruction: scheduling, backfilling,
-backtesting, and the `legacy` branch's PDF backfill pipeline. Specified but
-NOT scheduled - deliverable IDs get claimed when a phase is picked up.
+backtesting, and the `legacy` branch's PDF backfill pipeline. Phase 1 is
+delivered as **D195**; remaining phases' deliverable IDs get claimed when
+picked up.
 
 | Requirement | Deliverables |
 | --- | --- |
-| `race_days.entries_source` and `result_charts.source_kind` gain a real `equibase_apify` CHECK value each (schema-rebuild migrations), and `server/ingest.js`'s silent coercion of an unlisted `entriesSource` to `'program'` is fixed to an explicit refusal in the same pass | - (not scheduled) |
+| `race_days.entries_source` and `result_charts.source_kind` gain a real `equibase_apify` CHECK value each (schema-rebuild migration), and `server/ingest.js`'s silent coercion of an unlisted `entriesSource` to `'program'` is fixed to an explicit refusal in the same pass | D195 |
 | Both already-built, real-sample-verified Apify parsers (D190/D192 entries, D193 results) are wired to real saves - `toPayload`/`apifyResultsToPayload` stop throwing once the schema accepts their provenance value; neither parser's own `parse()` changes | - (not scheduled) |
 | BetSheet calls Apify's API directly, on demand only, no scheduling of any kind - a deliberate, documented second exception to invariant 6 (the mobile surface is the first), resolved 2026-09-09 in favor of minimum friction over manual-file consistency | - (not scheduled) |
 | A results-side CLI/ingestion path exists for the first time - today `saveResults` is reachable only from the UI's paste/PDF route | - (not scheduled) |

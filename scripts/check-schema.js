@@ -84,6 +84,14 @@ check('entries_source admits equibase_html and still refuses anything unlisted',
   db.prepare('DELETE FROM race_days WHERE id = ?').run(dayId);
   return stored === 'equibase_html' && refused;
 })());
+check('entries_source admits equibase_apify (migration 033, D190/D192\'s save path)', (() => {
+  const dayId = db.prepare(
+    "INSERT INTO race_days (track, date, correlation_id, entries_source) VALUES ('Kentucky Downs', '2026-09-07', 'cid-033', 'equibase_apify')",
+  ).run().lastInsertRowid;
+  const stored = db.prepare('SELECT entries_source FROM race_days WHERE id = ?').get(dayId).entries_source;
+  db.prepare('DELETE FROM race_days WHERE id = ?').run(dayId);
+  return stored === 'equibase_apify';
+})());
 check('the three pre-existing entries_source values still pass', (() => {
   let ok = true;
   for (const v of ['program', 'ml_sheet', 'both']) {
@@ -271,6 +279,13 @@ const ticket = d.prepare(`INSERT INTO tickets (card_id, race_id, sequence, bet_t
 
 d.prepare(`INSERT INTO result_charts (race_day_id, source_kind, raw_digest, correlation_id)
   VALUES (?, 'equibase_paste', 'abc123', 'cid-check')`).run(day);
+
+check('result_charts.source_kind admits equibase_apify (migration 033, D193\'s save path)',
+  d.prepare(`INSERT INTO result_charts (race_day_id, source_kind, raw_digest, correlation_id)
+    VALUES (?, 'equibase_apify', 'def456', 'cid-check-033')`).run(day).changes === 1);
+check('result_charts.source_kind still rejects an unknown value',
+  !!throws(() => d.prepare(`INSERT INTO result_charts (race_day_id, source_kind, raw_digest, correlation_id)
+    VALUES (?, 'not_a_source', 'ghi789', 'cid-check-033b')`).run(day)));
 
 d.prepare(`INSERT INTO race_results (race_day_id, race_number, program_number, horse_name, finish_position, win_cents, place_cents, show_cents)
   VALUES (?, 1, '1A', 'Fast Idea', 1, 700, 340, 260)`).run(day);
