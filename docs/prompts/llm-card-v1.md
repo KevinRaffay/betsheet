@@ -157,6 +157,42 @@ via `llm_card_requests.prompt_text`, the same mechanism those three document.
 The server builds this by plain string interpolation (`server/llm-prompt.js`),
 not a templating engine - `{{...}}` below is illustrative, not literal syntax.
 
+### D179: BASELINE PICKS — the day's other sources
+
+What the tip sheets (D176) and Equibase's Off to the Races (D71) already think
+about this race, **labelled per source**, added beside the optional analyst
+notes.
+
+Resurrected from the `CONSENSUS` block D112 deleted — `git show 2543e52 --
+server/llm-prompt.js` — because that block had already solved the shape:
+
+- **Tip sheets** render as a ranked order (`top`, `2nd`, `3rd`).
+- **OTR renders as printed TICKETS**, in its own sentence, for D74's reason:
+  it prints a show pick, a win pick and unranked box mentions, never a ranked
+  3rd pick, so forcing it through the ranked line would invent one. Read from
+  the `both` variant, the only one carrying all four printed tickets.
+- **Both appear when both exist** — no precedence, neither is dropped.
+
+`BASELINE_CLAUSES` is appended to the system prompt **only when a baseline
+exists**, the same conditional shape `ANALYST_NOTES_CLAUSES` uses and for the
+same reason: an LLM card has no version axis. A race with no baseline produces
+the byte-identical prompt it always did, and `buildSystemPrompt({})` is still
+`SYSTEM_PROMPT`.
+
+The clause that matters is the instruction not to reproduce a baseline
+source's tickets — these sources are cheap to copy, and a card that copies the
+sheet is worth nothing the sheet is not already worth.
+
+Source labels are free text a person typed (D167 lets an unknown app keep its
+own slug), so they pass through the same `sanitizeSourceLabel` a note's label
+does — asserted with a label that tries to forge the ticket markers.
+
+**Consequence, recorded deliberately**: LLM cards are now derivative of the
+`EQB_OTR` and `TIPSHEET` buckets rather than independent of them, so comparing
+those buckets no longer measures what it measured before. Acceptable only
+because the corpus is a sandbox by standing instruction — see
+`docs/requirements/llm-baseline-inputs.md`.
+
 ### D178: three dead inputs removed from the prompt
 
 The opening used to promise the model *program handicapper rankings*, *the
@@ -382,6 +418,12 @@ left of ${{remainingBankrollDollars}} on this card)
 ENTRIES
 #{{programNumber}} {{horseName, parenthetical suffix stripped}}{{" (SCRATCHED)" if scratched}} - ML {{morningLine}}
 ... one line per entry ...
+
+BASELINE PICKS
+{{sourceLabel}}: top #{{pgm}} {{horse}}, 2nd #{{pgm}} {{horse}}, 3rd #{{pgm}} {{horse}}
+... one line per tip sheet ...
+Equibase Off to the Races (the free at-track sheet, algorithmic): {{teller calls, " | "-joined}}
+{{the whole section only if a tip sheet or an OTR sheet exists for this race}}
 
 <analyst_notes scope="card" source="{{label}}">
 {{the day-level note, sanitized and capped - only if present}}

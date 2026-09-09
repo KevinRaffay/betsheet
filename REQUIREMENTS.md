@@ -395,6 +395,19 @@ Follows D166's own flagged finding. Consolidation, not new capability.
 | Re-staking a graded card is warned about before it happens, never silently, and never blocked | D174 |
 | Duplicates already created are folded by an explicit dry-run script that refuses to delete a graded card | D174 |
 
+## Tipsheet and OTR as a baseline LLM input (scoped 2026-09-08)
+
+Scope and archaeology: `docs/requirements/llm-baseline-inputs.md`.
+
+| requirement | deliverable |
+| --- | --- |
+| The LLM prompt carries what the day's other sources think, LABELLED per source | D179 |
+| Tip sheets render as ranks; OTR renders as printed tickets, because it never claims a ranked 3rd pick | D179 |
+| Both sources appear when both exist - no precedence, neither dropped | D179 |
+| A race with no baseline produces the byte-identical prompt it always did | D179 |
+| A free-text source label cannot forge the ticket markers | D179 |
+| **Out of scope by instruction**: any measurement of whether the baseline improves results or grades | - (excluded) |
+
 ## TIPSHEET P/L and day-view P/L (requested 2026-09-08)
 
 | requirement | deliverable |

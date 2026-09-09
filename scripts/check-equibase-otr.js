@@ -377,10 +377,20 @@ try {
       'SELECT prompt_text FROM llm_card_requests WHERE race_day_id = ? ORDER BY id DESC',
     ).get(day.id);
     vdb.close();
-    check('D112: the LLM prompt carries no CONSENSUS section and never names the sheet as a source',
+    // D112 removed the CONSENSUS section, and that stays removed - the word,
+    // the classification and the "no external consensus on file" fallback are
+    // all gone for good. D179 then put the SHEET back, under a different
+    // heading and for a different reason: not as consensus to be classified,
+    // but as one labelled baseline opinion among several. Both halves are
+    // asserted together so neither can drift back into the other.
+    check('D112: the CONSENSUS section is still gone from the prompt',
       Boolean(row) && !row.prompt_text.includes('CONSENSUS')
-        && !row.prompt_text.includes('Equibase Off to the Races (the free at-track sheet'),
+        && !row.prompt_text.includes('No external consensus on file'),
       row?.prompt_text?.slice(0, 400));
+    check('D179: but the sheet IS named, under BASELINE PICKS, as printed tickets',
+      Boolean(row) && row.prompt_text.includes('BASELINE PICKS')
+        && row.prompt_text.includes('Equibase Off to the Races (the free at-track sheet'),
+      row?.prompt_text?.slice(row?.prompt_text?.indexOf('BASELINE PICKS'), 400));
   }
 
   // -------- 9. archive + manifest; re-parse from archive matches golden --------
