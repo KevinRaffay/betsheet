@@ -350,6 +350,60 @@ console.log('-- routes: preview -> save -> correct -> delete (D169) --');
     check('the archived extraction SURVIVES the row deletion',
       fs.existsSync(path.join(archive, `${pv.parseToken}.json`)));
 
+    // ---------------------------------------------- manual entry (D176)
+    // Typed picks must produce the IDENTICAL payload extraction does - same
+    // validator, same writer, same rows - so scoring and staking cannot tell
+    // them apart. Only the audit columns differ, and honestly so.
+    const manual = await (await jpost(`/api/race-days/${srvDayId}/tip-picks/manual`, {
+      race: 2,
+      sheets: [
+        { sourceLabel: 'TrackMaster', picks: [{ horse_no: '1', rank: 1 }, { horse_no: '2', rank: 2 }] },
+        // The SAME horse in a second sheet at a different rank - the case a
+        // one-tipsheet-per-row grid could not express, and the reason the
+        // entry dialog is horse-rows x tipsheet-columns.
+        { sourceLabel: 'numberfire', picks: [{ horse_no: '2', rank: 1 }, { horse_no: '1', rank: 2 }] },
+      ],
+    })).json();
+    check('manual entry saves one row per sheet', manual.sheets?.length === 2);
+    {
+      const rows = (await jget(`/api/race-days/${srvDayId}/tip-picks`)).rows.filter((r) => r.raceNo === 2);
+      check('  and normalizes the source the same way extraction does',
+        rows.map((r) => r.sourceLabel).sort().join() === 'numberfire,trackmaster');
+      const tm = rows.find((r) => r.sourceLabel === 'trackmaster');
+      const nf = rows.find((r) => r.sourceLabel === 'numberfire');
+      check('  the SAME horse can rank differently in two sheets',
+        tm.picks.find((p) => p.horse_no === '1').rank === 1
+        && nf.picks.find((p) => p.horse_no === '1').rank === 2);
+      check('  horse names come from the DAY, not the client', tm.picks.every((p) => p.horse_name));
+      check('  no odds are invented for a typed pick',
+        tm.picks.every((p) => !('ml_odds' in p) && !('live_odds' in p)));
+      check('  and the audit columns are honestly empty - no model, no image',
+        tm.model === null && tm.imageSha256 === null);
+      check('  a typed row is shaped exactly like an extracted one',
+        ['id', 'raceNo', 'bucket', 'sourceLabel', 'picks', 'edited'].every((k) => k in tm)
+        && tm.bucket === 'TIPSHEET');
+    }
+
+    // The same validator a model's output faces.
+    const dupRank = await jpost(`/api/race-days/${srvDayId}/tip-picks/manual`, {
+      race: 2, sheets: [{ sourceLabel: 'trackmaster', picks: [{ horse_no: '1', rank: 1 }, { horse_no: '2', rank: 1 }] }],
+    });
+    check('a duplicated rank is refused 422, same rule as extraction', dupRank.status === 422);
+    const ghost = await jpost(`/api/race-days/${srvDayId}/tip-picks/manual`, {
+      race: 2, sheets: [{ sourceLabel: 'trackmaster', picks: [{ horse_no: '99', rank: 1 }] }],
+    });
+    check('a horse not in the race is refused 422', ghost.status === 422);
+
+    // An empty sheet CLEARS that source - there is no second verb for it.
+    await jpost(`/api/race-days/${srvDayId}/tip-picks/manual`, {
+      race: 2, sheets: [{ sourceLabel: 'numberfire', picks: [] }],
+    });
+    {
+      const rows = (await jget(`/api/race-days/${srvDayId}/tip-picks`)).rows.filter((r) => r.raceNo === 2);
+      check('an empty sheet clears that source, leaving the others', rows.length === 1
+        && rows[0].sourceLabel === 'trackmaster');
+    }
+
     const missing = await jpost(`/api/race-days/${srvDayId}/tip-picks/preview`, {
       race: 99, imageBase64: png, __stubResponse: stub(THREE),
     });

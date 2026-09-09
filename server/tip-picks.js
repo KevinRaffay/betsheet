@@ -262,3 +262,94 @@ tipPicksRouter.delete('/tip-picks/:tipId', wrap(async (req, res) => {
   });
   res.json({ deleted: row.id });
 }));
+
+/**
+ * MANUAL entry (D176): tip picks typed from the printed sheet, no vision call.
+ *
+ * Screenshot extraction is slow and costs an API call per race; a tip sheet is
+ * three horses and three ranks, which is faster to type than to photograph.
+ * This produces the IDENTICAL payload - the same `tip_picks` rows, through the
+ * same `validateTipPicks` and the same `insertTipPicks` writer - so scoring
+ * (D170) and staking (D171) cannot tell the two apart, and neither can a
+ * findings query later.
+ *
+ * `raw_extraction` / `model` / `image_sha256` stay NULL, which is the honest
+ * record: there was no model and no image. A row's provenance is therefore
+ * readable as "typed" vs "extracted" without a flag anyone has to set.
+ *
+ * ODDS ARE NOT CAPTURED HERE, deliberately. The morning line already sits on
+ * `entries` and staking reads it from there; a tip sheet's own printed price
+ * is a different number, and copying the ML onto the pick would invent a
+ * quotation the sheet never made.
+ *
+ * Body: `{ race, sheets: [{ sourceLabel, picks: [{ horse_no, rank }] }] }`.
+ * A sheet with NO picks DELETES that source's row for the race, which is how
+ * a column is cleared - there is no second verb for it, the same shape
+ * `writeNote` uses for an emptied note.
+ */
+tipPicksRouter.post('/race-days/:id/tip-picks/manual', wrap(async (req, res) => {
+  const db = getDb();
+  const day = loadDay(db, req.params.id);
+  const raceNo = requireRace(db, day, req.body?.race);
+  const sheets = Array.isArray(req.body?.sheets) ? req.body.sheets : null;
+  if (!sheets) throw new TipPicksError(400, 'sheets must be an array.');
+
+  // The day's own entries are the authority on a horse's name and on whether a
+  // program number exists at all - never the client's copy of them.
+  const race = db.prepare('SELECT id FROM races WHERE race_day_id = ? AND number = ?').get(day.id, raceNo);
+  const entries = db.prepare('SELECT program_number, horse_name FROM entries WHERE race_id = ?').all(race.id);
+  const nameOf = new Map(entries.map((e) => [String(e.program_number).toUpperCase(), e.horse_name]));
+
+  const correlationId = req.get('x-correlation-id') || newCorrelationId();
+  const results = [];
+  const write = db.transaction(() => {
+    for (const sheet of sheets) {
+      const source = normalizeSourceLabel(sheet?.sourceLabel);
+      if (!source) throw new TipPicksError(400, 'Each sheet needs a sourceLabel.');
+      const raw = Array.isArray(sheet?.picks) ? sheet.picks : [];
+
+      if (raw.length === 0) {
+        const gone = db.prepare(
+          'DELETE FROM tip_picks WHERE race_day_id = ? AND race_no = ? AND source_label = ?',
+        ).run(day.id, raceNo, source).changes;
+        if (gone) {
+          traceLog.info('tip_picks_deleted', {
+            correlationId, raceDayId: day.id, raceNo, sourceLabel: source, reason: 'cleared_manually',
+          });
+        }
+        results.push({ sourceLabel: source, picks: 0, cleared: true });
+        continue;
+      }
+
+      const unknown = raw.map((p) => String(p?.horse_no ?? '').toUpperCase())
+        .filter((pgm) => pgm && !nameOf.has(pgm));
+      if (unknown.length) {
+        throw new TipPicksError(422, `Race ${raceNo} has no horse ${unknown.map((u) => `#${u}`).join(', ')}.`);
+      }
+
+      // The SAME validator a model's output passes, so a typed ranking cannot
+      // be something extraction would have refused.
+      const { picks, warnings } = validateTipPicks(raw.map((p) => ({
+        horse_no: p.horse_no,
+        horse_name: nameOf.get(String(p.horse_no).toUpperCase()) ?? '',
+        rank: p.rank,
+      })));
+      if (hasBlocking(warnings)) {
+        throw new TipPicksError(422, `${source}: ${
+          warnings.filter((w) => w.blocking).map((w) => w.message).join('; ')}`);
+      }
+
+      insertTipPicks(db, {
+        raceDayId: day.id, raceNo, sourceLabel: source, picks,
+        capturedAt: req.body?.capturedAt ?? null,
+      });
+      traceLog.info('tip_picks_saved', {
+        correlationId, raceDayId: day.id, raceNo, sourceLabel: source,
+        pickCount: picks.length, entryMode: 'manual',
+      });
+      results.push({ sourceLabel: source, picks: picks.length, cleared: false });
+    }
+  });
+  write();
+  res.status(201).json({ raceNo, sheets: results, correlationId });
+}));
