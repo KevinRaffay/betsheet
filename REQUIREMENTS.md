@@ -470,8 +470,8 @@ picked up.
 
 | Requirement | Deliverables |
 | --- | --- |
-| Entries parsers are pluggable adapters to one canonical payload shape, chosen per run via `--parser`, instead of the one hardcoded HTML parser - the shape already matches what `insertRaceDay` consumes | - (not scheduled) |
-| An unknown `--parser` value is a hard error naming valid ids, never a silent fallback to default | - (not scheduled) |
+| Entries parsers are pluggable adapters to one canonical payload shape, chosen per run via `--parser`, instead of the one hardcoded HTML parser - the shape already matches what `insertRaceDay` consumes | D188 (M-1) |
+| An unknown `--parser` value is a hard error naming valid ids, never a silent fallback to default | D188 (M-1) |
 | One command pulls a full day's slate across every track racing, each pulled and parsed independently so one track's failure doesn't abort the run | - (not scheduled) |
 | Every ingest run lands in one ledger (`ingest_runs`) that a later comparison and cost report both read from | - (not scheduled) |
 | A challenger parser is compared against the HTML parser as the trusted baseline - never symmetric peer comparison - on the "label everything, conclude nothing until n is stated" rule already governing this corpus | - (not scheduled) |
