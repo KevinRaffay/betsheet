@@ -44,8 +44,31 @@
 // the HTML parser doesn't have, but `insertRaceDay`'s schema has no column
 // for it (same class of gap `UNMAPPED` already tracks in
 // batch-import-equibase-entries.js) - dropped here, not stored anywhere.
+//
+// A SECOND real sample (Del Mar, 2026-09-07) turned up a LEANER variant of
+// this same actor's output: every field it carries is a strict subset of
+// the first sample's (verified field-by-field, not assumed), and it
+// carries the same class of data-quality glitch (an occasional weight with
+// an extra digit - 1175/1165 here, 1137 in the first sample) - strong
+// corroborating evidence this is the same source captured with fewer
+// fields enabled, not a different actor. It has NO `rowType` (every row IS
+// an entry row, so that discriminator was simply never included), NO
+// `trackCode` (falls back to deriving one from `trackName` via
+// `canonicalizeTrack`, the same derived-code-never-blocked posture
+// `shared/track-codes.js` already extends to an unregistered track), and
+// NO `isScratched` (a scratch is inferred from a MISSING `programNumber` -
+// this codebase's own D180 precedent for "the number is genuinely absent,
+// not a placeholder" - and the inference is reported, not silent, via a
+// non-blocking `scratch_status_inferred` warning naming every horse it
+// applied to). **`fieldsNotProvided` is NOT widened for this variant**:
+// `medication` really is absent from every row THIS capture holds, but it
+// is a genuine field of the underlying source (present in the first
+// sample) - a per-run gap, not a structural one, so it comes back `null`
+// per entry exactly like any other missing value, never reclassified as
+// something the parser can never provide.
 
 import { morningLineToDecimal } from '../betmath.js';
+import { canonicalizeTrack } from '../track-codes.js';
 
 const SEE_MORE_LESS_RE = /\s*\.{0,3}\s*See More See Less\s*$/;
 
@@ -76,10 +99,16 @@ export function parseApifyParseforgeDataset(rawInput, context = {}) {
   }
   if (!Array.isArray(rows)) return emptyResult([{ type: 'not_an_array', blocking: true }]);
 
-  const entryRows = rows.filter((r) => r && r.rowType === 'entry');
+  // `rowType` is absent entirely on the leaner variant (every row IS an
+  // entry then) - only a row that NAMES a different, non-'entry' rowType
+  // is excluded, never one that simply omits the field.
+  const entryRows = rows.filter((r) => r && (r.rowType === 'entry' || r.rowType === undefined));
   if (entryRows.length === 0) return emptyResult([{ type: 'no_races', blocking: true }]);
 
-  const tracksPresent = [...new Set(entryRows.map((r) => r.trackCode).filter(Boolean))];
+  // `trackCode` may be entirely absent (the leaner variant) - derive one
+  // from `trackName` per row rather than requiring the source to print it.
+  const resolvedTrackCode = (r) => r.trackCode ?? (r.trackName ? canonicalizeTrack(r.trackName).code : null);
+  const tracksPresent = [...new Set(entryRows.map(resolvedTrackCode).filter(Boolean))];
   let trackCode = context.trackCode ?? null;
   if (trackCode) {
     if (!tracksPresent.includes(trackCode)) {
@@ -95,7 +124,7 @@ export function parseApifyParseforgeDataset(rawInput, context = {}) {
     return emptyResult([{ type: 'multiple_tracks_in_file', blocking: true, tracks: tracksPresent }]);
   }
 
-  const trackRows = entryRows.filter((r) => r.trackCode === trackCode);
+  const trackRows = entryRows.filter((r) => resolvedTrackCode(r) === trackCode);
   const datesPresent = [...new Set(trackRows.map((r) => r.raceDate).filter(Boolean))];
   if (datesPresent.length === 0) return emptyResult([{ type: 'no_track_or_date', blocking: true }]);
   if (datesPresent.length > 1) {
@@ -106,6 +135,7 @@ export function parseApifyParseforgeDataset(rawInput, context = {}) {
 
   const warnings = [];
   const byRace = new Map();
+  const inferredScratches = [];
 
   for (const row of trackRows) {
     const number = row.raceNumber;
@@ -131,7 +161,17 @@ export function parseApifyParseforgeDataset(rawInput, context = {}) {
       race.wagerMenu = row.wagers.join(' / ');
     }
 
-    const scratched = row.isScratched === true;
+    // This variant carries no isScratched flag at all - a scratch is
+    // inferred from a MISSING programNumber (D180's own precedent: the
+    // number is genuinely absent, not a placeholder), and every inference
+    // is named in one summary warning below rather than assumed silently.
+    let scratched;
+    if (row.isScratched !== undefined) {
+      scratched = row.isScratched === true;
+    } else {
+      scratched = row.programNumber == null;
+      if (scratched) inferredScratches.push({ race: number, horse: row.horse ?? null });
+    }
     const horseName = row.horse
       ? (row.horseState ? `${row.horse} (${row.horseState})` : row.horse)
       : null;
@@ -172,6 +212,9 @@ export function parseApifyParseforgeDataset(rawInput, context = {}) {
   if (races.length === 0) warnings.push({ type: 'no_races', blocking: true });
   for (const race of races) {
     if (!race.wagerMenu) warnings.push({ type: 'no_wager_menu', blocking: false, race: race.number });
+  }
+  if (inferredScratches.length) {
+    warnings.push({ type: 'scratch_status_inferred', blocking: false, horses: inferredScratches });
   }
 
   return { track, date, races, warnings };

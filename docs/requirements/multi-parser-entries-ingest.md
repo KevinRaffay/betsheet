@@ -13,8 +13,12 @@ and asked for a parser built against it. **M-3 is now delivered as D191**
 verified with no real matched track/date pair between the two registered
 parsers' fixtures (finding 13). Two real bugs surfaced WHILE building and
 verifying it, both fixed in the same deliverable rather than shipped and
-found later (findings 14 and 15). M-4 and M-5 remain specified but not
-scheduled. Filed 2026-09-09 from an externally-drafted scope.
+found later (findings 14 and 15). **D192** (2026-09-09) then made
+`equibase-apify-parseforge` handle a second, leaner real capture from the
+same actor (findings 16, 17) — the fixture gap finding 13 named is still
+open; a second Apify sample for a different date doesn't close it. M-4 and
+M-5 remain specified but not scheduled. Filed 2026-09-09 from an
+externally-drafted scope.
 **The internal `D1`–`D5` labels the incoming scope used are renamed
 `M-1`–`M-5` below** — this repo's own convention (see `docs/requirements/
 card-source-model.md`'s `S-1..S-3`) is that a requirements doc never mints
@@ -255,6 +259,39 @@ filtered out every `equibase-html` entry entirely (`Number.isInteger("1")`
 is `false`) and so had never actually run on that side at all. Both fixed
 in this deliverable rather than shipped and found by a later comparison
 run.
+
+**16. The same actor can produce materially different real schemas across
+captures, and "fieldsNotProvided is static per parser" (the architecture
+decision above) needs a sharper distinction than the doc originally drew.**
+A second real sample (D192, Del Mar 2026-09-07) from what all the evidence
+says is the same `parseforge/equibase-scraper` actor (every field is a
+strict subset of the first sample's, and it carries the same class of
+weight glitch) arrived with NO `rowType`, `trackCode`, `isScratched` or
+`medication` anywhere - a leaner capture, not a broken one. The right fix
+was NOT to widen `fieldsNotProvided` (that field means "this SOURCE can
+never carry this," and the first sample proves the source manifestly can
+carry medication) - it was to make `parse()` itself robust to the field's
+absence per call (derive a track code from `trackName`, infer `scratched`
+from a missing `programNumber`, both with a visible non-blocking warning
+naming the inference rather than a silent guess) and let the genuinely
+missing value (`medication: null`) fall out the normal way every other
+absent value already does. **The distinction that matters going forward**:
+`fieldsNotProvided` answers "can this source ever carry this field," never
+"did this particular capture happen to include it" - the second question
+has no static answer and doesn't need one, since every field already comes
+back `null` when a given row simply lacks it.
+
+**17. Handing the tool a second real date did not produce a real
+comparison, because the fixture gap from finding 13 is about DATES, not
+just about there being "two parsers."** D192's new sample is Del Mar,
+2026-09-07 - still no HTML fixture exists for that exact track and date
+(the HTML set only covers 2026-09-06/07/10, and the one 2026-09-07 HTML
+fixture in this repo is Woodbine, not Del Mar). `compare-parsers.js`
+correctly reported the baseline `UNAVAILABLE` rather than fabricate a
+result or silently do nothing - the honest outcome finding 13 already
+described, now confirmed to generalize: closing this gap needs a same
+TRACK-AND-DATE pair specifically, and a second Apify sample for a
+different date doesn't shrink it.
 
 ---
 
