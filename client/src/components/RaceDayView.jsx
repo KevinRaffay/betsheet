@@ -1,9 +1,12 @@
 import React, { useEffect, useState } from 'react';
-import { deleteRaceDay, deletionPreview, getLlmNotes, getRaceDay, listTipPicks } from '../api.js';
+import {
+  deleteRaceDay, deletionPreview, getDayTipScoring, getLlmNotes, getRaceDay, listTipPicks,
+} from '../api.js';
 import CardsPanel from './CardsPanel.jsx';
 import ResultsPanel from './ResultsPanel.jsx';
 import EquibaseOtrPanel from './EquibaseOtrPanel.jsx';
-import TipPicksPanel from './TipPicksPanel.jsx';
+import TipStakingPanel from './TipStakingPanel.jsx';
+import RaceTipPicks from './RaceTipPicks.jsx';
 import TipPicksEntryModal from './TipPicksEntryModal.jsx';
 import RaceDayNotesModal from './RaceDayNotesModal.jsx';
 import RaceNotes from './RaceNotes.jsx';
@@ -30,11 +33,16 @@ export default function RaceDayView({ id, onBack, onOpenCard }) {
   // own children and call its `reload` directly.
   const [cardsVersion, setCardsVersion] = useState(0);
   const [showNotesModal, setShowNotesModal] = useState(false);
-  // D176: which race's tip-pick dialog is open, and a counter that remounts
-  // TipPicksPanel when it saves - the same wire D173 had to add for staking.
+  // D176: which race's tip-pick dialog is open, and a counter that refetches
+  // the day's tip rows when anything writes one. D182: the rows and their
+  // scores are loaded ONCE here and passed down to each race's own panel and
+  // to the day-level staking panel - one request for the day rather than one
+  // per race, and no second copy that could disagree about which sources
+  // exist.
   const [tipRace, setTipRace] = useState(null);
   const [tipVersion, setTipVersion] = useState(0);
   const [tipRows, setTipRows] = useState([]);
+  const [tipScoring, setTipScoring] = useState(null);
   // Read-only: the analyst notes entered via "Enter Analyst Notes" / the LLM
   // generator's own notes fields (same `llm_notes` draft, D92), keyed by race
   // number so each race's collapsible panel below can look itself up.
@@ -59,8 +67,17 @@ export default function RaceDayView({ id, onBack, onOpenCard }) {
     listTipPicks(id)
       .then((r) => { if (!cancelled) setTipRows(r.rows ?? []); })
       .catch(() => {}); // supplementary - a failure here must not blank the page
+    // Scoring is a SEPARATE, equally supplementary read: a day with no
+    // results on file has nothing to score, and that must leave the picks
+    // themselves perfectly visible.
+    getDayTipScoring(id)
+      .then((s) => { if (!cancelled) setTipScoring(s); })
+      .catch(() => {});
     return () => { cancelled = true; };
   }, [id, tipVersion]);
+
+  const bumpTips = () => setTipVersion((v) => v + 1);
+  const scoreFor = (rowId) => tipScoring?.races?.find((r) => r.id === rowId)?.score ?? null;
 
   const askDelete = async () => {
     setBusy(true);
@@ -165,11 +182,14 @@ export default function RaceDayView({ id, onBack, onOpenCard }) {
           entries={tipRace.entries ?? []}
           existing={tipRows.filter((r) => r.raceNo === tipRace.number)}
           onClose={() => setTipRace(null)}
-          onSaved={() => setTipVersion((v) => v + 1)}
+          onSaved={bumpTips}
         />
       )}
 
-      <TipPicksPanel key={`tips-${tipVersion}`} dayId={day.id} races={day.races ?? []} onSaved={() => setCardsVersion((v) => v + 1)} />
+      {/* D182: only STAKING is day-level - it splits the bankroll across every
+          race that has picks, so it cannot be expressed one race at a time.
+          Reviewing and correcting a sheet moved into the race it describes. */}
+      <TipStakingPanel dayId={day.id} rows={tipRows} onSaved={() => setCardsVersion((v) => v + 1)} />
       <ResultsPanel dayId={day.id} />
       <EquibaseOtrPanel dayId={day.id} onSaved={() => setCardsVersion((v) => v + 1)} />
       {day.races.map((race) => (
@@ -203,14 +223,6 @@ export default function RaceDayView({ id, onBack, onOpenCard }) {
             })()}
           </summary>
           {race.conditions && <p className="conditions">{race.conditions}</p>}
-          {/* D176: tip picks are typed here, per race, rather than
-              photographed - three horses and three ranks is faster to enter
-              than to screenshot, and costs no API call. */}
-          <div className="formrow">
-            <button type="button" className="btn btn--sm" onClick={() => setTipRace(race)}>
-              Enter tipsheet picks
-            </button>
-          </div>
           <table className="grid">
             <thead>
               <tr><th>#</th><th>PP</th><th>Horse</th><th>Jockey</th><th>Trainer</th><th>Wt</th><th>M/L</th><th>Rank</th></tr>
@@ -237,6 +249,15 @@ export default function RaceDayView({ id, onBack, onOpenCard }) {
           </table>
           {race.wager_menu && <p className="dim wager">{race.wager_menu}</p>}
           <RaceNotes note={notesByRace.get(race.number) ?? null} />
+          {/* D182: a tip sheet is an opinion about THIS race, so it sits
+              beside this race's notes rather than in a day-level list. D176's
+              entry dialog is opened from inside the panel. */}
+          <RaceTipPicks
+            rows={tipRows.filter((r) => r.raceNo === race.number)}
+            scoreFor={scoreFor}
+            onEnter={() => setTipRace(race)}
+            onChanged={bumpTips}
+          />
         </details>
       ))}
     </section>
