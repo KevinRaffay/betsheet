@@ -108,6 +108,20 @@ that real sample does carry all three. This confirms one specific factual
 claim from the uncommitted evaluation; it does NOT confirm the dollar
 figures, which remain unverified and still must not be repeated as fact.
 
+**Second partial correction, 2026-09-09 (D197, `docs/requirements/
+apify-equibase-ingest.md`, Phase 3):** the dollar figures ARE now
+independently confirmed - not from the uncommitted evaluation, which stays
+unverifiable, but from `parseforge/equibase-scraper`'s own live Store page,
+read directly while building the real Apify client. Its published pricing
+states a default full card (~90 runners) costs $0.675, and $0.891 with
+connections and pedigree switched on - matching this scope's own cited
+"~$0.675–$0.891" exactly. This is a coincidence worth naming plainly: the
+uncommitted evaluation's number happened to be right, but it is right
+because the actor's OWN page says so today, checked today, not because the
+prior claim became citable. `shared/parsers/registry.js`'s
+`equibase-apify-parseforge` entry now carries these real, sourced figures
+in place of the empty placeholder finding 5 required.
+
 **6. The cited `D-scope-race-day-notes-entry.md` does not exist under that
 name (or any name) in `docs/requirements/`.** The closest real analogue —
 "compare different producers against the same fixed input before trusting a

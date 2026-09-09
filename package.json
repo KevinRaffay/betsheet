@@ -28,6 +28,7 @@
     "check-equibase-apify-parseforge": "node scripts/check-equibase-apify-parseforge.js",
     "check-equibase-apify-results": "node scripts/check-equibase-apify-results.js",
     "check-apify-equibase-ingest": "node scripts/check-apify-equibase-ingest.js",
+    "check-apify-equibase-client": "node scripts/check-apify-equibase-client.js",
     "check-compare-parsers": "node scripts/check-compare-parsers.js",
     "compare-parsers": "node scripts/compare-parsers.js",
     "check-graded-card-fixtures": "node scripts/check-graded-card-fixtures.js",
@@ -69,6 +70,7 @@
   },
   "dependencies": {
     "@radix-ui/colors": "^3.0.0",
+    "apify-client": "^2.25.0",
     "better-sqlite3": "^13.0.3",
     "dotenv": "^16.4.5",
     "express": "^4.19.2",
