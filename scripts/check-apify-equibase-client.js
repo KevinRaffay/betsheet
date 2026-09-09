@@ -60,8 +60,10 @@ await fetchEntries({ raceDate: '2026-09-09', tracks: ['DMR'] }, entriesClient);
 const entriesCall = entriesClient.calls[0];
 check('calls the real actor id', entriesCall.actorId === 'parseforge/equibase-scraper');
 check('resultType is entries, date/tracks mapped from raceDate/tracks', JSON.stringify(entriesCall.input) === JSON.stringify({
-  resultType: 'entries', date: '2026-09-09', tracks: ['DMR'],
+  resultType: 'entries', date: '2026-09-09', tracks: ['DMR'], maxItems: 10000,
 }));
+check('D205: maxItems defaults to 10000, overriding the actor\'s own default - too low for a big field (Kentucky Downs, 168 real entries)',
+  entriesCall.input.maxItems === 10000);
 
 const noTracksClient = fakeClient([]);
 await fetchEntries({ raceDate: '2026-09-09' }, noTracksClient);
@@ -72,6 +74,7 @@ const resultsClient = fakeClient([{ rowType: 'result', trackCode: 'DMR', raceNum
 await fetchResults({ raceDate: '2026-09-09', tracks: ['DMR'] }, resultsClient);
 check('includeWagers defaults to TRUE, overriding the actor\'s own default (off) - every real fixture needed this on',
   resultsClient.calls[0].input.includeWagers === true);
+check('D205: fetchResults also defaults maxItems to 10000', resultsClient.calls[0].input.maxItems === 10000);
 
 const noWagersClient = fakeClient([]);
 await fetchResults({ raceDate: '2026-09-09', tracks: ['DMR'], includeWagers: false }, noWagersClient);
@@ -81,7 +84,9 @@ check('includeWagers is overridable for a caller that wants to skip the extra co
 const filterClient = fakeClient([]);
 await fetchEntries({ raceDate: '2026-09-09', tracks: ['DMR'], onlyStakes: true, maxItems: 50 }, filterClient);
 check('arbitrary documented filters pass through via ...rest without this file needing to know their names',
-  filterClient.calls[0].input.onlyStakes === true && filterClient.calls[0].input.maxItems === 50);
+  filterClient.calls[0].input.onlyStakes === true);
+check('D205: maxItems is overridable for a caller that wants a smaller/larger cap',
+  filterClient.calls[0].input.maxItems === 50);
 
 console.log('\n-- a failed/aborted run is refused loudly, not returned as an empty success --');
 let threwFailed = false;

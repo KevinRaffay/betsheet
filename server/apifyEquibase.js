@@ -15,9 +15,13 @@
 // second calling convention for a live source. `runId` (D204) names the
 // exact Apify run that produced `items`, for a caller to log - Kentucky
 // Downs, 2026-09-09, undercounted a 14-race card as 9 on one live pull and
-// 2 on another, and there was no way to check the actor's own run in
-// Apify's console to see whether ITS scrape was already short, since
-// nothing here recorded which run it even was. Swapping actors later (this
+// 2 on another. **D205 found the actual cause, confirmed by the user
+// running the identical input directly in the Apify portal**: the actor's
+// own `maxItems` default is too low for a big field (168 real entries
+// that day) and was silently truncating the dataset - `maxItems: 10000`
+// in the portal returned all 14 races/168 entries. `runId`'s own
+// diagnostic value stands regardless (a future undercount from a
+// DIFFERENT cause is still checkable this way). Swapping actors later (this
 // codebase's own comparison discipline, `docs/requirements/
 // multi-parser-entries-ingest.md`) is a change to `ACTOR_ID` and the input
 // shape below, not to any caller of these two functions.
@@ -42,6 +46,22 @@ import { getApifyClient } from './apifyClient.js';
 // samples anywhere in this repo.
 const ACTOR_ID = 'parseforge/equibase-scraper';
 
+// D205: the actor's OWN default `maxItems` is too low for a big field and
+// silently TRUNCATES the dataset rather than warning - confirmed live,
+// 2026-09-09: a Kentucky Downs entries pull (168 real rows across 14
+// races) came back as 9 races/100 rows and, on an earlier attempt, 2
+// races/19 rows, with no error of any kind either time. The user
+// reproduced the exact input directly in the Apify portal and got the
+// correct 14 races/168 rows only once `maxItems: 10000` was set
+// explicitly - this codebase's own calls never set it before, so every
+// live call so far relied entirely on whatever the actor defaults to.
+// 10000 is the user's own confirmed-working value, generously above any
+// real single-track single-day row count this codebase has ever seen
+// (the largest fixture on file is 123 rows). The same "override the
+// actor's own default rather than trust it" shape `includeWagers` already
+// uses below - overridable via an explicit `maxItems` in the call.
+const DEFAULT_MAX_ITEMS = 10000;
+
 // `client` is an optional injection seam, used ONLY by
 // scripts/check-apify-equibase-client.js so this file's real logic (input
 // shaping, the includeWagers default, the run-status check) can be verified
@@ -49,14 +69,13 @@ const ACTOR_ID = 'parseforge/equibase-scraper';
 // a person running a CLI script (Phase 4), never a check script. A real
 // caller never passes it; `getApifyClient()` still throws its own clear
 // error when APIFY_TOKEN is unset.
-// Returns { items, runId } rather than bare items - D204's own live pull
-// (Kentucky Downs, 2026-09-09) undercounted a large field (9 of 14 real
-// races, on TWO separate live pulls that returned different, both-wrong
-// counts) with no way to tell whether the actor's own scrape was
-// incomplete or something downstream dropped rows. `runId` names the
-// exact Apify run a caller's log line came from, so that question is
-// answerable from https://console.apify.com/actors/runs/<runId> without
-// re-running (and re-paying for) the call.
+// Returns { items, runId } rather than bare items (D204) - `runId` names
+// the exact Apify run a caller's log line came from, so a suspicious
+// row count is answerable from
+// https://console.apify.com/actors/runs/<runId> without re-running (and
+// re-paying for) the call. The undercount that motivated this (Kentucky
+// Downs, 2026-09-09) turned out to be `maxItems` (D205, see above), but
+// `runId`'s diagnostic value is not specific to that one cause.
 async function runActor(input, client) {
   const c = client ?? getApifyClient();
   const run = await c.actor(ACTOR_ID).call(input);
@@ -70,8 +89,8 @@ async function runActor(input, client) {
   return { items, runId: run.id };
 }
 
-export function fetchEntries({ raceDate, tracks, ...rest } = {}, client) {
-  return runActor({ resultType: 'entries', date: raceDate, tracks: tracks ?? [], ...rest }, client);
+export function fetchEntries({ raceDate, tracks, maxItems = DEFAULT_MAX_ITEMS, ...rest } = {}, client) {
+  return runActor({ resultType: 'entries', date: raceDate, tracks: tracks ?? [], maxItems, ...rest }, client);
 }
 
 // `includeWagers` defaults to true here, deliberately overriding the
@@ -84,6 +103,6 @@ export function fetchEntries({ raceDate, tracks, ...rest } = {}, client) {
 // gap, a caller bug, and one this codebase's own grading depends on
 // (exacta/trifecta/etc. tickets need these payoffs to grade). Overridable
 // for a caller that genuinely wants to skip the extra cost.
-export function fetchResults({ raceDate, tracks, includeWagers = true, ...rest } = {}, client) {
-  return runActor({ resultType: 'results', date: raceDate, tracks: tracks ?? [], includeWagers, ...rest }, client);
+export function fetchResults({ raceDate, tracks, includeWagers = true, maxItems = DEFAULT_MAX_ITEMS, ...rest } = {}, client) {
+  return runActor({ resultType: 'results', date: raceDate, tracks: tracks ?? [], includeWagers, maxItems, ...rest }, client);
 }
