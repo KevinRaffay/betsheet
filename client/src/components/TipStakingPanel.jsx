@@ -89,11 +89,6 @@ export default function TipStakingPanel({ dayId, rows = [], onSaved = () => {} }
   return (
     <section className="consensus">
       <h3>Stake tip sheets into cards</h3>
-      <p className="dim">
-        Enter a race&apos;s picks in its own <strong>Tip sheets</strong> panel above. Staking is
-        day-level because the per-race stake is the bankroll split across every race that
-        has picks — adding a race re-prices the ones already there.
-      </p>
       {error && <p className="notice notice--error">{error}</p>}
 
       {sources.length === 0 && <p className="dim">No tip sheets on this day yet.</p>}
