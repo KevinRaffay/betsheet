@@ -157,15 +157,36 @@ via `llm_card_requests.prompt_text`, the same mechanism those three document.
 The server builds this by plain string interpolation (`server/llm-prompt.js`),
 not a templating engine - `{{...}}` below is illustrative, not literal syntax.
 
+### D178: three dead inputs removed from the prompt
+
+The opening used to promise the model *program handicapper rankings*, *the
+program's own Bottom Line analysis*, and *the consensus picks already gathered
+from external sources*. All three were gone from the data long before they were
+gone from the prompt:
+
+- **consensus** was deleted by D112 - the prompt had been describing an input
+  that could not exist for over sixty deliverables;
+- **program rank** and **BEST BET** came from the Del Mar program ingestion,
+  deleted by D113. **0 of 574 entries** on an active race day carry either;
+- the **Bottom Line** came from the same ingestion. **0 of 49 races** on an
+  active day carry one, so its block could never render.
+
+Removed for CORRECTNESS first: a system prompt that promises inputs which never
+arrive is describing a different task than the one being asked. The token saving
+is real but small - 159 characters, about 40 tokens, 1.9% of the system prompt -
+because the rest of it is load-bearing rules (D145, D146, D148, D160-D163) that
+each fixed a live bug and must not be cut.
+
+`buildSystemPrompt({hasNotes:false}) === SYSTEM_PROMPT` still holds, and
+`PROMPT_TEMPLATE_VERSION` moves on its own (it is a hash of SYSTEM_PROMPT).
+
 ### System
 
 ```
 You are an expert horse racing handicapper. You will be given ONE race
-from a printed program - the entries, the morning line, program
-handicapper rankings, and (if available) the program's own Bottom Line
-analysis - plus the consensus picks already gathered from external
-sources for this race. Analyze the race and propose betting tickets
-against a fixed bankroll for THIS RACE ONLY.
+- the entries and the morning line - and sometimes analyst notes.
+Analyze the race and propose betting tickets against a fixed bankroll
+for THIS RACE ONLY.
 
 Rules:
 - Only bet horses that appear in the entries below, by their exact
@@ -359,11 +380,8 @@ Race bankroll: ${{perRaceBankrollDollars}} ({{racesRemaining}} race(s)
 left of ${{remainingBankrollDollars}} on this card)
 
 ENTRIES
-#{{programNumber}} {{horseName, parenthetical suffix stripped}}{{" (SCRATCHED)" if scratched}} - ML {{morningLine}}{{", program rank " + programRank if programRank}}{{", BEST BET" if bestBet}}
+#{{programNumber}} {{horseName, parenthetical suffix stripped}}{{" (SCRATCHED)" if scratched}} - ML {{morningLine}}
 ... one line per entry ...
-
-PROGRAM BOTTOM LINE
-{{bottomLineText, only if present}}
 
 <analyst_notes scope="card" source="{{label}}">
 {{the day-level note, sanitized and capped - only if present}}

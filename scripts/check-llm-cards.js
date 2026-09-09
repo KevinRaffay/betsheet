@@ -44,12 +44,22 @@ console.log('-- pure: buildLlmRaceUserPrompt --');
       { programNumber: '2', horseName: 'Two Runner', morningLine: '4/1', programRank: null, bestBet: false, scratched: true },
       { programNumber: '3', horseName: 'Eternal Reign (IRE)', morningLine: '10/1', programRank: null, bestBet: false, scratched: false },
     ],
+    // Still passed, and deliberately: the assertion below proves the builder
+    // IGNORES it now, which is stronger than removing it from the fixture.
     bottomLineText: 'One Runner drops in class and adds blinkers.',
     bankroll: { perRaceCents: 2500, remainingCents: 5000, racesRemaining: 2 },
   });
   check('carries race header, wager menu and bankroll', prompt.includes('RACE 1 of 2') && prompt.includes('$1 Exacta') && prompt.includes('$25.00'));
-  check('carries every entry with scratch/best-bet/rank annotations', prompt.includes('#1 One Runner') && prompt.includes('BEST BET') && prompt.includes('#2 Two Runner (SCRATCHED)'));
-  check('carries the Bottom Line text', prompt.includes('One Runner drops in class'));
+  check('carries every entry, with the scratch marker and the morning line',
+    prompt.includes('#1 One Runner') && prompt.includes('#2 Two Runner (SCRATCHED)') && prompt.includes('ML '));
+  // D178: program rank, BEST BET and the Bottom Line all came from the Del Mar
+  // program, whose ingestion D113 deleted - 0 of 574 entries and 0 of 49 races
+  // on an ACTIVE day carry any of them. These assertions are INVERTED rather
+  // than deleted, so re-adding a dead field has to be a deliberate act.
+  check('does NOT carry program rank or BEST BET (D178 - dead since D113)',
+    !prompt.includes('program rank') && !prompt.includes('BEST BET'));
+  check('does NOT carry a Bottom Line block (same removal)',
+    !prompt.includes('PROGRAM BOTTOM LINE') && !prompt.includes('One Runner drops in class'));
   // D125: entries.horse_name keeps a bred-country/state suffix verbatim, but
   // the model should read the bare name - the suffix is noise on every card.
   check('strips a parenthetical suffix from the entry name shown to the model (D125)',

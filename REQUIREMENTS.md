@@ -425,3 +425,13 @@ Follows D166's own flagged finding. Consolidation, not new capability.
 | The writer, reader, validator and odds normalizer survive - they were never part of the vision half | D177 |
 | Columns holding real values from already-extracted rows are kept, not dropped | D177 |
 | Scoring, staking and P/L are untouched by the removal | D177 |
+
+## LLM prompt inputs (analysed 2026-09-08)
+
+| requirement | deliverable |
+| --- | --- |
+| The system prompt describes only inputs that actually arrive - no promise of consensus picks, program rankings or a Bottom Line | D178 |
+| Entry lines carry the program number, the horse and the morning line; nothing sourced from the deleted program ingestion | D178 |
+| Assertions about removed prompt content are inverted, not deleted, so re-adding a dead field is deliberate | D178 |
+| **Rejected on evidence**: stripping program numbers from the prompt. 0.1% error rate over 3,190 references, both failures traced to a data defect, ~2.5% token saving, and it would trade a non-blocking name check for a blocking one | - (analysed, not built) |
+| **Found, not fixed**: 150 entries across 15 days carry `SCR`/`SCR-2` as a program number | - (own deliverable) |

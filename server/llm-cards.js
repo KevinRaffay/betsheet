@@ -172,9 +172,8 @@ export async function previewLlmRace(db, day, raceNumber, cardId, {
     race: { surface: race.surface, distance: race.distance, raceType: race.race_type, postTime: race.post_time, wagerMenu: race.wager_menu },
     entries: entries.map((e) => ({
       programNumber: e.program_number, horseName: e.horse_name, morningLine: e.morning_line,
-      programRank: e.program_rank, bestBet: Boolean(e.best_bet), scratched: Boolean(e.scratched),
+      scratched: Boolean(e.scratched),
     })),
-    bottomLineText: race.bottom_line ?? null,
     bankroll: { perRaceCents, remainingCents, racesRemaining: remaining },
     notes: notes.prompt,
   });
