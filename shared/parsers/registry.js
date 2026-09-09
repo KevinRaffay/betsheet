@@ -145,6 +145,18 @@ export function listParserIds() {
   return Object.keys(PARSER_REGISTRY);
 }
 
+// M-3 (docs/requirements/multi-parser-entries-ingest.md): a comparison run
+// (scripts/compare-parsers.js) needs to know, per sourceKind, which file
+// extension actually holds that kind of raw input - one shared map so
+// compare-parsers.js and any future orchestration script agree on it rather
+// than each guessing its own. `pull-race-day.js` predates this (it only
+// ever discovers `.html`/`.htm`, hardcoded, and refuses outright when asked
+// to use a non-`html` parser) and is not changed by adding this.
+export const EXTENSIONS_BY_SOURCE_KIND = {
+  html: /\.html?$/i,
+  apify: /\.json$/i,
+};
+
 // Never falls back to the default on an unknown id - a typo silently
 // ingesting through the wrong parser is worse than a hard error (M-1's
 // stated rule). Throws rather than returning null/undefined so a caller

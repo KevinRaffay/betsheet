@@ -7,13 +7,14 @@ user decision made explicitly before building it (2026-09-09): see finding 9
 below. **M-3 was ON HOLD, and now has what it was waiting for**: **D190**
 (2026-09-09) registered a real second parser, `equibase-apify-parseforge`
 (finding 10 below) — the user supplied a real Apify dataset export directly
-and asked for a parser built against it. **M-3's dependency is now met, but
-M-3 ITSELF IS STILL NOT SCHEDULED** - registering a second parser was its own
-deliverable, picked up because a real sample existed to build against, not
-an implicit decision to also build the comparison harness. M-4 and M-5
-remain specified but not scheduled. No deliverable ID is claimed for M-3
-through M-5 until each is separately picked up. Filed 2026-09-09 from an
-externally-drafted scope.
+and asked for a parser built against it. **M-3 is now delivered as D191**
+(2026-09-09, `scripts/compare-parsers.js` + `shared/parsers/compare.js`) —
+**with no live fetching**, inheriting M-2's decision (finding 9), and
+verified with no real matched track/date pair between the two registered
+parsers' fixtures (finding 13). Two real bugs surfaced WHILE building and
+verifying it, both fixed in the same deliverable rather than shipped and
+found later (findings 14 and 15). M-4 and M-5 remain specified but not
+scheduled. Filed 2026-09-09 from an externally-drafted scope.
 **The internal `D1`–`D5` labels the incoming scope used are renamed
 `M-1`–`M-5` below** — this repo's own convention (see `docs/requirements/
 card-source-model.md`'s `S-1..S-3`) is that a requirements doc never mints
@@ -207,6 +208,54 @@ asked for. **This parser's `parse()` is real and fully verified against
 real data; its `toPayload` is deliberately inert until that migration
 exists** - which is M-5's scope, not this one's.
 
+**13. There is no real captured pair of the SAME track and date through
+both registered parsers.** The HTML fixtures cover Del Mar/Lethbridge
+(2026-09-06), Woodbine (2026-09-07) and Thistledown (2026-09-10); the Apify
+fixture covers Horseshoe Indianapolis and Kentucky Downs (2026-09-09) - zero
+overlap. `scripts/compare-parsers.js` (M-3) is verified two ways instead:
+`shared/parsers/compare.js`'s diff logic is unit-tested against hand-built
+synthetic parses engineered to exercise every code path at once
+(`scripts/check-compare-parsers.js`), and the CLI's file-discovery and
+"parser unavailable" reporting is exercised against the REAL fixture
+directories, which correctly report each side unavailable for every
+combination actually available today (there being no overlap is not a
+defect in the tool - it is what the tool is supposed to say when it's
+true). A genuinely matched real pair is what would let a comparison run
+count toward the decision rule's sample size; none exists yet.
+
+**14. Passing `context.track`/`context.date` as "hints" to `parse()` during
+discovery is not safe for every parser - found live while first testing
+M-3's file discovery.** `equibase-html`'s `context` shape is a FALLBACK
+(`pageTrack = track ?? header...`), used only when the page's own markup
+can't be read - not a filter. `compare-parsers.js`'s first draft passed
+the REQUESTED track/date as that context on every attempt, which made the
+HTML parser report back whatever was asked for regardless of the file's
+real content: a request for Indianapolis "matched" a Del Mar page. Fixed
+by passing only `trackCode` during discovery (harmless to `equibase-html`,
+since it destructures a differently-named key and ignores it; the Apify
+parser is the only one that reads it, and it only SELECTS among rows
+already present in the file - it invents nothing, so it carries no version
+of this risk). The general lesson: a registry entry's `context` shape is
+NOT guaranteed to be filter-safe just because it exists - a caller must
+know whether a given parser's context hint can OVERRIDE reality or only
+NARROW what's already there, before passing one uniformly to every
+registered parser.
+
+**15. Two parsers can report an IDENTICAL value in different TYPES, and a
+strict `!==` reports that as a mismatch it isn't.** Found by running the
+finished comparison against real output: `equibase-html` prints
+`postPosition`/`weight` as STRINGS ("1", "124" - Equibase's own printed
+format), `equibase-apify-parseforge` as numbers (`1`, `124`) - the exact
+same value, on the exact same real horse, on a genuinely matched race
+(constructed for this one verification pass; see finding 13). `shared/
+parsers/compare.js`'s field comparison now coerces through `Number` when
+both sides look numeric before flagging a difference (`valuesEqual`); the
+same coercion was needed in the post-position-gap check, which had
+filtered out every `equibase-html` entry entirely (`Number.isInteger("1")`
+is `false`) and so had never actually run on that side at all. Both fixed
+in this deliverable rather than shipped and found by a later comparison
+run.
+
 ---
 
 ## Suggested shape, renumbered from the incoming scope
@@ -249,26 +298,48 @@ named tracks, reporting a requested-but-absent one as `failed` rather than
 silently omitting it. Both confirmed against the real 5-file fixture
 directory — see DELIVERABLES.md D189.
 
-**M-3** (was D3) — *ON HOLD, user decision 2026-09-09.* Parser comparison,
-against the HTML parser as baseline (never symmetric peer comparison), on
-the same "label everything, conclude nothing until n is stated" discipline
-`docs/decisions/2026-09-05-simulator-pivot.md` already states for this
-codebase. Depends on M-1 (≥2 registered parsers) and M-2's `ingest_runs`
-ledger. **The dependency is not met**: M-1 deliberately registered exactly
-one parser (finding 7 - no a11y-tree or Apify adapter has a verified sample
-to build against), so there is nothing real for M-3 to compare against yet,
-and the incoming scope's own done-when ("correctly identifies the known
-getascraper name-spacing bug," "correctly lists claimingPrice/medication/
-scratched as parseforge-only fields") cannot be satisfied without those
-adapters existing. Asked before building anything (a comparison harness that
-can only ever compare the baseline against itself would prove nothing);
-the user chose to hold M-3 entirely rather than build unproven infrastructure
-or a rushed second parser just to have something to diff against. **M-3
-also inherits M-2's fetch question** - its own spec says it "fetches (or
-reuses cached raw input for) the same track/date" - so whenever M-3 is
-picked up, it needs a `--dir`-style input the same way `pull-race-day.js`
-does, not a live request, unless a future decision says otherwise.
-Revisit once a second parser is registered with a real, verified sample.
+**M-3** (was D3) — *Delivered as D191.* Parser comparison, against the
+registry's DEFAULT parser as baseline (never symmetric peer comparison),
+built once M-1's dependency was actually met (D190 registered a second real
+parser). **No live fetching** (inherits M-2's decision - finding 9):
+`scripts/compare-parsers.js <date> <trackCode> --dir <dir> [--parsers
+id1,id2,...] [--write-report path.json]` takes a directory that may hold
+files for several sourceKinds at once (`shared/parsers/registry.js`'s new
+`EXTENSIONS_BY_SOURCE_KIND` map decides which extension each parser reads);
+a parser with no matching file for the requested track/date is reported
+UNAVAILABLE for that run, never fatal to it. The pure diff itself lives in
+`shared/parsers/compare.js` (`compareParsedDays`), browser-safe and
+independently unit-tested (`scripts/check-compare-parsers.js`) against
+hand-built synthetic parses, since no real matched track/date pair exists
+between the two registered parsers' fixtures (finding 13). Matches horses
+by `nameKey` (not `programNumber` - the field itself can be the bug under
+test), classifies every field as skip / baseline-only / challenger-only
+("additive value," the scope's own term) / compared, based on each side's
+`fieldsNotProvided`, and generalises the scope's two getascraper-specific
+data-quality examples (a post-position sequence gap, a double-space name
+artifact) into checks any source can trip, not one vendor's alone. Every
+comparison actually performed appends one row to `data/parser_comparisons
+.jsonl` (JSON-lines, gitignored, append-only - the same reasoning as M-2's
+`ingest_runs`: the decision rule for ever proposing a new default needs a
+sample across many runs, read by a person from this ledger, never applied
+automatically here). **Two real bugs surfaced during verification and were
+fixed in this same deliverable** (findings 14 and 15): a context-hint bug
+that made the HTML parser falsely "match" any file to any requested
+track/date, and a string-vs-number type mismatch (`postPosition`/`weight`)
+that both inflated false mismatches and silently disabled the
+post-position-gap check on the HTML parser's side entirely. **Done when**:
+a comparison for one real track/date reports race-count/entry mismatches,
+additive fields and data-quality findings without a person re-deriving them
+by hand - confirmed via the CLI against a real HTML fixture plus a small
+synthetic Apify-shaped file constructed ONLY to exercise the "compared"
+path end-to-end (not committed as a fixture - no real matched pair exists
+to commit); the scope's own literal wording ("correctly identifies the
+known getascraper name-spacing bug," "correctly lists claimingPrice/
+medication/scratched as parseforge-only fields") named an actor that isn't
+registered, so that exact phrasing cannot be satisfied - the generalised
+data-quality checks and the real `challengerOnlyFields` classification are
+what this deliverable does instead, and do actually run. See DELIVERABLES.md
+D191.
 
 **M-4** (was D4) — cost tracking per `ingest_runs` row, real Apify-billed
 amounts pulled from the actor's own run-details API rather than its
@@ -296,12 +367,13 @@ already does. Can land any time after M-1.
 3. **Where do Apify credentials live** if M-4's `cost_source: "apify_api"`
    path is ever exercised — this doc, like the incoming scope, treats that
    as its own small prerequisite task, not something to improvise here.
-4. **RESOLVED 2026-09-09**: M-3 is on hold until a second real parser is
-   registered — see M-3's shape above. Asked before building an unproven
-   comparison harness or rushing a second parser just to exercise it; the
-   user chose to hold rather than either. Whichever parser gets registered
-   next (a11y-tree, per finding 7, or an Apify actor, per decision #1 above)
-   is what un-blocks M-3, not a separate decision of its own.
+4. **RESOLVED 2026-09-09, then superseded the same day.** M-3 was held
+   until a second real parser was registered - asked before building an
+   unproven comparison harness or rushing a second parser just to exercise
+   it, and the user chose to hold rather than either. D190 then registered
+   `equibase-apify-parseforge` against a real user-supplied sample, which
+   is what un-blocked M-3 - and once it was unblocked, M-3 itself was
+   picked up and delivered as D191 the same day. See M-3's shape above.
 
 ## What this doc does not cover
 

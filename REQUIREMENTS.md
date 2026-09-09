@@ -477,7 +477,10 @@ picked up.
 | Every ingest run lands in one ledger (`data/ingest_runs.jsonl`, JSON-lines rather than a table - a table inside the per-run throwaway DB would be deleted with it) that a later comparison and cost report both read from | D189 (M-2) |
 | A second real parser exists, built and verified against a real captured sample rather than assumed - correctly discards the source's own morning-line decimal (a different, incompatible convention) rather than trusting it, and refuses to guess which track a multi-track file's rows belong to | D190 (`equibase-apify-parseforge`) |
 | A parser with no schema support for its provenance refuses to save rather than silently mislabeling `entries_source` | D190 |
-| A challenger parser is compared against the HTML parser as the trusted baseline - never symmetric peer comparison - on the "label everything, conclude nothing until n is stated" rule already governing this corpus | - (not scheduled - the dependency is now met, per D190, but comparison itself is a separate, still-unpicked-up deliverable) |
+| A challenger parser is compared against the HTML parser as the trusted baseline - never symmetric peer comparison - on the "label everything, conclude nothing until n is stated" rule already governing this corpus | D191 |
+| Field-level comparison correctly treats "1" and 1 as the same value (real parsers disagree on type, not just content) and never confuses a structural coverage gap with an actual value disagreement | D191 |
+| A parser with no matching file for the requested track/date is reported unavailable for that comparison run, never fatal to it | D191 |
+| Every comparison performed lands in one ledger so a trend across many race days, not one anecdotal run, is what any future default-parser proposal is based on | D191 |
 | Every parser's real cost is tracked per run, including the ones that aren't billed in dollars, and an Apify actor's cost comes from its own billed-run API rather than its advertised rate | - (not scheduled) |
 | `source_parser_id` provenance is queryable per race day without cross-referencing `ingest_runs` by timestamp | - (not scheduled) |
 | Switching the default parser is always a manual decision informed by the comparison evidence, never automatic | - (not scheduled) |
