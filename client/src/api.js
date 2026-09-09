@@ -149,6 +149,12 @@ export const deleteCard = (id) => fetch(`/api/cards/${id}`, {
   headers: { 'content-type': 'application/json' },
   body: JSON.stringify({ confirm: 'DELETE' }),
 }).then(asJson);
+export const bulkDeleteCards = (ids) =>
+  fetch('/api/cards/bulk-delete', {
+    method: 'POST',
+    headers: { 'content-type': 'application/json' },
+    body: JSON.stringify({ ids }),
+  }).then(asJson);
 
 export const manualPicksSave = (id, sourceName, races) =>
   fetch(`/api/race-days/${id}/consensus/manual`, {

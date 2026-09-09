@@ -84,6 +84,40 @@ cardsRouter.delete('/cards/:id', (req, res) => {
   res.json({ ok: true, id: cardId, raceDayId: card.race_day_id });
 });
 
+// Bulk delete from the day view's card table (checkbox selection), mirroring
+// server/ingest.js's race-day bulk-delete: one request, many ids, each
+// handled independently so one bad id can't block the rest. Unlike that
+// route, there is **no grading guard here at all** (user decision
+// 2026-09-09) - a card is a generated/built artifact, not a record of a
+// day's history the way a graded race day is, so any card, graded or not,
+// may be bulk-deleted. Hard delete, same as the single-card route above;
+// cascades take tickets/allocations/grades with it.
+cardsRouter.post('/cards/bulk-delete', (req, res) => {
+  const db = getDb();
+  const ids = req.body?.ids;
+  if (!Array.isArray(ids) || ids.length === 0 || !ids.every((id) => Number.isInteger(id))) {
+    return res.status(400).json({ error: 'ids must be a non-empty array of integers.' });
+  }
+
+  const deleted = [];
+  const skipped = [];
+  for (const id of ids) {
+    const card = db.prepare('SELECT id, race_day_id, card_number, correlation_id FROM cards WHERE id = ?').get(id);
+    if (!card) {
+      skipped.push({ id, reason: 'not_found' });
+      continue;
+    }
+    db.prepare('DELETE FROM cards WHERE id = ?').run(id);
+    appLog.info('card_deleted', {
+      cardId: id,
+      raceDayId: card.race_day_id,
+      correlationId: card.correlation_id,
+    });
+    deleted.push({ id, raceDayId: card.race_day_id, cardNumber: card.card_number });
+  }
+  res.json({ deleted, skipped });
+});
+
 cardsRouter.get('/cards/:id', (req, res) => {
   const db = getDb();
   const card = db.prepare(`
