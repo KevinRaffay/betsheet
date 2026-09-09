@@ -12,9 +12,10 @@
 // source's fields already line up one-to-one with what race_results/
 // exotic_payoffs/result_scratches persist).
 //
-// NOT WIRED TO ANY SAVE PATH (deliberately, see apifyResultsToPayload below)
-// - result_charts.source_kind's CHECK constraint (migration 010) has no
-// value for an Apify-sourced results day yet.
+// WIRED TO A REAL SAVE PATH (D195/D196): result_charts.source_kind's CHECK
+// constraint (migration 033) admits 'equibase_apify';
+// server/equibase-apify-results.js's preview route calls this parser
+// directly and hands its output straight to saveResults, unchanged.
 //
 // SCRATCH DERIVATION (resolved 2026-09-09, user decision): this source
 // names no scratches at all - only horses that actually finished appear.
@@ -201,22 +202,15 @@ export function parseApifyResultsDataset(rawInput, context = {}) {
   return { track, date, races, warnings };
 }
 
-// NOT WIRED TO ANY SAVE PATH (deliberately). result_charts.source_kind's
-// CHECK constraint (migration 010) admits only 'equibase_paste',
-// 'equibase_pdf', 'dmtc_html' - no value for an Apify-sourced results day.
-// This parser's own output already matches saveResults's `p` shape with no
-// reshaping step needed (unlike the entries side, which needs toPayload to
-// bridge to insertRaceDay's payload), so this throw is the one deliberate
-// place left to make "not wired yet" loud and intentional - matching
-// equibase-apify-parseforge.js's own toPayload precedent - rather than an
-// accident of nothing having called this function yet.
-export function apifyResultsToPayload() {
-  throw new Error(
-    'equibase-apify-results: not wired to any save path yet - '
-    + "result_charts.source_kind's CHECK constraint (migration 010) has no "
-    + 'value for an Apify-sourced results day (see docs/requirements/'
-    + 'equibase-apify-results-ingest.md, finding E). Extend the schema (a '
-    + "rebuild migration, matching migration 010's own precedent) before "
-    + 'wiring this parser into server/results.js.',
-  );
-}
+// WIRED TO A REAL SAVE PATH (D195/D196, `docs/requirements/
+// apify-equibase-ingest.md`). `result_charts.source_kind`'s CHECK constraint
+// (migration 033) now admits `'equibase_apify'`. There is deliberately NO
+// `toPayload`-style adapter export here, unlike the entries side: this
+// parser's output already matches `saveResults`'s own `p` shape exactly (no
+// reshaping was ever the blocker, only the schema was - see this file's own
+// header), and results ingestion has no parser registry to satisfy an
+// adapter-interface contract for (`chart-parser.js` doesn't export one
+// either). `server/equibase-apify-results.js`'s preview route calls
+// `parseApifyResultsDataset` directly and attaches `sourceKind:
+// 'equibase_apify'` inline, the same shape every other results preview
+// route already uses.

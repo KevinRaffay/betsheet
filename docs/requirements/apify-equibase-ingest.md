@@ -3,8 +3,10 @@
 **Status: PARTIALLY SCHEDULED.** Reconciled 2026-09-09 against an
 externally-drafted scope doc (`apify-equibase-ingest-scope.md`, written
 without repo access) and against this repo's own same-day prior art (D188-
-D193). **Phase 1 is delivered as D195.** Remaining phases' deliverable IDs
-get claimed when picked up.
+D193). **Phase 1 is delivered as D195, Phase 2 as D196** - both parsers can
+now genuinely save data. Phases 3-5 (the live Apify client, CLI scripts,
+further verification) remain not scheduled; deliverable IDs get claimed
+when picked up.
 **Explicitly out of scope, per user instruction**: scheduling, backfilling,
 backtesting, and anything touching the `legacy` branch (the D43/D44 PDF
 backfill pipeline for DMR-2026-summer etc.). **User framing that governs
@@ -167,16 +169,67 @@ against the pre-Phase-1 baseline (confirmed via a stashed before/after
 run) - not caused by this migration, out of scope for it, flagged
 separately.
 
-**Phase 2 - wire the two already-verified parsers to real saves.**
-`apifyParseforgeToPayload` stops throwing and produces `insertRaceDay`'s
-payload with `entriesSource: 'equibase_apify'` (mirroring
-`equibaseHtmlToPayload`'s existing shape). `apifyResultsToPayload` stops
-throwing and returns `saveResults`'s own `p` shape directly (it already
-matches - no reshaping was ever the blocker, only the schema was). A new
-results preview/confirm route pair, mirroring the OTR upload's
-preview-then-confirm shape (invariant 9), wraps `equibase-apify-results.js`
-+ `saveResults`. No change to either parser's own `parse()` function - both
-are already golden-verified and untouched by this phase.
+**Phase 2 - wire the two already-verified parsers to real saves. DELIVERED
+AS D196.** `apifyParseforgeToPayload` stops throwing and produces
+`insertRaceDay`'s payload with `entriesSource: 'equibase_apify'` (mirroring
+`equibaseHtmlToPayload`'s existing shape) - since `parse()`'s output already
+matches `insertRaceDay`'s consumed shape field-for-field, the function is
+now a two-line wrapper adding only what `parse()` cannot supply itself
+(provenance, capture time), not a reshaping adapter.
+
+**One planned piece turned out to be unnecessary once built, and was cut
+rather than kept for symmetry**: the plan called for `apifyResultsToPayload`
+to "stop throwing and return `saveResults`'s own `p` shape directly." Once
+building the real route, that function had no work left to do - `parse()`'s
+output already matches `saveResults`'s shape with nothing to add (unlike
+the entries side, which needs `entriesSource`/`oddsCapturedAt` bolted on).
+`chart-parser.js` doesn't export a `toPayload` either, for the same reason.
+Keeping a pass-through function around anyway would have been dead
+indirection - it was deleted rather than kept.
+
+A new day-scoped preview route, `server/equibase-apify-results.js`
+(`POST /race-days/:id/results-apify/preview`), wraps
+`equibase-apify-results.js` and builds `context.entriesByRace` from the
+day's already-saved entries in one query. Unlike the plan's original
+"preview/confirm route pair," **no new confirm/save route was built** - the
+existing `POST /race-days/:id/results` route already accepts exactly the
+preview response's shape (the same way chart/dmtc results already work:
+preview once, confirm by re-sending the same shape to the existing save
+route), so a second save endpoint would have duplicated it for no reason.
+
+**Found and fixed the identical finding-8-class bug on the results side,
+not just the entries side.** `server/results.js`'s `SOURCE_KINDS` map had
+the exact same silent-fallback shape `ENTRIES_SOURCES` had before Phase 1:
+an unrecognized `sourceKind` silently became `'equibase_paste'` rather than
+being refused - and simply adding `equibase_apify` to the map without
+fixing this would have left a live version of the bug Phase 1 had just
+closed on the other table. Fixed identically: a `resolveSourceKind` helper,
+an omitted value still defaults to `'equibase_paste'`, a present-but-
+unrecognized one throws (and the HTTP route 400s it).
+
+Neither parser's own `parse()` function changed - both are still exactly
+the golden-verified functions from D190/D192/D193.
+
+**VERIFIED**: a new `scripts/check-apify-equibase-ingest.js` boots the real
+server and runs the full entries -> results flow over HTTP using the two
+real fixtures - which happen to be the SAME real day (Del Mar, 2026-09-07),
+the first time this codebase has had a genuinely matched real entries+
+results pair to wire end to end rather than seed synthetically. Confirms:
+the day saves with `entries_source = 'equibase_apify'`; a bogus
+`entriesSource` is refused 400 (Phase 1's fix exercised for real, not just
+unit-tested); the results preview derives exactly the 4 real scratches in
+race 11 (horses with a real program number in the saved entries that don't
+appear among that race's finishers - genuinely absent from the file, not a
+synthetic case); race 1 (no scratches) derives none; the confirmed preview
+saves through the existing, unmodified `/results` route; `result_charts`
+records `source_kind = 'equibase_apify'`; a bogus `sourceKind` is refused
+400; the day-lifecycle guards (404 on an unknown day, 400 on missing data)
+hold. `npm run check-equibase-apify-parseforge` and
+`check-equibase-apify-results` both updated (the dead `toPayload`-throw
+tests replaced with real-wiring assertions) and green; the full regression
+sweep (`check-schema`, `check-ingest`, `check-grading`,
+`check-dmtc-results`, `check-charts`, `check-equibase-entries`,
+`check-compare-parsers`, `check-module-bindings`, `build`) is green.
 
 **Phase 3 - live Apify client, on-demand only.**
 `shared/apifyClient.js`: a thin singleton wrapping `apify-client`,

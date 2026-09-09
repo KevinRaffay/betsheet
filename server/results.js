@@ -22,9 +22,27 @@ const traceLog = getLogger('decision-trace');
 
 export const resultsRouter = express.Router();
 
-// Results provenance (D42, migration 010): where the day's results came from.
-// Re-saving from ANY source replaces the day's results and regrades every card.
-const SOURCE_KINDS = { paste: 'equibase_paste', pdf: 'equibase_pdf', equibase_paste: 'equibase_paste', equibase_pdf: 'equibase_pdf', dmtc_html: 'dmtc_html' };
+// Results provenance (D42, migration 010; 'equibase_apify' added by
+// migration 033 / D195-D196): where the day's results came from. Re-saving
+// from ANY source replaces the day's results and regrades every card.
+export const SOURCE_KINDS = {
+  paste: 'equibase_paste', pdf: 'equibase_pdf', equibase_paste: 'equibase_paste',
+  equibase_pdf: 'equibase_pdf', dmtc_html: 'dmtc_html', equibase_apify: 'equibase_apify',
+};
+
+// An omitted sourceKind defaults to 'equibase_paste' (every ingest path that
+// predates this helper relies on that); a PRESENT-but-unrecognized value is
+// REFUSED rather than silently coerced to it - the same finding-8-class bug
+// entries_source's own gate had (D190/D195): a typo'd or unregistered
+// provenance value quietly filed under the wrong bucket, undetectably, is
+// exactly what invariant 13's isolation exists to prevent.
+function resolveSourceKind(value) {
+  if (value == null) return 'equibase_paste';
+  if (!(value in SOURCE_KINDS)) {
+    throw new Error(`Unknown sourceKind "${value}". Valid values: ${Object.keys(SOURCE_KINDS).join(', ')}`);
+  }
+  return SOURCE_KINDS[value];
+}
 
 /**
  * Persist a confirmed results parse for a day - the ONE writer of
@@ -94,7 +112,7 @@ export function saveResults(db, day, p, correlationId) {
     }
     db.prepare(`INSERT INTO result_charts (race_day_id, source_kind, raw_digest, correlation_id)
         VALUES (?, ?, ?, ?)`)
-      .run(day.id, SOURCE_KINDS[p.sourceKind] ?? 'equibase_paste', digest, correlationId);
+      .run(day.id, resolveSourceKind(p.sourceKind), digest, correlationId);
   });
   save();
 
@@ -121,6 +139,11 @@ resultsRouter.post('/race-days/:id/results', (req, res) => {
   const p = req.body ?? {};
   if (!Array.isArray(p.races) || p.races.length === 0) {
     return res.status(400).json({ error: 'races (from the results preview) are required.' });
+  }
+  if (p.sourceKind != null && !(p.sourceKind in SOURCE_KINDS)) {
+    return res.status(400).json({
+      error: `sourceKind "${p.sourceKind}" is not recognized. Valid values: ${Object.keys(SOURCE_KINDS).join(', ')}`,
+    });
   }
   // The chart names its own track and date; a mismatch is refused whole.
   if (p.date && p.date !== day.date) {

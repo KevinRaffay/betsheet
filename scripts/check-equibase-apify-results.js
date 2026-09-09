@@ -17,7 +17,7 @@
 import fs from 'node:fs';
 import path from 'node:path';
 import { fileURLToPath, URL } from 'node:url';
-import { parseApifyResultsDataset, apifyResultsToPayload } from '../shared/parsers/equibase-apify-results.js';
+import { parseApifyResultsDataset } from '../shared/parsers/equibase-apify-results.js';
 
 const ROOT = fileURLToPath(new URL('../', import.meta.url));
 const DIR = path.join(ROOT, 'tests', 'fixtures', 'equibase-apify');
@@ -132,10 +132,9 @@ check('an unknown track code refuses rather than returning an empty card',
 check('the right track code works the same as no context at all',
   JSON.stringify(parseApifyResultsDataset(raw, { trackCode: 'DMR' })) === JSON.stringify(dmr));
 
-console.log('\n-- not wired to any save path, deliberately --');
-let threw = false;
-try { apifyResultsToPayload(dmr); } catch { threw = true; }
-check('apifyResultsToPayload refuses rather than silently inserting an unlisted source_kind', threw);
+console.log('\n-- output already matches saveResults\'s p shape, no adapter needed (D195/D196) --');
+check('every race carries results/exotics/scratches arrays saveResults reads directly',
+  dmr.races.every((r) => Array.isArray(r.results) && Array.isArray(r.exotics) && Array.isArray(r.scratches)));
 
 console.log('\n-- malformed input never throws (the same contract every parser here holds) --');
 check('non-JSON input returns a blocking warning, not an exception',
