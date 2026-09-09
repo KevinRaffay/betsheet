@@ -14,11 +14,17 @@
 // Nothing here can touch a real race day.
 //
 // Usage:
-//   npm run batch-equibase -- <directory> [--write-report path.json]
+//   npm run batch-equibase -- <directory> [--write-report path.json] [--parser id]
 //
 // <directory> is searched recursively for .html/.htm files. Each is treated as
 // one saved Equibase entries page - a direct save or a view-source: capture,
 // which the parser auto-detects and unwraps.
+//
+// --parser selects which registered parser (shared/parsers/registry.js)
+// reads every file in the batch - default is the registry's isDefault entry
+// (equibase-html today). An unrecognized id is a hard error naming the valid
+// ones (M-1, docs/requirements/multi-parser-entries-ingest.md) - a typo
+// silently ingesting through the wrong parser is worse than refusing to run.
 //
 // Exit code is non-zero only on a genuine crash (the parser's contract is
 // "never throws", so a file that breaks it IS the regression this exists to
@@ -28,7 +34,7 @@
 import fs from 'node:fs';
 import os from 'node:os';
 import path from 'node:path';
-import { parseEquibaseEntriesHtml } from '../shared/parsers/equibase-entries.js';
+import { getParser, DEFAULT_PARSER_ID } from '../shared/parsers/registry.js';
 import { canonicalizeTrack } from '../shared/track-codes.js';
 import { openDb } from '../server/db.js';
 import { insertRaceDay } from '../server/ingest.js';
@@ -39,14 +45,18 @@ import { newCorrelationId } from '../server/logging.js';
 const args = process.argv.slice(2);
 const reportFlagIndex = args.indexOf('--write-report');
 const reportPath = reportFlagIndex >= 0 ? args[reportFlagIndex + 1] : null;
-// Guarded on reportFlagIndex >= 0: with the flag absent it is -1, so a naive
-// `i !== reportFlagIndex + 1` filters out args[0] - the directory itself - and
-// every run without a report path dies on the usage message.
-const dirArg = args.find((a, i) => a !== '--write-report'
-  && !(reportFlagIndex >= 0 && i === reportFlagIndex + 1));
+const parserFlagIndex = args.indexOf('--parser');
+const parserId = parserFlagIndex >= 0 ? args[parserFlagIndex + 1] : DEFAULT_PARSER_ID;
+// Guarded on each flag's own index: with a flag absent its index is -1, so a
+// naive `i !== flagIndex + 1` filters out args[0] - the directory itself - and
+// every run without that flag dies on the usage message.
+const consumedIndexes = new Set(
+  [reportFlagIndex, parserFlagIndex].flatMap((i) => (i >= 0 ? [i, i + 1] : [])),
+);
+const dirArg = args.find((a, i) => !consumedIndexes.has(i));
 
 if (!dirArg) {
-  console.error('Usage: npm run batch-equibase -- <directory-of-html-files> [--write-report path.json]');
+  console.error('Usage: npm run batch-equibase -- <directory-of-html-files> [--write-report path.json] [--parser id]');
   process.exit(2);
 }
 const inputDir = path.resolve(process.cwd(), dirArg);
@@ -54,6 +64,15 @@ if (!fs.existsSync(inputDir) || !fs.statSync(inputDir).isDirectory()) {
   console.error(`Not a directory: ${inputDir}`);
   process.exit(2);
 }
+
+let parser;
+try {
+  parser = getParser(parserId);
+} catch (err) {
+  console.error(String(err.message));
+  process.exit(2);
+}
+console.log(`Using parser: ${parser.id} (${parser.label})\n`);
 
 // ---------- find files ----------
 
@@ -76,84 +95,21 @@ console.log(`Found ${files.length} HTML file(s) under ${inputDir}\n`);
 
 // ---------- payload adapter: parser output -> insertRaceDay's shape ----------
 //
-// D115 gave the six Equibase-only entry fields real columns and D116 wired the
-// route, so almost nothing is dropped any more. What still has no home is
-// listed explicitly rather than left to be discovered: a field silently lost at
-// ingest cannot be recovered without re-saving the page.
+// M-1: the adapter itself moved to shared/parsers/registry.js, one per
+// registered parser, since a future parser's raw shape and required
+// shaping need not match this one's. D115 gave the six Equibase-only entry
+// fields real columns and D116 wired the route, so almost nothing is
+// dropped any more for equibase-html. What still has no home is listed
+// explicitly rather than left to be discovered: a field silently lost at
+// ingest cannot be recovered without re-saving the page. This list is a
+// property of insertRaceDay's SCHEMA, not of any one parser, so it stays
+// here rather than moving into the registry.
 
 const UNMAPPED = [
   ['race.purseCents', 'the races table has no purse column'],
   ['entry.effectiveOdds', 'derived, not source data - recomputable from liveOdds/morningLine, both of which ARE stored'],
   ['entry.effectiveOddsDecimal', 'as above'],
 ];
-
-function toPayload(parsed, capturedAt, notes) {
-  return {
-    track: parsed.track,
-    date: parsed.date,
-    // D115's vocabulary. NOT 'program': that would file an Equibase page under
-    // the deleted program parser's source and quietly corrupt the provenance
-    // this whole ingest exists to keep straight.
-    entriesSource: 'equibase_html',
-    // What D116's UI sends: the page prints no capture time, so the file's own
-    // mtime is the best available and the staleness module reads it.
-    oddsCapturedAt: capturedAt,
-    races: parsed.races.map((race) => {
-      if (race.purseCents != null) notes.add('race.purseCents');
-      // A range-claiming race can carry more than one distinct claim price
-      // across its entries while `races.claiming_price_cents` holds exactly
-      // one. Per-entry values are preserved in `entries.claim_price` (D115),
-      // so nothing is lost - but the race-level number is still a choice, and
-      // a race whose entries disagree is flagged rather than silently reduced.
-      const claimPrices = [...new Set(race.entries.map((e) => e.claimPrice).filter(Boolean))];
-      if (claimPrices.length > 1) {
-        notes.add(`race ${race.number}: claim price varies by entry (${claimPrices.join(', ')})`);
-      }
-      for (const e of race.entries) {
-        if (e.effectiveOdds != null) notes.add('entry.effectiveOdds');
-      }
-      return {
-        number: race.number,
-        postTime: race.postTime,
-        distance: race.distance,
-        surface: race.surface,
-        // D116 added both, and the wager menu is LOAD-BEARING: TicketBuilder
-        // and human-picks.js read races.wager_menu for minimums, and a null
-        // there is a silent fallback to BET.minimums rather than a visible
-        // failure - so every ticket at this track would be costed wrong.
-        raceType: race.raceType,
-        wagerMenu: race.wagerMenu,
-        conditions: race.conditions,
-        claimingPriceCents: claimPrices.length ? moneyToCents(claimPrices[0]) : null,
-        entries: race.entries.map((e) => ({
-          programNumber: e.programNumber,
-          postPosition: e.postPosition,
-          horseName: e.horseName,
-          morningLine: e.morningLine,
-          morningLineDecimal: e.morningLineDecimal,
-          jockey: e.jockey,
-          trainer: e.trainer,
-          weight: e.weight,
-          scratched: e.scratched,
-          // D115's six. Passing them is the point of running the REAL writer:
-          // a column added to a migration but never threaded through here
-          // would look fine in the parser and be empty in the database.
-          liveOdds: e.liveOdds,
-          liveOddsDecimal: e.liveOddsDecimal,
-          medication: e.medication,
-          ageSex: e.ageSex,
-          claimPrice: e.claimPrice,
-          alsoEligible: e.alsoEligible,
-        })),
-      };
-    }),
-  };
-}
-
-const moneyToCents = (s) => {
-  const m = String(s ?? '').match(/[\d,.]+/);
-  return m ? Math.round(Number(m[0].replace(/,/g, '')) * 100) : null;
-};
 
 // ---------- temp db (never the real one) ----------
 
@@ -170,7 +126,7 @@ let crashes = 0;
 for (const file of files) {
   const rel = path.relative(inputDir, file);
   const row = {
-    file: rel, status: null, track: null, date: null, races: 0, entries: 0, activeEntries: 0,
+    file: rel, parser: parser.id, status: null, track: null, date: null, races: 0, entries: 0, activeEntries: 0,
     warnings: [], columnCounts: [], notes: [], trackRecognized: null, error: null,
   };
   try {
@@ -179,7 +135,7 @@ for (const file of files) {
     // UTF-8 page as latin1 does not fail, it mojibakes the names - which would
     // then be stored, and would look like a parser bug.
     const html = fs.readFileSync(file, 'utf8');
-    const parsed = parseEquibaseEntriesHtml(html);
+    const parsed = parser.parse(html);
     row.track = parsed.track;
     row.date = parsed.date;
     row.races = parsed.races.length;
@@ -204,7 +160,7 @@ for (const file of files) {
 
     const notes = new Set();
     const capturedAt = fs.statSync(file).mtime.toISOString();
-    const payload = toPayload(parsed, capturedAt, notes);
+    const payload = parser.toPayload(parsed, capturedAt, notes);
     row.notes = [...notes];
 
     try {
@@ -284,6 +240,7 @@ const unrecognizedTracks = [...new Set(results.filter((r) => r.trackRecognized =
 const columnCounts = [...new Set(results.flatMap((r) => r.columnCounts))].sort((a, b) => a - b);
 
 console.log('\n== summary ==');
+console.log(`parser:               ${parser.id}`);
 console.log(`files:                ${results.length}`);
 for (const [status, count] of Object.entries(byStatus)) console.log(`  ${status.padEnd(30)} ${count}`);
 console.log(`total races parsed:   ${results.reduce((a, r) => a + r.races, 0)}`);
@@ -313,7 +270,7 @@ for (const t of unrecognizedTracks) console.log(`  - ${t}`);
 
 if (reportPath) {
   fs.writeFileSync(reportPath, JSON.stringify(
-    { inputDir, files: results, byStatus, allWarningTypes, unrecognizedTracks, columnCounts }, null, 2,
+    { inputDir, parser: parser.id, files: results, byStatus, allWarningTypes, unrecognizedTracks, columnCounts }, null, 2,
   ));
   console.log(`\nWrote full report: ${reportPath}`);
 }

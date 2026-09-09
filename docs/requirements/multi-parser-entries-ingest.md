@@ -1,13 +1,15 @@
 # Multi-parser, multi-track/day entries ingestion
 
-**Status: SPECIFIED, NOT SCHEDULED.** No deliverable IDs are claimed here —
-they get claimed when the work is picked up, not before. Filed 2026-09-09
-from an externally-drafted scope. **The internal `D1`–`D5` labels the
-incoming scope used are renamed `M-1`–`M-5` below** — this repo's own
-convention (see `docs/requirements/card-source-model.md`'s `S-1..S-3`) is
-that a requirements doc never mints something that reads like a real
-deliverable ID before the work is picked up, precisely so a stray `D1` here
-is never confused with an actual ledger row.
+**Status: PARTIALLY SCHEDULED.** M-1 is delivered as **D188** (`shared/
+parsers/registry.js` + `--parser` on the batch harness); M-2 through M-5
+remain specified but not scheduled — no deliverable ID is claimed for any of
+them until picked up. Filed 2026-09-09 from an externally-drafted scope.
+**The internal `D1`–`D5` labels the incoming scope used are renamed
+`M-1`–`M-5` below** — this repo's own convention (see `docs/requirements/
+card-source-model.md`'s `S-1..S-3`) is that a requirements doc never mints
+something that reads like a real deliverable ID before the work is picked
+up, precisely so a stray `D1` here is never confused with an actual ledger
+row.
 
 ## Purpose
 
@@ -113,16 +115,18 @@ parser wrote this").
 
 ## Suggested shape, renumbered from the incoming scope
 
-**M-1** (was D1) — parser registry + `--parser` flag on
+**M-1** (was D1) — *Delivered as D188.* Parser registry + `--parser` flag on
 `batch-import-equibase-entries.js`. Registry module `shared/parsers/
-registry.js` exporting `{ id -> { module, label, isDefault, sourceKind,
-costModel } }`, `equibase-html` (today's `equibase-entries.js`, `isDefault:
-true`) as the sole real entry until an a11y-tree adapter is built and
-verified per finding 7. Unknown `--parser` value is a hard error naming valid
-ids, never a silent fallback to default (mirrors finding 8's own lesson).
-**Done when**: the existing Del Mar HTML fixture runs through
-`--parser equibase-html` unchanged, and the report JSON names the parser
-used.
+registry.js` exporting `{ id -> { label, isDefault, sourceKind, costModel,
+fieldsNotProvided, parse, toPayload } }`, `equibase-html` (today's
+`equibase-entries.js`) as the sole real entry, `isDefault: true`. Unknown
+`--parser` value is a hard error naming valid ids, never a silent fallback to
+default (mirrors finding 8's own lesson). **Deliberately still only one real
+entry** — finding 7 stands: no a11y-tree fixture exists to verify that
+adapter against, so it was not built to pad this deliverable out. **Done
+when**: the existing Del Mar HTML fixture runs through `--parser
+equibase-html` unchanged, and the report JSON names the parser used. Both
+confirmed — see DELIVERABLES.md D188.
 
 **M-2** (was D2) — `pull-race-day.js` orchestration + `ingest_runs` ledger.
 Resolves which tracks race on a date from Equibase's entries index page,
