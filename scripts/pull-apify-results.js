@@ -20,6 +20,7 @@
 //   npm run pull-apify-results -- <YYYY-MM-DD> [--tracks DMR,SA] [--yes]
 //     [--write-report path.json] [--fixture path.json]
 
+import 'dotenv/config';
 import fs from 'node:fs';
 import { hasToken } from '../server/apifyClient.js';
 import { fetchResults } from '../server/apifyEquibase.js';
