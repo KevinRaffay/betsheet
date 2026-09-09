@@ -1,5 +1,5 @@
-import React, { useEffect, useState } from 'react';
-import { listCards, modelLabel, plMoney, plClass } from '../api.js';
+import React, { useEffect, useRef, useState } from 'react';
+import { listCards, modelLabel, plMoney, plClass, bulkDeleteCards } from '../api.js';
 import LlmCardModal from './LlmCardModal.jsx';
 import DayTicketBuilderModal from './DayTicketBuilderModal.jsx';
 
@@ -23,15 +23,82 @@ export default function CardsPanel({ dayId, bankrollCents, onOpenCard }) {
   const [error, setError] = useState(null);
   const [showLlmModal, setShowLlmModal] = useState(false);
   const [showHandModal, setShowHandModal] = useState(false);
+  // Bulk-select (checkbox column), mirroring RaceDayList.jsx's pattern.
+  // Unlike a race day, a card has no grading guard here at all (user
+  // decision 2026-09-09) - any card, graded or not, may be selected and
+  // deleted.
+  const [selected, setSelected] = useState(() => new Set());
+  const [confirmBulk, setConfirmBulk] = useState(false);
+  const [bulkResult, setBulkResult] = useState(null);
+  const [busy, setBusy] = useState(false);
+  const selectAllRef = useRef(null);
 
   const reload = () => listCards(dayId).then(setCards).catch((e) => setError(String(e.message)));
   useEffect(() => { reload(); }, [dayId]);
+
+  useEffect(() => {
+    setSelected(new Set());
+    setConfirmBulk(false);
+    setBulkResult(null);
+  }, [dayId]);
+
+  const toggleSelect = (id) => {
+    setSelected((prev) => {
+      const next = new Set(prev);
+      if (next.has(id)) next.delete(id); else next.add(id);
+      return next;
+    });
+  };
+
+  const allIds = (cards || []).map((c) => c.id);
+  const allSelected = allIds.length > 0 && allIds.every((id) => selected.has(id));
+  const someSelected = allIds.some((id) => selected.has(id));
+
+  useEffect(() => {
+    if (selectAllRef.current) {
+      selectAllRef.current.indeterminate = someSelected && !allSelected;
+    }
+  }, [someSelected, allSelected]);
+
+  const toggleSelectAll = () => {
+    setSelected((prev) => {
+      const next = new Set(prev);
+      if (allSelected) allIds.forEach((id) => next.delete(id));
+      else allIds.forEach((id) => next.add(id));
+      return next;
+    });
+  };
+
+  const handleBulkDelete = async () => {
+    setBusy(true);
+    setError(null);
+    try {
+      const result = await bulkDeleteCards([...selected]);
+      setBulkResult(result);
+      setSelected(new Set());
+      setConfirmBulk(false);
+      await reload();
+    } catch (e) {
+      setError(String(e.message));
+    } finally {
+      setBusy(false);
+    }
+  };
+
+  const selectedCards = (cards || []).filter((c) => selected.has(c.id));
 
   return (
     <section className="consensus">
       <div className="pagehead">
         <h3>Betting cards</h3>
         <div className="formrow formrow--tight">
+          <button
+            className="btn btn--danger"
+            disabled={selected.size === 0 || busy}
+            onClick={() => setConfirmBulk(true)}
+          >
+            Delete selected ({selected.size})
+          </button>
           <button className="btn btn--primary" onClick={() => setShowLlmModal(true)}>
             Generate Card from LLM
           </button>
@@ -41,10 +108,46 @@ export default function CardsPanel({ dayId, bankrollCents, onOpenCard }) {
         </div>
       </div>
       {error && <p className="notice notice--error">{error}</p>}
+      {confirmBulk && (
+        <div className="notice notice--warn">
+          <p>
+            <strong>Delete {selectedCards.length} card{selectedCards.length === 1 ? '' : 's'}?</strong>
+            {' '}{selectedCards.map((c) => `#${c.card_number}${c.name ? ` (${c.name})` : ''}`).join(', ')}.
+            {' '}This permanently deletes each card and every ticket, allocation and grade on it -
+            graded cards included. Not reversible.
+          </p>
+          <div className="formrow formrow--tight">
+            <button className="btn btn--danger" disabled={busy} onClick={handleBulkDelete}>
+              Delete them
+            </button>
+            <button className="btn" disabled={busy} onClick={() => setConfirmBulk(false)}>Cancel</button>
+          </div>
+        </div>
+      )}
+      {bulkResult && (
+        <p className="notice">
+          Deleted {bulkResult.deleted.length} card{bulkResult.deleted.length === 1 ? '' : 's'}.
+          {bulkResult.skipped.length > 0 && (
+            <>
+              {' '}{bulkResult.skipped.length} not deleted: {bulkResult.skipped.map((s) => `#${s.id} (no longer exists)`).join(', ')}.
+            </>
+          )}
+        </p>
+      )}
       {cards && cards.length > 0 && (
         <table className="grid grid--click">
           <thead>
             <tr>
+              <th>
+                <input
+                  ref={selectAllRef}
+                  type="checkbox"
+                  checked={allSelected}
+                  disabled={allIds.length === 0}
+                  onClick={(e) => e.stopPropagation()}
+                  onChange={toggleSelectAll}
+                />
+              </th>
               <th>#</th><th>Name</th><th>Template</th><th>Variant</th><th>Engine</th><th>Bankroll</th><th>Per-race min</th>
               <th>Bucket</th><th>Tickets</th><th>Day total</th><th>P/L</th><th>Generated</th>
             </tr>
@@ -52,6 +155,14 @@ export default function CardsPanel({ dayId, bankrollCents, onOpenCard }) {
           <tbody>
             {cards.map((c) => (
               <tr key={c.id} onClick={() => onOpenCard(c.id)}>
+                <td>
+                  <input
+                    type="checkbox"
+                    checked={selected.has(c.id)}
+                    onClick={(e) => e.stopPropagation()}
+                    onChange={() => toggleSelect(c.id)}
+                  />
+                </td>
                 <td><strong>#{c.card_number}</strong></td>
                 <td>{c.name ?? '—'}</td>
                 <td>{c.template ?? '—'}</td>
