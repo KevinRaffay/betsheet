@@ -305,12 +305,19 @@ label.btn.btn--primary { color: var(--color-accent-text); }
   margin: 10px 0;
 }
 .wager { font-size: 12.5px; }
-.race-notes { margin: 8px 0 10px; }
-.race-notes > summary {
+/* The nested read-in-place panels inside one race: analyst notes (D164) and
+   tip sheets (D182). ONE rule for both - they are the same affordance, a
+   collapsed sub-panel under a race's entries, and letting them drift apart
+   would say they were different kinds of thing. */
+.race-notes, .race-tips { margin: 8px 0 10px; }
+.race-notes > summary, .race-tips > summary {
   cursor: pointer;
   color: var(--color-text-muted);
   font-size: 12px;
 }
+/* One source's picks within a race - several sheets can rank the same race,
+   so each needs its own visible block rather than a run-on table. */
+.tip-source { margin: 8px 0 12px; }
 .notes-text { white-space: pre-wrap; max-width: 110ch; margin: 6px 0 0; font-size: 13px; line-height: 1.45; }
 
 /* ---- consensus panel ---- */
