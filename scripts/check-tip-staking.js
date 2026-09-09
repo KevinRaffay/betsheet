@@ -311,10 +311,62 @@ console.log('-- the endpoints: preview writes nothing, save writes three cards -
       }
     }
 
+    // Grade all three trackmaster variants, so the D175 assertions below have
+    // three graded variants to distinguish - P/L only ever reports graded cards.
+    for (const c of saved.cards) await jpost(`/api/cards/${c.cardId}/grade`, {});
+
     // Bucket isolation: TIPSHEET must not pool with anything (invariant 13).
     const pl = await jget('/api/pl?engineVersion=all');
     const buckets = (pl.buckets ?? []).map((b) => b.completeness ?? b.bucket ?? b.key);
     check('P/L lists TIPSHEET as its own bucket', buckets.includes('TIPSHEET'), JSON.stringify(buckets));
+
+    // D175: the three variants are mutually exclusive, so the bucket TOTAL
+    // must count exactly ONE per (day, source) - summing them reported three
+    // times the money that could ever have been staked.
+    {
+      const tip = pl.buckets.find((b) => (b.completeness ?? b.bucket) === 'TIPSHEET');
+      const dbv = new Database(srvDb);
+      // GRADED cards only - /api/pl reports nothing else, so comparing against
+      // every stored card would compare two different populations.
+      const gradedOnly = `AND EXISTS (SELECT 1 FROM graded_tickets_latest g
+        JOIN tickets gt3 ON gt3.id = g.ticket_id WHERE gt3.card_id = ca.id)`;
+      const staked = dbv.prepare(`SELECT SUM(t.cost_cents) c FROM tickets t JOIN cards ca ON ca.id = t.card_id
+        WHERE ca.race_day_id = ? AND ca.consensus_completeness = 'TIPSHEET' ${gradedOnly}`).get(dayId).c ?? 0;
+      const headlineOnly = dbv.prepare(`SELECT SUM(t.cost_cents) c FROM tickets t JOIN cards ca ON ca.id = t.card_id
+        WHERE ca.race_day_id = ? AND ca.consensus_completeness = 'TIPSHEET' AND ca.variant = 'win-only' ${gradedOnly}`).get(dayId).c ?? 0;
+      dbv.close();
+      check('the TIPSHEET total counts ONE variant, not all three',
+        tip.costCents === headlineOnly && tip.costCents < staked,
+        `total ${tip.costCents}, headline ${headlineOnly}, all variants ${staked}`);
+      check('  and it names which variant it counted', tip.headlineVariant === 'win-only');
+      check('  while byVariant still reports every variant, side by side',
+        Array.isArray(tip.byVariant) && tip.byVariant.length === 3
+        && tip.byVariant.filter((v) => v.headline === true).length === 1,
+        JSON.stringify(tip.byVariant?.map((v) => [v.variant, v.headline, v.costCents])));
+      check('  and byVariant is a BREAKDOWN, never added into the total',
+        tip.byVariant.reduce((a, v) => a + v.costCents, 0) === staked
+        && tip.byVariant.reduce((a, v) => a + v.costCents, 0) > tip.costCents);
+      check('  the total counts one CARD per (day, source), not three', tip.cards === 1,
+        `cards counted: ${tip.cards}`);
+    }
+
+    // D175: the day view shows P/L once a card is graded, from the SAME
+    // latest-grade view /api/pl reports from, so the two cannot disagree.
+    {
+      const dayCards = await jget(`/api/race-days/${dayId}/cards`);
+      const gradedCard = dayCards.find((c) => c.graded);
+      check('a graded card carries pl_cents on the day view', gradedCard != null
+        && gradedCard.pl_cents !== undefined && gradedCard.pl_cents !== null);
+      const ungraded = dayCards.find((c) => !c.graded);
+      check('an UNGRADED card reports null, never 0 - different facts',
+        ungraded === undefined || ungraded.pl_cents === null);
+      const fromPl = pl.cards?.find((r) => r.cardId === gradedCard.id);
+      if (fromPl) {
+        check('  and it agrees with /api/pl to the cent',
+          gradedCard.pl_cents === fromPl.plCents,
+          `day ${gradedCard.pl_cents} vs pl ${fromPl.plCents}`);
+      }
+    }
     check('  and pools it with nothing - no combined total (invariant 13)',
       !buckets.includes('all') && new Set(buckets).size === buckets.length, JSON.stringify(buckets));
 

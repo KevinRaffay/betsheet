@@ -44,6 +44,24 @@ export const LONGSHOT_DECIMAL = 8;
 
 export const TIP_VARIANTS = ['win-only', 'across-the-board', 'exacta-box-top2'];
 
+/**
+ * The variant a bucket TOTAL counts (D175).
+ *
+ * The three variants are MUTUALLY EXCLUSIVE alternatives - three ways to bet
+ * the same picks, of which only one is ever real money - so summing them into
+ * one bucket total reports three times the money that could have been staked.
+ * A $500 bankroll on one race read as ~$1,498 spent, which is what surfaced
+ * this.
+ *
+ * The headline is therefore ONE fixed variant, and fixed is the whole point:
+ * picking the best-performing one per day would be cherry-picking and would
+ * inflate every reported figure. `win-only` is the choice because it is the
+ * simplest structure and the cheapest to reason about - the honest reading of
+ * the bucket total is now "if you had bet the top pick to win, every time".
+ * The other two are reported beside it as a breakdown, never added to it.
+ */
+export const TIP_HEADLINE_VARIANT = 'win-only';
+
 export const TIP_VARIANT_LABEL = {
   'win-only': 'Win on the top pick',
   'across-the-board': 'Across the board on the top pick',

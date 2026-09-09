@@ -19,6 +19,7 @@ const MODEL_LABEL = Object.fromEntries(KNOWN_MODELS.map((m) => [m.id, m.label]))
 
 // D171: imported, not redeclared - see shared/distribution.js for why.
 import { BUCKET_ORDER } from '../shared/distribution.js';
+import { TIP_VARIANTS, TIP_HEADLINE_VARIANT } from '../shared/tip-staking.js';
 
 // The running view: per-bucket totals + every graded card as a row, plus
 // the cards still waiting on results. Deliberately NO overall total.
@@ -34,6 +35,7 @@ plRouter.get('/pl', (req, res) => {
            c.card_number AS cardNumber, c.variant, st.name AS template,
            c.consensus_completeness AS completeness, c.bankroll_cents AS bankrollCents,
            c.engine_version AS engineVersion, c.llm_model AS llmModel, c.notes_present AS notesPresent,
+           c.tip_source_label AS tipSource,
            SUM(t.cost_cents) AS costCents,
            SUM(gt.returned_cents) AS returnedCents,
            SUM(gt.pl_cents) AS plCents,
@@ -78,6 +80,29 @@ plRouter.get('/pl', (req, res) => {
   // "every race did". Deliberately NOT cross-tabbed with model - with a handful
   // of cards each cell would be a pool of one.
   const byNotes = new Map();
+  // D175: TIPSHEET variants are MUTUALLY EXCLUSIVE - three ways to bet one
+  // source's picks, only one of which is ever real money. Summing them made a
+  // $500 bankroll report ~$1,498 spent. So exactly ONE variant per (day,
+  // source) counts toward the bucket TOTAL, and it is a FIXED one: choosing
+  // the best performer per day would be cherry-picking. The other two are
+  // reported as `byVariant`, a breakdown of the same rows, never added in.
+  // This is the rule Distributions has always had ("one card per day per
+  // bucket") arriving in P/L, where it was missing.
+  const tipHeadline = new Map();
+  for (const row of cardRows) {
+    if (!inSelection(row) || row.completeness !== 'TIPSHEET') continue;
+    const key = `${row.raceDayId}::${row.tipSource ?? 'unknown'}`;
+    const rank = (v) => { const i = TIP_VARIANTS.indexOf(v); return i === -1 ? TIP_VARIANTS.length : i; };
+    const held = tipHeadline.get(key);
+    // The headline variant when it exists; otherwise the earliest variant
+    // present, so a day staked with only one structure is still counted once
+    // rather than dropped.
+    if (!held || rank(row.variant) < rank(held.variant)) tipHeadline.set(key, row);
+  }
+  const countsToward = (row) => row.completeness !== 'TIPSHEET'
+    || tipHeadline.get(`${row.raceDayId}::${row.tipSource ?? 'unknown'}`)?.cardId === row.cardId;
+
+  const byVariant = new Map();
   for (const row of cardRows) {
     if (!inSelection(row)) continue;
     if (!byBucket.has(row.completeness)) {
@@ -86,6 +111,25 @@ plRouter.get('/pl', (req, res) => {
         costCents: 0, returnedCents: 0, plCents: 0, bankrollCents: 0,
       });
     }
+    // Every TIPSHEET row is still reported, just not all of them ADDED UP.
+    if (row.completeness === 'TIPSHEET') {
+      const key = row.variant;
+      if (!byVariant.has(key)) {
+        byVariant.set(key, {
+          variant: key, headline: key === TIP_HEADLINE_VARIANT, cards: 0, tickets: 0,
+          costCents: 0, returnedCents: 0, plCents: 0, bankrollCents: 0,
+        });
+      }
+      const v = byVariant.get(key);
+      v.cards++;
+      v.tickets += row.tickets;
+      v.costCents += row.costCents;
+      v.returnedCents += row.returnedCents;
+      v.plCents += row.plCents;
+      v.bankrollCents += row.bankrollCents ?? 0;
+    }
+    if (!countsToward(row)) continue;
+
     const b = byBucket.get(row.completeness);
     b.cards++;
     b.tickets += row.tickets;
@@ -129,6 +173,16 @@ plRouter.get('/pl', (req, res) => {
   }
   const buckets = BUCKET_ORDER.filter((k) => byBucket.has(k)).map((k) => {
     const b = byBucket.get(k);
+    if (k === 'TIPSHEET') {
+      return {
+        ...b,
+        // The total above counts ONE variant per (day, source). This says which,
+        // and what the alternatives would have done - side by side, never summed.
+        headlineVariant: TIP_HEADLINE_VARIANT,
+        byVariant: [...byVariant.values()]
+          .sort((a, b2) => TIP_VARIANTS.indexOf(a.variant) - TIP_VARIANTS.indexOf(b2.variant)),
+      };
+    }
     if (k !== 'LLM_GENERATED') return b;
     return {
       ...b,

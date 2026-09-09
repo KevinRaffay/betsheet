@@ -394,3 +394,13 @@ Follows D166's own flagged finding. Consolidation, not new capability.
 | A different source still gets its own cards - two tip apps are two opinions (invariant 13) | D174 |
 | Re-staking a graded card is warned about before it happens, never silently, and never blocked | D174 |
 | Duplicates already created are folded by an explicit dry-run script that refuses to delete a graded card | D174 |
+
+## TIPSHEET P/L and day-view P/L (requested 2026-09-08)
+
+| requirement | deliverable |
+| --- | --- |
+| The TIPSHEET bucket total counts one variant per (day, source) - three mutually exclusive alternatives are not one spend | D175 |
+| The counted variant is fixed, never the best-performing one, so the headline figure cannot be cherry-picked | D175 |
+| The other variants are reported beside it as a breakdown that is never added to the total | D175 |
+| A graded card shows its P/L on the day view, from the same grade set /api/pl reports, agreeing to the cent | D175 |
+| An ungraded card shows a dash, never $0 - not-graded-yet and broke-even are different facts | D175 |

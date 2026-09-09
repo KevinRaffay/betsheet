@@ -339,3 +339,17 @@ export const saveTipCards = (dayId, sourceLabel, correlationId) =>
   fetch(`/api/race-days/${dayId}/tip-cards`, {
     method: 'POST', headers: hdr(correlationId), body: JSON.stringify({ sourceLabel }),
   }).then(asJson);
+
+// ---- P/L display (D175) ------------------------------------------------
+//
+// Here, beside MODEL_LABEL/BLINDNESS_LABEL, for the reason those are here: so
+// every view renders a P/L figure identically. CardsPanel (the day view) and
+// PLView both use these - a second local copy is how the format drifts.
+
+/** Signed money for a P/L figure. Uses U+2212, the minus PLView has always used. */
+export const plMoney = (cents) => (cents == null ? '—'
+  : `${cents >= 0 ? '+' : '−'}$${
+    Math.abs(cents) % 100 === 0 ? Math.abs(cents) / 100 : (Math.abs(cents) / 100).toFixed(2)}`);
+
+/** The class that colours it. `null` (nothing graded) is dim, not a loss. */
+export const plClass = (cents) => (cents == null ? 'dim' : cents >= 0 ? 'pl--pos' : 'pl--neg');
