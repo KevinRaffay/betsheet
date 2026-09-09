@@ -150,7 +150,14 @@ export default function RaceDayView({ id, onBack, onOpenCard }) {
       {/* D98: the hand-builder posts to D54's own endpoints, which take the
           card's bankroll. RaceDayView already holds the day, so pass it down
           rather than making CardsPanel fetch the day a second time. */}
-      <CardsPanel key={cardsVersion} dayId={day.id} bankrollCents={day.bankroll_cents} onOpenCard={onOpenCard} />
+      {/* The key is NAMESPACED, and must stay that way. These remount counters
+          are siblings in one children list, they both start at 0, and a
+          duplicate key among siblings does not warn-and-carry-on: React
+          duplicates or omits the children outright (D181 - the /day page grew
+          a second, then a fourth, "Betting cards" panel on any re-render).
+          A bare `key={someVersion}` is only safe while nothing beside it uses
+          one, which is not a property a later edit can be expected to check. */}
+      <CardsPanel key={`cards-${cardsVersion}`} dayId={day.id} bankrollCents={day.bankroll_cents} onOpenCard={onOpenCard} />
       {tipRace && (
         <TipPicksEntryModal
           dayId={day.id}
@@ -162,7 +169,7 @@ export default function RaceDayView({ id, onBack, onOpenCard }) {
         />
       )}
 
-      <TipPicksPanel key={tipVersion} dayId={day.id} races={day.races ?? []} onSaved={() => setCardsVersion((v) => v + 1)} />
+      <TipPicksPanel key={`tips-${tipVersion}`} dayId={day.id} races={day.races ?? []} onSaved={() => setCardsVersion((v) => v + 1)} />
       <ResultsPanel dayId={day.id} />
       <EquibaseOtrPanel dayId={day.id} onSaved={() => setCardsVersion((v) => v + 1)} />
       {day.races.map((race) => (
