@@ -4,12 +4,16 @@
 parsers/registry.js` + `--parser` on the batch harness). M-2 is delivered as
 **D189** (`scripts/pull-race-day.js`) — **with no live fetching at all**, a
 user decision made explicitly before building it (2026-09-09): see finding 9
-below. **M-3 is explicitly ON HOLD** (user decision 2026-09-09, see
-"Decisions the operator owns" #4 below) until a second real parser is
-registered — it is fundamentally a comparison, and there is exactly one
-registered parser (M-1's own deliberate scope). M-4 and M-5 remain specified
-but not scheduled. No deliverable ID is claimed for M-3 through M-5 until
-picked up. Filed 2026-09-09 from an externally-drafted scope.
+below. **M-3 was ON HOLD, and now has what it was waiting for**: **D190**
+(2026-09-09) registered a real second parser, `equibase-apify-parseforge`
+(finding 10 below) — the user supplied a real Apify dataset export directly
+and asked for a parser built against it. **M-3's dependency is now met, but
+M-3 ITSELF IS STILL NOT SCHEDULED** - registering a second parser was its own
+deliverable, picked up because a real sample existed to build against, not
+an implicit decision to also build the comparison harness. M-4 and M-5
+remain specified but not scheduled. No deliverable ID is claimed for M-3
+through M-5 until each is separately picked up. Filed 2026-09-09 from an
+externally-drafted scope.
 **The internal `D1`–`D5` labels the incoming scope used are renamed
 `M-1`–`M-5` below** — this repo's own convention (see `docs/requirements/
 card-source-model.md`'s `S-1..S-3`) is that a requirements doc never mints
@@ -85,6 +89,15 @@ being evaluated. **M-3's baseline-parser assumption is unaffected** — it
 compares against the HTML parser regardless of what the Apify actors turn
 out to cost or cover.
 
+**Partial correction, 2026-09-09 (D190):** the "only `parseforge` currently
+reports scratches, medication, and claiming price" claim is now independently
+CHECKABLE, not just cited - the user supplied a real `parseforge/
+equibase-scraper` dataset export (identified from its own filename and
+corroborated by content; see `equibase-apify-parseforge.js`'s header), and
+that real sample does carry all three. This confirms one specific factual
+claim from the uncommitted evaluation; it does NOT confirm the dollar
+figures, which remain unverified and still must not be repeated as fact.
+
 **6. The cited `D-scope-race-day-notes-entry.md` does not exist under that
 name (or any name) in `docs/requirements/`.** The closest real analogue —
 "compare different producers against the same fixed input before trusting a
@@ -139,6 +152,60 @@ a scripted HTTP client — a person's own browser session, the same posture
 every other manual-capture path in this codebase already has) remains the
 way such a directory gets populated; this script does not populate one
 itself.
+
+**10. The second parser (D190) surfaced a real, load-bearing bug this scope
+never anticipated: the source's OWN `morningLineDecimal` uses a DIFFERENT
+convention than this codebase's `morningLineToDecimal`.** The real Apify
+sample's row for a "7/5" morning line carries `morningLineDecimal: 2.4` —
+European "decimal odds" (fraction + 1). `shared/betmath.js`'s
+`morningLineToDecimal('7/5')` returns `1.4` — the fractional ratio ALONE,
+which D171's own ledger entry already proved is this codebase's convention
+("the fractional RATIO, `winPayout`'s `stake * (ml + 1)` proves it").
+Trusting the source's own decimal field directly - the obvious, "free"
+choice, since it looks like exactly the field this codebase wants - would
+have silently double-counted the `+1` on every payout estimate and every
+grade built from a card sourced this way, corrupting figures rather than
+refusing anything. `equibase-apify-parseforge.js` always discards the
+source's `morningLineDecimal` and recomputes from `morningLineOdds` through
+the shared function instead. **This is exactly the class of finding
+building a second real parser was for** — the incoming scope's own D3/M-3
+goal ("accumulate evidence before ever changing the default") assumed the
+risk was in FIELD COVERAGE (does the challenger have scratches, medication,
+claiming price); this one was in a field BOTH parsers appear to provide,
+disagreeing silently. A pure per-value diff (M-3, still not built) would
+have caught this immediately once both parsers existed on the same race —
+which is the strongest concrete case yet for eventually building M-3, not a
+reason it needed to be built before this parser could be.
+
+**11. The source scrapes multiple tracks into ONE file; the HTML parser's
+contract assumes one file is always one track.** The real sample holds
+Horseshoe Indianapolis and Kentucky Downs together. `parse(rawInput,
+context)`'s `context` parameter (already part of the architecture decision
+above, and already used by the HTML parser for optional track/date hints)
+is what absorbs this: `context.trackCode` selects which track's rows to
+extract, and the parser refuses - a blocking warning naming every track
+actually present, never a silent pick - when the file holds more than one
+track and no `trackCode` is given. **`batch-import-equibase-entries.js` and
+`pull-race-day.js` do not call `parse()` with a `context` object today**,
+and both already refuse a non-`html` `sourceKind` outright (`pull-race-day.js`)
+or would simply never discover a `.json` file at all (`batch-import`'s file
+search is `.html`/`.htm` only) - so this parser is real and independently
+verified, but not yet reachable through either orchestration script.
+Extending them to discover non-HTML files and pass a `trackCode` per file is
+real, additional work this deliverable deliberately did not also do.
+
+**12. `insertRaceDay`'s `entries_source` CHECK constraint has no value for
+an Apify-sourced day, and adding one is a schema-rebuild migration against
+`race_days` - the table CLAUDE.md itself calls the riskiest to rebuild.**
+Finding 8 already named this gap; this parser makes it concrete rather than
+hypothetical. `equibase-apify-parseforge.js`'s `toPayload` therefore THROWS
+unconditionally rather than emitting a payload with an `entriesSource` value
+the allowlist doesn't recognize, which `insertRaceDay` would otherwise
+silently coerce to `'program'` (finding 8's exact danger) - a loud, certain
+failure was chosen over a schema change scoped, and risked, without being
+asked for. **This parser's `parse()` is real and fully verified against
+real data; its `toPayload` is deliberately inert until that migration
+exists** - which is M-5's scope, not this one's.
 
 ---
 
