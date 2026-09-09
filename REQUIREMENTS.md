@@ -416,3 +416,12 @@ Follows D166's own flagged finding. Consolidation, not new capability.
 | Clearing every rank in a column removes that sheet from the race, with no second verb for it | D176 |
 | The dialog edits what is already there rather than starting blank | D176 |
 | **Split out**: removing the screenshot path entirely | D177 |
+
+## Removing the tip-sheet screenshot path (decided 2026-09-08)
+
+| requirement | deliverable |
+| --- | --- |
+| Tip picks no longer require a vision call, an image upload, or an archive | D177 |
+| The writer, reader, validator and odds normalizer survive - they were never part of the vision half | D177 |
+| Columns holding real values from already-extracted rows are kept, not dropped | D177 |
+| Scoring, staking and P/L are untouched by the removal | D177 |

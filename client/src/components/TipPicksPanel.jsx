@@ -1,6 +1,6 @@
 import { useEffect, useState } from 'react';
 import {
-  previewTipPicks, saveTipPicks, listTipPicks, correctTipPicks, deleteTipPicks,
+  listTipPicks, correctTipPicks, deleteTipPicks,
   getDayTipScoring, previewTipCards, saveTipCards,
 } from '../api.js';
 
@@ -14,13 +14,6 @@ import {
 // recorded (picks_extracted keeps the model's original answer forever). A
 // vision extraction has no "fix the source and re-parse" path, which is why
 // the edit exists at all - but it lives after the save, never inside it.
-
-const fileToBase64 = (file) => new Promise((resolve, reject) => {
-  const r = new FileReader();
-  r.onerror = () => reject(new Error('Could not read that file.'));
-  r.onload = () => resolve(String(r.result).replace(/^data:[^;]+;base64,/, ''));
-  r.readAsDataURL(file);
-});
 
 const oddsOf = (p, key) => (key in p ? p[key] : '');
 
@@ -167,10 +160,6 @@ function CorrectRow({ row, onDone, onCancel }) {
  */
 export default function TipPicksPanel({ dayId, races = [], onSaved = () => {} }) {
   const [rows, setRows] = useState([]);
-  const [race, setRace] = useState(races[0]?.number ?? 1);
-  const [sourceHint, setSourceHint] = useState('');
-  const [file, setFile] = useState(null);
-  const [preview, setPreview] = useState(null);
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState(null);
   const [editing, setEditing] = useState(null);
@@ -189,27 +178,6 @@ export default function TipPicksPanel({ dayId, races = [], onSaved = () => {} })
   // React calls it on unmount - which blanks the whole app. See Gotchas.
   useEffect(() => { reload(); }, [dayId]);
 
-  const runPreview = async () => {
-    if (!file) return;
-    setBusy(true); setError(null); setPreview(null);
-    try {
-      const imageBase64 = await fileToBase64(file);
-      const res = await previewTipPicks(dayId, { race: Number(race), imageBase64, sourceHint });
-      setPreview({ ...res, capturedAt: new Date(file.lastModified).toISOString() });
-    } catch (err) { setError(err.message); } finally { setBusy(false); }
-  };
-
-  const confirm = async () => {
-    setBusy(true); setError(null);
-    try {
-      await saveTipPicks(dayId, {
-        race: preview.raceNo, parseToken: preview.parseToken, capturedAt: preview.capturedAt,
-      });
-      setPreview(null); setFile(null);
-      await reload();
-    } catch (err) { setError(err.message); } finally { setBusy(false); }
-  };
-
   const remove = async (row) => {
     setError(null);
     try { await deleteTipPicks(row.id); await reload(); } catch (err) { setError(err.message); }
@@ -219,98 +187,11 @@ export default function TipPicksPanel({ dayId, races = [], onSaved = () => {} })
     <details className="race">
       <summary>Tip sheet picks</summary>
       <p className="dim">
-        A screenshot of a third-party handicapping app, read into a ranked pick list.
-        Kept in its own TIPSHEET bucket - never pooled with your own cards, the LLM&apos;s or Equibase&apos;s.
+        Ranked picks from a third-party tip sheet, typed per race with
+        <strong> Enter tipsheet picks</strong> on the race above. Kept in its own TIPSHEET bucket -
+        never pooled with your own cards, the LLM&apos;s or Equibase&apos;s.
       </p>
       {error && <p className="notice notice--error">{error}</p>}
-
-      <div className="formrow">
-        <label>
-          Race{' '}
-          <select className="in in--sm" value={race} onChange={(e) => setRace(e.target.value)}>
-            {races.map((r) => <option key={r.number} value={r.number}>{r.number}</option>)}
-          </select>
-        </label>
-        <label>
-          Source{' '}
-          <input
-            className="in in--sm" list="tip-sources" placeholder="read from the image"
-            value={sourceHint} onChange={(e) => setSourceHint(e.target.value)}
-          />
-        </label>
-        <datalist id="tip-sources">
-          <option value="trackmaster" /><option value="numberfire" /><option value="equibase-tipsheet" />
-        </datalist>
-        <input type="file" accept="image/png,image/jpeg,image/webp,image/gif"
-          onChange={(e) => { setFile(e.target.files?.[0] ?? null); setPreview(null); }} />
-        <button type="button" className="btn btn--primary" onClick={runPreview} disabled={!file || busy}>
-          {busy ? 'Reading the screenshot…' : 'Read picks'}
-        </button>
-      </div>
-
-      {preview && (
-        <div className="tip-edit">
-          <p className="dim"><strong>Preview — race {preview.raceNo}, {preview.sourceLabel}</strong></p>
-          {/* READ-ONLY, on purpose. This shows exactly what Save will store.
-              Corrections happen after saving, so the stored row is always
-              verbatim model output first (invariant 9). */}
-          <p className="dim">
-            Read-only. This is exactly what Save will store, verbatim from the model.
-            If it read something wrong, save it and then use Correct — the original is kept.
-          </p>
-          {preview.warnings.length > 0 && (
-            <div className={preview.blocking ? 'notice notice--error' : 'notice notice--warn'}>
-              <ul>
-                {preview.warnings.map((w, i) => <li key={i}>{w.blocking ? 'Blocking: ' : ''}{w.message}</li>)}
-              </ul>
-            </div>
-          )}
-          {preview.picks.every((p) => !('ml_odds' in p) && !('live_odds' in p)) && (
-            <p className="dim">No odds on this sheet — normal, and not a failed read.</p>
-          )}
-          <PicksTable picks={preview.picks} />
-          {preview.existing && (
-            <p className="notice notice--warn">
-              Race {preview.raceNo} already has {preview.sourceLabel} picks
-              {preview.existing.edited ? ', including a correction you made' : ''}. Saving replaces them.
-            </p>
-          )}
-          <div className="formrow">
-            <button type="button" className="btn" onClick={() => setPreview(null)} disabled={busy}>Discard</button>
-            <button type="button" className="btn btn--primary" onClick={confirm} disabled={busy || preview.blocking}>
-              {busy ? 'Saving…' : 'Save picks'}
-            </button>
-          </div>
-        </div>
-      )}
-
-      {scoring?.bySource?.length > 0 && (
-        <>
-          <p className="dim"><strong>How these sources have done on this day</strong></p>
-          <table className="grid">
-            <thead>
-              <tr><th>Source</th><th>Top pick won</th><th>Placed</th><th>Showed</th><th>Top 3 caught</th><th>Not scored</th></tr>
-            </thead>
-            <tbody>
-              {scoring.bySource.map((s2) => (
-                <tr key={s2.sourceLabel}>
-                  <td>{s2.sourceLabel}</td>
-                  <td>{pct(s2.winRate, s2.n)}</td>
-                  <td>{pct(s2.placeRate, s2.n)}</td>
-                  {/* Without a Show column a sheet whose pick ran 3rd reads as
-                      0% won / 0% placed, which is worse than what happened. */}
-                  <td>{pct(s2.showRate, s2.n)}</td>
-                  <td>{pct(s2.top3OverlapRate, s2.n)}</td>
-                  <td>{s2.unscored || '—'}</td>
-                </tr>
-              ))}
-            </tbody>
-          </table>
-          <p className="dim">
-            One day only, so these counts are small by construction — read them as a tally, not a verdict.
-          </p>
-        </>
-      )}
 
       {/* D171: stake a source's picks into three comparable cards. Preview
           writes nothing; Save appends three cards, never edits earlier ones. */}
