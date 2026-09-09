@@ -3,10 +3,10 @@
 **Status: PARTIALLY SCHEDULED.** Reconciled 2026-09-09 against an
 externally-drafted scope doc (`apify-equibase-ingest-scope.md`, written
 without repo access) and against this repo's own same-day prior art (D188-
-D193). **Phase 1 is delivered as D195, Phase 2 as D196** - both parsers can
-now genuinely save data. Phases 3-5 (the live Apify client, CLI scripts,
-further verification) remain not scheduled; deliverable IDs get claimed
-when picked up.
+D193). **Phase 1 is delivered as D195, Phase 2 as D196, Phase 3 as D197** -
+both parsers can now genuinely save data, and BetSheet can now call
+Apify's own API on demand. Phases 4-5 (CLI scripts, further verification)
+remain not scheduled; deliverable IDs get claimed when picked up.
 **Explicitly out of scope, per user instruction**: scheduling, backfilling,
 backtesting, and anything touching the `legacy` branch (the D43/D44 PDF
 backfill pipeline for DMR-2026-summer etc.). **User framing that governs
@@ -231,21 +231,91 @@ sweep (`check-schema`, `check-ingest`, `check-grading`,
 `check-dmtc-results`, `check-charts`, `check-equibase-entries`,
 `check-compare-parsers`, `check-module-bindings`, `build`) is green.
 
-**Phase 3 - live Apify client, on-demand only.**
-`shared/apifyClient.js`: a thin singleton wrapping `apify-client`,
+**Phase 3 - live Apify client, on-demand only. DELIVERED AS D197.**
+`server/apifyClient.js`: a thin singleton wrapping `apify-client`,
 initialized from `process.env.APIFY_TOKEN`, failing fast with a clear error
-if unset rather than surfacing an opaque 401 later. `shared/apifyEquibase.js`:
-`fetchEntries({raceDate, trackCodes})` / `fetchResults({raceDate,
-trackCodes})`, each calling the actor with the matching `resultType` and
-returning the run's raw dataset items - no reshaping inside this file, kept
-a thin swappable actor-calling layer per the incoming doc's own §4.2
-reasoning (still correct advice, independent of which actor). The
-existing parse functions take a raw JSON string and call `JSON.parse`
-internally; the live-fetch callers `JSON.stringify` the dataset items before
-handing them to `parseApifyParseforgeDataset`/`parseApifyResultsDataset`
-unchanged - preserves both functions' golden-tested contract exactly, at
-the cost of one redundant stringify/parse round-trip, which is the safer
-trade against touching verified code.
+if unset (mirroring `server/anthropic-client.js`'s own pattern exactly)
+rather than surfacing an opaque 401 later.
+
+**Corrected on two points once actually built, neither cosmetic.**
+
+1. **File location: `server/`, not `shared/apifyClient.js`/
+   `shared/apifyEquibase.js` as originally planned.** The incoming scope
+   doc's guessed paths put these under `shared/`, and that plan was carried
+   into this doc's own Phase 3 description unchecked. `shared/` is this
+   codebase's browser-safe zone - every file under it holds itself to "no
+   `node:` import, ever," because the client build reaches it. A file
+   holding an Apify API token has no more business there than
+   `anthropic-client.js` does, and that file has always lived under
+   `server/` for exactly this reason. Caught before merging, not after.
+
+2. **The real input schema, read from the actor's own live Store page
+   (2026-09-09) rather than assumed from the incoming scope doc's guessed
+   names.** The doc's §3 used `dataMode`/`trackCodes`, which are a
+   DIFFERENT actor's parameter names (the comparison table's own jungle_
+   synthesizer/getascraper row) mis-attributed to parseforge. The real
+   parseforge schema: `resultType` ('entries'|'results'|'horses'), `tracks`
+   (not `trackCodes`), `date` (not `raceDate` - `fetchEntries`/
+   `fetchResults` keep `raceDate` as their OWN external parameter name,
+   translating to the actor's `date` internally, since every real fixture
+   and every parser in this codebase already calls the field `raceDate`).
+   **One load-bearing finding this reading surfaced that the plan never
+   anticipated**: exotic payoffs are an OPT-IN, separately-billed field on
+   this actor (`includeWagers`, off by default) - every real results sample
+   this codebase's parser was built and verified against necessarily had it
+   turned on, so `fetchResults` defaults `includeWagers: true`, overriding
+   the actor's own default. Left at the actor's default, a live pull would
+   have come back with every race silently missing exotic payoffs - not a
+   parser gap, a caller bug, and one this codebase's own grading depends on.
+
+`server/apifyEquibase.js`: `fetchEntries({raceDate, tracks, ...rest})` /
+`fetchResults({raceDate, tracks, includeWagers = true, ...rest})`, each
+calling the actor with the matching `resultType` and returning the run's
+raw dataset items - no reshaping inside this file, kept a thin swappable
+actor-calling layer per the incoming doc's own §4.2 reasoning (still
+correct advice, independent of which actor or its real parameter names).
+Documented filters (`raceNumbers`, `surfaces`, `onlyStakes`, `maxItems`, ...)
+pass through via `...rest` rather than being named individually, so a
+caller can use any of them without this file needing to know about it. A
+non-`SUCCEEDED` run (`FAILED`/`ABORTED`/`TIMED-OUT`) throws, naming the run
+id and status, rather than returning an empty dataset silently.
+
+The existing parse functions take a raw JSON STRING and call `JSON.parse`
+internally; `fetchEntries`/`fetchResults` return the actor's raw dataset
+items (an array), and the CALLER `JSON.stringify`s them back into that
+exact string contract before handing them to
+`parseApifyParseforgeDataset`/`parseApifyResultsDataset` unchanged -
+preserves both functions' golden-tested contract exactly, at the cost of
+one redundant stringify/parse round-trip, the safer trade against touching
+verified code.
+
+**A related, previously-flagged gap corrected with newly-verified
+evidence, in the same pass**: `shared/parsers/registry.js`'s
+`equibase-apify-parseforge` entry carried a placeholder `costModel`
+because "the prior evaluation's dollar figures are not verifiable
+anywhere in this repository" (`multi-parser-entries-ingest.md`, finding
+5). Reading the actor's own live Store page for its real input schema
+also surfaced its real, current, published pricing - now recorded there
+instead of an empty placeholder, sourced and dated. This independently
+CONFIRMS the prior evaluation's own cited figure ($0.675 for a default
+full card) was accurate all along; it does not retroactively make that
+evaluation citable as fact going forward - this page is the source now,
+not the memory of a prior session's claim.
+
+**VERIFIED, never with a real billed call**: a real Apify run costs real
+money and belongs to a person running a CLI script (Phase 4, not yet
+built), never a check script. New `scripts/check-apify-equibase-client.js`
+verifies `hasToken()`/`getApifyClient()`'s fail-fast behavior, and injects
+a fake client (matching `apify-client`'s own `actor(id).call(input)` /
+`dataset(id).listItems()` shape) through the one seam `runActor()` exists
+to provide - confirming the real actor id is called, `raceDate`/`tracks`
+map to `date`/`tracks` correctly, an omitted `tracks` defaults to `[]`
+(every track racing that day) rather than `undefined`, `includeWagers`
+defaults to `true` but is overridable, arbitrary filters pass through via
+`...rest`, and a non-`SUCCEEDED` run throws naming the run id and status.
+Also proves the round trip this file exists for: a fake live-fetched item,
+`JSON.stringify`'d back through the real, golden-verified parsers,
+produces the identical parse a real file-based fixture would.
 
 **Phase 4 - CLI scripts, one for entries and one for results.**
 A new script (not a `pull-race-day.js` retrofit - that script's design is

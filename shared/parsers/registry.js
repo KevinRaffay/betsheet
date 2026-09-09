@@ -119,18 +119,34 @@ export const PARSER_REGISTRY = {
   // The second registered parser (unblocks M-3's own "needs >=2 registered
   // parsers" dependency). NOT the default - the HTML parser stays default
   // for all real ingestion until a comparison process says otherwise (M-1's
-  // stated rule). `costModel` is deliberately a placeholder: the "prior
-  // evaluation"'s specific dollar figures for this actor are not verifiable
-  // anywhere in this repository (docs/requirements/
-  // multi-parser-entries-ingest.md, finding 5) and must not be repeated as
-  // fact - a real number belongs here only once M-4 (cost tracking, not
-  // built) or Apify's own actor page supplies one.
+  // stated rule). `costModel` was a placeholder ("the prior evaluation's
+  // dollar figures are not verifiable anywhere in this repository," finding
+  // 5) until Phase 3 (D197) read the actor's own live Store page directly -
+  // real, current, sourced figures, not the prior evaluation's uncheckable
+  // ones. `actions` are per-row/per-page event prices IN PLAIN USD DOLLARS,
+  // not cents - several are sub-cent per row, and inventing a fractional-
+  // cents unit to force this codebase's usual integer-cents DB convention
+  // would only confuse a future reader (this is static in-memory metadata,
+  // never a persisted column). `perFullCard` is the page's own worked
+  // example (a default ~90-runner card, connections+pedigree switched on)
+  // kept as a sanity-check figure, not a per-run cost this codebase
+  // computes itself (that is still M-4's job).
   'equibase-apify-parseforge': {
     id: 'equibase-apify-parseforge',
     label: 'Apify actor: parseforge/equibase-scraper',
     isDefault: false,
     sourceKind: 'apify',
-    costModel: { type: 'per-action', actions: {} },
+    costModel: {
+      type: 'per-action',
+      currency: 'USD',
+      source: 'https://apify.com/parseforge/equibase-scraper (read 2026-09-09)',
+      actions: {
+        resultItem: 0.007, racePage: 0.045, horseProfile: 0.03,
+        calendarScan: 0.01, actorStartPerGb: 0.02,
+        connections: 0.0012, pedigree: 0.0012, wagerPayoffs: 0.002, raceHistory: 0.003,
+      },
+      perFullCard: { default: 0.675, withConnectionsAndPedigree: 0.891 },
+    },
     fieldsNotProvided: ['postTime', 'liveOdds', 'liveOddsDecimal', 'alsoEligible'],
     parse: parseApifyParseforgeDataset,
     toPayload: apifyParseforgeToPayload,
