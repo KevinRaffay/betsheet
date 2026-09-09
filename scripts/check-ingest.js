@@ -94,8 +94,13 @@ try {
     Math.abs(fav.morning_line_decimal - 1.6) < 1e-9 && fav.jockey === 'J. Hernandez');
   const scratched = day.races.find((r) => r.number === 3).entries
     .find((e) => e.horse_name === 'Charmz Away');
-  check('detail: program-less scratch stored visibly as SCR',
-    scratched && scratched.program_number === 'SCR' && scratched.scratched === 1);
+  // D180: a program-less scratch is stored as NULL, not the literal 'SCR'.
+  // Equibase replaces the number cell with a colspan SCR marker, so the number
+  // is genuinely absent - NULL says that, a placeholder asserted a number the
+  // page never printed and collided when a race scratched two horses (D122).
+  check('detail: a program-less scratch is stored as NULL, not a placeholder',
+    scratched && scratched.program_number === null && scratched.scratched === 1,
+    JSON.stringify(scratched));
 
   // --- conflict + replace ---
   const conflict = await fetch(`${BASE}/api/race-days`, {
@@ -575,6 +580,38 @@ try {
       && eqEntries.filter((e) => !e.scratched).every((e) => e.morning_line));
     await fetch(`${BASE}/api/race-days/${eqBody.id}`, { method: 'DELETE' });
   }
+
+  // Placed LAST inside the try, on purpose: this CREATES a race day, and
+  // several assertions above count the days on file. Run earlier it broke
+  // three of them - a test that changes the state its neighbours measure.
+  // D122's collision, now dissolved: two program-less scratches in ONE race
+  // used to need 'SCR' and 'SCR-2' because they collided on
+  // UNIQUE(race_id, program_number). SQLite permits any number of NULLs, so
+  // this needs no suffix, no counter and no dependence on parse order.
+  {
+    const two = await fetch(`${BASE}/api/race-days`, {
+      method: 'POST',
+      headers: { 'content-type': 'application/json' },
+      body: JSON.stringify({
+        track: 'Del Mar', date: '2026-08-31', bankrollCents: 20000, perRaceMinCents: 500,
+        races: [{ number: 1, entries: [
+          { programNumber: '1', horseName: 'Runner One' },
+          { programNumber: null, horseName: 'Scratch One', scratched: true },
+          { programNumber: null, horseName: 'Scratch Two', scratched: true },
+        ] }],
+      }),
+    });
+    check('two program-less scratches in one race save without a suffix',
+      two.status === 201, `status ${two.status}`);
+    const body = await two.json().catch(() => ({}));
+    if (body.id) {
+      const d2 = await fetch(`${BASE}/api/race-days/${body.id}`).then((r) => r.json());
+      const nulls = d2.races[0].entries.filter((e) => e.program_number === null);
+      check('  both are stored NULL, neither is renamed', nulls.length === 2
+        && nulls.every((e) => e.scratched === 1), JSON.stringify(d2.races[0].entries));
+    }
+  }
+
 } finally {
   server.kill();
   await new Promise((r) => setTimeout(r, 300));

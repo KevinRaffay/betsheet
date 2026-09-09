@@ -42,14 +42,17 @@ function stakeableRaces(db, dayId, sourceLabel) {
     const entries = db.prepare(
       'SELECT program_number, morning_line, scratched FROM entries WHERE race_id = ?',
     ).all(r.race_id);
-    const ml = new Map(entries.map((e) => [String(e.program_number).toUpperCase(), e.morning_line]));
+    // D180: skip entries with no program number rather than keying on "null".
+    const ml = new Map(entries.filter((e) => e.program_number != null)
+      .map((e) => [String(e.program_number).toUpperCase(), e.morning_line]));
     return {
       raceNo: r.race_no,
       raceId: r.race_id,
       picks: JSON.parse(r.picks),
       menu: parseWagerMenu(r.wager_menu),
       mlOf: (pgm) => ml.get(String(pgm).toUpperCase()) ?? null,
-      scratched: entries.filter((e) => e.scratched).map((e) => String(e.program_number)),
+      scratched: entries.filter((e) => e.scratched && e.program_number != null)
+        .map((e) => String(e.program_number)),
     };
   });
 }

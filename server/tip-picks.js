@@ -166,7 +166,10 @@ tipPicksRouter.post('/race-days/:id/tip-picks/manual', wrap(async (req, res) => 
   // program number exists at all - never the client's copy of them.
   const race = db.prepare('SELECT id FROM races WHERE race_day_id = ? AND number = ?').get(day.id, raceNo);
   const entries = db.prepare('SELECT program_number, horse_name FROM entries WHERE race_id = ?').all(race.id);
-  const nameOf = new Map(entries.map((e) => [String(e.program_number).toUpperCase(), e.horse_name]));
+  // D180: a scratched horse may have no number; skip it rather than keying the
+  // map on the string "null", which a pick could then match.
+  const nameOf = new Map(entries.filter((e) => e.program_number != null)
+    .map((e) => [String(e.program_number).toUpperCase(), e.horse_name]));
 
   const correlationId = req.get('x-correlation-id') || newCorrelationId();
   const results = [];
