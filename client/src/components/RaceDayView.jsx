@@ -13,6 +13,8 @@ import RaceDayNotesModal from './RaceDayNotesModal.jsx';
 import RaceNotesEditor from './RaceNotesEditor.jsx';
 import { NoteSourceDatalist } from './AnalystNotesEditor.jsx';
 import { entriesStaleness } from '@shared/staleness.js';
+import { flagRaceEntries } from '@shared/entry-flags.js';
+import EntryFlagTags from './EntryFlagTags.jsx';
 
 // Read-only view of a stored race day - what actually landed in the
 // database, not what the parser proposed.
@@ -198,6 +200,14 @@ export default function RaceDayView({ id, onBack, onOpenCard }) {
   if (error) return <p className="notice notice--error">{error}</p>;
   if (!day) return <p className="placeholder">Loading…</p>;
 
+  // D216: one entry-flag array per race, keyed by race number, computed here
+  // rather than inside the races `.map` below - that callback is an expression
+  // arrow, and widening it to a block body to hold one `const` would rewrite
+  // fifty lines of JSX indentation for nothing.
+  const entryFlags = new Map(
+    day.races.map((r) => [r.number, flagRaceEntries(r.entries ?? []).flags]),
+  );
+
   return (
     <section>
       <div className="pagehead">
@@ -332,8 +342,14 @@ export default function RaceDayView({ id, onBack, onOpenCard }) {
               <tr><th>#</th><th>PP</th><th>Horse</th><th>Jockey</th><th>Trainer</th><th>Wt</th><th>M/L</th><th>Rank</th></tr>
             </thead>
             <tbody>
-              {race.entries.map((e) => (
-                <tr key={e.id} className={e.scratched ? 'row--scratched' : ''}>
+              {/* D216: index-aligned with `race.entries`, computed once per race. */}
+              {race.entries.map((e, ei) => (
+                <tr
+                  key={e.id}
+                  className={[e.scratched ? 'row--scratched' : '',
+                    (entryFlags.get(race.number)?.[ei]?.baffert
+                      || entryFlags.get(race.number)?.[ei]?.favorite) ? 'row--entry-flag' : ''].filter(Boolean).join(' ')}
+                >
                   <td>{e.program_number}</td>
                   <td className="dim">{e.post_position ?? ''}</td>
                   <td>
@@ -341,6 +357,7 @@ export default function RaceDayView({ id, onBack, onOpenCard }) {
                     {e.best_bet ? <span className="tag tag--gold">BEST BET</span> : null}
                     {e.not_to_be_claimed ? <span className="tag">NTC</span> : null}
                     {e.scratched ? <span className="tag tag--red">SCR</span> : null}
+                    <EntryFlagTags flag={entryFlags.get(race.number)?.[ei]} />
                   </td>
                   <td>{e.jockey ?? ''}</td>
                   <td>{e.trainer ?? ''}</td>

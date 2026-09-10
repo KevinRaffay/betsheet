@@ -2,6 +2,8 @@ import React, { useEffect, useState } from 'react';
 import { FAILURE_MODE_WARNINGS } from '@shared/card-notices.js';
 import { deleteCard, getCard, getGrades, getLlmNotes, gradeCardApi, modelLabel } from '../api.js';
 import RaceNotes from './RaceNotes.jsx';
+import EntryFlagTags from './EntryFlagTags.jsx';
+import { flagRaceEntries } from '@shared/entry-flags.js';
 
 const RESPONSIBLE_LINE =
   'Entertainment wagering with a pre-committed budget. No mid-card increases.';
@@ -206,6 +208,13 @@ export default function CardView({ cardId, onBack, onDeleted, embedded = false }
       {card.allocations.map((a) => {
         const race = (card.races ?? []).find((r) => r.number === a.race_number);
         const entries = race?.entries ?? [];
+        // D216: the card sheet is a RECORD, not an authoring surface (D184),
+        // so this is decoration only - but it is decoration that answers "why
+        // is this ticket here?" when reviewing a card weeks later, and it is
+        // derived from the same stored entries the flags were read off at the
+        // time. Leaving it off here would make the same horse look flagged on
+        // one screen and unflagged on another.
+        const { flags: entryFlags } = flagRaceEntries(entries);
         const raceResults = resultsByRace.get(a.race_number);
         const raceTickets = singles.filter((t) => {
           const races = t.selections.races ?? [];
@@ -272,10 +281,14 @@ export default function CardView({ cardId, onBack, onDeleted, embedded = false }
                   <tr><th>#</th><th>Horse</th><th>Jockey</th><th>Trainer</th><th>M/L</th><th>Rank</th></tr>
                 </thead>
                 <tbody>
-                  {entries.map((entry) => (
-                    <tr key={entry.id} className={entry.scratched ? 'row--scratched' : ''}>
+                  {entries.map((entry, ei) => (
+                    <tr
+                      key={entry.id}
+                      className={[entry.scratched ? 'row--scratched' : '',
+                        (entryFlags[ei]?.baffert || entryFlags[ei]?.favorite) ? 'row--entry-flag' : ''].filter(Boolean).join(' ')}
+                    >
                       <td>{entry.program_number ?? '—'}</td>
-                      <td>{entry.horse_name}</td>
+                      <td>{entry.horse_name}<EntryFlagTags flag={entryFlags[ei]} /></td>
                       <td>{entry.jockey ?? '—'}</td>
                       <td>{entry.trainer ?? '—'}</td>
                       <td>{entry.morning_line ?? '—'}</td>
