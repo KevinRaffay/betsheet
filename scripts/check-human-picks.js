@@ -16,8 +16,8 @@ import os from 'node:os';
 import path from 'node:path';
 import { fileURLToPath, URL } from 'node:url';
 import { parseHumanPicksText } from '../shared/parsers/human-picks.js';
-import { estimateTicketPayouts, exactaEstimate, moneyToken, parseMoneyToken, placeEstimate,
-  trifectaBoxEstimate, winPayout } from '../shared/betmath.js';
+import { estimateTicketPayouts, exactaEstimate, moneyToken, parseMoneyToken, parseWagerMenu,
+  placeEstimate, trifectaBoxEstimate, wagerMenuOffered, winPayout } from '../shared/betmath.js';
 
 const ROOT = fileURLToPath(new URL('../', import.meta.url));
 const tmp = fs.mkdtempSync(path.join(os.tmpdir(), 'betsheet-humancheck-'));
@@ -318,6 +318,69 @@ try {
       const r = tp('$10 W 5 / $2 EX BOX 2-4-5\nWin | 2 | $25\nTrifecta | 2,4/2,4/3,5 | $20');
       return r.tickets.length === 4 && r.warnings.length === 0 && r.raceCostCents === 1000 + 1200 + 2500 + 2000;
     })(), JSON.stringify(tp('$10 W 5 / $2 EX BOX 2-4-5\nWin | 2 | $25\nTrifecta | 2,4/2,4/3,5 | $20').tickets.map((t) => t.tellerCall)));
+  }
+
+  console.log('-- D213: the printed wager menu, in the forms tracks actually print --');
+  {
+    // The live bug: Woodbine race 1, 2026-09-10. The menu says the trifecta
+    // is sold at 20c; the parser read no amount at all, fell back to
+    // BET.minimums' 50c, and refused a legal $4.80 trifecta box on 4 horses
+    // ($0.20 x 24 combos) as "below the $0.50 minimum for trifecta box".
+    const WOODBINE = 'Rolling Double / Exacta / 0.20 Trifecta / 0.20 Superfecta '
+      + '0.20 Pick 3 (Races 1-2-3)/ $1 Swinger';
+    const wb = parseWagerMenu(WOODBINE);
+    check('a bare decimal is read as the amount - "0.20 Trifecta" is 20c, not the 50c fallback',
+      wb.trifecta === 20 && wb.superfecta === 20 && wb.pick3 === 20, JSON.stringify(wb));
+    check('the menu that names a bet type is REPORTED as naming it (the builder\'s honest label)',
+      ['trifecta', 'superfecta', 'pick3'].every((k) => wagerMenuOffered(WOODBINE).has(k)),
+      [...wagerMenuOffered(WOODBINE)].join(','));
+
+    // Same amount, the other three ways a real menu in this corpus writes it.
+    check('".50 Trifecta" (Delaware Park / Louisiana Downs) is READ as 50c, not defaulted to it', (() => {
+      const t = '$1 Exacta / .50 Trifecta / .10 Superfecta';
+      const m = parseWagerMenu(t), o = wagerMenuOffered(t);
+      return m.trifecta === 50 && m.superfecta === 10 && o.has('trifecta') && o.has('superfecta');
+    })(), [...wagerMenuOffered('$1 Exacta / .50 Trifecta / .10 Superfecta')].join(','));
+    check('"50 Cent Trifecta / 10 cent Superfecta" (Albuquerque / Parx / Horseshoe) reads both', (() => {
+      const t = 'Exacta / 50 Cent Trifecta / 10 cent Superfecta';
+      const m = parseWagerMenu(t), o = wagerMenuOffered(t);
+      return m.trifecta === 50 && m.superfecta === 10 && o.has('trifecta') && o.has('superfecta');
+    })(), [...wagerMenuOffered('Exacta / 50 Cent Trifecta / 10 cent Superfecta')].join(','));
+    check('"20 Cent Triactor" / "EXACTOR" are the trifecta and exacta (Fort Erie, Assiniboia Downs)', (() => {
+      const m = parseWagerMenu('WPS, Exactor, 20 Cent Triactor, Daily Double, 20 Cent Superfecta');
+      const n = parseWagerMenu('ROLLING DOUBLE / $1 CLASSIC HI 5 / .20 SUPERFECTA / .20 TRIACTOR / EXACTOR');
+      return m.trifecta === 20 && m.superfecta === 20 && n.trifecta === 20 && n.superfecta === 20;
+    })(), JSON.stringify(parseWagerMenu('WPS, Exactor, 20 Cent Triactor, Daily Double, 20 Cent Superfecta')));
+    check('the "$N Type" and "Nc Type" forms this always read are untouched', (() => {
+      const m = parseWagerMenu('$1 Exacta / $2 Quinella / 50c Trifecta / $1 Superfecta (10c min)');
+      return m.exacta === 100 && m.quinella === 200 && m.trifecta === 50 && m.superfecta === 10;
+    })(), JSON.stringify(parseWagerMenu('$1 Exacta / $2 Quinella / 50c Trifecta / $1 Superfecta (10c min)')));
+
+    // NEGATIVE CONTROL, and the reason the bare form must carry a decimal
+    // point: this is a real Del Mar menu, and "9 & 10 Pick 3" would read the
+    // second race number as a $10 Pick 3 if bare integers were accepted.
+    const DMR = 'Exacta ($1), Trifecta (.50), Super (.10), Double ($1) 9 & 10 Pick 3 ($1) (9-11)';
+    check('a bare INTEGER is never an amount - "9 & 10 Pick 3" is a race pair, not a $10 Pick 3',
+      parseWagerMenu(DMR).pick3 === 50, JSON.stringify(parseWagerMenu(DMR)));
+    check('an unnamed bet type still falls back to BET.minimums',
+      parseWagerMenu('0.20 Trifecta').exacta === 100 && !wagerMenuOffered('0.20 Trifecta').has('exacta'));
+
+    // End to end: the exact ticket the live generation was refused on, against
+    // the exact menu that race printed.
+    const wbEntries = ['2', '4', '5', '6'].map((n) => ({ program_number: n, horse_name: `Horse ${n}` }));
+    const wbParse = parseHumanPicksText({
+      text: 'trifecta box | #2,#4,#5,#6 | $4.80 | 24 combos at the menu\'s 20c base.',
+      race: 1, entries: wbEntries, wagerMenu: WOODBINE,
+    });
+    check('the refused ticket now parses: $4.80 trifecta box, 24 combos, no blocking warning',
+      wbParse.tickets.length === 1 && wbParse.tickets[0].stakeCents === 20
+      && wbParse.tickets[0].costCents === 480 && !wbParse.warnings.some((w) => w.blocking),
+      JSON.stringify(wbParse.warnings.concat(wbParse.tickets.map((t) => [t.stakeCents, t.costCents]))));
+    check('the same ticket is still refused on a menu whose trifecta really is 50c',
+      parseHumanPicksText({
+        text: 'trifecta box | #2,#4,#5,#6 | $4.80 | .', race: 1, entries: wbEntries,
+        wagerMenu: '$1 Exacta / 50c Trifecta',
+      }).warnings.some((w) => w.type === 'below_minimum' && w.blocking));
   }
 
   let up = false;
