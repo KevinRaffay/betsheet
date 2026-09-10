@@ -137,13 +137,29 @@ check('every race carries results/exotics/scratches arrays saveResults reads dir
   dmr.races.every((r) => Array.isArray(r.results) && Array.isArray(r.exotics) && Array.isArray(r.scratches)));
 
 console.log('\n-- malformed input never throws (the same contract every parser here holds) --');
+const invalidJson = parseApifyResultsDataset('not json at all');
+const notArray = parseApifyResultsDataset('{}');
+const emptyArray = parseApifyResultsDataset('[]');
+const entryOnly = parseApifyResultsDataset(JSON.stringify([{ rowType: 'entry', raceNumber: 1 }]));
 check('non-JSON input returns a blocking warning, not an exception',
-  parseApifyResultsDataset('not json at all').warnings[0]?.type === 'invalid_json');
+  invalidJson.warnings[0]?.type === 'invalid_json');
 check('a JSON object (not an array) is refused the same way',
-  parseApifyResultsDataset('{}').warnings[0]?.type === 'not_an_array');
-check('an empty array is refused as no races', parseApifyResultsDataset('[]').warnings[0]?.type === 'no_races');
+  notArray.warnings[0]?.type === 'not_an_array');
+check('an empty array is refused as no races', emptyArray.warnings[0]?.type === 'no_races');
 check('a file with only entry-mode rows (rowType "entry") is refused as no races, not silently empty',
-  parseApifyResultsDataset(JSON.stringify([{ rowType: 'entry', raceNumber: 1 }])).warnings[0]?.type === 'no_races');
+  entryOnly.warnings[0]?.type === 'no_races');
+
+console.log('\n-- every warning carries a human-readable message (server/equibase-apify-results.js\'s preview and ParsePreview.jsx both render w.message; every warning here used to be missing one, rendering as a blank bullet in the preview) --');
+function checkMessages(label, warnings) {
+  const missing = warnings.filter((w) => typeof w.message !== 'string' || w.message.trim() === '');
+  check(`${label}: every warning has a non-empty message`, missing.length === 0, JSON.stringify(missing));
+}
+checkMessages('Del Mar (no context)', dmr.warnings);
+checkMessages('wrong track code', wrongTrack.warnings);
+checkMessages('invalid JSON', invalidJson.warnings);
+checkMessages('not an array', notArray.warnings);
+checkMessages('empty array', emptyArray.warnings);
+checkMessages('entry-only rows', entryOnly.warnings);
 
 console.log('\n-- golden --');
 if (writeGolden) {
