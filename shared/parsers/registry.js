@@ -41,6 +41,7 @@
 
 import { parseEquibaseEntriesHtml } from './equibase-entries.js';
 import { parseApifyParseforgeDataset, apifyParseforgeToPayload } from './equibase-apify-parseforge.js';
+import { parseGetascraperDataset, getascraperToPayload } from './equibase-getascraper.js';
 
 const moneyToCents = (s) => {
   const m = String(s ?? '').match(/[\d,.]+/);
@@ -150,6 +151,42 @@ export const PARSER_REGISTRY = {
     fieldsNotProvided: ['postTime', 'liveOdds', 'liveOddsDecimal', 'alsoEligible'],
     parse: parseApifyParseforgeDataset,
     toPayload: apifyParseforgeToPayload,
+  },
+  // The third registered parser (D219). NOT the default - the HTML parser stays
+  // default for all real ingestion until a comparison process says otherwise
+  // (M-1's stated rule), and this source is deliberately narrower than either
+  // incumbent on entry detail.
+  //
+  // It exists for ONE measured reason: post times. `parseforge` lists `postTime`
+  // under its own `fieldsNotProvided` above, and 11 of 11 races in its real Del
+  // Mar fixture come back null, which puts every parseforge-sourced day entirely
+  // into `server/race-calendar.js`'s `unplaceable` list - blank on the D209-D211
+  // calendar. This source prints one per race, with a timezone.
+  //
+  // `costModel` is deliberately UNKNOWN rather than filled from the figures the
+  // inherited scope doc quotes for this actor ("$4.60/1,000"). Finding 5 of
+  // docs/requirements/multi-parser-entries-ingest.md established that those
+  // numbers are not checkable anywhere in this repository, and D197 later found
+  // the same doc had mis-attributed this very actor's input schema to a
+  // different one - so its pricing claims get no more credit than its schema
+  // claims did. Fill this in by reading the actor's own Store page, the way
+  // D197 did for parseforge.
+  'equibase-getascraper': {
+    id: 'equibase-getascraper',
+    label: 'Apify actor: getascraper/equibase-us-horse-racing-scraper',
+    isDefault: false,
+    sourceKind: 'apify',
+    costModel: {
+      type: 'unknown',
+      note: 'Not read from the actor\'s own Store page yet; the inherited scope doc\'s figures for this actor are not independently checkable (finding 5).',
+    },
+    fieldsNotProvided: [
+      'distance', 'surface', 'wagerMenu', 'conditions', 'claimingPriceCents',
+      'scratched', 'medication', 'ageSex', 'claimPrice',
+      'liveOdds', 'liveOddsDecimal', 'alsoEligible',
+    ],
+    parse: parseGetascraperDataset,
+    toPayload: getascraperToPayload,
   },
 };
 

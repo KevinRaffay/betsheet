@@ -39,6 +39,20 @@ export const pullApifyEntries = (track, date, correlationId) =>
     body: JSON.stringify({ track, date }),
   }).then(asJson);
 
+// getascraper/equibase-us-horse-racing-scraper dataset export (D219). A FILE the
+// user exported from Apify, read in the browser and posted as text - not a live
+// call, unlike pullApifyEntries above. This actor's real input schema has not
+// been read from a primary source, and D197's own experience with the sibling
+// actor is that guessing one produces a confident, wrong, billed request; the
+// export is verified real, so it is what this path takes. `trackCode` is only
+// needed when one export spans several tracks (this source's output can).
+export const parseGetascraperEntries = (json, { trackCode = null, oddsCapturedAt = null, correlationId } = {}) =>
+  fetch('/api/parse/getascraper-entries', {
+    method: 'POST',
+    headers: { 'content-type': 'application/json', ...(correlationId ? { 'x-correlation-id': correlationId } : {}) },
+    body: JSON.stringify({ json, trackCode, oddsCapturedAt }),
+  }).then(asJson);
+
 // Bulk entries zip. The FILE is posted as a raw application/zip body rather
 // than read in the browser: a day's decompressed HTML is 15-17MB against the
 // 10mb JSON limit, while the archive itself is about 2MB. Posted twice, once

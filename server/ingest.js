@@ -28,7 +28,7 @@ export const ingestRouter = express.Router();
 // this array, never one of them. Module-scoped (not re-declared per call)
 // so insertRaceDay's own gate and the /race-days route's validation can
 // never drift into two different lists.
-export const ENTRIES_SOURCES = ['program', 'ml_sheet', 'both', 'equibase_html', 'equibase_apify'];
+export const ENTRIES_SOURCES = ['program', 'ml_sheet', 'both', 'equibase_html', 'equibase_apify', 'equibase_getascraper'];
 
 // An omitted entriesSource defaults to 'program' (every ingest path that
 // predates D115 relies on this); a PRESENT-but-unrecognized value is

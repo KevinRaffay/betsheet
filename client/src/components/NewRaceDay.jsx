@@ -1,5 +1,7 @@
 import React, { useState } from 'react';
-import { parseEquibaseEntries, pullApifyEntries, saveRaceDay } from '../api.js';
+import {
+  parseEquibaseEntries, parseGetascraperEntries, pullApifyEntries, saveRaceDay,
+} from '../api.js';
 import { listTracks } from '@shared/track-codes.js';
 import ParsePreview from './ParsePreview.jsx';
 import BulkEntriesUpload from './BulkEntriesUpload.jsx';
@@ -110,6 +112,27 @@ export default function NewRaceDay({ onSaved, onCancel }) {
     }
   };
 
+  // getascraper dataset export (D212). A FILE, not a live call - see
+  // server/getascraper-entries.js for why this source takes the export rather
+  // than calling the actor. Track and date are read out of the export itself
+  // (applyParse fills the form from them), so neither is required up front.
+  const handleGetascraperFile = async (file) => {
+    if (!file) return;
+    setBusy(true);
+    setError(null);
+    try {
+      applyParse(await parseGetascraperEntries(await file.text(), {
+        trackCode: track.trim() || null,
+        oddsCapturedAt: new Date(file.lastModified).toISOString().replace(/\.\d+Z$/, 'Z'),
+        correlationId,
+      }));
+    } catch (e) {
+      setError(String(e.message));
+    } finally {
+      setBusy(false);
+    }
+  };
+
   const handleSave = async (replace = false) => {
     setBusy(true);
     setError(null);
@@ -189,10 +212,17 @@ export default function NewRaceDay({ onSaved, onCancel }) {
         >
           Live pull (Apify)
         </button>
+        <button
+          className={`btn ${mode === 'getascraper' ? 'btn--primary' : ''}`}
+          onClick={() => setMode('getascraper')}
+        >
+          getascraper export
+        </button>
         <span className="dim">
           {mode === 'single' && 'One saved Equibase entries page becomes one race day.'}
           {mode === 'bulk' && 'One zip of saved entries pages becomes every race day it holds.'}
           {mode === 'apify' && 'Calls Apify live for the Track and Date above - costs real money every time.'}
+          {mode === 'getascraper' && 'A getascraper dataset export (JSON) you downloaded from Apify. The only entries source that carries post times.'}
         </span>
       </div>
 
@@ -214,6 +244,30 @@ export default function NewRaceDay({ onSaved, onCancel }) {
             >
               {busy ? 'Calling Apify…' : 'Pull entries from Apify'}
             </button>
+          </div>
+        </div>
+      )}
+
+      {mode === 'getascraper' && (
+        <div className="ingest-inputs">
+          <p className="dim">
+            Export the run&rsquo;s dataset from Apify as JSON and upload it here. Track and date are
+            read out of the file. This is the only entries source that carries post times, so it is
+            the one that puts a day on the race calendar &mdash; but it carries no distance, surface,
+            or program numbers (those are derived from post position, which differs for coupled
+            entries). The preview lists every derivation before anything is saved.
+          </p>
+          <div className="ingest-actions">
+            <label className="btn btn--primary">
+              {busy ? 'Reading…' : 'Upload getascraper JSON'}
+              <input
+                type="file"
+                accept="application/json,.json"
+                style={{ display: 'none' }}
+                disabled={busy}
+                onChange={(e) => handleGetascraperFile(e.target.files?.[0])}
+              />
+            </label>
           </div>
         </div>
       )}
