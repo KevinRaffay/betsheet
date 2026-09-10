@@ -1,6 +1,6 @@
 # Pick-source scoring: which sources name winners, with no money involved
 
-**Status: SPECIFIED, NOT SCHEDULED.** No deliverable IDs are claimed here; each
+**Status: SPECIFIED; PS-1 picked up 2026-09-10.** No deliverable IDs are claimed here; each
 phase claims its own with `npm run allocate-deliverable` when it is picked up,
 the way `race-day-calendar.md` and `multi-parser-entries-ingest.md` were
 worked. Written 2026-09-10 from a user question ("Does TrackMaster pick a lot
@@ -77,8 +77,9 @@ Per source, what the tickets say:
   `win` ticket, **168 carry more than one win ticket** on the same race. A
   source that backs three horses to win and is scored "any win-backed horse
   won" is flattered against one that backs one.
-- **HUMAN** has 7 races with results. Included for completeness; it will not
-  support a conclusion.
+- **HUMAN** has 7 races with results. **Included, user decision 2026-09-10**;
+  it will not support a conclusion at that n, and the page says so by
+  printing the n.
 
 ### Variant cards duplicate the same picks
 
@@ -130,8 +131,8 @@ baseline (1/field for win, 3/field for named-in-top-three).
 
 ## Decisions
 
-Proposed here; the operator owns each one, and the ones marked OPEN are asked
-rather than assumed.
+Proposed here and confirmed by the user on 2026-09-10, including the two that
+were asked rather than assumed (the primary pick, and HUMAN's inclusion).
 
 1. **The unit is (race day, race number, source), never a card.** Source
    identity is `consensus_completeness` for OTR and HUMAN, `cards.llm_model`
@@ -152,8 +153,9 @@ rather than assumed.
    pick (the win ticket with the largest `stake_cents`; ties broken by lowest
    `sequence`) and ANY win-backed horse. The mean size of `winBacked` is
    reported next to both so a reader can see how much "any" is buying.
-   OPEN: largest stake is proposed as "primary" because it is what the source
-   put its money behind; first-written is the alternative.
+   **User decision 2026-09-10: largest stake is the primary pick**, because
+   it is what the source put its money behind; first-written was the
+   alternative and was not taken.
 4. **Scratches follow D170.** A backed horse that scratched is excluded from
    hit/miss for that role, never counted a miss; a race whose every backed
    horse scratched scores NULL. A backed program number absent from both the
