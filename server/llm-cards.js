@@ -319,9 +319,22 @@ export function persistLlmRace(db, day, { race: raceNumber, requestId, bankrollC
     text: extracted.ticketBlockText, race: raceNumber, entries, wagerMenu: race.wager_menu,
     scratchedProgramNumbers: scratched, ruleTag: 'llm',
   });
-  const blocking = parsed.warnings.filter((w) => w.blocking);
-  if (blocking.length) {
-    const err = new LlmCardError(422, `Race ${raceNumber}: ${blocking.length} blocking warning(s) - nothing saved.`);
+  // D215: a refused LINE no longer refuses the RACE. A blocking warning here
+  // never meant "drop a parsed ticket" - parseColumnRow / parseTellerTicketString
+  // / buildTickets each return without pushing one, so the ticket does not
+  // exist by the time this code runs. Refusing the whole race therefore threw
+  // away the tickets that DID parse, which is how five real generations
+  // (Horseshoe Indianapolis, 2026-09-10) cost ~22 good tickets over one bad
+  // line each. This is deliberately NOT done for a human's pasted card
+  // (server/human-cards.js): a human can fix the source text and re-parse,
+  // which is what invariant 9 requires; a paid model response cannot be edited.
+  const refused = parsed.warnings.filter((w) => w.blocking);
+  // Nothing survived: still a refusal, and deliberately so. Saving an empty
+  // race here would be indistinguishable from the model deciding this race is
+  // not worth a bet - a real and legitimate outcome the prompt asks for - and
+  // that difference is exactly what the LLM_GENERATED bucket is measuring.
+  if (refused.length && !parsed.tickets.length) {
+    const err = new LlmCardError(422, `Race ${raceNumber}: all ${refused.length} ticket line(s) were refused - nothing to save.`);
     err.warnings = parsed.warnings;
     throw err;
   }
@@ -434,9 +447,17 @@ export function persistLlmRace(db, day, { race: raceNumber, requestId, bankrollC
       selections: t.legs, stakeCents: t.stakeCents, costCents: t.costCents, rationaleText: t.rationale_text,
     });
   }
+  // Invariant 7: the trace must explain why a card holds 4 tickets when the
+  // model wrote 5. A refused line is a decision, so it is an event, not a gap.
+  for (const w of refused) {
+    traceLog.info('ticket_refused', {
+      correlationId, cardId: result.id, raceDayId: day.id, race: raceNumber,
+      requestId, reason: w.type, message: w.message,
+    });
+  }
   appLog.info('llm_race_generated', {
     correlationId, cardId: result.id, raceDayId: day.id, race: raceNumber, requestId,
-    tickets: parsed.tickets.length, costCents: parsed.raceCostCents,
+    tickets: parsed.tickets.length, refused: refused.length, costCents: parsed.raceCostCents,
   });
 
   let graded = null;
@@ -444,7 +465,7 @@ export function persistLlmRace(db, day, { race: raceNumber, requestId, bankrollC
   if (hasResults) graded = gradeAndPersist(db, result.id, correlationId, { engineVersion: 'llm' });
 
   const cardCostCents = db.prepare('SELECT COALESCE(SUM(cost_cents), 0) AS n FROM tickets WHERE card_id = ?').get(result.id).n;
-  return { cardId: result.id, correlationId, llmModel: result.llm_model, tickets: parsed.tickets, raceCostCents: parsed.raceCostCents, cardCostCents, warnings: parsed.warnings, graded };
+  return { cardId: result.id, correlationId, llmModel: result.llm_model, tickets: parsed.tickets, raceCostCents: parsed.raceCostCents, cardCostCents, warnings: parsed.warnings, refused, graded };
 }
 
 function loadDay(db, id) {

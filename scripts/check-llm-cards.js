@@ -545,6 +545,78 @@ Place | #1 | $20 | Safe.
   // - the inverse assertion (no CONSENSUS section in the prompt) is made in
   // the pure phase above, where it costs no server round trip.
 
+  console.log('-- D215: a refused LINE drops, the rest of the race is kept --');
+  {
+    // The real shape of the reports this fixes (Horseshoe Indianapolis,
+    // 2026-09-10): a 4-horse trifecta box at a 50c base costs 24 x $0.50 =
+    // $12.00, the model wrote $6 to fit its leftover bankroll, and that ONE
+    // unbuyable line used to discard the four legal tickets beside it.
+    const partialDay = {
+      track: 'Partial Save Downs', date: '2026-09-10', bankrollCents: 20000, perRaceMinCents: 500,
+      races: [{
+        number: 1, wagerMenu: 'Exacta / 50 Cent Trifecta / 10 Cent Superfecta',
+        entries: [entry('1', 'One', '3/1', 3), entry('2', 'Two', '5/2', 2.5),
+          entry('3', 'Three', '4/1', 4), entry('4', 'Four', '8/5', 1.6)],
+      }],
+    };
+    const pDay = await (await jpost('/api/race-days', partialDay)).json();
+    const mixed = 'Reasoning.\n\n<<<TICKETS>>>\n'
+      + 'win | #1 | $6 | The price play.\n'
+      + 'exacta box | #1,#2 | $4 | Two clear top choices. (2 x 1 = 2 combos; $2.00 x 2 combos = $4.00)\n'
+      + 'trifecta box | #1,#2,#3,#4 | $6 | Wider spread. (4 x 3 x 2 = 24 combos; $0.50 x 24 combos = $12.00)\n'
+      + '<<<END TICKETS>>>\n';
+    const pv = await (await jpost(`/api/race-days/${pDay.id}/llm-cards/preview`, { race: 1, __stubResponse: mixed })).json();
+    check('preview shows the two legal tickets AND the refusal - the table IS what Save stores (invariant 9)',
+      pv.tickets.length === 2 && pv.warnings.filter((w) => w.blocking).length === 1
+      && pv.warnings.some((w) => w.blocking && w.type === 'below_minimum'),
+      JSON.stringify({ tickets: pv.tickets.length, warnings: pv.warnings.map((w) => w.type) }));
+
+    const pSave = await jpost(`/api/race-days/${pDay.id}/llm-cards`, { race: 1, requestId: pv.requestId });
+    const pBody = await pSave.json();
+    check('the race SAVES (201) instead of being discarded over one bad line', pSave.status === 201, JSON.stringify(pBody).slice(0, 200));
+    check('exactly the two legal tickets are stored, and the refused line is not among them', (() => {
+      const types = (pBody.tickets ?? []).map((t) => t.betType).sort();
+      return pBody.tickets?.length === 2 && types.join(',') === 'exacta_box,win';
+    })(), JSON.stringify((pBody.tickets ?? []).map((t) => [t.betType, t.stakeCents, t.costCents])));
+    check('the refusal comes back with the save, so a caller can report it rather than infer it',
+      Array.isArray(pBody.refused) && pBody.refused.length === 1 && pBody.refused[0].type === 'below_minimum',
+      JSON.stringify(pBody.refused));
+    check('the card cost counts ONLY the saved tickets ($6 win + $4 exacta box)',
+      pBody.raceCostCents === 1000 && pBody.cardCostCents === 1000,
+      JSON.stringify([pBody.raceCostCents, pBody.cardCostCents]));
+    const pCard = await jget(`/api/cards/${pBody.cardId}`);
+    check('and the card really holds two tickets when read back', pCard.tickets.length === 2,
+      JSON.stringify(pCard.tickets.map((t) => t.bet_type)));
+
+    // Invariant 7: the trace has to explain why the card holds 2 of the 3
+    // lines the model wrote. A dropped line is a decision, so it is an event -
+    // read from the decision-trace LOG this server was pointed at, which is
+    // where check-export.js reads ticket_added from for the same reason.
+    check('the decision trace names the refused line (invariant 7 - not a silent gap)', (() => {
+      const dir = path.join(tmp, 'server-logs');
+      const events = fs.readdirSync(dir).filter((f) => f.startsWith('decision-trace'))
+        .flatMap((f) => fs.readFileSync(path.join(dir, f), 'utf8').split(/\r?\n/))
+        .filter(Boolean).map((l) => { try { return JSON.parse(l); } catch { return null; } }).filter(Boolean);
+      const refusedEvents = events.filter((e) => e.event === 'ticket_refused' && e.cardId === pBody.cardId);
+      return refusedEvents.length === 1 && refusedEvents[0].reason === 'below_minimum'
+        && events.filter((e) => e.event === 'ticket_added' && e.cardId === pBody.cardId).length === 2;
+    })(), fs.readdirSync(path.join(tmp, 'server-logs')).join(','));
+
+    // The one case that still refuses, and deliberately: saving an empty race
+    // would be indistinguishable from the model declining to bet, which is a
+    // real outcome the prompt asks for and the LLM_GENERATED bucket measures.
+    const allBad = 'Reasoning.\n\n<<<TICKETS>>>\n'
+      + 'trifecta box | #1,#2,#3,#4 | $6 | Unbuyable. (4 x 3 x 2 = 24 combos)\n'
+      + '<<<END TICKETS>>>\n';
+    const abPv = await (await jpost(`/api/race-days/${pDay.id}/llm-cards/preview`, { race: 1, __stubResponse: allBad })).json();
+    const abSave = await jpost(`/api/race-days/${pDay.id}/llm-cards`, { race: 1, requestId: abPv.requestId, cardId: pBody.cardId });
+    check('a race where EVERY line was refused still refuses (422) - an empty save would read as "no bet worth making"',
+      abSave.status === 422, String(abSave.status));
+    const pCardAfter = await jget(`/api/cards/${pBody.cardId}`);
+    check('and that refusal changed nothing - the two good tickets are still there',
+      pCardAfter.tickets.length === 2, JSON.stringify(pCardAfter.tickets.map((t) => t.bet_type)));
+  }
+
   console.log('-- reasoning + raw response retrievable per race --');
   const requests = await jget(`/api/cards/${cardId}/llm-requests`);
   check('every logged call for this card is retrievable, race 1 and race 2 both present', requests.some((r) => r.raceNumber === 1) && requests.some((r) => r.raceNumber === 2));

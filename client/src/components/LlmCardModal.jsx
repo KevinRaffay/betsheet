@@ -94,7 +94,10 @@ export default function LlmCardModal({ dayId, onCardChanged, onClose }) {
   const [error, setError] = useState(null);
   const [errorRace, setErrorRace] = useState(null);
   const [regenerateAllProgress, setRegenerateAllProgress] = useState(null); // { index, total, raceNumber }
-  const [regenerateAllResults, setRegenerateAllResults] = useState(null); // [{ race, status: 'saved'|'blocked'|'error', message }]
+  // [{ race, status: 'saved'|'blocked'|'error', message }] - D215: 'saved'
+  // now carries a message when some lines were refused, so `message` (not
+  // status) is what decides whether a race is worth listing.
+  const [regenerateAllResults, setRegenerateAllResults] = useState(null);
   const [models, setModels] = useState([]); // D75: [{id, label}]
   const [selectedModel, setSelectedModel] = useState('');
   // D76: once a resumed card has a locked-in model (cards.llm_model, set at
@@ -344,16 +347,22 @@ export default function LlmCardModal({ dayId, onCardChanged, onClose }) {
       try {
         const p = await previewLlmCard(dayId, raceNumber, localCardId, localCorrelationId, selectedModel);
         if (p.correlationId) localCorrelationId = p.correlationId;
-        const blocking = p.warnings.find((w) => w.blocking);
-        if (blocking) {
-          results.push({ race: raceNumber, status: 'blocked', message: blocking.message });
-          continue;
-        }
+        // D215: a refused line no longer skips the race - the tickets that
+        // parsed are saved and the refusals are reported alongside them. Only
+        // a race where NOTHING parsed still comes back as blocked (the server
+        // refuses it, so this is reported from the catch below).
+        const refused = p.warnings.filter((w) => w.blocking);
         const r = await lockLlmCard(dayId, {
           race: raceNumber, requestId: p.requestId, bankrollCents: dayInfo.bankroll_cents, cardId: localCardId,
         }, localCorrelationId);
         if (!localCardId) { localCardId = r.cardId; setLockedModel(r.llmModel ?? selectedModel); }
-        results.push({ race: raceNumber, status: 'saved' });
+        results.push(refused.length
+          ? {
+            race: raceNumber,
+            status: 'saved',
+            message: `${r.tickets.length} ticket(s) saved, ${refused.length} line(s) refused: ${refused.map((w) => w.message).join(' ')}`,
+          }
+          : { race: raceNumber, status: 'saved' });
       } catch (e) {
         results.push({ race: raceNumber, status: 'error', message: String(e.message) });
       }
@@ -466,14 +475,14 @@ export default function LlmCardModal({ dayId, onCardChanged, onClose }) {
                 )}
               </div>
               {regenerateAllResults && (
-                <div className={`notice ${regenerateAllResults.every((r) => r.status === 'saved') ? '' : 'notice--warn'}`}>
+                <div className={`notice ${regenerateAllResults.every((r) => r.status === 'saved' && !r.message) ? '' : 'notice--warn'}`}>
                   <p>
                     Regenerate all: {regenerateAllResults.filter((r) => r.status === 'saved').length} of {regenerateAllResults.length} races saved.
                   </p>
-                  {regenerateAllResults.some((r) => r.status !== 'saved') && (
+                  {regenerateAllResults.some((r) => r.message) && (
                     <ul>
-                      {regenerateAllResults.filter((r) => r.status !== 'saved').map((r) => (
-                        <li key={r.race}>Race {r.race}: {r.status === 'blocked' ? 'blocked' : 'failed'} — {r.message}</li>
+                      {regenerateAllResults.filter((r) => r.message).map((r) => (
+                        <li key={r.race}>Race {r.race}: {r.status === 'saved' ? 'saved' : (r.status === 'blocked' ? 'blocked' : 'failed')} — {r.message}</li>
                       ))}
                     </ul>
                   )}
@@ -567,7 +576,17 @@ export default function LlmCardModal({ dayId, onCardChanged, onClose }) {
                               )}
                               {preview.warnings.length > 0 && (
                                 <div className={`notice ${preview.warnings.some((w) => w.blocking) ? 'notice--error' : 'notice--warn'}`}>
-                                  <ul>{preview.warnings.map((w, i) => <li key={i}>{w.blocking ? <strong>BLOCKING: </strong> : null}{w.message}</li>)}</ul>
+                                  <ul>{preview.warnings.map((w, i) => <li key={i}>{w.blocking ? <strong>REFUSED, not saved: </strong> : null}{w.message}</li>)}</ul>
+                                  {/* D215: a refused line is dropped and the rest of the race
+                                      still saves, so the table below IS what Save stores -
+                                      which is what invariant 9 asks the preview to show. */}
+                                  {preview.warnings.some((w) => w.blocking) && (
+                                    <p className="dim">
+                                      {preview.tickets.length === 0
+                                        ? 'Every line was refused, so there is nothing to save on this race.'
+                                        : `Saving keeps the ${preview.tickets.length} ticket(s) below and drops the refused line(s).`}
+                                    </p>
+                                  )}
                                 </div>
                               )}
                               {preview.tickets.length === 0 && preview.warnings.length === 0 && (
@@ -576,7 +595,7 @@ export default function LlmCardModal({ dayId, onCardChanged, onClose }) {
                               {preview.tickets.length > 0 && <TicketsTable tickets={preview.tickets} totalCents={preview.raceCostCents} />}
                               <div className="formrow formrow--tight">
                                 <button
-                                  className="btn btn--primary" disabled={busy || preview.warnings.some((w) => w.blocking)}
+                                  className="btn btn--primary" disabled={busy || preview.tickets.length === 0}
                                   onClick={handleSave}
                                 >
                                   Save this race
