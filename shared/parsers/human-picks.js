@@ -98,6 +98,38 @@ const ODDS_RE = /^\d+(?:\.\d+)?(?:[-/]\d+(?:\.\d+)?)?$/;
  */
 const TELLER_LINE_RE = /^(?:races?\s+\d+(?:\s*-\s*\d+)*\s*,?\s+)?(?:\$|\.\d|\d+\s*(?:c|¢|-?cents?)(?=\s|$))/i;
 
+/**
+ * The disjointness TELLER_LINE_RE relies on ("no bet type starts with '$',
+ * '.' or a digit") is a claim about the BET_TYPES table, and a writer can
+ * still lead a column row with money - an LLM did, writing the menu's own base
+ * unit into the type column as "50 cent trifecta | ... | $0.50" (D214). A
+ * pipe-delimited row of three or more columns is unambiguously the column
+ * grammar whatever it starts with: the teller grammar has no '|' in it at all.
+ * Three is the floor because the column grammar itself needs
+ * type/selections/stake, and it keeps a two-column oddity like
+ * "$2 EX BOX 1-2 | note" on the teller path where it has always been.
+ */
+function isColumnRow(line) {
+  return line.includes('|') && line.split('|').map((c) => c.trim()).filter(Boolean).length >= 3;
+}
+
+/**
+ * A bet-type column may carry the wager menu's own base unit as a prefix -
+ * "50 cent trifecta", "$1 exacta box" - which names the price, not a different
+ * bet. Returns the amount stripped (for the warning) and the bare type, or
+ * null when the remainder still isn't a type this parser knows. The stake is
+ * NEVER read from here: it is validated against the race's real menu in
+ * buildTickets like every other ticket's, so a wrong prefix cannot buy a
+ * wrong-priced bet.
+ */
+function stripBaseUnitPrefix(typeKey) {
+  const m = typeKey.match(/^((?:\$\s*)?\d+(?:\.\d+)?\s*(?:c|¢|-?cents?)?)\s+(.+)$/i);
+  if (!m) return null;
+  const rest = m[2].trim();
+  const known = Boolean(BET_TYPES[rest]) || /^(daily\s*double|rolling\s*double|pick\s*\d+)$/i.test(rest);
+  return known ? { prefix: m[1].trim(), typeKey: rest } : null;
+}
+
 // Exported (D125) so every other file that matches horse names imports this
 // ONE implementation instead of keeping its own copy - five near-identical
 // copies existed before this, none stripping a bred-country/state suffix
@@ -322,7 +354,17 @@ function parseColumnRow(line, race, warnings) {
     return null;
   }
   const [rawType, rawSelections, rawStake, ...rest] = cols;
-  const typeKey = stripParens(rawType).toLowerCase();
+  let typeKey = stripParens(rawType).toLowerCase();
+  if (!BET_TYPES[typeKey]) {
+    const stripped = stripBaseUnitPrefix(typeKey);
+    if (stripped) {
+      typeKey = stripped.typeKey;
+      warnings.push({
+        type: 'base_unit_prefix_ignored', blocking: false, race,
+        message: `Race ${race}: read "${rawType}" as ${typeKey} - "${stripped.prefix}" names the menu's base unit, not the stake, and the stake column is what is bet.`,
+      });
+    }
+  }
 
   if (/^(daily\s*double|rolling\s*double|pick\s*\d+)$/i.test(typeKey)) {
     return { betType: 'daily_double', isMultiRace: true, label: rawType };
@@ -513,8 +555,11 @@ export function parseHumanPicksText({ text, race, entries = [], wagerMenu = null
   const lines = String(text ?? '').split(/\r?\n/).map((l) => l.trim()).filter(Boolean);
   for (const line of lines) {
     // Grammar is decided BEFORE any splitting: '/' means "next ticket" in the
-    // teller grammar and "next position" in the column grammar.
-    if (TELLER_LINE_RE.test(line)) {
+    // teller grammar and "next position" in the column grammar. Getting this
+    // wrong is not a near miss - a column row sent to the teller grammar is
+    // SHREDDED on its own '/' separators into fragments that each fail
+    // separately (D214: one real LLM line produced three blocking warnings).
+    if (!isColumnRow(line) && TELLER_LINE_RE.test(line)) {
       for (const piece of splitTellerTickets(line)) {
         const spec = parseTellerTicketString(piece, race, warnings);
         if (spec) buildTickets(spec, ctx);

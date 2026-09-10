@@ -360,8 +360,14 @@ try {
     // point: this is a real Del Mar menu, and "9 & 10 Pick 3" would read the
     // second race number as a $10 Pick 3 if bare integers were accepted.
     const DMR = 'Exacta ($1), Trifecta (.50), Super (.10), Double ($1) 9 & 10 Pick 3 ($1) (9-11)';
+    // D214 note: this used to assert pick3 === 50, the BET.minimums fallback,
+    // because nothing read "Pick 3 ($1)" either. The trailing-parenthetical
+    // rule reads it now, so the expected value moved to $1 - but what this
+    // control exists to prove is unchanged and is asserted directly: the bare
+    // "10" in "9 & 10 Pick 3" must never become a $10 minimum.
     check('a bare INTEGER is never an amount - "9 & 10 Pick 3" is a race pair, not a $10 Pick 3',
-      parseWagerMenu(DMR).pick3 === 50, JSON.stringify(parseWagerMenu(DMR)));
+      parseWagerMenu(DMR).pick3 === 100 && parseWagerMenu(DMR).pick3 !== 1000,
+      JSON.stringify(parseWagerMenu(DMR)));
     check('an unnamed bet type still falls back to BET.minimums',
       parseWagerMenu('0.20 Trifecta').exacta === 100 && !wagerMenuOffered('0.20 Trifecta').has('exacta'));
 
@@ -381,6 +387,75 @@ try {
         text: 'trifecta box | #2,#4,#5,#6 | $4.80 | .', race: 1, entries: wbEntries,
         wagerMenu: '$1 Exacta / 50c Trifecta',
       }).warnings.some((w) => w.type === 'below_minimum' && w.blocking));
+  }
+
+  console.log('-- D214: the OTHER printed-menu shape, and two column/teller routing traps --');
+  {
+    // Saratoga names the bet first and puts the amount in a trailing
+    // parenthetical. D213 read none of it, so every one of these fell back to
+    // BET.minimums and only LOOKED right where the fallback happened to agree.
+    const SAR = 'Exacta ($1), Quinella ($1), Trifecta (.50), Super (.10), Double ($1) 9 & 10 Pick 3 ($1) (9-11), Pick 4 (.50) (9-12)';
+    check('a trailing parenthetical is the amount - Saratoga\'s whole menu reads', (() => {
+      const m = parseWagerMenu(SAR);
+      return m.exacta === 100 && m.quinella === 100 && m.trifecta === 50
+        && m.superfecta === 10 && m.daily_double === 100 && m.pick3 === 100;
+    })(), JSON.stringify(parseWagerMenu(SAR)));
+    check('"Super (.10)" is the superfecta, and every named type is reported as offered',
+      ['exacta', 'quinella', 'trifecta', 'superfecta', 'daily_double', 'pick3']
+        .every((k) => wagerMenuOffered(SAR).has(k)), [...wagerMenuOffered(SAR)].join(','));
+    check('a race list in a parenthetical is NEVER an amount - "(9-11)" and "(Races 1-2-3)"',
+      parseWagerMenu(SAR).pick3 === 100
+      && parseWagerMenu('0.20 Pick 3 (Races 1-2-3)').pick3 === 20
+      && parseWagerMenu('Pick 3 (9-11)').pick3 === 50, JSON.stringify(parseWagerMenu('Pick 3 (9-11)')));
+    check('a BARE INTEGER in a parenthetical is refused too - "Pick 4 (4)" is a race, not $4',
+      parseWagerMenu('Exacta (4) / Trifecta (8)').exacta === 100
+      && parseWagerMenu('Exacta (4) / Trifecta (8)').trifecta === 50);
+
+    // A REAL bug this generalisation fixed, found by diffing the corpus: the
+    // rule it replaces was /Superfecta\s*\((\d+)c\s*min\)/, which matches the
+    // exact spelling "(10c min)" and nothing else - so Del Mar's own
+    // "(10c min.)" and "(10-cent min)" fell through to "$1 Superfecta" and the
+    // home track's 10c superfecta minimum read as $1 for the whole corpus.
+    check('Del Mar\'s three spellings of the same 10c superfecta minimum all read 10c',
+      ['$1 Superfecta (10c min)', '$1 Superfecta (10c min.)', '$1 Superfecta (10-cent min)']
+        .every((t) => parseWagerMenu(t).superfecta === 10),
+      JSON.stringify(['$1 Superfecta (10c min)', '$1 Superfecta (10c min.)', '$1 Superfecta (10-cent min)']
+        .map((t) => parseWagerMenu(t).superfecta)));
+    check('the trailing parenthetical WINS over an amount printed before the name',
+      parseWagerMenu('$1 Superfecta (10c min)').superfecta === 10);
+    check('D213\'s leading forms are untouched by the trailing rule', (() => {
+      const m = parseWagerMenu('Rolling Double / Exacta / 0.20 Trifecta / 0.20 Superfecta 0.20 Pick 3 (Races 1-2-3)/ $1 Swinger');
+      return m.trifecta === 20 && m.superfecta === 20 && m.pick3 === 20;
+    })());
+
+    // The routing traps. Both come from one real LLM line (Horseshoe
+    // Indianapolis race 9, 2026-09-10) that wrote the menu's base unit into
+    // the bet-type column: "50 cent trifecta | #4 / #3 / #5 | $0.50".
+    const rEntries = ['3', '4', '5'].map((n) => ({ program_number: n, horse_name: `Horse ${n}` }));
+    const rp = (text) => parseHumanPicksText({
+      text, race: 1, entries: rEntries, wagerMenu: 'Exacta / 50 Cent Trifecta / 10 Cent Superfecta',
+    });
+    const shredded = rp('50 cent trifecta | #4 / #3 / #5 | $0.50 | Small stab.');
+    check('a money-leading COLUMN row is not shredded into fragments by the teller grammar',
+      shredded.tickets.length === 1 && !shredded.warnings.some((w) => w.blocking),
+      JSON.stringify(shredded.warnings.map((w) => w.type)));
+    check('the base-unit prefix is read as the bet type it names, and said so out loud', (() => {
+      const t = shredded.tickets[0];
+      const w = shredded.warnings.find((x) => x.type === 'base_unit_prefix_ignored');
+      return t && t.betType === 'trifecta' && t.stakeCents === 50 && t.costCents === 50
+        && w && !w.blocking && /base unit/.test(w.message);
+    })(), JSON.stringify(shredded.tickets.map((t) => [t.betType, t.stakeCents, t.costCents])));
+    check('the prefix names the type only - the STAKE column is still what is bet',
+      rp('50 cent trifecta | #4 / #3 / #5 | $2').tickets[0].stakeCents === 200);
+    check('a prefix on an unknown type is still refused, not silently accepted',
+      rp('50 cent quinella box | #4 / #3 | $2').warnings.some((w) => w.type === 'unrecognized_bet_type' && w.blocking));
+    check('a real teller line is untouched - it has no pipes and still splits on "/"', (() => {
+      const t = rp('$10 W 4 / $2 TRI 4 WITH 3 WITH 5');
+      return t.tickets.length === 2 && t.tickets[0].betType === 'win' && t.tickets[1].betType === 'trifecta'
+        && !t.warnings.some((w) => w.blocking);
+    })(), JSON.stringify(rp('$10 W 4 / $2 TRI 4 WITH 3 WITH 5').tickets.map((t) => t.betType)));
+    check('a TWO-column money-leading line stays on the teller path, as it always has',
+      rp('$2 TRI 4-3-5 | a note').tickets.length + rp('$2 TRI 4-3-5 | a note').warnings.length > 0);
   }
 
   let up = false;
