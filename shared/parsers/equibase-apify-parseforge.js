@@ -97,13 +97,23 @@ export function parseApifyParseforgeDataset(rawInput, context = {}) {
   } catch (err) {
     return emptyResult([{ type: 'invalid_json', blocking: true, message: String(err?.message ?? err) }]);
   }
-  if (!Array.isArray(rows)) return emptyResult([{ type: 'not_an_array', blocking: true }]);
+  if (!Array.isArray(rows)) {
+    return emptyResult([{
+      type: 'not_an_array', blocking: true,
+      message: 'This file is not a JSON array of rows - is this an Apify parseforge/equibase-scraper dataset export?',
+    }]);
+  }
 
   // `rowType` is absent entirely on the leaner variant (every row IS an
   // entry then) - only a row that NAMES a different, non-'entry' rowType
   // is excluded, never one that simply omits the field.
   const entryRows = rows.filter((r) => r && (r.rowType === 'entry' || r.rowType === undefined));
-  if (entryRows.length === 0) return emptyResult([{ type: 'no_races', blocking: true }]);
+  if (entryRows.length === 0) {
+    return emptyResult([{
+      type: 'no_races', blocking: true,
+      message: 'No entry rows found in this file - every row was either absent or tagged as a non-entry rowType.',
+    }]);
+  }
 
   // `trackCode` may be entirely absent (the leaner variant) - derive one
   // from `trackName` per row rather than requiring the source to print it.
@@ -112,7 +122,10 @@ export function parseApifyParseforgeDataset(rawInput, context = {}) {
   let trackCode = context.trackCode ?? null;
   if (trackCode) {
     if (!tracksPresent.includes(trackCode)) {
-      return emptyResult([{ type: 'track_not_in_file', blocking: true, requested: trackCode, available: tracksPresent }]);
+      return emptyResult([{
+        type: 'track_not_in_file', blocking: true, requested: trackCode, available: tracksPresent,
+        message: `Track ${trackCode} is not present in this file. Tracks found: ${tracksPresent.join(', ') || '(none)'}.`,
+      }]);
     }
   } else if (tracksPresent.length === 1) {
     trackCode = tracksPresent[0];
@@ -121,14 +134,25 @@ export function parseApifyParseforgeDataset(rawInput, context = {}) {
     // matches the HTML parser's own refusal shape (no_track_or_date) for
     // "this file's identity is ambiguous," so every caller already knows
     // how to treat it: a blocking warning, not a crash or a silent pick.
-    return emptyResult([{ type: 'multiple_tracks_in_file', blocking: true, tracks: tracksPresent }]);
+    return emptyResult([{
+      type: 'multiple_tracks_in_file', blocking: true, tracks: tracksPresent,
+      message: `This file holds multiple tracks (${tracksPresent.join(', ')}) - specify which one before saving.`,
+    }]);
   }
 
   const trackRows = entryRows.filter((r) => resolvedTrackCode(r) === trackCode);
   const datesPresent = [...new Set(trackRows.map((r) => r.raceDate).filter(Boolean))];
-  if (datesPresent.length === 0) return emptyResult([{ type: 'no_track_or_date', blocking: true }]);
+  if (datesPresent.length === 0) {
+    return emptyResult([{
+      type: 'no_track_or_date', blocking: true,
+      message: `Could not read a race date for ${trackCode} from this file.`,
+    }]);
+  }
   if (datesPresent.length > 1) {
-    return emptyResult([{ type: 'multiple_dates_in_file', blocking: true, dates: datesPresent, trackCode }]);
+    return emptyResult([{
+      type: 'multiple_dates_in_file', blocking: true, dates: datesPresent, trackCode,
+      message: `${trackCode} has rows for multiple dates in this file (${datesPresent.join(', ')}) - expected exactly one.`,
+    }]);
   }
   const date = datesPresent[0];
   const track = trackRows[0].trackName || trackCode;
@@ -140,7 +164,10 @@ export function parseApifyParseforgeDataset(rawInput, context = {}) {
   for (const row of trackRows) {
     const number = row.raceNumber;
     if (!Number.isInteger(number)) {
-      warnings.push({ type: 'row_missing_race_number', blocking: false, horse: row.horse ?? null });
+      warnings.push({
+        type: 'row_missing_race_number', blocking: false, horse: row.horse ?? null,
+        message: `A row for ${row.horse ?? 'an unnamed horse'} carried no race number and was skipped.`,
+      });
       continue;
     }
     if (!byRace.has(number)) {
@@ -175,7 +202,12 @@ export function parseApifyParseforgeDataset(rawInput, context = {}) {
     const horseName = row.horse
       ? (row.horseState ? `${row.horse} (${row.horseState})` : row.horse)
       : null;
-    if (!horseName) warnings.push({ type: 'entry_missing_horse_name', blocking: false, race: number });
+    if (!horseName) {
+      warnings.push({
+        type: 'entry_missing_horse_name', blocking: false, race: number,
+        message: `Race ${number}: an entry row carried no horse name.`,
+      });
+    }
 
     const ageSex = Number.isFinite(row.age) && row.sex ? `${row.age}/${row.sex}` : null;
 
@@ -186,6 +218,7 @@ export function parseApifyParseforgeDataset(rawInput, context = {}) {
       warnings.push({
         type: 'implausible_weight', blocking: false, race: number,
         horse: row.horse ?? null, weight: row.weight,
+        message: `Race ${number}: ${row.horse ?? 'a horse'} shows an implausible weight (${row.weight}).`,
       });
     }
 
@@ -209,12 +242,22 @@ export function parseApifyParseforgeDataset(rawInput, context = {}) {
   }
 
   const races = [...byRace.values()].sort((a, b) => a.number - b.number);
-  if (races.length === 0) warnings.push({ type: 'no_races', blocking: true });
+  if (races.length === 0) {
+    warnings.push({ type: 'no_races', blocking: true, message: 'No races could be built from this file.' });
+  }
   for (const race of races) {
-    if (!race.wagerMenu) warnings.push({ type: 'no_wager_menu', blocking: false, race: race.number });
+    if (!race.wagerMenu) {
+      warnings.push({
+        type: 'no_wager_menu', blocking: false, race: race.number,
+        message: `Race ${race.number}: no wager menu found for this race.`,
+      });
+    }
   }
   if (inferredScratches.length) {
-    warnings.push({ type: 'scratch_status_inferred', blocking: false, horses: inferredScratches });
+    warnings.push({
+      type: 'scratch_status_inferred', blocking: false, horses: inferredScratches,
+      message: `Scratch status inferred from a missing program number for ${inferredScratches.length} horse(s) - this source doesn't flag scratches directly: ${inferredScratches.map((s) => `race ${s.race} ${s.horse ?? '(unnamed)'}`).join(', ')}.`,
+    });
   }
 
   return { track, date, races, warnings };

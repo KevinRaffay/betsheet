@@ -90,16 +90,29 @@ export function parseApifyResultsDataset(rawInput, context = {}) {
   } catch (err) {
     return emptyResult([{ type: 'invalid_json', blocking: true, message: String(err?.message ?? err) }]);
   }
-  if (!Array.isArray(rows)) return emptyResult([{ type: 'not_an_array', blocking: true }]);
+  if (!Array.isArray(rows)) {
+    return emptyResult([{
+      type: 'not_an_array', blocking: true,
+      message: 'This file is not a JSON array of rows - is this an Apify equibase-scraper results dataset export?',
+    }]);
+  }
 
   const resultRows = rows.filter((r) => r && r.rowType === 'result');
-  if (resultRows.length === 0) return emptyResult([{ type: 'no_races', blocking: true }]);
+  if (resultRows.length === 0) {
+    return emptyResult([{
+      type: 'no_races', blocking: true,
+      message: 'No result rows found in this file - every row was either absent or not tagged rowType "result".',
+    }]);
+  }
 
   const tracksPresent = [...new Set(resultRows.map((r) => r.trackCode).filter(Boolean))];
   let trackCode = context.trackCode ?? null;
   if (trackCode) {
     if (!tracksPresent.includes(trackCode)) {
-      return emptyResult([{ type: 'track_not_in_file', blocking: true, requested: trackCode, available: tracksPresent }]);
+      return emptyResult([{
+        type: 'track_not_in_file', blocking: true, requested: trackCode, available: tracksPresent,
+        message: `Track ${trackCode} is not present in this file. Tracks found: ${tracksPresent.join(', ') || '(none)'}.`,
+      }]);
     }
   } else if (tracksPresent.length === 1) {
     trackCode = tracksPresent[0];
@@ -108,14 +121,25 @@ export function parseApifyResultsDataset(rawInput, context = {}) {
     // matches equibase-apify-parseforge.js's own refusal shape. The one
     // real sample this parser is verified against is single-track, so this
     // path is precautionary rather than exercised.
-    return emptyResult([{ type: 'multiple_tracks_in_file', blocking: true, tracks: tracksPresent }]);
+    return emptyResult([{
+      type: 'multiple_tracks_in_file', blocking: true, tracks: tracksPresent,
+      message: `This file holds multiple tracks (${tracksPresent.join(', ')}) - specify which one before saving.`,
+    }]);
   }
 
   const trackRows = resultRows.filter((r) => r.trackCode === trackCode);
   const datesPresent = [...new Set(trackRows.map((r) => r.raceDate).filter(Boolean))];
-  if (datesPresent.length === 0) return emptyResult([{ type: 'no_track_or_date', blocking: true }]);
+  if (datesPresent.length === 0) {
+    return emptyResult([{
+      type: 'no_track_or_date', blocking: true,
+      message: `Could not read a race date for ${trackCode} from this file.`,
+    }]);
+  }
   if (datesPresent.length > 1) {
-    return emptyResult([{ type: 'multiple_dates_in_file', blocking: true, dates: datesPresent, trackCode }]);
+    return emptyResult([{
+      type: 'multiple_dates_in_file', blocking: true, dates: datesPresent, trackCode,
+      message: `${trackCode} has rows for multiple dates in this file (${datesPresent.join(', ')}) - expected exactly one.`,
+    }]);
   }
   const date = datesPresent[0];
   const track = trackRows[0].trackName || trackCode;
@@ -133,7 +157,10 @@ export function parseApifyResultsDataset(rawInput, context = {}) {
   for (const row of trackRows) {
     const number = row.raceNumber;
     if (!Number.isInteger(number)) {
-      warnings.push({ type: 'row_missing_race_number', blocking: false, horse: row.horse ?? null });
+      warnings.push({
+        type: 'row_missing_race_number', blocking: false, horse: row.horse ?? null,
+        message: `A row for ${row.horse ?? 'an unnamed horse'} carried no race number and was skipped.`,
+      });
       continue;
     }
     if (!byRace.has(number)) {
@@ -152,9 +179,19 @@ export function parseApifyResultsDataset(rawInput, context = {}) {
     if (!race.finalTime && row.finalTime) race.finalTime = row.finalTime;
 
     const programNumber = row.programNumber ?? null;
-    if (programNumber == null) warnings.push({ type: 'finisher_missing_program_number', blocking: false, race: number, horse: row.horse ?? null });
+    if (programNumber == null) {
+      warnings.push({
+        type: 'finisher_missing_program_number', blocking: false, race: number, horse: row.horse ?? null,
+        message: `Race ${number}: ${row.horse ?? 'a finisher'} carried no program number.`,
+      });
+    }
     const horseName = row.horse ?? null;
-    if (!horseName) warnings.push({ type: 'finisher_missing_horse_name', blocking: false, race: number });
+    if (!horseName) {
+      warnings.push({
+        type: 'finisher_missing_horse_name', blocking: false, race: number,
+        message: `Race ${number}: a finisher row carried no horse name.`,
+      });
+    }
 
     race.results.push({
       programNumber,
@@ -169,7 +206,10 @@ export function parseApifyResultsDataset(rawInput, context = {}) {
       for (const x of row.exoticWagers) {
         const parsed = parseWagerType(x.wagerType);
         if (!parsed) {
-          warnings.push({ type: 'unrecognized_wager_type', blocking: false, race: number, wagerType: x.wagerType });
+          warnings.push({
+            type: 'unrecognized_wager_type', blocking: false, race: number, wagerType: x.wagerType,
+            message: `Race ${number}: unrecognized wager type "${x.wagerType}" - ignored.`,
+          });
           continue;
         }
         race.exotics.push({
@@ -184,8 +224,18 @@ export function parseApifyResultsDataset(rawInput, context = {}) {
 
   const races = [...byRace.values()].sort((a, b) => a.number - b.number);
   for (const race of races) {
-    if (!race.finalTime) warnings.push({ type: 'no_final_time', blocking: false, race: race.number });
-    if (!race.results.some((r) => r.winCents != null)) warnings.push({ type: 'no_win_payout', blocking: false, race: race.number });
+    if (!race.finalTime) {
+      warnings.push({
+        type: 'no_final_time', blocking: false, race: race.number,
+        message: `Race ${race.number}: no final time was captured for this race.`,
+      });
+    }
+    if (!race.results.some((r) => r.winCents != null)) {
+      warnings.push({
+        type: 'no_win_payout', blocking: false, race: race.number,
+        message: `Race ${race.number}: no win payout found among the finishers.`,
+      });
+    }
 
     const known = entriesByRace[race.number];
     if (Array.isArray(known)) {
@@ -197,7 +247,9 @@ export function parseApifyResultsDataset(rawInput, context = {}) {
       }
     }
   }
-  if (races.length === 0) warnings.push({ type: 'no_races', blocking: true });
+  if (races.length === 0) {
+    warnings.push({ type: 'no_races', blocking: true, message: 'No races could be built from this file.' });
+  }
 
   return { track, date, races, warnings };
 }

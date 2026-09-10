@@ -128,11 +128,14 @@ check('races pass through by reference - no reshaping, since parse() already mat
   payload.races === ind.races);
 
 console.log('\n-- malformed input never throws (the same contract every parser here holds) --');
+const invalidJson = parseApifyParseforgeDataset('not json at all');
+const notArray = parseApifyParseforgeDataset('{}');
+const emptyArray = parseApifyParseforgeDataset('[]');
 check('non-JSON input returns a blocking warning, not an exception',
-  parseApifyParseforgeDataset('not json at all').warnings[0]?.type === 'invalid_json');
+  invalidJson.warnings[0]?.type === 'invalid_json');
 check('a JSON object (not an array) is refused the same way',
-  parseApifyParseforgeDataset('{}').warnings[0]?.type === 'not_an_array');
-check('an empty array is refused as no races', parseApifyParseforgeDataset('[]').warnings[0]?.type === 'no_races');
+  notArray.warnings[0]?.type === 'not_an_array');
+check('an empty array is refused as no races', emptyArray.warnings[0]?.type === 'no_races');
 
 console.log('\n-- a second real sample, a LEANER variant of the same source (Del Mar, 2026-09-07) --');
 // No rowType, no trackCode, no isScratched, no medication anywhere in this
@@ -174,6 +177,20 @@ check('flags exactly the 3 real weight glitches in this file (1175, 1165, 1175),
 
 check('medication comes back null (a per-run gap, not reclassified as structurally absent)',
   dmr.races.every((r) => r.entries.every((e) => e.medication === null)));
+
+console.log('\n-- every warning carries a human-readable message (ParsePreview.jsx renders w.message; every warning here used to be missing one, rendering as a blank bullet in the preview) --');
+function checkMessages(label, warnings) {
+  const missing = warnings.filter((w) => typeof w.message !== 'string' || w.message.trim() === '');
+  check(`${label}: every warning has a non-empty message`, missing.length === 0, JSON.stringify(missing));
+}
+checkMessages('multiple tracks, no context', ambiguous.warnings);
+checkMessages('unknown track code', unknown.warnings);
+checkMessages('IND', ind.warnings);
+checkMessages('KD', kd.warnings);
+checkMessages('leaner DMR variant', dmr.warnings);
+checkMessages('invalid JSON', invalidJson.warnings);
+checkMessages('not an array', notArray.warnings);
+checkMessages('empty array', emptyArray.warnings);
 
 console.log('\n-- golden --');
 if (writeGolden) {
