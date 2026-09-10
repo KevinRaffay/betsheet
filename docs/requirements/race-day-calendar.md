@@ -1,6 +1,6 @@
 # Race day calendar: a day's races, one matrix, close to post
 
-**Status: ALL THREE PHASES DELIVERED - C-1 (D208), C-2 (D209), C-3 (D210).**
+**Status: ALL THREE PHASES DELIVERED - C-1 (D209), C-2 (D210), C-3 (D211).**
 Deliverable IDs are claimed per phase when picked up, the same way
 `multi-parser-entries-ingest.md` and `zip-entries-upload.md` are worked.
 Written 2026-09-10 from a user request, checked against the schema, the
@@ -106,7 +106,7 @@ anywhere in this codebase.
 Three phases, each independently reviewable and independently useful even if
 the ones after it are never picked up.
 
-### C-1 — per-track timezone data + a pure hour-bucketing helper. **DELIVERED AS D208.**
+### C-1 — per-track timezone data + a pure hour-bucketing helper. **DELIVERED AS D209.**
 
 Add an IANA zone to every entry in `shared/track-codes.js`'s `REGISTRY`
 (a static data fact about each track's real-world location — not a live
@@ -140,7 +140,7 @@ with no parseable format returning `null` rather than throwing, and an
 unrecognized track (`timezone: null`) returning `null` rather than a guessed
 bucket.
 
-### C-2 — `GET /api/calendar?date=YYYY-MM-DD`. **DELIVERED AS D209.**
+### C-2 — `GET /api/calendar?date=YYYY-MM-DD`. **DELIVERED AS D210.**
 
 New `server/race-calendar.js` (mirroring `server/distribution.js`'s shape: a
 small standalone read-only router over existing tables, mounted in
@@ -164,7 +164,7 @@ excluded, a day with a null post time is excluded from `races` but counted
 in `unplaceable`, and an empty date returns an empty list rather than an
 error.
 
-### C-3 — the client view. **DELIVERED AS D210.**
+### C-3 — the client view. **DELIVERED AS D211.**
 
 New `client/src/components/RaceDayCalendar.jsx`: a date input defaulting to
 today's Pacific calendar date (per Decision 2 below — computed via

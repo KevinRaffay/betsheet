@@ -1,12 +1,12 @@
 // Race day calendar: placing a track's printed local post time on a shared,
-// Pacific-anchored hourly grid (D208, docs/requirements/race-day-calendar.md).
+// Pacific-anchored hourly grid (D209, docs/requirements/race-day-calendar.md).
 //
 // The user is always Pacific (2026-09-10 decision) - both the COLUMN a race
 // lands in and the TIME PRINTED in its cell must be Pacific, never a mix of
 // track-local and converted. `races.post_time` is a printed LOCAL string
 // with no zone of its own (shared/staleness.js documents why in full), so
 // placing it correctly needs the track's real IANA timezone
-// (shared/track-codes.js's registry, D208) to convert into an actual instant
+// (shared/track-codes.js's registry, D209) to convert into an actual instant
 // before it can be read back out in Pacific.
 //
 // Pure - browser + Node, no I/O, no Date.now() of its own. Every function

@@ -1,5 +1,5 @@
-// Verification for shared/race-calendar.js (D208) and server/race-calendar.js
-// (D209, the GET /api/calendar endpoint) - exits non-zero on any failure.
+// Verification for shared/race-calendar.js (D209) and server/race-calendar.js
+// (D210, the GET /api/calendar endpoint) - exits non-zero on any failure.
 // Run: npm run check-race-calendar
 //
 // (1) PURE: no server, no DB, no fixtures, no real clock - every conversion
@@ -135,7 +135,7 @@ console.log('\n-- every registered track\'s timezone actually converts (ties tra
   check(`all ${zones.size} distinct registry zones convert a sample post time`, bad.length === 0, bad.join(', '));
 }
 
-// ---------- server: GET /api/calendar (D209, phase C-2) ----------
+// ---------- server: GET /api/calendar (D210, phase C-2) ----------
 console.log('\n-- server: /api/calendar --');
 {
   const tmp = fs.mkdtempSync(path.join(os.tmpdir(), 'betsheet-cal-'));

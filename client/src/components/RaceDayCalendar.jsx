@@ -2,7 +2,7 @@ import React, { useEffect, useState } from 'react';
 import { getCalendar } from '../api.js';
 import { CALENDAR_COLUMNS, CALENDAR_START_HOUR } from '@shared/race-calendar.js';
 
-// "Today" is always the Pacific calendar date (D209/2026-09-10 decision: the
+// "Today" is always the Pacific calendar date (D210/2026-09-10 decision: the
 // user is always Pacific), computed explicitly rather than read off the
 // browser's own `new Date()` - a browser whose OS clock sits in a different
 // zone would otherwise default to the wrong day right when it matters most
@@ -26,7 +26,7 @@ function columnLabel(i) {
 
 const COLUMNS = Array.from({ length: CALENDAR_COLUMNS }, (_, i) => i);
 
-// Race day calendar (D209, phase C-3 of docs/requirements/race-day-calendar.md):
+// Race day calendar (D210, phase C-3 of docs/requirements/race-day-calendar.md):
 // tracks x hourly Pacific columns, so a card can be built as close to post as
 // possible. Every displayed time is Pacific - there is no per-track zone
 // shown anywhere on this screen, by the same 2026-09-10 decision that shaped

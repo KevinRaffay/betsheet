@@ -16,12 +16,12 @@
 // spelling however the source wrote it, and a stable code that survives a
 // source changing its mind about capitalisation.
 
-// D208: every entry also carries `tz`, the track's real IANA timezone - a
+// D209: every entry also carries `tz`, the track's real IANA timezone - a
 // static fact about where the track physically is, not anything fetched
 // (invariant 6 untouched). Added for the race-day calendar
 // (docs/requirements/race-day-calendar.md), which needs it to convert a
 // track's own printed post time into the viewer's Pacific display; nothing
-// before D208 read this field. Each one was checked individually against
+// before D209 read this field. Each one was checked individually against
 // the track's actual city/county rather than assumed from the track's own
 // region in general, because a handful of these sit right on a time-zone
 // line (Kentucky Downs and Atokad Downs are both Central despite being
@@ -107,7 +107,7 @@ const lettersOnly = (s) => String(s ?? '').toUpperCase().replace(/[^A-Z]/g, '');
  * as typed for an unrecognized one. `code` is always present (derived for
  * the unrecognized case) so every comparison - the one-day-per-track+date
  * rule, the results chart mismatch refusal - can key on it. `timezone` is
- * the registry's IANA zone for a recognized track (D208) and `null` for an
+ * the registry's IANA zone for a recognized track (D209) and `null` for an
  * unrecognized one - never guessed, since a derived code carries no real
  * location information at all.
  */

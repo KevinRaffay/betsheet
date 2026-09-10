@@ -1,4 +1,4 @@
-// Race day calendar API (D209, phase C-2 of docs/requirements/race-day-calendar.md):
+// Race day calendar API (D210, phase C-2 of docs/requirements/race-day-calendar.md):
 // GET /api/calendar?date=YYYY-MM-DD - every non-deleted race day for one
 // date, with each race placed on the Pacific-anchored hourly grid
 // shared/race-calendar.js defines. Read-only, like server/distribution.js

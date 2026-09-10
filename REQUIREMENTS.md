@@ -530,17 +530,17 @@ verification.
 
 Full specification, checked against the schema and the existing ingest/UI
 code - including that no track's timezone was stored or derivable anywhere in
-this codebase before D208, which was the one design question the whole
+this codebase before D209, which was the one design question the whole
 feature turned on:
 [docs/requirements/race-day-calendar.md](docs/requirements/race-day-calendar.md).
-All three phases delivered: C-1 (per-track timezone data, **D208**), C-2 (a
-read-only `/api/calendar` endpoint, **D209**), C-3 (the client matrix view,
-**D210**).
+All three phases delivered: C-1 (per-track timezone data, **D209**), C-2 (a
+read-only `/api/calendar` endpoint, **D210**), C-3 (the client matrix view,
+**D211**).
 
 | Requirement | Deliverables |
 | --- | --- |
-| A calendar view, reachable from a button on the race-day list, defaults to the browser's own current date | D210 ("Race calendar" button on `RaceDayList.jsx`; the date input defaults to today's PACIFIC date, computed explicitly - the 2026-09-10 decision the user is always Pacific) |
-| A matrix of every track racing that date (rows) against 24 hourly columns starting 10:00 AM Pacific (columns), assuming one race day per track | D209 (the data), D210 (`RaceDayCalendar.jsx` renders it as a `grid grid--matrix` table) |
-| Each populated cell shows the race number and its post time **converted to Pacific** (the user is always Pacific - 2026-09-10 decision), and is a hyperlink to that track's stored race day (`/day/:id`) - navigating to an individual race is out of scope, and no route exists for it | D209 (`postTimePacific` per race), D210 (the clickable cell, browser-verified navigating to `/day/:id`) |
-| Placing AND printing a race in the Pacific-anchored grid requires converting its printed local post time from the track's own zone, which requires a per-track timezone - not stored on `races.post_time` (a zoneless printed string; the parser reads a zone off the page but `insertRaceDay` discards it) and, before D208, not derivable from `shared/track-codes.js`'s registry either | D208 (the registry's new `tz` field, individually verified per track rather than assumed from its state, plus the pure DST-safe conversion helper), D209 (wired into a real endpoint) |
-| A race with no parseable post time, or a track with no known timezone, is never silently dropped from the grid - it is surfaced as a visible count, matching invariant 11's standing preference for a visible gap over a silent one | D209 (`unplaceable`, per track, in the endpoint's own response shape) |
+| A calendar view, reachable from a button on the race-day list, defaults to the browser's own current date | D211 ("Race calendar" button on `RaceDayList.jsx`; the date input defaults to today's PACIFIC date, computed explicitly - the 2026-09-10 decision the user is always Pacific) |
+| A matrix of every track racing that date (rows) against 24 hourly columns starting 10:00 AM Pacific (columns), assuming one race day per track | D210 (the data), D211 (`RaceDayCalendar.jsx` renders it as a `grid grid--matrix` table) |
+| Each populated cell shows the race number and its post time **converted to Pacific** (the user is always Pacific - 2026-09-10 decision), and is a hyperlink to that track's stored race day (`/day/:id`) - navigating to an individual race is out of scope, and no route exists for it | D210 (`postTimePacific` per race), D211 (the clickable cell, browser-verified navigating to `/day/:id`) |
+| Placing AND printing a race in the Pacific-anchored grid requires converting its printed local post time from the track's own zone, which requires a per-track timezone - not stored on `races.post_time` (a zoneless printed string; the parser reads a zone off the page but `insertRaceDay` discards it) and, before D209, not derivable from `shared/track-codes.js`'s registry either | D209 (the registry's new `tz` field, individually verified per track rather than assumed from its state, plus the pure DST-safe conversion helper), D210 (wired into a real endpoint) |
+| A race with no parseable post time, or a track with no known timezone, is never silently dropped from the grid - it is surfaced as a visible count, matching invariant 11's standing preference for a visible gap over a silent one | D210 (`unplaceable`, per track, in the endpoint's own response shape) |

@@ -318,7 +318,7 @@ export const getDistribution = (engineVersion, meet) => {
   return fetch(`/api/distribution${qs ? `?${qs}` : ''}`).then(asJson);
 };
 
-// Race day calendar (D209): every track racing on a date, each race placed
+// Race day calendar (D210): every track racing on a date, each race placed
 // on the Pacific-anchored hour grid server-side (shared/race-calendar.js) -
 // the client never converts a time zone itself.
 export const getCalendar = (date) => fetch(`/api/calendar?date=${encodeURIComponent(date)}`).then(asJson);

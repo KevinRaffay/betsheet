@@ -32,7 +32,7 @@ const check = (name, ok, detail = '') => {
 // exported just to be tested. Reading the source is also what lets this assert
 // the SHAPE of every entry, which an exported array would not.
 const src = fs.readFileSync(path.join(ROOT, 'shared', 'track-codes.js'), 'utf8');
-// D208 added `tz` (the track's IANA timezone) as a fourth property on every
+// D209 added `tz` (the track's IANA timezone) as a fourth property on every
 // entry, right after `aliases`, so the shape this regex locks down widened
 // to match - it must stay the source of truth for what "every entry" means.
 const entries = [...src.matchAll(/\{ code: '([^']+)', display: '([^']+)', aliases: \[([^\]]*)\], tz: '([^']+)' \}/g)]
@@ -63,7 +63,7 @@ console.log('\n-- codes are identities: no two tracks may share one --');
     entries.filter((e) => !/^[A-Z0-9]+$/.test(e.code)).map((e) => e.code).join(', '));
 }
 
-console.log('\n-- every entry carries a real, valid IANA timezone (D208) --');
+console.log('\n-- every entry carries a real, valid IANA timezone (D209) --');
 {
   const missing = entries.filter((e) => !e.tz).map((e) => e.code);
   check('every entry has a non-empty tz', missing.length === 0, missing.join(', '));
