@@ -1,11 +1,10 @@
 # Race day calendar: a day's races, one matrix, close to post
 
-**Status: SPECIFIED, NOT SCHEDULED.** No deliverable ID is claimed here — one
-gets claimed (`npm run allocate-deliverable`) when a phase below is picked up,
-per phase, the same way `multi-parser-entries-ingest.md` and
-`zip-entries-upload.md` are worked. Written 2026-09-10 from a user request,
-checked against the schema, the ingest/parse code, and the existing UI
-conventions rather than assumed.
+**Status: PHASE C-1 DELIVERED (D208); C-2 AND C-3 SPECIFIED, NOT SCHEDULED.**
+Deliverable IDs are claimed per phase when picked up, the same way
+`multi-parser-entries-ingest.md` and `zip-entries-upload.md` are worked.
+Written 2026-09-10 from a user request, checked against the schema, the
+ingest/parse code, and the existing UI conventions rather than assumed.
 
 ## The workflow this serves
 
@@ -107,7 +106,7 @@ anywhere in this codebase.
 Three phases, each independently reviewable and independently useful even if
 the ones after it are never picked up.
 
-### C-1 — per-track timezone data + a pure hour-bucketing helper
+### C-1 — per-track timezone data + a pure hour-bucketing helper. **DELIVERED AS D208.**
 
 Add an IANA zone to every entry in `shared/track-codes.js`'s `REGISTRY`
 (a static data fact about each track's real-world location — not a live

@@ -529,17 +529,18 @@ verification.
 ## Race day calendar (requested 2026-09-10)
 
 Full specification, checked against the schema and the existing ingest/UI
-code - including that no track's timezone is stored or derivable anywhere in
-this codebase today, which is the one design question the whole feature
-turns on:
+code - including that no track's timezone was stored or derivable anywhere in
+this codebase before D208, which was the one design question the whole
+feature turned on:
 [docs/requirements/race-day-calendar.md](docs/requirements/race-day-calendar.md).
-Specified but NOT scheduled - deliverable IDs get claimed per phase when the
-work is picked up.
+Phase C-1 delivered as **D208**; C-2 (a read-only `/api/calendar` endpoint)
+and C-3 (the client matrix view) remain specified but NOT scheduled -
+deliverable IDs get claimed per phase when the work is picked up.
 
 | Requirement | Deliverables |
 | --- | --- |
 | A calendar view, reachable from a button on the race-day list, defaults to the browser's own current date | - (not scheduled) |
 | A matrix of every track racing that date (rows) against 24 hourly columns starting 10:00 AM Pacific (columns), assuming one race day per track | - (not scheduled) |
 | Each populated cell shows the race number and its post time **converted to Pacific** (the user is always Pacific - 2026-09-10 decision), and is a hyperlink to that track's stored race day (`/day/:id`) - navigating to an individual race is out of scope, and no route exists for it | - (not scheduled) |
-| Placing AND printing a race in the Pacific-anchored grid requires converting its printed local post time from the track's own zone, which requires a per-track timezone - not stored today (`races.post_time` is a zoneless printed string; the parser reads a zone off the page but `insertRaceDay` discards it) and not derivable from `shared/track-codes.js`'s registry, which carries no timezone field at all | - (not scheduled) |
-| A race with no parseable post time, or a track with no known timezone, is never silently dropped from the grid - it is surfaced as a visible count, matching invariant 11's standing preference for a visible gap over a silent one | - (not scheduled) |
+| Placing AND printing a race in the Pacific-anchored grid requires converting its printed local post time from the track's own zone, which requires a per-track timezone - not stored on `races.post_time` (a zoneless printed string; the parser reads a zone off the page but `insertRaceDay` discards it) and, before D208, not derivable from `shared/track-codes.js`'s registry either | D208 (the registry's new `tz` field, individually verified per track rather than assumed from its state, plus the pure DST-safe conversion helper) |
+| A race with no parseable post time, or a track with no known timezone, is never silently dropped from the grid - it is surfaced as a visible count, matching invariant 11's standing preference for a visible gap over a silent one | - (not scheduled - `shared/race-calendar.js`'s `placeRacePacific` already returns `null` for both cases, ready for C-2 to route into a count) |

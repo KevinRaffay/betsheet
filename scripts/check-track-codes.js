@@ -32,11 +32,15 @@ const check = (name, ok, detail = '') => {
 // exported just to be tested. Reading the source is also what lets this assert
 // the SHAPE of every entry, which an exported array would not.
 const src = fs.readFileSync(path.join(ROOT, 'shared', 'track-codes.js'), 'utf8');
-const entries = [...src.matchAll(/\{ code: '([^']+)', display: '([^']+)', aliases: \[([^\]]*)\] \}/g)]
+// D208 added `tz` (the track's IANA timezone) as a fourth property on every
+// entry, right after `aliases`, so the shape this regex locks down widened
+// to match - it must stay the source of truth for what "every entry" means.
+const entries = [...src.matchAll(/\{ code: '([^']+)', display: '([^']+)', aliases: \[([^\]]*)\], tz: '([^']+)' \}/g)]
   .map((m) => ({
     code: m[1],
     display: m[2],
     aliases: m[3].split(',').map((a) => a.trim().replace(/'/g, '')).filter(Boolean),
+    tz: m[4],
   }));
 
 const keyOf = (s) => String(s).toUpperCase().replace(/[^A-Z]/g, '');
@@ -57,6 +61,21 @@ console.log('\n-- codes are identities: no two tracks may share one --');
   check('no duplicate code', dupes.length === 0, dupes.join('; '));
   check('every code is non-empty letters/digits', entries.every((e) => /^[A-Z0-9]+$/.test(e.code)),
     entries.filter((e) => !/^[A-Z0-9]+$/.test(e.code)).map((e) => e.code).join(', '));
+}
+
+console.log('\n-- every entry carries a real, valid IANA timezone (D208) --');
+{
+  const missing = entries.filter((e) => !e.tz).map((e) => e.code);
+  check('every entry has a non-empty tz', missing.length === 0, missing.join(', '));
+  // The exact string must be a timezone the runtime actually recognizes, not
+  // merely a plausible-looking one - Intl throws RangeError on a typo'd zone
+  // name, which is the cheapest oracle available with no dependency.
+  const invalid = [];
+  for (const e of entries) {
+    try { new Intl.DateTimeFormat('en-US', { timeZone: e.tz }); }
+    catch { invalid.push(`${e.code}: ${e.tz}`); }
+  }
+  check('every tz is a real IANA zone Intl accepts', invalid.length === 0, invalid.join('; '));
 }
 
 console.log('\n-- spellings are unambiguous: one spelling, one track --');
@@ -89,19 +108,19 @@ console.log('\n-- every entry resolves to itself, by display and by every alias 
   let bad = 0;
   for (const e of entries) {
     const byDisplay = canonicalizeTrack(e.display);
-    if (byDisplay.code !== e.code || byDisplay.display !== e.display || !byDisplay.recognized) {
+    if (byDisplay.code !== e.code || byDisplay.display !== e.display || !byDisplay.recognized || byDisplay.timezone !== e.tz) {
       bad += 1;
       console.log(`        ${e.display} -> ${JSON.stringify(byDisplay)}`);
     }
     for (const a of e.aliases) {
       const byAlias = canonicalizeTrack(a);
-      if (byAlias.code !== e.code || byAlias.display !== e.display) {
+      if (byAlias.code !== e.code || byAlias.display !== e.display || byAlias.timezone !== e.tz) {
         bad += 1;
         console.log(`        alias ${a} (${e.code}) -> ${JSON.stringify(byAlias)}`);
       }
     }
   }
-  check(`all ${entries.length} displays and every alias round-trip to their own entry`, bad === 0, `${bad} bad`);
+  check(`all ${entries.length} displays and every alias round-trip to their own entry, timezone included`, bad === 0, `${bad} bad`);
 }
 
 console.log('\n-- the spellings this registry was built from (D122, real captures) --');
@@ -149,8 +168,10 @@ console.log('\n-- an unrecognized track is still never blocked --');
   check('gets a derived code rather than nothing', Boolean(got.code));
   check('is flagged unrecognized, so a caller can warn', got.recognized === false);
   check('keeps the spelling it was given as its display', got.display === 'Some Brand New Track');
+  check('carries no guessed timezone - a derived code has no real location', got.timezone === null);
   const empty = canonicalizeTrack('');
   check('an empty track yields a null code rather than throwing', empty.code === null && !empty.recognized);
+  check('an empty track carries no timezone either', empty.timezone === null);
   for (const junk of [null, undefined, 123, {}]) {
     let threw = false;
     try { canonicalizeTrack(junk); } catch { threw = true; }
