@@ -1,12 +1,13 @@
 import React, { useEffect, useRef, useState } from 'react';
 import {
-  deleteRaceDay, deletionPreview, getDayTipScoring, getLlmNotes, getRaceDay, listTipPicks,
+  deleteRaceDay, deletionPreview, getDayTipScoring, getLlmNotes, getRaceDay, getResults, listTipPicks,
 } from '../api.js';
 import CardsPanel from './CardsPanel.jsx';
 import ResultsPanel from './ResultsPanel.jsx';
 import EquibaseOtrPanel from './EquibaseOtrPanel.jsx';
 import TipStakingPanel from './TipStakingPanel.jsx';
 import RaceTipPicks from './RaceTipPicks.jsx';
+import RaceResults from './RaceResults.jsx';
 import TipPicksEntryModal from './TipPicksEntryModal.jsx';
 import RaceDayNotesModal from './RaceDayNotesModal.jsx';
 import RaceNotesEditor from './RaceNotesEditor.jsx';
@@ -54,6 +55,9 @@ export default function RaceDayView({ id, onBack, onOpenCard }) {
   // race's editor so the not-blind warning appears where a note is actually
   // typed, which since D184 is the race panel rather than the day dialog.
   const [notesPostResult, setNotesPostResult] = useState(false);
+  // Results data organized by race number so each race can display its own
+  // results in a collapsible panel. Loaded once per day, not per race.
+  const [resultsByRace, setResultsByRace] = useState(new Map());
   const racesContainerRef = useRef(null);
 
   const expandAll = () => {
@@ -110,6 +114,42 @@ export default function RaceDayView({ id, onBack, onOpenCard }) {
       }, 0);
     }
   }, [day]);
+
+  // Load race results organized by race number for per-race display
+  useEffect(() => {
+    let cancelled = false;
+    getResults(id)
+      .then((data) => {
+        if (!cancelled) {
+          const byRace = new Map();
+          if (data?.results) {
+            for (const r of data.results) {
+              if (!byRace.has(r.race_number)) {
+                byRace.set(r.race_number, { results: [], exotics: [], scratches: [] });
+              }
+              byRace.get(r.race_number).results.push(r);
+            }
+          }
+          if (data?.exotics) {
+            for (const x of data.exotics) {
+              if (byRace.has(x.race_number)) {
+                byRace.get(x.race_number).exotics.push(x);
+              }
+            }
+          }
+          if (data?.scratches) {
+            for (const s of data.scratches) {
+              if (byRace.has(s.race_number)) {
+                byRace.get(s.race_number).scratches.push(s);
+              }
+            }
+          }
+          setResultsByRace(byRace);
+        }
+      })
+      .catch(() => {}); // supplementary - a failure here must not blank the page
+    return () => { cancelled = true; };
+  }, [id]);
 
   // D176: the race's existing tip picks, so the entry dialog opens EDITING
   // what is already there rather than blank. Refetched on tipVersion so a save
@@ -330,6 +370,11 @@ export default function RaceDayView({ id, onBack, onOpenCard }) {
               scoreFor={scoreFor}
               onEnter={() => setTipRace(race)}
               onChanged={bumpTips}
+            />
+            {/* Display race results if available */}
+            <RaceResults
+              raceNumber={race.number}
+              results={resultsByRace.get(race.number) ?? null}
             />
           </details>
         ))}
