@@ -75,16 +75,16 @@ for (const junk of [undefined, {}, 123]) {
   check(`survives ${JSON.stringify(junk) ?? String(junk)}`, !threw);
 }
 
-console.log('\n-- hourBucket: the 10:00 AM Pacific anchored grid --');
+console.log('\n-- hourBucket: the 7:00 AM Pacific anchored grid --');
 {
   // 2026-01-15 is deep winter (PST, UTC-8) with no DST edge nearby, so a
   // fixed-hour UTC offset is safe to hand-compute for each case.
   const at = (ptHour) => new Date(Date.UTC(2026, 0, 15, ptHour + 8, 0, 0));
-  check(`10:00 AM PT is column 0 (the grid's own start hour is ${CALENDAR_START_HOUR})`, hourBucket(at(10)) === 0);
-  check('11:00 AM PT is column 1', hourBucket(at(11)) === 1);
-  check('9:00 AM PT (the last hour before the grid repeats) is column 23', hourBucket(at(9)) === 23);
-  check('midnight PT is column 14', hourBucket(at(0)) === 14);
-  check('1:00 AM PT is column 15', hourBucket(at(1)) === 15);
+  check(`7:00 AM PT is column 0 (the grid's own start hour is ${CALENDAR_START_HOUR})`, hourBucket(at(7)) === 0);
+  check('8:00 AM PT is column 1', hourBucket(at(8)) === 1);
+  check('6:00 AM PT (the last hour before the grid repeats) is column 23', hourBucket(at(6)) === 23);
+  check('midnight PT is column 17', hourBucket(at(0)) === 17);
+  check('1:00 AM PT is column 18', hourBucket(at(1)) === 18);
   check('an invalid instant returns null rather than a wrong bucket', hourBucket(new Date('not a date')) === null);
   check('a non-Date input returns null', hourBucket('2026-01-15T18:00:00Z') === null);
 }
@@ -101,7 +101,7 @@ console.log('\n-- placeRacePacific: the one call a caller actually needs --');
   // real rather than assumed.
   const kd = placeRacePacific('2026-09-10', '11:00 AM', 'America/Chicago');
   check('Kentucky Downs 11:00 AM CDT lands on 9:00 AM PDT', kd?.postTimePacific === '9:00 AM PDT', JSON.stringify(kd));
-  check('...which is column 23 on the Pacific grid', kd?.hourBucket === 23, JSON.stringify(kd));
+  check('...which is column 2 on the Pacific grid', kd?.hourBucket === 2, JSON.stringify(kd));
 
   check('an unrecognized track (no known zone) is UNPLACEABLE, never a guessed bucket',
     placeRacePacific('2026-09-10', '11:00 AM', null) === null);
@@ -121,7 +121,7 @@ console.log('\n-- the same-track, different-season case: identical column, diffe
   check('winter: 2:00 PM CST -> Pacific noon, PST', winter?.postTimePacific === '12:00 PM PST', JSON.stringify(winter));
   check('summer: 2:00 PM CDT -> Pacific noon, PDT', summer?.postTimePacific === '12:00 PM PDT', JSON.stringify(summer));
   check('same wall-clock post time, same track, lands in the same Pacific column both seasons',
-    winter?.hourBucket === summer?.hourBucket && winter?.hourBucket === 2);
+    winter?.hourBucket === summer?.hourBucket && winter?.hourBucket === 5);
 }
 
 console.log('\n-- every registered track\'s timezone actually converts (ties track-codes.js to this module) --');
@@ -155,11 +155,11 @@ console.log('\n-- server: /api/calendar --');
     }
     return dayId;
   }
-  // Del Mar (Pacific): 10:15 AM PDT is already Pacific - bucket 0.
+  // Del Mar (Pacific): 10:15 AM PDT is already Pacific - bucket 3.
   const dmr = seedDay('Del Mar', [[1, '10:15 AM'], [2, null]]);
-  // Kentucky Downs (Central, CDT -5): 1:00 PM CDT = 18:00 UTC = 11:00 AM PDT - bucket 1.
+  // Kentucky Downs (Central, CDT -5): 1:00 PM CDT = 18:00 UTC = 11:00 AM PDT - bucket 4.
   seedDay('Kentucky Downs', [[1, '1:00 PM']]);
-  // Saratoga (Eastern, EDT -4): 3:05 PM EDT = 19:05 UTC = 12:05 PM PDT - bucket 2.
+  // Saratoga (Eastern, EDT -4): 3:05 PM EDT = 19:05 UTC = 12:05 PM PDT - bucket 5.
   seedDay('Saratoga', [[1, '3:05 PM']]);
   // An unregistered track: derived code, no known timezone - every race unplaceable.
   seedDay('Some Brand New Fairgrounds', [[1, '1:00 PM']]);
@@ -195,19 +195,19 @@ console.log('\n-- server: /api/calendar --');
       r.tracks.length === 4, r.tracks.map((t) => t.track).join(', '));
 
     const dm = r.tracks.find((t) => t.track === 'Del Mar');
-    check('Del Mar: race 1 placed at 10:15 AM PDT, column 0; race 2 (null post time) is unplaceable',
+    check('Del Mar: race 1 placed at 10:15 AM PDT, column 3; race 2 (null post time) is unplaceable',
       dm?.timezone === 'America/Los_Angeles'
-      && dm.races.length === 1 && dm.races[0].number === 1 && dm.races[0].postTimePacific === '10:15 AM PDT' && dm.races[0].hourBucket === 0
+      && dm.races.length === 1 && dm.races[0].number === 1 && dm.races[0].postTimePacific === '10:15 AM PDT' && dm.races[0].hourBucket === 3
       && dm.unplaceable.join() === '2',
       JSON.stringify(dm));
 
     const kd = r.tracks.find((t) => t.track === 'Kentucky Downs');
-    check('Kentucky Downs (Central): 1:00 PM CDT lands on 11:00 AM PDT, column 1',
-      kd?.races[0]?.postTimePacific === '11:00 AM PDT' && kd.races[0].hourBucket === 1, JSON.stringify(kd));
+    check('Kentucky Downs (Central): 1:00 PM CDT lands on 11:00 AM PDT, column 4',
+      kd?.races[0]?.postTimePacific === '11:00 AM PDT' && kd.races[0].hourBucket === 4, JSON.stringify(kd));
 
     const sar = r.tracks.find((t) => t.track === 'Saratoga');
-    check('Saratoga (Eastern): 3:05 PM EDT lands on 12:05 PM PDT, column 2',
-      sar?.races[0]?.postTimePacific === '12:05 PM PDT' && sar.races[0].hourBucket === 2, JSON.stringify(sar));
+    check('Saratoga (Eastern): 3:05 PM EDT lands on 12:05 PM PDT, column 5',
+      sar?.races[0]?.postTimePacific === '12:05 PM PDT' && sar.races[0].hourBucket === 5, JSON.stringify(sar));
 
     check('tracks are ordered by earliest post: Del Mar, then Kentucky Downs, then Saratoga',
       r.tracks.map((t) => t.track).join() === 'Del Mar,Kentucky Downs,Saratoga,Some Brand New Fairgrounds');
