@@ -18,9 +18,9 @@ import { postTimeMinutes } from './staleness.js';
 
 export const PACIFIC_ZONE = 'America/Los_Angeles';
 
-// The grid's first column is 10:00 AM Pacific; column 23 is 9:00 AM Pacific
+// The grid's first column is 7:00 AM Pacific; column 23 is 6:00 AM Pacific
 // the following calendar day - 24 columns covering one full racing day.
-export const CALENDAR_START_HOUR = 10;
+export const CALENDAR_START_HOUR = 7;
 export const CALENDAR_COLUMNS = 24;
 
 /**
@@ -70,7 +70,7 @@ export function localWallClockToUtc(dateStr, timeStr, ianaZone) {
   return new Date(guess.getTime() + (guess.getTime() - readBack));
 }
 
-/** The column index 0-23 a UTC instant falls in on the 10:00 AM Pacific grid, or `null`. */
+/** The column index 0-23 a UTC instant falls in on the 7:00 AM Pacific grid, or `null`. */
 export function hourBucket(utcInstant) {
   if (!(utcInstant instanceof Date) || Number.isNaN(utcInstant.getTime())) return null;
   const fmt = new Intl.DateTimeFormat('en-US', { timeZone: PACIFIC_ZONE, hourCycle: 'h23', hour: '2-digit' });

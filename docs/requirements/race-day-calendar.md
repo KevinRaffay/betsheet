@@ -20,7 +20,7 @@ card can be built shortly before the window opens rather than hours ahead
 
 The requested shape: a button from the race-day list opens a calendar view,
 defaulting to today, showing a matrix — tracks as rows, hourly columns
-starting 10:00 AM, 24 of them — where a populated cell reads `Race N -
+starting 7:00 AM, 24 of them — where a populated cell reads `Race N -
 H:MM <zone>` and is a hyperlink straight to that track's stored race day
 (`/day/:id`). **Navigating to a specific race within that day is explicitly
 out of scope** — there is no per-race route in this codebase to link to
@@ -38,7 +38,8 @@ said "Eastern"/"ET" is superseded by this: the shared reference zone for
 both the column grid and the printed cell text is **`America/Los_Angeles`**
 (Pacific Time proper — tracks DST correctly and labels PST in winter, PDT in
 summer — not a frozen UTC-8, which would silently read an hour wrong for
-roughly half the year). "10:00 AM" now means 10:00 AM Pacific.
+roughly half the year). The grid now starts at **7:00 AM Pacific** (changed
+2026-09-10).
 
 ## What was checked against the code
 
@@ -121,9 +122,9 @@ track — never guessed). New pure module `shared/race-calendar.js`:
   the guess, correct) — no new dependency, matching this codebase's existing
   preference for hand-rolled conversions over a library (the same call made
   for the zip reader in D127).
-- `hourBucket(utcInstant)` — the column index 0-23 in the 10:00 AM Pacific
+- `hourBucket(utcInstant)` — the column index 0-23 in the 7:00 AM Pacific
   anchored grid (`Intl.DateTimeFormat` with `timeZone: 'America/Los_Angeles'`
-  to read the Pacific hour, then `(ptHour - 10 + 24) % 24`).
+  to read the Pacific hour, then `(ptHour - 7 + 24) % 24`).
 - `formatPacific(utcInstant)` — the same instant rendered as `H:MM AM/PM
   PST`/`PDT` (`Intl.DateTimeFormat` with `timeZoneName: 'short'`, so the
   correct label for the date is read from the platform rather than hardcoded)
@@ -176,7 +177,7 @@ against a stale response the same way `RaceDayList.jsx` already is
 (`client/src/components/RaceDayList.jsx:35-41`'s `cancelled` pattern —
 D118's own documented gotcha). Renders a `grid grid--matrix` table: one row
 per track (sorted by earliest post that day), 24 `<th>` columns labelled
-`10:00 AM PT` … `9:00 AM PT`, each populated cell a clickable element
+`7:00 AM PT` … `6:00 AM PT`, each populated cell a clickable element
 (matching this codebase's existing row/cell click convention rather than a
 literal `<a href>`, since navigation is client-side view state, not a URL
 load) reading `Race N - <postTimePacific>` straight from the API response —
