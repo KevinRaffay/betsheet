@@ -23,24 +23,24 @@ export default function RaceResults({ raceNumber, results }) {
         <tbody>
           {finishers.map((r, i) => (
             <tr key={i}>
-              <td className="dim">{r.finishPosition}</td>
-              <td>{r.programNumber}</td>
-              <td>{r.horseName}</td>
-              <td>{money(r.winCents)}</td>
-              <td>{money(r.placeCents)}</td>
-              <td>{money(r.showCents)}</td>
+              <td className="dim">{r.finish_position}</td>
+              <td>{r.program_number}</td>
+              <td>{r.horse_name}</td>
+              <td>{money(r.win_cents)}</td>
+              <td>{money(r.place_cents)}</td>
+              <td>{money(r.show_cents)}</td>
             </tr>
           ))}
         </tbody>
       </table>
       {exotics.length > 0 && (
         <p className="dim">
-          {exotics.map((x) => `${x.betType.replace(/_/g, ' ')} ${x.combination} → ${money(x.payoutCents)}`).join(' · ')}
+          {exotics.map((x) => `${x.bet_type.replace(/_/g, ' ')} ${x.combination} → ${money(x.payout_cents)}`).join(' · ')}
         </p>
       )}
       {scratches.length > 0 && (
         <p className="dim">
-          Scratched: {scratches.map((s) => `${s.horseName}${s.reason ? ` (${s.reason})` : ''}`).join(', ')}
+          Scratched: {scratches.map((s) => `${s.horse_name}${s.reason ? ` (${s.reason})` : ''}`).join(', ')}
         </p>
       )}
     </details>
