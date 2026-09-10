@@ -490,9 +490,20 @@ label.btn.btn--primary { color: var(--color-accent-text); }
 .grid--matrix { margin-top: 10px; }
 /* D210: the race-day calendar's 24-hour-column matrix is wider than the
    shell at any realistic column width - scroll the table alone rather than
-   letting it stretch (and break) the whole page layout. */
+   letting it stretch (and break) the whole page layout. The first column
+   (track name) is sticky so it remains visible while scrolling horizontally. */
 .grid--wide-scroll { overflow-x: auto; }
 .grid--wide-scroll .grid { white-space: nowrap; }
+.grid--wide-scroll th:first-child,
+.grid--wide-scroll td:first-child {
+  position: sticky;
+  left: 0;
+  background: var(--color-bg-raised);
+  z-index: 10;
+}
+.grid--wide-scroll thead th:first-child {
+  z-index: 11; /* header row sits above body rows */
+}
 
 /* ---- graded results on the sheet ---- */
 
