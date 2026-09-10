@@ -88,10 +88,16 @@ export default function RaceDayView({ id, onBack, onOpenCard }) {
     if (hash.startsWith('#race-')) {
       // Wait for the next render to ensure details elements exist
       setTimeout(() => {
-        const element = document.querySelector(hash);
-        if (element && element.tagName === 'DETAILS') {
-          element.open = true;
-          element.scrollIntoView({ behavior: 'smooth', block: 'start' });
+        const allRaces = racesContainerRef.current?.querySelectorAll('details.race') ?? [];
+        const targetElement = document.querySelector(hash);
+
+        // Collapse all races
+        allRaces.forEach((d) => { d.open = false; });
+
+        // Open only the target race
+        if (targetElement && targetElement.tagName === 'DETAILS') {
+          targetElement.open = true;
+          targetElement.scrollIntoView({ behavior: 'smooth', block: 'start' });
         }
       }, 0);
     }
