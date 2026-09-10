@@ -28,6 +28,7 @@
 //      npm run gh -- pr list [--state open|closed|all]
 //      npm run gh -- pr create --title T --body-file f [--base main] [--head b]
 //      npm run gh -- pr merge 133 [--squash|--merge|--rebase]
+//      npm run gh -- pr close 281
 //      npm run gh -- checks [ref]
 //      npm run gh -- raw GET /repos/:owner/:repo/pulls/133
 
@@ -57,6 +58,17 @@ const ALLOW = [
   // CLAUDE.md's delivery workflow changed from "Claude never merges" to
   // "Claude merges only when explicitly told to, per PR".
   { m: 'PUT', re: /^\/repos\/[^/]+\/[^/]+\/pulls\/\d+\/merge$/, why: 'merge a PR you asked me to merge' },
+  // Closing (D217). Narrower than it looks and deliberately so: this same
+  // PATCH endpoint can retarget a PR's base, rewrite its title and rewrite its
+  // body, so the SUBCOMMAND sends `{ state: 'closed' }` and nothing else - the
+  // allowlist cannot express "this verb but only this field", so the guard
+  // against the rest is that no code path here ever builds a different body.
+  // Reversible (a closed PR reopens), and it does NOT delete the branch, which
+  // stays outside what this script may do. Added because the alternative on
+  // offer was deleting a head branch to close a PR as a SIDE EFFECT - which is
+  // how #142 was lost in D104/D105 (see CLAUDE.md's Gotchas), and a stale PR
+  // left open because closing was awkward is its own small hazard.
+  { m: 'PATCH', re: /^\/repos\/[^/]+\/[^/]+\/pulls\/\d+$/, why: 'close a PR you asked me to close' },
 ];
 const permitted = (method, path) => ALLOW.find((a) => a.m === method && a.re.test(path));
 
@@ -108,8 +120,9 @@ function normalizePath(p) {
 async function api(method, path, body) {
   if (!permitted(method, path)) {
     die(`REFUSED: ${method} ${path}\n`
-      + "Not on this script's allowlist. It permits reads, opening a PR, commenting, and merging a PR "
-      + 'you asked for - and nothing that deletes, force-pushes, or changes repository settings.\n'
+      + "Not on this script's allowlist. It permits reads, opening a PR, commenting, and merging or "
+      + 'closing a PR you asked for - and nothing that deletes, force-pushes, or changes '
+      + 'repository settings.\n'
       + 'Nothing was sent. Edit ALLOW in scripts/gh-api.js if that is genuinely wrong.');
   }
   const res = await fetch(`https://api.github.com${path}`, {
@@ -166,9 +179,25 @@ if (cmd === 'pr' && sub === 'list') {
   const method = argv.includes('--rebase') ? 'rebase' : argv.includes('--merge') ? 'merge' : 'squash';
   const out = await api('PUT', `${R}/pulls/${n}/merge`, { merge_method: method });
   say(`merged #${n} (${method}): ${out.message || out.sha || ''}`);
+} else if (cmd === 'pr' && sub === 'close') {
+  const n = Number(rest[0]);
+  if (!Number.isInteger(n)) die('usage: pr close <number>');
+  // `{ state: 'closed' }` is the ONLY body this script ever PATCHes onto a
+  // pull request - see the ALLOW entry for why that matters. An already-merged
+  // PR is reported rather than PATCHed: GitHub answers 200 and leaves it
+  // merged, so a blind PATCH would print a reassuring "closed" for a no-op.
+  const before = await api('GET', `${R}/pulls/${n}`);
+  if (before.merged) die(`#${n} is MERGED, not open - nothing to close.`);
+  if (before.state === 'closed') {
+    say(`#${n} is already closed.`);
+  } else {
+    const p = await api('PATCH', `${R}/pulls/${n}`, { state: 'closed' });
+    say(`closed #${p.number}: ${p.title}`);
+    say(`  branch ${p.head.ref} is untouched - delete it yourself if you want it gone.`);
+  }
 } else if (cmd === 'pr') {
   const n = Number(sub);
-  if (!Number.isInteger(n)) die('usage: pr <number> | pr list | pr create | pr merge <n>');
+  if (!Number.isInteger(n)) die('usage: pr <number> | pr list | pr create | pr merge <n> | pr close <n>');
   const p = await api('GET', `${R}/pulls/${n}`);
   say(`#${p.number}  ${p.title}`);
   say(`  state      ${p.state}${p.merged ? ' (merged)' : ''}`);
@@ -188,6 +217,6 @@ if (cmd === 'pr' && sub === 'list') {
   say(`-> ${method} https://api.github.com${path}`); // the request LINE, never the header
   say(JSON.stringify(await api(method, path), null, 1));
 } else {
-  say('usage: npm run gh -- <pr <n> | pr list | pr create | pr merge <n> | checks [ref] | raw <METHOD> <path>>');
+  say('usage: npm run gh -- <pr <n> | pr list | pr create | pr merge <n> | pr close <n> | checks [ref] | raw <METHOD> <path>>');
   process.exit(2);
 }
