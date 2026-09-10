@@ -182,7 +182,8 @@ label.btn.btn--primary { color: var(--color-accent-text); }
   font-size: 13px;
   color: var(--color-text-muted);
 }
-.formrow input {
+.formrow input,
+.formrow select {
   border: 1px solid var(--color-border);
   background: var(--color-bg);
   color: var(--color-text);
