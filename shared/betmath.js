@@ -80,21 +80,37 @@ export function parseMoneyToken(raw) {
   return Number.isFinite(n) ? Math.round(n * 100) : null;
 }
 
+// The money token a printed menu leads a bet type with. Deliberately wider
+// than "$N or Nc": Woodbine prints "0.20 Trifecta" and Fort Erie prints
+// "20 Cent Triactor", and reading neither is what made a legal 20c box unbuildable
+// (D213) - the menu said 20c, the parser fell back to BET.minimums' 50c and
+// refused the ticket. Three shapes, in order:
+//   $1 / $.50 / $0.20   - the dollar-signed token
+//   50c / 20¢ / 20 Cent / 20 cents / 20-cent
+//   .50 / 0.20          - a BARE DECIMAL, never a bare integer
+// The bare form must carry a decimal point. A bare integer would read the
+// race numbers in "Double ($1) 9 & 10 Pick 3 ($1) (9-11)" - a real menu in
+// this corpus - as a $10 Pick 3, and no menu here prints a whole-dollar
+// amount without a '$'. Amounts are converted by parseMoneyToken above, so
+// the menu and the teller grammar read money through ONE function.
+const MENU_AMOUNT = String.raw`(\$[\d.]+|\d+(?:\.\d+)?\s*(?:¢|-?cents?|c)|\d*\.\d+)`;
+const menuRe = (tail) => new RegExp(MENU_AMOUNT + tail, 'i');
+
 // The printed-menu patterns, module level so parseWagerMenu (which minimum?)
 // and wagerMenuOffered (is it sold at all?) can never drift apart.
+// Exactor/Triactor are the Canadian names for the exacta/trifecta and are what
+// Fort Erie and Assiniboia Downs print - the same bet, not a new one.
 const MENU_PATTERNS = [
-  ['exacta', /(\$[\d.]+|\d+c)\s+Exacta/i],
-  ['quinella', /(\$[\d.]+|\d+c)\s+Quinella/i],
-  ['trifecta', /(\$[\d.]+|\d+c)\s+Trifecta/i],
-  ['daily_double', /(\$[\d.]+|\d+c)\s+(?:Rolling\s+)?(?:Daily\s+)?Double/i],
-  ['pick3', /(\$[\d.]+|\d+c)\s+(?:Rolling\s+)?Pick\s*3/i],
-  ['parlay', /(\$[\d.]+|\d+c)\s+WPS\s+Parlay/i],
+  ['exacta', menuRe(String.raw`\s+Exact(?:a|or)`)],
+  ['quinella', menuRe(String.raw`\s+Quinella`)],
+  ['trifecta', menuRe(String.raw`\s+Tri(?:fecta|actor)`)],
+  ['daily_double', menuRe(String.raw`\s+(?:Rolling\s+)?(?:Daily\s+)?Double`)],
+  ['pick3', menuRe(String.raw`\s+(?:Rolling\s+)?Pick\s*3`)],
+  ['parlay', menuRe(String.raw`\s+WPS\s+Parlay`)],
 ];
 const SUPER_MIN_RE = /Superfecta\s*\((\d+)c\s*min\)/i;
-const SUPER_FLAT_RE = /(\$[\d.]+|\d+c)\s+Superfecta/i;
-const menuCents = (tok) => (tok.endsWith('c')
-  ? Number(tok.slice(0, -1))
-  : Math.round(Number(tok.replace('$', '')) * 100));
+const SUPER_FLAT_RE = menuRe(String.raw`\s+Superfecta`);
+const menuCents = (tok) => parseMoneyToken(tok);
 
 /**
  * Parse a race's printed wager menu ("$1 Exacta / 50c Trifecta / $1
