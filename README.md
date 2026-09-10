@@ -62,7 +62,8 @@ The server binds `127.0.0.1` only — BetSheet is not hosted anywhere and is not
 meant to be.
 
 > **Experimenting, or about to factory-reset?** Use the scratch clone at
-> `C:eposetsheet-alt` — see
+> `C:
+eposetsheet-alt` — see
 > [The scratch environment](#the-scratch-environment-betsheet-alt) below. A
 > reset against this checkout deletes the whole corpus and every log, with no
 > undo.
@@ -191,8 +192,17 @@ install back. `--ignore-scripts` skips the pointless build; the prebuilt
 
 ## Project documents
 
-- [CLAUDE.md](CLAUDE.md) — working notes: invariants, architecture map,
-  workflow rules. Kept current with every change.
+- [CLAUDE.md](CLAUDE.md) — working notes: the invariants, the delivery
+  workflow, the house rules and the gotchas. Kept current with every change.
+  It is loaded in full into every agent session, so it holds RULES only;
+  three reference tables that used to live in it now sit beside it, and are
+  kept just as current (D208, D219):
+  - [docs/commands.md](docs/commands.md) — every `npm run` command and what
+    it actually verifies.
+  - [docs/feature-status.md](docs/feature-status.md) — what exists, its
+    state, its PR, and a paragraph of why.
+  - [docs/architecture-map.md](docs/architecture-map.md) — what each file
+    owns and the invariants a reader must not break.
 - [REQUIREMENTS.md](REQUIREMENTS.md) — requirements mapped to deliverable IDs.
   Read its section banners first: the pivot retired whole sections, and a
   RETIRED section describes what the system used to do rather than a gap.
