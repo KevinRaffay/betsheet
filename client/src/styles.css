@@ -505,6 +505,27 @@ label.btn.btn--primary { color: var(--color-accent-text); }
   z-index: 11; /* header row sits above body rows */
 }
 
+.races-card {
+  border: 1px solid var(--color-border);
+  border-radius: var(--radius);
+  background: var(--color-bg-raised);
+  padding: 16px;
+}
+
+.races-card__controls {
+  display: flex;
+  gap: 8px;
+  margin-bottom: 16px;
+}
+
+.races-card details.race {
+  margin-bottom: 16px;
+}
+
+.races-card details.race:last-child {
+  margin-bottom: 0;
+}
+
 /* ---- graded results on the sheet ---- */
 
 .btnrow { display: flex; gap: 8px; }

@@ -237,11 +237,11 @@ export default function RaceDayView({ id, onBack, onOpenCard }) {
       <TipStakingPanel dayId={day.id} rows={tipRows} onSaved={() => setCardsVersion((v) => v + 1)} />
       <ResultsPanel dayId={day.id} />
       <EquibaseOtrPanel dayId={day.id} onSaved={() => setCardsVersion((v) => v + 1)} />
-      <div className="formrow formrow--tight">
-        <button className="btn" onClick={expandAll}>Expand all</button>
-        <button className="btn" onClick={collapseAll}>Collapse all</button>
-      </div>
       <div className="races-card" ref={racesContainerRef}>
+        <div className="races-card__controls">
+          <button className="btn" onClick={expandAll}>Expand all</button>
+          <button className="btn" onClick={collapseAll}>Collapse all</button>
+        </div>
         {day.races.map((race) => (
           <details className="race" key={race.id} id={`race-${race.number}`} open>
             <summary>
