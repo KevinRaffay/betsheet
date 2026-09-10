@@ -1,4 +1,4 @@
-import React, { useEffect, useState } from 'react';
+import React, { useEffect, useRef, useState } from 'react';
 import { getCalendar } from '../api.js';
 import { CALENDAR_COLUMNS, CALENDAR_START_HOUR } from '@shared/race-calendar.js';
 
@@ -24,6 +24,14 @@ function columnLabel(i) {
   return `${h12}:00 ${ampm} PT`;
 }
 
+// Get the current hour in Pacific time (0-23).
+function currentPacificHour() {
+  const fmt = new Intl.DateTimeFormat('en-US', {
+    timeZone: 'America/Los_Angeles', hourCycle: 'h23', hour: '2-digit',
+  });
+  return Number(fmt.format(new Date()));
+}
+
 const COLUMNS = Array.from({ length: CALENDAR_COLUMNS }, (_, i) => i);
 
 // Race day calendar (D210, phase C-3 of docs/requirements/race-day-calendar.md):
@@ -35,6 +43,7 @@ export default function RaceDayCalendar({ onBack, onOpenDay }) {
   const [date, setDate] = useState(todayPacific);
   const [data, setData] = useState(null);
   const [error, setError] = useState(null);
+  const scrollContainerRef = useRef(null);
 
   useEffect(() => {
     let cancelled = false;
@@ -45,6 +54,26 @@ export default function RaceDayCalendar({ onBack, onOpenDay }) {
       .catch((e) => { if (!cancelled) setError(String(e.message)); });
     return () => { cancelled = true; };
   }, [date]);
+
+  // Auto-scroll to the current Pacific hour when data loads
+  useEffect(() => {
+    if (!data || !scrollContainerRef.current || data.tracks.length === 0) return;
+
+    const current = currentPacificHour();
+    // Column for the current hour: (hour - CALENDAR_START_HOUR + CALENDAR_COLUMNS) % CALENDAR_COLUMNS
+    const column = (current - CALENDAR_START_HOUR + CALENDAR_COLUMNS) % CALENDAR_COLUMNS;
+
+    // Estimate column width: account for the track column + padding
+    // Approximate column width based on typical table styling
+    const trackColumnWidth = 100; // approximate width of track column (in px)
+    const columnWidth = 120; // approximate width of each hour column (in px)
+    const scrollLeft = Math.max(0, column * columnWidth - columnWidth); // scroll to show current hour near the start
+
+    // Use requestAnimationFrame to ensure the DOM is ready
+    requestAnimationFrame(() => {
+      scrollContainerRef.current?.scrollTo({ left: scrollLeft, behavior: 'auto' });
+    });
+  }, [data]);
 
   const totalUnplaceable = data ? data.tracks.reduce((n, t) => n + t.unplaceable.length, 0) : 0;
 
@@ -70,7 +99,7 @@ export default function RaceDayCalendar({ onBack, onOpenDay }) {
 
       {!error && data && data.tracks.length > 0 && (
         <>
-          <div className="grid--wide-scroll">
+          <div className="grid--wide-scroll" ref={scrollContainerRef}>
             <table className="grid grid--matrix">
               <thead>
                 <tr>
