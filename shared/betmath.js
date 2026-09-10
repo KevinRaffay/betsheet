@@ -108,9 +108,36 @@ const MENU_PATTERNS = [
   ['pick3', menuRe(String.raw`\s+(?:Rolling\s+)?Pick\s*3`)],
   ['parlay', menuRe(String.raw`\s+WPS\s+Parlay`)],
 ];
-const SUPER_MIN_RE = /Superfecta\s*\((\d+)c\s*min\)/i;
 const SUPER_FLAT_RE = menuRe(String.raw`\s+Superfecta`);
 const menuCents = (tok) => parseMoneyToken(tok);
+
+// The OTHER shape a printed menu takes: the bet type first, its amount in a
+// trailing parenthetical - "Exacta ($1), Trifecta (.50), Super (.10), Double
+// ($1)" and "$1 Superfecta (10c min)". D214. The parenthetical is the real
+// minimum and WINS over any amount printed before the name, which is exactly
+// what the older Superfecta-only rule this replaces already did - generalised
+// rather than left as one bet type's special case.
+const MENU_TRAILING = [
+  ['exacta', /Exact(?:a|or)\s*\(([^)]*)\)/i],
+  ['quinella', /Quinella\s*\(([^)]*)\)/i],
+  ['trifecta', /Tri(?:fecta|actor)\s*\(([^)]*)\)/i],
+  ['superfecta', /Super(?:fecta)?\s*\(([^)]*)\)/i],
+  ['daily_double', /(?:Rolling\s+|Daily\s+)?Double\s*\(([^)]*)\)/i],
+  ['pick3', /(?:Rolling\s+)?Pick\s*3\s*\(([^)]*)\)/i],
+];
+
+/**
+ * A trailing parenthetical's amount, or null when it holds something else.
+ * Nearly every parenthetical on a real menu is a RACE LIST - "(Races 1-2-3)",
+ * "(9-11)", "(4-7)" - so this demands a money MARKER ('$', a decimal point, or
+ * a cents word) and refuses a bare integer, the same rule and the same reason
+ * as MENU_AMOUNT above: "Pick 4 (4)" is a race, not a $4 minimum.
+ */
+function menuParenCents(content) {
+  const t = String(content ?? '').trim().replace(/\s*min\.?$/i, '').trim();
+  if (!/[$.]|c\s*$|¢|cents?/i.test(t)) return null;
+  return parseMoneyToken(t);
+}
 
 /**
  * Parse a race's printed wager menu ("$1 Exacta / 50c Trifecta / $1
@@ -128,11 +155,20 @@ export function parseWagerMenu(text) {
       if (v) menu[key] = v;
     }
   }
-  // "$1 Superfecta (10c min)" - the parenthetical minimum wins.
-  const superMin = t.match(SUPER_MIN_RE);
   const superFlat = t.match(SUPER_FLAT_RE);
-  if (superMin) menu.superfecta = Number(superMin[1]);
-  else if (superFlat) menu.superfecta = menuCents(superFlat[1]);
+  if (superFlat) {
+    const v = menuCents(superFlat[1]);
+    if (v) menu.superfecta = v;
+  }
+  // "Trifecta (.50)" / "$1 Superfecta (10c min)" - the bet type first, its
+  // amount trailing. Applied LAST so the parenthetical wins a disagreement.
+  for (const [key, re] of MENU_TRAILING) {
+    const m = t.match(re);
+    if (m) {
+      const v = menuParenCents(m[1]);
+      if (v) menu[key] = v;
+    }
+  }
   return menu;
 }
 
@@ -150,7 +186,11 @@ export function wagerMenuOffered(text) {
   if (!text) return offered;
   const t = String(text);
   for (const [key, re] of MENU_PATTERNS) if (re.test(t)) offered.add(key);
-  if (SUPER_MIN_RE.test(t) || SUPER_FLAT_RE.test(t)) offered.add('superfecta');
+  if (SUPER_FLAT_RE.test(t)) offered.add('superfecta');
+  for (const [key, re] of MENU_TRAILING) {
+    const m = t.match(re);
+    if (m && menuParenCents(m[1]) != null) offered.add(key);
+  }
   return offered;
 }
 

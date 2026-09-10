@@ -136,6 +136,18 @@ grammar, then a line reading exactly "${TICKET_BLOCK_END}":
   can be spent - is not arithmetic, it is a price that does not exist
   at the window; the real move is to bet $12.00 (a legal 24-combo box)
   or not to make the bet at all.
+- A ticket line you have decided against must not be written AT ALL.
+  Deleting the line IS the action: every line between the markers is a
+  bet that gets placed, so there is no way to drop, skip or flag one
+  from inside the block. If a <rationale> would need the words
+  "invalid", "dropped", "skip", "see below" or "instead", the line
+  should not be there - delete it and move on. And never make an
+  unaffordable ticket affordable by shrinking <stake>: combinations x
+  base unit IS the price, so if that product is more than the money you
+  have left, that ticket cannot be bought at ANY number - a 24-combo
+  50c box costs $12.00 and writing $6 does not buy half a box, it buys
+  nothing, because $6 / 24 = $0.25 is below the base unit and the whole
+  line is refused.
 - <rationale>: one short sentence, required - for a BOX bet, append
   the combo arithmetic above, and nothing else.
 
