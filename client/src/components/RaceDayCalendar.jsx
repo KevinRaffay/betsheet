@@ -121,7 +121,7 @@ export default function RaceDayCalendar({ onBack, onOpenDay }) {
                             ? <span className="dim">—</span>
                             : races.map((r) => (
                               <div key={r.number}>
-                                <span className="linkish" onClick={() => onOpenDay(t.raceDayId)}>
+                                <span className="linkish" onClick={() => onOpenDay(t.raceDayId, r.number)}>
                                   Race {r.number} - {r.postTimePacific}
                                 </span>
                               </div>
