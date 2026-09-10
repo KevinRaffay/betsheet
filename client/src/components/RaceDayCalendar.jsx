@@ -1,0 +1,119 @@
+import React, { useEffect, useState } from 'react';
+import { getCalendar } from '../api.js';
+import { CALENDAR_COLUMNS, CALENDAR_START_HOUR } from '@shared/race-calendar.js';
+
+// "Today" is always the Pacific calendar date (D209/2026-09-10 decision: the
+// user is always Pacific), computed explicitly rather than read off the
+// browser's own `new Date()` - a browser whose OS clock sits in a different
+// zone would otherwise default to the wrong day right when it matters most
+// (late evening Pacific, already past midnight elsewhere).
+function todayPacific() {
+  const parts = new Intl.DateTimeFormat('en-US', {
+    timeZone: 'America/Los_Angeles', year: 'numeric', month: '2-digit', day: '2-digit',
+  }).formatToParts(new Date());
+  const get = (type) => parts.find((p) => p.type === type)?.value ?? '';
+  return `${get('year')}-${get('month')}-${get('day')}`;
+}
+
+// Column i's header label, matching the endpoint's own hourBucket convention
+// (column 0 is CALENDAR_START_HOUR:00 Pacific, wrapping past midnight).
+function columnLabel(i) {
+  const hour = (CALENDAR_START_HOUR + i) % 24;
+  const h12 = hour % 12 === 0 ? 12 : hour % 12;
+  const ampm = hour < 12 ? 'AM' : 'PM';
+  return `${h12}:00 ${ampm} PT`;
+}
+
+const COLUMNS = Array.from({ length: CALENDAR_COLUMNS }, (_, i) => i);
+
+// Race day calendar (D209, phase C-3 of docs/requirements/race-day-calendar.md):
+// tracks x hourly Pacific columns, so a card can be built as close to post as
+// possible. Every displayed time is Pacific - there is no per-track zone
+// shown anywhere on this screen, by the same 2026-09-10 decision that shaped
+// the endpoint this reads.
+export default function RaceDayCalendar({ onBack, onOpenDay }) {
+  const [date, setDate] = useState(todayPacific);
+  const [data, setData] = useState(null);
+  const [error, setError] = useState(null);
+
+  useEffect(() => {
+    let cancelled = false;
+    setData(null);
+    setError(null);
+    getCalendar(date)
+      .then((d) => { if (!cancelled) setData(d); })
+      .catch((e) => { if (!cancelled) setError(String(e.message)); });
+    return () => { cancelled = true; };
+  }, [date]);
+
+  const totalUnplaceable = data ? data.tracks.reduce((n, t) => n + t.unplaceable.length, 0) : 0;
+
+  return (
+    <section>
+      <div className="pagehead">
+        <h2>Race day calendar</h2>
+        <div className="formrow formrow--tight">
+          <label>
+            Date{' '}
+            <input type="date" value={date} onChange={(e) => setDate(e.target.value)} />
+          </label>
+          <button className="btn" onClick={() => setDate(todayPacific())}>Today</button>
+          <button className="btn" onClick={onBack}>Back</button>
+        </div>
+      </div>
+
+      {error && <p className="notice notice--error">{error}</p>}
+      {!error && !data && <p className="placeholder">Loading…</p>}
+      {!error && data && data.tracks.length === 0 && (
+        <p className="placeholder">No race days for {date}.</p>
+      )}
+
+      {!error && data && data.tracks.length > 0 && (
+        <>
+          <div className="grid--wide-scroll">
+            <table className="grid grid--matrix">
+              <thead>
+                <tr>
+                  <th>Track</th>
+                  {COLUMNS.map((i) => <th key={i}>{columnLabel(i)}</th>)}
+                </tr>
+              </thead>
+              <tbody>
+                {data.tracks.map((t) => (
+                  <tr key={t.raceDayId}>
+                    <td>
+                      <span className="linkish" onClick={() => onOpenDay(t.raceDayId)}>{t.track}</span>
+                    </td>
+                    {COLUMNS.map((i) => {
+                      const races = t.races.filter((r) => r.hourBucket === i);
+                      return (
+                        <td key={i}>
+                          {races.length === 0
+                            ? <span className="dim">—</span>
+                            : races.map((r) => (
+                              <div key={r.number}>
+                                <span className="linkish" onClick={() => onOpenDay(t.raceDayId)}>
+                                  Race {r.number} - {r.postTimePacific}
+                                </span>
+                              </div>
+                            ))}
+                        </td>
+                      );
+                    })}
+                  </tr>
+                ))}
+              </tbody>
+            </table>
+          </div>
+          {totalUnplaceable > 0 && (
+            <p className="dim">
+              {totalUnplaceable} race{totalUnplaceable === 1 ? '' : 's'} could not be placed on
+              the grid (a missing post time, or a track with no known timezone) - open the day
+              directly to see it.
+            </p>
+          )}
+        </>
+      )}
+    </section>
+  );
+}

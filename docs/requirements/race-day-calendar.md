@@ -1,6 +1,6 @@
 # Race day calendar: a day's races, one matrix, close to post
 
-**Status: PHASES C-1 (D208) AND C-2 (D209) DELIVERED; C-3 SPECIFIED, NOT SCHEDULED.**
+**Status: ALL THREE PHASES DELIVERED - C-1 (D208), C-2 (D209), C-3 (D210).**
 Deliverable IDs are claimed per phase when picked up, the same way
 `multi-parser-entries-ingest.md` and `zip-entries-upload.md` are worked.
 Written 2026-09-10 from a user request, checked against the schema, the
@@ -164,7 +164,7 @@ excluded, a day with a null post time is excluded from `races` but counted
 in `unplaceable`, and an empty date returns an empty list rather than an
 error.
 
-### C-3 — the client view
+### C-3 — the client view. **DELIVERED AS D210.**
 
 New `client/src/components/RaceDayCalendar.jsx`: a date input defaulting to
 today's Pacific calendar date (per Decision 2 below — computed via

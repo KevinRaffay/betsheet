@@ -8,7 +8,7 @@ const SKIP_REASON_LABEL = {
   write_failed: 'delete did not persist',
 };
 
-export default function RaceDayList({ onOpen, onNew, onPL, onDistribution, onReplay, refreshKey }) {
+export default function RaceDayList({ onOpen, onNew, onPL, onDistribution, onReplay, onCalendar, refreshKey }) {
   const [days, setDays] = useState(null);
   const [error, setError] = useState(null);
   const [showDeleted, setShowDeleted] = useState(false);
@@ -138,6 +138,7 @@ export default function RaceDayList({ onOpen, onNew, onPL, onDistribution, onRep
           {!showDeleted && <button className="btn" onClick={onPL}>P/L</button>}
           {!showDeleted && <button className="btn" onClick={onDistribution}>Distributions</button>}
           {!showDeleted && <button className="btn" onClick={onReplay}>Replay</button>}
+          {!showDeleted && <button className="btn" onClick={onCalendar}>Race calendar</button>}
           <button className="btn" onClick={() => setShowDeleted((v) => !v)}>
             {showDeleted ? 'Show active' : 'Show deleted'}
           </button>

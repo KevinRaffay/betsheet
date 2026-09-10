@@ -7,6 +7,7 @@ import CardView from './components/CardView.jsx';
 import PLView from './components/PLView.jsx';
 import { parseRoute, pathForView } from './routes.js';
 import DistributionView from './components/DistributionView.jsx';
+import RaceDayCalendar from './components/RaceDayCalendar.jsx';
 import ReplayDayPicker from './components/ReplayDayPicker.jsx';
 import ReplayDayLanding from './components/ReplayDayLanding.jsx';
 import ReplayStanding from './components/ReplayStanding.jsx';
@@ -68,6 +69,13 @@ export default function App() {
             onPL={() => navigate({ name: 'pl' })}
             onDistribution={() => navigate({ name: 'distribution' })}
             onReplay={() => navigate({ name: 'replay' })}
+            onCalendar={() => navigate({ name: 'calendar' })}
+          />
+        )}
+        {view.name === 'calendar' && (
+          <RaceDayCalendar
+            onBack={() => navigate({ name: 'list' })}
+            onOpenDay={(id) => navigate({ name: 'day', id })}
           />
         )}
         {view.name === 'replay' && (

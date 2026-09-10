@@ -6,6 +6,7 @@ export function parseRoute(pathname) {
   if (parts.length === 1 && parts[0] === 'new') return { name: 'new' };
   if (parts.length === 1 && parts[0] === 'pl') return { name: 'pl' };
   if (parts.length === 1 && parts[0] === 'distribution') return { name: 'distribution' };
+  if (parts.length === 1 && parts[0] === 'calendar') return { name: 'calendar' };
   if (parts.length === 1 && parts[0] === 'replay') return { name: 'replay' };
   if (parts.length === 2 && parts[0] === 'replay' && parts[1] === 'standing') return { name: 'replayStanding' };
   if (parts.length === 3 && parts[0] === 'replay' && parts[1] === 'day' && POSITIVE_ID.test(parts[2])) {
@@ -27,6 +28,7 @@ export function pathForView(view) {
   if (view.name === 'new') return '/new';
   if (view.name === 'pl') return '/pl';
   if (view.name === 'distribution') return '/distribution';
+  if (view.name === 'calendar') return '/calendar';
   if (view.name === 'replay') return '/replay';
   if (view.name === 'replayStanding') return '/replay/standing';
   if (view.name === 'replayDay' && Number.isSafeInteger(view.id) && view.id > 0) return `/replay/day/${view.id}`;
