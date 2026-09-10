@@ -75,7 +75,13 @@ export default function App() {
         {view.name === 'calendar' && (
           <RaceDayCalendar
             onBack={() => navigate({ name: 'list' })}
-            onOpenDay={(id) => navigate({ name: 'day', id })}
+            onOpenDay={(id, raceNumber) => {
+              const view = { name: 'day', id };
+              setView(view);
+              const path = pathForView(view);
+              const hash = raceNumber ? `#race-${raceNumber}` : '';
+              window.history.pushState(null, '', path + hash);
+            }}
           />
         )}
         {view.name === 'replay' && (
