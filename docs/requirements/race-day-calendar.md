@@ -1,6 +1,6 @@
 # Race day calendar: a day's races, one matrix, close to post
 
-**Status: PHASE C-1 DELIVERED (D208); C-2 AND C-3 SPECIFIED, NOT SCHEDULED.**
+**Status: PHASES C-1 (D208) AND C-2 (D209) DELIVERED; C-3 SPECIFIED, NOT SCHEDULED.**
 Deliverable IDs are claimed per phase when picked up, the same way
 `multi-parser-entries-ingest.md` and `zip-entries-upload.md` are worked.
 Written 2026-09-10 from a user request, checked against the schema, the
@@ -140,7 +140,7 @@ with no parseable format returning `null` rather than throwing, and an
 unrecognized track (`timezone: null`) returning `null` rather than a guessed
 bucket.
 
-### C-2 — `GET /api/calendar?date=YYYY-MM-DD`
+### C-2 — `GET /api/calendar?date=YYYY-MM-DD`. **DELIVERED AS D209.**
 
 New `server/race-calendar.js` (mirroring `server/distribution.js`'s shape: a
 small standalone read-only router over existing tables, mounted in
