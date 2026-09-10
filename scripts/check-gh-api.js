@@ -20,6 +20,7 @@
 
 import fs from 'node:fs';
 import path from 'node:path';
+import os from 'node:os';
 import { execFileSync } from 'node:child_process';
 import { fileURLToPath } from 'node:url';
 
@@ -107,6 +108,47 @@ const notANumber = run(['pr', 'close', 'main']);
 check('`pr close main` is refused the same way', notANumber.code !== 0 && /usage: pr close <number>/.test(notANumber.out));
 const usage = run([]);
 check('the bare usage line advertises `pr close <n>`', /pr close <n>/.test(usage.out), usage.out.slice(0, 200));
+
+console.log('\nHow the script stops (D218)');
+
+// The regression this pins: `process.exit()` after a fetch to api.github.com
+// aborts on node 24 / Windows with
+//   Assertion failed: !(handle->flags & UV_HANDLE_CLOSING), file src\win\async.c
+// and the shell sees 127 instead of the intended code - so a careful refusal
+// read as "command not found". It cannot be reproduced offline (it needs the
+// real host), so what is asserted here is the SOURCE property that prevents
+// it: this file calls `process.exit()` nowhere at all. The live matrix was
+// run by hand and is recorded in DELIVERABLES.md D218.
+const codeOnly = src.split('\n').filter((l) => !l.trim().startsWith('//')).join('\n');
+check('scripts/gh-api.js calls process.exit() NOWHERE (only exitCode)',
+  !/process\.exit\(/.test(codeOnly), (codeOnly.match(/process\.exit\([^)]*\)/g) || []).join(', '));
+check('die() sets process.exitCode and throws the sentinel',
+  /const die = \([^)]*\) => \{[\s\S]*?process\.exitCode = code;[\s\S]*?throw new ExitSignal/.test(src));
+check('both fatal handlers are registered',
+  /process\.on\('uncaughtException', onFatal\)/.test(src) && /process\.on\('unhandledRejection', onFatal\)/.test(src));
+check('a non-sentinel error is reported with its STACK, through redact()',
+  /const onFatal = \([\s\S]*?redact\(\(err && err\.stack\)/.test(src));
+
+// The fatal path exercised for real, on a COPY with a throw injected before
+// the command dispatch - so no request is made and the real script is never
+// modified. This is the same technique the negative controls use.
+const tmp = path.join(os.tmpdir(), `gh-api-fatal-${process.pid}.mjs`);
+const marker = 'const [cmd, sub, ...rest] = argv;';
+check('the injection point still exists in the source', src.includes(marker));
+fs.writeFileSync(tmp, src.replace(marker, `throw new TypeError('injected-not-a-sentinel');\n${marker}`), 'utf8');
+let fatal;
+try {
+  fatal = (() => {
+    try {
+      execFileSync(process.execPath, [tmp, 'pr', 'list'], { encoding: 'utf8', cwd: path.join(HERE, '..'), stdio: ['ignore', 'pipe', 'pipe'] });
+      return { out: '', code: 0 };
+    } catch (err) { return { out: `${err.stdout ?? ''}${err.stderr ?? ''}`, code: err.status ?? 1 }; }
+  })();
+} finally { fs.rmSync(tmp, { force: true }); }
+check('an unexpected error exits 1, not 0 and not an abort code', fatal.code === 1, String(fatal.code));
+check('...naming the error', /injected-not-a-sentinel/.test(fatal.out), fatal.out.slice(0, 120));
+check('...with a stack, which a real bug needs', /at .*gh-api-fatal/.test(fatal.out), fatal.out.slice(0, 200));
+check('...and NOT a libuv abort', !/Assertion failed/.test(fatal.out));
 
 if (failures) {
   console.error(`\ncheck-gh-api: ${failures} failure(s)`);

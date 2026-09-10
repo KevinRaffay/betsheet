@@ -43,10 +43,41 @@ const SECRETISH = [
 ];
 const redact = (s) => SECRETISH.reduce((a, re) => a.replace(re, '[redacted]'), String(s));
 const say = (...a) => process.stdout.write(`${a.map(redact).join(' ')}\n`);
+
+// ---------- stopping ----------
+// `die()` sets `process.exitCode` and THROWS a sentinel; it must NEVER call
+// `process.exit()` (D218). On this machine, `process.exit()` after a fetch to
+// api.github.com aborts the process instead of exiting:
+//
+//   Assertion failed: !(handle->flags & UV_HANDLE_CLOSING), file src\win\async.c
+//
+// and the shell then sees **127**, not the code we asked for - so every
+// refusal this script takes care to report cleanly came back looking like
+// "command not found". Reproduced deterministically (5 of 5) on node 24 /
+// Windows, and NOT reproducible against example.com or registry.npmjs.org,
+// whose responses carry `connection: keep-alive` where GitHub's carry no
+// `connection` header at all. That correlation is as far as the diagnosis
+// goes, and it is exactly why the fix is to stop calling `process.exit()`
+// rather than to predict when it happens to be safe. Setting `exitCode` and
+// letting the loop drain exits with the right code in every case tested, and
+// promptly (~0.5s - undici's pooled sockets do not hold the loop open); as a
+// bonus it also cannot truncate a piped stdout write the way exit() can.
+class ExitSignal extends Error {}
 const die = (msg, code = 1) => {
   process.stderr.write(`${redact(msg)}\n`);
-  process.exit(code);
+  process.exitCode = code;
+  throw new ExitSignal(msg);
 };
+// A sentinel has already reported itself. Anything else is a real bug, and
+// prints its STACK - redacted, because this file's premise is that no byte
+// escapes unredacted, error paths included.
+const onFatal = (err) => {
+  if (err instanceof ExitSignal) return;
+  process.stderr.write(`${redact((err && err.stack) || String(err))}\n`);
+  process.exitCode = 1;
+};
+process.on('uncaughtException', onFatal);
+process.on('unhandledRejection', onFatal);
 
 // ---------- what this script is permitted to do ----------
 // Checked BEFORE any request is made, so a refused verb sends nothing.
@@ -218,5 +249,9 @@ if (cmd === 'pr' && sub === 'list') {
   say(JSON.stringify(await api(method, path), null, 1));
 } else {
   say('usage: npm run gh -- <pr <n> | pr list | pr create | pr merge <n> | pr close <n> | checks [ref] | raw <METHOD> <path>>');
-  process.exit(2);
+  // `exitCode`, not `process.exit(2)` - see the note beside `die()`. This
+  // branch runs before any fetch and so was never affected, but leaving one
+  // `process.exit()` behind is how the next network-touching branch quietly
+  // inherits the bug.
+  process.exitCode = 2;
 }
