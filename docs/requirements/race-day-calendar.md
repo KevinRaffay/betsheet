@@ -21,12 +21,25 @@ card can be built shortly before the window opens rather than hours ahead
 
 The requested shape: a button from the race-day list opens a calendar view,
 defaulting to today, showing a matrix — tracks as rows, hourly columns
-starting 10:00 AM ET, 24 of them — where a populated cell reads `Race N -
+starting 10:00 AM, 24 of them — where a populated cell reads `Race N -
 H:MM <zone>` and is a hyperlink straight to that track's stored race day
 (`/day/:id`). **Navigating to a specific race within that day is explicitly
 out of scope** — there is no per-race route in this codebase to link to
 anyway (`client/src/routes.js` only ever parses `day/:id` and `card/:id`),
 so the calendar's job stops at the race day.
+
+**Revised 2026-09-10, user decision: the user is always in Pacific time, so
+every displayed time — the column axis AND the printed time in each
+cell — is Pacific, never a mix.** The original spec's "10:00 AM EST" was the
+column anchor only; showing each race in its own track-local zone (the
+original plan below) would have left the user doing exactly the mental
+timezone math this feature exists to remove — a cell reading "12:15 PM
+CT" still costs a conversion for a Pacific viewer. Every place below that
+said "Eastern"/"ET" is superseded by this: the shared reference zone for
+both the column grid and the printed cell text is **`America/Los_Angeles`**
+(Pacific Time proper — tracks DST correctly and labels PST in winter, PDT in
+summer — not a frozen UTC-8, which would silently read an hour wrong for
+roughly half the year). "10:00 AM" now means 10:00 AM Pacific.
 
 ## What was checked against the code
 
@@ -55,10 +68,11 @@ so the calendar's job stops at the race day.
   `client/`.
 
 **This is the one design question that decides how correct the matrix can
-be**, addressed under "Decisions" below — a shared 10am-ET-anchored column
-grid, by construction, needs every track's local post time converted to
-Eastern before it can be placed in a column, and that conversion needs a
-timezone, which today does not exist anywhere in this codebase.
+be**, addressed under "Decisions" below — a shared, Pacific-anchored column
+grid *and* a Pacific-displayed cell time both, by construction, need every
+track's local post time converted to Pacific before it can be placed or
+printed, and that conversion needs a timezone, which today does not exist
+anywhere in this codebase.
 
 ### What already exists to build on
 
@@ -108,15 +122,21 @@ track — never guessed). New pure module `shared/race-calendar.js`:
   the guess, correct) — no new dependency, matching this codebase's existing
   preference for hand-rolled conversions over a library (the same call made
   for the zip reader in D127).
-- `hourBucket(utcInstant)` — the column index 0-23 in the 10:00 AM ET
-  anchored grid (`Intl.DateTimeFormat` with `timeZone: 'America/New_York'` to
-  read the ET hour, then `(etHour - 10 + 24) % 24`).
+- `hourBucket(utcInstant)` — the column index 0-23 in the 10:00 AM Pacific
+  anchored grid (`Intl.DateTimeFormat` with `timeZone: 'America/Los_Angeles'`
+  to read the Pacific hour, then `(ptHour - 10 + 24) % 24`).
+- `formatPacific(utcInstant)` — the same instant rendered as `H:MM AM/PM
+  PST`/`PDT` (`Intl.DateTimeFormat` with `timeZoneName: 'short'`, so the
+  correct label for the date is read from the platform rather than hardcoded)
+  — this is what every cell prints, regardless of which track the race
+  belongs to.
 - Both take `postTimeMinutes` from `shared/staleness.js` as their time-string
   parser rather than re-implementing it.
 
 **Done when:** unit tests cover every registry zone at least once, a
-same-track-different-season pair proving DST is handled (e.g. a July post
-time and a January post time landing in the same ET column), a post time
+same-track-different-season pair proving DST is handled on both ends (e.g. a
+July post time and a January post time from the same track landing in the
+correct Pacific column and printing PDT vs. PST respectively), a post time
 with no parseable format returning `null` rather than throwing, and an
 unrecognized track (`timezone: null`) returning `null` rather than a guessed
 bucket.
@@ -128,9 +148,11 @@ small standalone read-only router over existing tables, mounted in
 `server/index.js` next to the other `app.use('/api', ...Router)` lines).
 Query: every `race_days` row for the date with `deleted_at IS NULL`, joined
 to its `races` (`number`, `post_time`), returning per track: `{raceDayId,
-track, trackCode, timezone, races: [{number, postTime, postTimeZone:
-<printed, if any>, hourBucket}], unplaceable: [<race numbers with no
-parseable post time>]}`. A race with no parseable post time or an
+track, trackCode, timezone, races: [{number, postTimePacific: <"12:15 PM
+PST", from formatPacific>, hourBucket}], unplaceable: [<race numbers with no
+parseable post time>]}`. The printed track-local time/zone is not returned
+at all — the user is always Pacific, so `postTimePacific` is the only time
+string any client of this endpoint needs. A race with no parseable post time or an
 unrecognized track's races are **never silently dropped** — they come back
 under `unplaceable`/a distinguished bucket so the count is visible
 (invariant 11's spirit, generalized from "a failing source" to "data this
@@ -146,21 +168,25 @@ error.
 ### C-3 — the client view
 
 New `client/src/components/RaceDayCalendar.jsx`: a date input defaulting to
-the browser's own local today (`new Date()`, formatted `YYYY-MM-DD` — this
-is a client-only concept, there is no server clock to defer to), fetching
+today's Pacific calendar date (per Decision 2 below — computed via
+`Intl.DateTimeFormat` against `America/Los_Angeles`, not a bare `new Date()`
+read of the browser's own zone), fetching
 `getCalendar(date)` (new `client/src/api.js` export, same `fetch`+`asJson`
 convention as every other read there) on mount and on date change, guarded
 against a stale response the same way `RaceDayList.jsx` already is
 (`client/src/components/RaceDayList.jsx:35-41`'s `cancelled` pattern —
 D118's own documented gotcha). Renders a `grid grid--matrix` table: one row
 per track (sorted by earliest post that day), 24 `<th>` columns labelled
-`10:00 AM ET` … `9:00 AM ET`, each populated cell a clickable element
+`10:00 AM PT` … `9:00 AM PT`, each populated cell a clickable element
 (matching this codebase's existing row/cell click convention rather than a
 literal `<a href>`, since navigation is client-side view state, not a URL
-load) reading `Race N - H:MM <zone>` — the race's **own local time and
-printed zone**, not the ET-converted time; only the column position is
-ET-normalized. Multiple races from one track landing in the same hour render
-stacked in the same cell. A footer line reports the `unplaceable` count when
+load) reading `Race N - <postTimePacific>` straight from the API response —
+**always Pacific, for every track, with no per-track zone label and no
+conversion happening in the browser** — so a cell for a Chicago or New York
+track reads exactly as directly comparable to a California track's cell as
+the column position already implies. Multiple races from one track landing
+in the same hour render stacked in the same cell. A footer line reports the
+`unplaceable` count when
 non-zero, never hiding it. New route `calendar` in `routes.js` (`/calendar`)
 and a `calendar` view block in `App.jsx`, wired from a new button on
 `RaceDayList.jsx` beside the existing `onPL`/`onDistribution`/`onReplay`
@@ -175,20 +201,25 @@ without a page reload.
 ## Decisions the operator owns
 
 1. **Building a 39-track timezone table vs. a cheaper, less correct
-   alternative.** The user's own framing — "hour blocks... starting at 10
-   am EST" as one shared timeline across every track — only means something
-   if every track's post time is actually converted to Eastern; the
+   alternative.** The user's own framing — one shared timeline across every
+   track, now pinned to Pacific by the 2026-09-10 decision above — only
+   means something if every track's post time is actually converted; the
    alternative (bucket every track by its own printed hour, ignoring zone
-   entirely) is far cheaper to build but makes the grid's column position
-   meaningless the moment two tracks in different zones appear side by
-   side, which is the normal case on any real race day. **Recommend:**
-   build the table (C-1) — it is a bounded, one-time, static-data addition
-   (city/track geography, not anything fetched), and every track already in
-   the registry has a well-known, easily-verified home timezone.
-2. **What "today" means.** Recommend the browser's own local date — this
-   app has no server-side session or "the user's day" concept anywhere else
-   (`RaceDayList`'s own date filter is client-derived), and a person opening
-   the calendar cares about their own clock, not the server process's.
+   entirely) is far cheaper to build but makes both the grid's column
+   position AND the printed cell time wrong for every non-Pacific track,
+   which is most of the registry. **Recommend:** build the table (C-1) — it
+   is a bounded, one-time, static-data addition (city/track geography, not
+   anything fetched), and every track already in the registry has a
+   well-known, easily-verified home timezone.
+2. **What "today" means.** Given the user is always Pacific, **recommend
+   computing "today" as the current Pacific calendar date**
+   (`Intl.DateTimeFormat` with `timeZone: 'America/Los_Angeles'`) rather than
+   the browser's own local date — the two coincide for this user today, but
+   computing it explicitly means the default date is correct even from a
+   browser whose OS clock is set to a different zone (a remote desktop, a
+   borrowed machine), which "just read `new Date()`" would get wrong right
+   when it matters most: late evening Pacific, past midnight Eastern, a
+   naive local-date read would default to tomorrow's board.
 3. **Whether to allow navigating to an adjacent date at all.** The user's
    spec says "default to current day"; a single date input is close to free
    once C-2 already takes `?date=` as a parameter, and lets the same screen

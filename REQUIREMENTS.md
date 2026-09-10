@@ -539,7 +539,7 @@ work is picked up.
 | Requirement | Deliverables |
 | --- | --- |
 | A calendar view, reachable from a button on the race-day list, defaults to the browser's own current date | - (not scheduled) |
-| A matrix of every track racing that date (rows) against 24 hourly columns starting 10:00 AM ET (columns), assuming one race day per track | - (not scheduled) |
-| Each populated cell shows the race number and its own local post time + printed zone, and is a hyperlink to that track's stored race day (`/day/:id`) - navigating to an individual race is out of scope, and no route exists for it | - (not scheduled) |
-| Placing a race in an ET-anchored column requires converting its printed local post time to Eastern, which requires a per-track timezone - not stored today (`races.post_time` is a zoneless printed string; the parser reads a zone off the page but `insertRaceDay` discards it) and not derivable from `shared/track-codes.js`'s registry, which carries no timezone field at all | - (not scheduled) |
+| A matrix of every track racing that date (rows) against 24 hourly columns starting 10:00 AM Pacific (columns), assuming one race day per track | - (not scheduled) |
+| Each populated cell shows the race number and its post time **converted to Pacific** (the user is always Pacific - 2026-09-10 decision), and is a hyperlink to that track's stored race day (`/day/:id`) - navigating to an individual race is out of scope, and no route exists for it | - (not scheduled) |
+| Placing AND printing a race in the Pacific-anchored grid requires converting its printed local post time from the track's own zone, which requires a per-track timezone - not stored today (`races.post_time` is a zoneless printed string; the parser reads a zone off the page but `insertRaceDay` discards it) and not derivable from `shared/track-codes.js`'s registry, which carries no timezone field at all | - (not scheduled) |
 | A race with no parseable post time, or a track with no known timezone, is never silently dropped from the grid - it is surfaced as a visible count, matching invariant 11's standing preference for a visible gap over a silent one | - (not scheduled) |
