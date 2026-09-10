@@ -24,10 +24,12 @@ const RANKS = [1, 2, 3];
 
 export default function TipPicksEntryModal({ dayId, race, entries = [], existing = [], onClose, onSaved }) {
   // One column per tipsheet, seeded from whatever this race already has so
-  // opening the dialog again EDITS rather than starting blank.
+  // opening the dialog again EDITS rather than starting blank. When starting
+  // fresh, default to NumberFire and TrackMaster (the two most commonly used
+  // sources), with NumberFire first.
   const [columns, setColumns] = useState(() => {
     const seeded = existing.map((r) => r.sourceLabel);
-    return seeded.length ? [...new Set(seeded)] : [TIP_SOURCE_LABELS[0]];
+    return seeded.length ? [...new Set(seeded)] : ['numberfire', 'trackmaster'];
   });
   // `${source}::${programNumber}` -> rank
   const [ranks, setRanks] = useState(() => {
