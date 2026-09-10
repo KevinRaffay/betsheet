@@ -525,3 +525,21 @@ verification.
 | A new race day can be created from the UI using a live Apify pull, not just the CLI - **user request 2026-09-09**, out of the original four phases' scope (CLI-only). One track, one date, committed before the paid call is possible (matching how a race day is already created one track at a time); the same preview/save UI the paste/upload flow already uses, with no special-casing, since the route returns the identical shape `/api/parse/equibase-entries` does | D202 |
 | The track name field offers every track this codebase has personally seen as suggestions (a `<datalist>`, never a restriction - an unlisted track still saves via `canonicalizeTrack`'s derived-code fallback) | D202 (`shared/track-codes.js`'s new `listTracks()`) |
 | The actor stays `parseforge/equibase-scraper`, not the incoming doc's recommended `getascraper` - three real verified samples already exist against parseforge and zero against getascraper, and this codebase doesn't build adapters without a captured real sample | - (decided, not built) |
+
+## Race day calendar (requested 2026-09-10)
+
+Full specification, checked against the schema and the existing ingest/UI
+code - including that no track's timezone is stored or derivable anywhere in
+this codebase today, which is the one design question the whole feature
+turns on:
+[docs/requirements/race-day-calendar.md](docs/requirements/race-day-calendar.md).
+Specified but NOT scheduled - deliverable IDs get claimed per phase when the
+work is picked up.
+
+| Requirement | Deliverables |
+| --- | --- |
+| A calendar view, reachable from a button on the race-day list, defaults to the browser's own current date | - (not scheduled) |
+| A matrix of every track racing that date (rows) against 24 hourly columns starting 10:00 AM ET (columns), assuming one race day per track | - (not scheduled) |
+| Each populated cell shows the race number and its own local post time + printed zone, and is a hyperlink to that track's stored race day (`/day/:id`) - navigating to an individual race is out of scope, and no route exists for it | - (not scheduled) |
+| Placing a race in an ET-anchored column requires converting its printed local post time to Eastern, which requires a per-track timezone - not stored today (`races.post_time` is a zoneless printed string; the parser reads a zone off the page but `insertRaceDay` discards it) and not derivable from `shared/track-codes.js`'s registry, which carries no timezone field at all | - (not scheduled) |
+| A race with no parseable post time, or a track with no known timezone, is never silently dropped from the grid - it is surfaced as a visible count, matching invariant 11's standing preference for a visible gap over a silent one | - (not scheduled) |
