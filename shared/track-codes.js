@@ -16,13 +16,25 @@
 // spelling however the source wrote it, and a stable code that survives a
 // source changing its mind about capitalisation.
 
+// D209: every entry also carries `tz`, the track's real IANA timezone - a
+// static fact about where the track physically is, not anything fetched
+// (invariant 6 untouched). Added for the race-day calendar
+// (docs/requirements/race-day-calendar.md), which needs it to convert a
+// track's own printed post time into the viewer's Pacific display; nothing
+// before D209 read this field. Each one was checked individually against
+// the track's actual city/county rather than assumed from the track's own
+// region in general, because a handful of these sit right on a time-zone
+// line (Kentucky Downs and Atokad Downs are both Central despite being
+// nominally "Eastern-region" states; Sandy Ridge Racing is Eastern despite
+// being in Kentucky, because Boyd County sits on the state's Eastern side;
+// all of Nevada, including Elko, is Pacific).
 const REGISTRY = [
-  { code: 'DMR', display: 'Del Mar', aliases: ['DELMARRACINGCOM'] },
+  { code: 'DMR', display: 'Del Mar', aliases: ['DELMARRACINGCOM'], tz: 'America/Los_Angeles' },
   // D115: the first target for the Equibase entries ingest, and the first
   // non-Del-Mar track in this registry. Equibase's own page header prints
   // "Kentucky Downs"; the aliases cover its report code and the spaceless form
   // a saved filename tends to carry.
-  { code: 'KD', display: 'Kentucky Downs', aliases: ['KD', 'KDOWNS'] },
+  { code: 'KD', display: 'Kentucky Downs', aliases: ['KD', 'KDOWNS'], tz: 'America/Chicago' }, // Franklin, KY (Simpson County) is Central, not Eastern
 
   // D122: the 37 tracks a 91-page Equibase capture turned up, added together
   // rather than one at a time, because the corpus that names them exists now
@@ -38,63 +50,66 @@ const REGISTRY = [
   // A registry entry still blocks nothing: an unlisted track saves fine with a
   // derived code. What these buy is one canonical display spelling per track
   // and a code that survives the source rewording itself.
-  { code: 'AJX', display: 'Ajax Downs', aliases: ['AJX'] },
-  { code: 'ALB', display: 'Albuquerque', aliases: ['ALB'] },
-  { code: 'ASD', display: 'Assiniboia Downs', aliases: ['ASD', 'ASSINIBOIA'] },
-  { code: 'ATO', display: 'Atokad Downs', aliases: ['ATO', 'ATOKAD'] },
-  { code: 'BKF', display: 'Blackfoot', aliases: ['BKF'] },
-  { code: 'BTP', display: 'Belterra Park', aliases: ['BTP', 'BELTERRA'] },
-  { code: 'CBY', display: 'Canterbury Park', aliases: ['CBY', 'CANTERBURY'] },
-  { code: 'CD', display: 'Churchill Downs', aliases: ['CD'] },
-  { code: 'CNL', display: 'Colonial Downs', aliases: ['CNL', 'COLONIAL'] },
-  { code: 'CTM', display: 'Century Mile', aliases: ['CTM'] },
-  { code: 'DEL', display: 'Delaware Park', aliases: ['DEL', 'DELAWARE'] },
-  { code: 'ELK', display: 'Elko County Fair', aliases: ['ELK', 'ELKOFAIR', 'ELKO'] },
-  { code: 'EMD', display: 'Emerald Downs', aliases: ['EMD', 'EMERALD'] },
-  { code: 'EVD', display: 'Evangeline Downs', aliases: ['EVD', 'EVANGELINE'] },
-  { code: 'FE', display: 'Fort Erie', aliases: ['FE'] },
-  { code: 'FL', display: 'Finger Lakes', aliases: ['FL'] },
-  { code: 'FP', display: 'Fairmount Park', aliases: ['FP', 'FAIRMOUNT'] },
-  { code: 'GP', display: 'Gulfstream Park', aliases: ['GP', 'GULFSTREAM'] },
-  { code: 'IND', display: 'Horseshoe Indianapolis', aliases: ['IND', 'INDIANAGRANDRACING', 'INDIANAGRAND'] },
-  { code: 'LA', display: 'Los Alamitos', aliases: ['LA', 'LOSALAMITOSQUARTERHORSE', 'LOSAL'] },
-  { code: 'LAD', display: 'Louisiana Downs', aliases: ['LAD', 'LOUISIANA'] },
-  { code: 'LRL', display: 'Laurel Park', aliases: ['LRL', 'LAUREL'] },
-  { code: 'LS', display: 'Lone Star Park', aliases: ['LS', 'LONESTAR'] },
-  { code: 'MTH', display: 'Monmouth Park', aliases: ['MTH', 'MONMOUTH'] },
-  { code: 'PID', display: 'Presque Isle Downs', aliases: ['PID', 'PRESQUEISLE'] },
-  { code: 'PRM', display: 'Prairie Meadows', aliases: ['PRM'] },
-  { code: 'PRX', display: 'Parx Racing', aliases: ['PRX', 'PARX'] },
-  { code: 'RP', display: 'Remington Park', aliases: ['RP', 'REMINGTON'] },
-  { code: 'SAR', display: 'Saratoga', aliases: ['SAR'] },
-  { code: 'SRR', display: 'Sandy Ridge Racing', aliases: ['SRR', 'SANDYRIDGE'] },
-  { code: 'SWF', display: 'Sweetwater Downs', aliases: ['SWF', 'SWEETWATER'] },
-  { code: 'TDN', display: 'Thistledown', aliases: ['TDN'] },
-  { code: 'TIM', display: 'Timonium', aliases: ['TIM'] },
-  { code: 'WO', display: 'Woodbine', aliases: ['WO'] },
+  { code: 'AJX', display: 'Ajax Downs', aliases: ['AJX'], tz: 'America/Toronto' },
+  { code: 'ALB', display: 'Albuquerque', aliases: ['ALB'], tz: 'America/Denver' },
+  { code: 'ASD', display: 'Assiniboia Downs', aliases: ['ASD', 'ASSINIBOIA'], tz: 'America/Winnipeg' },
+  { code: 'ATO', display: 'Atokad Downs', aliases: ['ATO', 'ATOKAD'], tz: 'America/Chicago' }, // South Sioux City, NE
+  { code: 'BKF', display: 'Blackfoot', aliases: ['BKF'], tz: 'America/Boise' }, // Bingham County, ID is Mountain
+  { code: 'BTP', display: 'Belterra Park', aliases: ['BTP', 'BELTERRA'], tz: 'America/New_York' },
+  { code: 'CBY', display: 'Canterbury Park', aliases: ['CBY', 'CANTERBURY'], tz: 'America/Chicago' },
+  { code: 'CD', display: 'Churchill Downs', aliases: ['CD'], tz: 'America/New_York' },
+  { code: 'CNL', display: 'Colonial Downs', aliases: ['CNL', 'COLONIAL'], tz: 'America/New_York' },
+  { code: 'CTM', display: 'Century Mile', aliases: ['CTM'], tz: 'America/Edmonton' },
+  { code: 'DEL', display: 'Delaware Park', aliases: ['DEL', 'DELAWARE'], tz: 'America/New_York' },
+  { code: 'ELK', display: 'Elko County Fair', aliases: ['ELK', 'ELKOFAIR', 'ELKO'], tz: 'America/Los_Angeles' }, // all of Nevada is Pacific
+  { code: 'EMD', display: 'Emerald Downs', aliases: ['EMD', 'EMERALD'], tz: 'America/Los_Angeles' },
+  { code: 'EVD', display: 'Evangeline Downs', aliases: ['EVD', 'EVANGELINE'], tz: 'America/Chicago' },
+  { code: 'FE', display: 'Fort Erie', aliases: ['FE'], tz: 'America/Toronto' },
+  { code: 'FL', display: 'Finger Lakes', aliases: ['FL'], tz: 'America/New_York' },
+  { code: 'FP', display: 'Fairmount Park', aliases: ['FP', 'FAIRMOUNT'], tz: 'America/Chicago' },
+  { code: 'GP', display: 'Gulfstream Park', aliases: ['GP', 'GULFSTREAM'], tz: 'America/New_York' },
+  { code: 'IND', display: 'Horseshoe Indianapolis', aliases: ['IND', 'INDIANAGRANDRACING', 'INDIANAGRAND'], tz: 'America/Indiana/Indianapolis' },
+  { code: 'LA', display: 'Los Alamitos', aliases: ['LA', 'LOSALAMITOSQUARTERHORSE', 'LOSAL'], tz: 'America/Los_Angeles' },
+  { code: 'LAD', display: 'Louisiana Downs', aliases: ['LAD', 'LOUISIANA'], tz: 'America/Chicago' },
+  { code: 'LRL', display: 'Laurel Park', aliases: ['LRL', 'LAUREL'], tz: 'America/New_York' },
+  { code: 'LS', display: 'Lone Star Park', aliases: ['LS', 'LONESTAR'], tz: 'America/Chicago' },
+  { code: 'MTH', display: 'Monmouth Park', aliases: ['MTH', 'MONMOUTH'], tz: 'America/New_York' },
+  { code: 'PID', display: 'Presque Isle Downs', aliases: ['PID', 'PRESQUEISLE'], tz: 'America/New_York' },
+  { code: 'PRM', display: 'Prairie Meadows', aliases: ['PRM'], tz: 'America/Chicago' },
+  { code: 'PRX', display: 'Parx Racing', aliases: ['PRX', 'PARX'], tz: 'America/New_York' },
+  { code: 'RP', display: 'Remington Park', aliases: ['RP', 'REMINGTON'], tz: 'America/Chicago' },
+  { code: 'SAR', display: 'Saratoga', aliases: ['SAR'], tz: 'America/New_York' },
+  { code: 'SRR', display: 'Sandy Ridge Racing', aliases: ['SRR', 'SANDYRIDGE'], tz: 'America/New_York' }, // Boyd County, KY (Ashland) is Eastern
+  { code: 'SWF', display: 'Sweetwater Downs', aliases: ['SWF', 'SWEETWATER'], tz: 'America/Denver' }, // Rock Springs, WY
+  { code: 'TDN', display: 'Thistledown', aliases: ['TDN'], tz: 'America/New_York' },
+  { code: 'TIM', display: 'Timonium', aliases: ['TIM'], tz: 'America/New_York' },
+  { code: 'WO', display: 'Woodbine', aliases: ['WO'], tz: 'America/Toronto' },
 
   // Three whose page name is not the track's name. The long form is kept as
   // an alias so a save that arrives spelled the page's way still lands on the
   // same row, while the short form is what gets stored and shown.
-  { code: 'CT', display: 'Charles Town', aliases: ['CT', 'HOLLYWOODCASINOATCHARLESTOWNRACES', 'CHARLESTOWNRACES'] },
+  { code: 'CT', display: 'Charles Town', aliases: ['CT', 'HOLLYWOODCASINOATCHARLESTOWNRACES', 'CHARLESTOWNRACES'], tz: 'America/New_York' },
   // "Lethbridge Rmtc" in the page header, "Lethbridge - Rmtc" in every race
   // block on the same page - the mismatch behind D122's wager-menu bug.
-  { code: 'LBG', display: 'Lethbridge', aliases: ['LBG', 'LETHBRIDGERMTC'] },
+  { code: 'LBG', display: 'Lethbridge', aliases: ['LBG', 'LETHBRIDGERMTC'], tz: 'America/Edmonton' },
   // "Mountaineer Casino Racetrack & Resort". Until D122 widened the entries
   // header's character class the `&` fell outside it and this parsed as the
   // bare word "Resort" - which is what would have been stored and keyed on,
   // so that spelling is an alias too, for any row already written that way.
-  { code: 'MNR', display: 'Mountaineer', aliases: ['MNR', 'MOUNTAINEERCASINORACETRACKRESORT', 'RESORT'] },
+  { code: 'MNR', display: 'Mountaineer', aliases: ['MNR', 'MOUNTAINEERCASINORACETRACKRESORT', 'RESORT'], tz: 'America/New_York' },
 ];
 
 const lettersOnly = (s) => String(s ?? '').toUpperCase().replace(/[^A-Z]/g, '');
 
 /**
- * `raw` -> { code, display, recognized }. `display` is the canonical name to
- * store/show for a recognized track, or the trimmed input as typed for an
- * unrecognized one. `code` is always present (derived for the unrecognized
- * case) so every comparison - the one-day-per-track+date rule, the results
- * chart mismatch refusal - can key on it.
+ * `raw` -> { code, display, recognized, timezone }. `display` is the
+ * canonical name to store/show for a recognized track, or the trimmed input
+ * as typed for an unrecognized one. `code` is always present (derived for
+ * the unrecognized case) so every comparison - the one-day-per-track+date
+ * rule, the results chart mismatch refusal - can key on it. `timezone` is
+ * the registry's IANA zone for a recognized track (D209) and `null` for an
+ * unrecognized one - never guessed, since a derived code carries no real
+ * location information at all.
  */
 /**
  * Every track this codebase has personally seen in a real captured page -
@@ -111,13 +126,13 @@ export function listTracks() {
 export function canonicalizeTrack(raw) {
   const key = lettersOnly(raw);
   const trimmed = String(raw ?? '').trim();
-  if (!key) return { code: null, display: trimmed, recognized: false };
+  if (!key) return { code: null, display: trimmed, recognized: false, timezone: null };
   for (const t of REGISTRY) {
     if (key === lettersOnly(t.display) || t.aliases.some((a) => key === a)) {
-      return { code: t.code, display: t.display, recognized: true };
+      return { code: t.code, display: t.display, recognized: true, timezone: t.tz };
     }
   }
-  return { code: key.slice(0, 3) || 'UNK', display: trimmed, recognized: false };
+  return { code: key.slice(0, 3) || 'UNK', display: trimmed, recognized: false, timezone: null };
 }
 
 // ---------- meets ----------
