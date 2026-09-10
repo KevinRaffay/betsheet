@@ -1,5 +1,5 @@
 import React, { useEffect, useRef, useState } from 'react';
-import { getCalendar } from '../api.js';
+import { getCalendar, listCards } from '../api.js';
 import { CALENDAR_COLUMNS, CALENDAR_START_HOUR } from '@shared/race-calendar.js';
 
 // "Today" is always the Pacific calendar date (D210/2026-09-10 decision: the
@@ -43,6 +43,7 @@ export default function RaceDayCalendar({ onBack, onOpenDay }) {
   const [date, setDate] = useState(todayPacific);
   const [data, setData] = useState(null);
   const [error, setError] = useState(null);
+  const [daysWithCards, setDaysWithCards] = useState(new Set());
   const scrollContainerRef = useRef(null);
 
   useEffect(() => {
@@ -54,6 +55,35 @@ export default function RaceDayCalendar({ onBack, onOpenDay }) {
       .catch((e) => { if (!cancelled) setError(String(e.message)); });
     return () => { cancelled = true; };
   }, [date]);
+
+  // Fetch cards for all race days to determine button styling
+  useEffect(() => {
+    if (!data || data.tracks.length === 0) {
+      setDaysWithCards(new Set());
+      return;
+    }
+    let cancelled = false;
+    const daysToCheck = new Set(data.tracks.map((t) => t.raceDayId));
+    const cardsMap = new Set();
+
+    Promise.all(
+      [...daysToCheck].map((dayId) =>
+        listCards(dayId)
+          .then((cards) => {
+            if (!cancelled && cards.length > 0) {
+              cardsMap.add(dayId);
+            }
+          })
+          .catch(() => {
+            // Silently ignore errors when fetching cards
+          })
+      )
+    ).then(() => {
+      if (!cancelled) setDaysWithCards(cardsMap);
+    });
+
+    return () => { cancelled = true; };
+  }, [data]);
 
   // Auto-scroll to the current Pacific hour when data loads
   useEffect(() => {
@@ -108,10 +138,18 @@ export default function RaceDayCalendar({ onBack, onOpenDay }) {
                 </tr>
               </thead>
               <tbody>
-                {data.tracks.map((t) => (
+                {data.tracks.map((t) => {
+                  const hasCards = daysWithCards.has(t.raceDayId);
+                  return (
                   <tr key={t.raceDayId}>
                     <td>
-                      <span className="linkish" onClick={() => onOpenDay(t.raceDayId)}>{t.track}</span>
+                      <button
+                        type="button"
+                        className={hasCards ? 'btn btn--primary' : 'btn'}
+                        onClick={() => onOpenDay(t.raceDayId)}
+                      >
+                        {t.track}
+                      </button>
                     </td>
                     {COLUMNS.map((i) => {
                       const races = t.races.filter((r) => r.hourBucket === i);
@@ -121,16 +159,21 @@ export default function RaceDayCalendar({ onBack, onOpenDay }) {
                             ? <span className="dim">—</span>
                             : races.map((r) => (
                               <div key={r.number}>
-                                <span className="linkish" onClick={() => onOpenDay(t.raceDayId, r.number)}>
+                                <button
+                                  type="button"
+                                  className={hasCards ? 'btn btn--primary btn--sm' : 'btn btn--sm'}
+                                  onClick={() => onOpenDay(t.raceDayId, r.number)}
+                                >
                                   Race {r.number} - {r.postTimePacific}
-                                </span>
+                                </button>
                               </div>
                             ))}
                         </td>
                       );
                     })}
                   </tr>
-                ))}
+                  );
+                })}
               </tbody>
             </table>
           </div>
