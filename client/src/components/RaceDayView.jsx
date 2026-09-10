@@ -94,9 +94,17 @@ export default function RaceDayView({ id, onBack, onOpenCard }) {
         // Collapse all races
         allRaces.forEach((d) => { d.open = false; });
 
-        // Open only the target race
+        // Open only the target race and its nested panels
         if (targetElement && targetElement.tagName === 'DETAILS') {
           targetElement.open = true;
+
+          // Expand analyst notes and tip sheets panels within the target race
+          const notesPanel = targetElement.querySelector('details.race-notes');
+          if (notesPanel) notesPanel.open = true;
+
+          const tipsPanel = targetElement.querySelector('details.race-tips');
+          if (tipsPanel) tipsPanel.open = true;
+
           targetElement.scrollIntoView({ behavior: 'smooth', block: 'start' });
         }
       }, 0);
