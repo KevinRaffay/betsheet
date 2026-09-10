@@ -1,4 +1,4 @@
-import React, { useEffect, useState } from 'react';
+import React, { useEffect, useRef, useState } from 'react';
 import {
   deleteRaceDay, deletionPreview, getDayTipScoring, getLlmNotes, getRaceDay, listTipPicks,
 } from '../api.js';
@@ -54,6 +54,21 @@ export default function RaceDayView({ id, onBack, onOpenCard }) {
   // race's editor so the not-blind warning appears where a note is actually
   // typed, which since D184 is the race panel rather than the day dialog.
   const [notesPostResult, setNotesPostResult] = useState(false);
+  const racesContainerRef = useRef(null);
+
+  const expandAll = () => {
+    if (racesContainerRef.current) {
+      const details = racesContainerRef.current.querySelectorAll('details.race');
+      details.forEach((d) => { d.open = true; });
+    }
+  };
+
+  const collapseAll = () => {
+    if (racesContainerRef.current) {
+      const details = racesContainerRef.current.querySelectorAll('details.race');
+      details.forEach((d) => { d.open = false; });
+    }
+  };
 
   useEffect(() => {
     getRaceDay(id).then(setDay).catch((e) => setError(String(e.message)));
@@ -66,6 +81,21 @@ export default function RaceDayView({ id, onBack, onOpenCard }) {
     })
     .catch(() => {}); // supplementary display only - a fetch failure here shouldn't block the page
   useEffect(() => { loadNotes(); }, [id]); // eslint-disable-line react-hooks/exhaustive-deps
+
+  // Handle anchor navigation to a specific race (#race-N)
+  useEffect(() => {
+    const hash = window.location.hash;
+    if (hash.startsWith('#race-')) {
+      // Wait for the next render to ensure details elements exist
+      setTimeout(() => {
+        const element = document.querySelector(hash);
+        if (element && element.tagName === 'DETAILS') {
+          element.open = true;
+          element.scrollIntoView({ behavior: 'smooth', block: 'start' });
+        }
+      }, 0);
+    }
+  }, [day]);
 
   // D176: the race's existing tip picks, so the entry dialog opens EDITING
   // what is already there rather than blank. Refetched on tipVersion so a save
@@ -207,38 +237,43 @@ export default function RaceDayView({ id, onBack, onOpenCard }) {
       <TipStakingPanel dayId={day.id} rows={tipRows} onSaved={() => setCardsVersion((v) => v + 1)} />
       <ResultsPanel dayId={day.id} />
       <EquibaseOtrPanel dayId={day.id} onSaved={() => setCardsVersion((v) => v + 1)} />
-      {day.races.map((race) => (
-        <details className="race" key={race.id} open>
-          <summary>
-            <strong>Race {race.number}</strong>
-            {' '}· {race.surface ?? '?'} · {race.distance ?? '?'} · {race.race_type ?? '?'}
-            {' '}· post {race.post_time ?? '?'}
-            {(() => {
-              const s = entriesStaleness({
-                capturedAt: day.odds_captured_at, raceDate: day.date, postTime: race.post_time, now,
-              });
-              if (!s.known) return null;
-              // `ran` is null whenever saying so would need the track's
-              // timezone, which nothing stores - see shared/staleness.js. The
-              // tag simply does not appear in that case rather than guessing.
-              if (s.ran) {
-                return (
-                  <span className="dim" title={s.assumesViewerClock
-                    ? 'Compared against this device\'s clock - the track\'s timezone is not recorded.'
-                    : 'This race day is in the past.'}
-                  >{' '}· past post</span>
-                );
-              }
-              // The separating space sits OUTSIDE the tag: inside it, the
-              // tag's own padding swallows it and the summary reads
-              // "post 1:30 PMentries 180m old".
-              return s.state === 'stale'
-                ? <>{' '}<span className="tag tag--gold" title={s.label}>entries {s.minutesOld}m old</span></>
-                : null;
-            })()}
-          </summary>
-          {race.conditions && <p className="conditions">{race.conditions}</p>}
-          <table className="grid">
+      <div className="formrow formrow--tight">
+        <button className="btn" onClick={expandAll}>Expand all</button>
+        <button className="btn" onClick={collapseAll}>Collapse all</button>
+      </div>
+      <div className="races-card" ref={racesContainerRef}>
+        {day.races.map((race) => (
+          <details className="race" key={race.id} id={`race-${race.number}`} open>
+            <summary>
+              <strong>Race {race.number}</strong>
+              {' '}· {race.surface ?? '?'} · {race.distance ?? '?'} · {race.race_type ?? '?'}
+              {' '}· post {race.post_time ?? '?'}
+              {(() => {
+                const s = entriesStaleness({
+                  capturedAt: day.odds_captured_at, raceDate: day.date, postTime: race.post_time, now,
+                });
+                if (!s.known) return null;
+                // `ran` is null whenever saying so would need the track's
+                // timezone, which nothing stores - see shared/staleness.js. The
+                // tag simply does not appear in that case rather than guessing.
+                if (s.ran) {
+                  return (
+                    <span className="dim" title={s.assumesViewerClock
+                      ? 'Compared against this device\'s clock - the track\'s timezone is not recorded.'
+                      : 'This race day is in the past.'}
+                    >{' '}· past post</span>
+                  );
+                }
+                // The separating space sits OUTSIDE the tag: inside it, the
+                // tag's own padding swallows it and the summary reads
+                // "post 1:30 PMentries 180m old".
+                return s.state === 'stale'
+                  ? <>{' '}<span className="tag tag--gold" title={s.label}>entries {s.minutesOld}m old</span></>
+                  : null;
+              })()}
+            </summary>
+            {race.conditions && <p className="conditions">{race.conditions}</p>}
+            <table className="grid">
             <thead>
               <tr><th>#</th><th>PP</th><th>Horse</th><th>Jockey</th><th>Trainer</th><th>Wt</th><th>M/L</th><th>Rank</th></tr>
             </thead>
@@ -261,29 +296,30 @@ export default function RaceDayView({ id, onBack, onOpenCard }) {
                 </tr>
               ))}
             </tbody>
-          </table>
-          {race.wager_menu && <p className="dim wager">{race.wager_menu}</p>}
-          {/* D184: a note about THIS race is typed here, under the house
-              rule that a race-specific input belongs in the Race UI. The
-              day-level dialog now writes the whole-day note only. */}
-          <RaceNotesEditor
-            dayId={day.id}
-            raceNumber={race.number}
-            note={notesByRace.get(race.number) ?? null}
-            postResult={notesPostResult}
-            onSaved={loadNotes}
-          />
-          {/* D182: a tip sheet is an opinion about THIS race, so it sits
-              beside this race's notes rather than in a day-level list. D176's
-              entry dialog is opened from inside the panel. */}
-          <RaceTipPicks
-            rows={tipRows.filter((r) => r.raceNo === race.number)}
-            scoreFor={scoreFor}
-            onEnter={() => setTipRace(race)}
-            onChanged={bumpTips}
-          />
-        </details>
-      ))}
+            </table>
+            {race.wager_menu && <p className="dim wager">{race.wager_menu}</p>}
+            {/* D184: a note about THIS race is typed here, under the house
+                rule that a race-specific input belongs in the Race UI. The
+                day-level dialog now writes the whole-day note only. */}
+            <RaceNotesEditor
+              dayId={day.id}
+              raceNumber={race.number}
+              note={notesByRace.get(race.number) ?? null}
+              postResult={notesPostResult}
+              onSaved={loadNotes}
+            />
+            {/* D182: a tip sheet is an opinion about THIS race, so it sits
+                beside this race's notes rather than in a day-level list. D176's
+                entry dialog is opened from inside the panel. */}
+            <RaceTipPicks
+              rows={tipRows.filter((r) => r.raceNo === race.number)}
+              scoreFor={scoreFor}
+              onEnter={() => setTipRace(race)}
+              onChanged={bumpTips}
+            />
+          </details>
+        ))}
+      </div>
     </section>
   );
 }
