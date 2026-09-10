@@ -1,4 +1,6 @@
 import React from 'react';
+import { flagRaceEntries } from '@shared/entry-flags.js';
+import EntryFlagTags from './EntryFlagTags.jsx';
 
 // The READ-ONLY ingest preview (invariant 9): exactly what Save will store,
 // warnings first. Shared by the New race day screen and the Backfill queue
@@ -23,6 +25,10 @@ export default function ParsePreview({ parsed, showWarnings = true }) {
 }
 
 export function RacePreview({ race }) {
+  // D216: the flags are a reading aid over exactly the rows below, computed
+  // from the parser's own output. Invariant 9 is untouched - nothing here is
+  // editable and nothing about what Save stores changes.
+  const { flags } = flagRaceEntries(race.entries);
   return (
     <details className="race" open>
       <summary>
@@ -40,7 +46,11 @@ export function RacePreview({ race }) {
         </thead>
         <tbody>
           {race.entries.map((e, ei) => (
-            <tr key={ei} className={e.scratched ? 'row--scratched' : ''}>
+            <tr
+              key={ei}
+              className={[e.scratched ? 'row--scratched' : '',
+                (flags[ei]?.baffert || flags[ei]?.favorite) ? 'row--entry-flag' : ''].filter(Boolean).join(' ')}
+            >
               <td>{e.programNumber ?? 'SCR'}</td>
               <td className="dim">{e.postPosition ?? ''}</td>
               <td>
@@ -49,6 +59,7 @@ export function RacePreview({ race }) {
                 {e.alsoEligible ? <span className="tag">AE</span> : null}
                 {e.notToBeClaimed ? <span className="tag">NTC</span> : null}
                 {e.scratched ? <span className="tag tag--red">SCR</span> : null}
+                <EntryFlagTags flag={flags[ei]} />
               </td>
               <td>{e.jockey ?? ''}</td>
               <td>{e.trainer ?? ''}</td>

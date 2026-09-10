@@ -1,4 +1,6 @@
 import React from 'react';
+import { flagRaceEntries } from '@shared/entry-flags.js';
+import EntryFlagTags from './EntryFlagTags.jsx';
 
 // Shared entries dropdown for a single race, used by the LLM card generator,
 // the day-level ticket builder (D134) and the Replay blind race view (D135)
@@ -30,6 +32,11 @@ const normalizeEntry = (e) => ({
 // program handicapper's rank is a genuine column and a null means "this day
 // has no program analysis", which is worth showing as such.
 export default function EntriesTable({ entries, open = false, showRank = true }) {
+  // D216: computed from the RAW rows, before `normalizeEntry` - the flags need
+  // the morning line (and, where the caller has it, the stored decimal), which
+  // the render shape does not carry. `.map` preserves order, so index i lines
+  // the two up.
+  const { flags } = flagRaceEntries(entries);
   return (
     <details className="race-entries" open={open}>
       <summary>Entries ({entries.length})</summary>
@@ -42,12 +49,17 @@ export default function EntriesTable({ entries, open = false, showRank = true })
         </thead>
         <tbody>
           {entries.map(normalizeEntry).map((e, i) => (
-            <tr key={e.programNumber ?? i} className={e.scratched ? 'row--scratched' : ''}>
+            <tr
+              key={e.programNumber ?? i}
+              className={[e.scratched ? 'row--scratched' : '',
+                (flags[i]?.baffert || flags[i]?.favorite) ? 'row--entry-flag' : ''].filter(Boolean).join(' ')}
+            >
               <td>{e.programNumber ?? '—'}</td>
               <td>
                 {e.horseName}
                 {e.bestBet ? <span className="tag tag--gold">BEST BET</span> : null}
                 {e.scratched ? <span className="tag tag--red">SCR</span> : null}
+                <EntryFlagTags flag={flags[i]} />
               </td>
               <td>{e.jockey ?? '—'}</td>
               <td>{e.trainer ?? '—'}</td>

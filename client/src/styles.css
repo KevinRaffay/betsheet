@@ -278,6 +278,27 @@ label.btn.btn--primary { color: var(--color-accent-text); }
 }
 .tag--gold { border-color: var(--gold); color: var(--gold); }
 .tag--red { border-color: var(--loss); color: var(--loss); }
+/* D216: the two entry flags. Colour-named to match the two above rather than
+   semantically named, because that is this block's existing convention. */
+.tag--blue { border-color: var(--accent-2); color: var(--accent-2); }
+.tag--green { border-color: var(--accent); color: var(--accent); }
+
+/* D216: a flagged entry's whole row, so the horse is findable by scanning the
+   table rather than by reading the Trainer column. The rule sits AFTER
+   `.row--scratched` deliberately: a scratched flagged horse keeps the struck-
+   through, dimmed treatment (that rule sets `opacity` on the same cells, which
+   this does not touch), so "flagged" never reads as "bettable" on a horse that
+   is out.
+
+   NAMED `row--entry-flag`, NOT `row--flagged`: that name was already taken,
+   further down this file, by DistributionView's outlier-day highlight - a RED
+   tint meaning "look at this, something is wrong". Reusing it here gave every
+   Baffert runner and every five-horse favorite the warning colour, because the
+   later rule wins the cascade; found by looking at the rendered page, which is
+   the only place a CSS-name collision between two unrelated components can be
+   seen at all. */
+.row--entry-flag td { background: var(--color-bg-raised); }
+.row--entry-flag td:first-child { box-shadow: inset 3px 0 0 var(--color-accent); }
 
 /* ---- race sections ---- */
 
