@@ -123,6 +123,41 @@ console.log('\n-- every entry resolves to itself, by display and by every alias 
   check(`all ${entries.length} displays and every alias round-trip to their own entry, timezone included`, bad === 0, `${bad} bad`);
 }
 
+console.log('\n-- every entry\'s own CODE resolves to that entry (D212) --');
+{
+  // The general form of a real bug: `canonicalizeTrack` compares the input
+  // against `display` and `aliases` and NOTHING ELSE, so an entry whose own
+  // code is not among its aliases sends that code down the DERIVED path -
+  // `recognized: false`, `timezone: null` - even though the code names a
+  // registered track. Del Mar was exactly that entry for as long as the
+  // registry has existed; `server/race-calendar.js` routes any race whose
+  // track has no timezone into `unplaceable`, so a caller passing the bare
+  // code would have made every Del Mar race vanish from the calendar.
+  //
+  // That caller is not hypothetical: `shared/parsers/equibase-apify-parseforge.js`
+  // falls back to `trackName || trackCode`, so a capture printing a code and
+  // no name hands the save layer a bare code today. It is correct for 38 of
+  // the 39 entries precisely BECAUSE each of those lists its own code.
+  //
+  // Asserted on BEHAVIOUR rather than on the shape of `aliases`, so it stays
+  // the right check if the lookup is ever taught to match codes implicitly.
+  const bad = [];
+  for (const e of entries) {
+    const got = canonicalizeTrack(e.code);
+    if (got.code !== e.code || got.display !== e.display || !got.recognized || got.timezone !== e.tz) {
+      bad.push(`${e.code} -> ${JSON.stringify(got)}`);
+    }
+  }
+  check(`all ${entries.length} codes round-trip to their own entry, timezone included`,
+    bad.length === 0, bad.join('; '));
+  // The case that was actually broken, pinned by name so a regression reads
+  // as itself rather than as one line in a list of 39.
+  const dmr = canonicalizeTrack('DMR');
+  check('the bare code "DMR" is a recognized Del Mar, with its Pacific zone',
+    dmr.code === 'DMR' && dmr.display === 'Del Mar' && dmr.recognized
+    && dmr.timezone === 'America/Los_Angeles', JSON.stringify(dmr));
+}
+
 console.log('\n-- the spellings this registry was built from (D122, real captures) --');
 for (const [raw, code, display] of [
   // The page header's own wording, including the two that are not the track's
