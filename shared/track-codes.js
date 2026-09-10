@@ -29,7 +29,13 @@
 // being in Kentucky, because Boyd County sits on the state's Eastern side;
 // all of Nevada, including Elko, is Pacific).
 const REGISTRY = [
-  { code: 'DMR', display: 'Del Mar', aliases: ['DELMARRACINGCOM'], tz: 'America/Los_Angeles' },
+  // D212: 'DMR' is listed here for the same reason every other entry lists its
+  // own code - the lookup compares against `display` and `aliases` and nothing
+  // else, so a bare code that is not an alias falls through to the DERIVED path
+  // and comes back `recognized: false` with `timezone: null`. Del Mar was the
+  // one entry in the registry missing its own code, so `canonicalizeTrack('DMR')`
+  // alone carried no zone while every other track's code resolved.
+  { code: 'DMR', display: 'Del Mar', aliases: ['DMR', 'DELMARRACINGCOM'], tz: 'America/Los_Angeles' },
   // D115: the first target for the Equibase entries ingest, and the first
   // non-Del-Mar track in this registry. Equibase's own page header prints
   // "Kentucky Downs"; the aliases cover its report code and the spaceless form
