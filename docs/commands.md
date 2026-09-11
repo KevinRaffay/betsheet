@@ -72,6 +72,7 @@ npm run reset -- --yes  # FACTORY RESET: wipe every record AND every log file
 npm run build-static-payload -- <raceDayId> [<raceDayId> ...] [--out f]        # D329: bundle one or more race days -> static/public/payload.json (read-only; every card and grade on each day is included, unconditionally)
 npm run build-static-payload -- --from <date> --to <date> [--track "Del Mar"]  # D329: the same, resolved by date range instead of explicit ids
 # D336: the same build, reachable from the UI too - "Publish snapshot" on the race day list (RaceDayList.jsx) checkbox-selects days and posts to POST /api/static-payload/publish, sharing server/static-payload-builder.js's build logic with this CLI. Writes the file only - never commits, pushes, or deploys.
+# D345: to actually deploy, commit static/public/payload.json and PUSH TO `deploy-static-app`, not `main` - that branch is what .github/workflows/deploy-pages.yml triggers on, deliberately not main, so a casual snapshot-refresh commit never has to go through the one-deliverable-per-PR workflow. `git push origin HEAD:deploy-static-app` from a branch that already has the payload commit works without a checkout.
 npm run dev:static      # D151: the static app on vite :5186 (needs a payload built first)
 npm run preview:static  # D155: serves the BUILT dist-static on :5187 - the only way to exercise the service worker (it registers in production builds only)
 npm run build:static    # D151: build dist-static (BETSHEET_STATIC_BASE sets the deploy sub-path)
