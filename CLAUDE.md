@@ -521,8 +521,21 @@ it. Rules still in force:
   reasoning: an abandoned number may already be cited somewhere by the time
   anyone notices). **This only coordinates worktrees on ONE machine** - a
   separate clone (betsheet-alt) or a cloud session has its own `.git` and
-  cannot see this counter, so the eyeball-the-ledger fallback is still the
-  right move there, carefully, until/unless this is ever made networked.
+  cannot see this counter, and until D226 the advice here was to eyeball the
+  ledger in that case. **D226 replaced that advice: run the allocator there
+  too.** A brand-new database now SEEDS from DELIVERABLES.md's high-water
+  mark instead of a hardcoded constant, so a fresh clone starts at the last
+  merged row + 1 rather than reissuing D203 - which is exactly what a cloud
+  session was handed on 2026-09-11, for the very work that fixed it. The
+  CLI prints the seed and its source to stderr on that first run, so a wrong
+  one is visible immediately rather than discovered by a human recognising
+  the number. The seed can only ever be RAISED by the ledger, never lowered
+  below the old constant, so a stale or half-written checkout falls back to
+  the pre-D226 behaviour instead of handing out a spent number. **What has
+  NOT changed: this is still not networked**, so it cannot see a number
+  minted on an unmerged branch in a DIFFERENT clone - if you know of one,
+  that is still yours to check by eye. A number in a merged row it now sees
+  by itself.
 - **A check script's safety assumption about its target can go stale when
   the target changes independently of the check** (D201). D198 shipped
   `check-pull-apify-cli.js`'s "no token" test on the assumption that
