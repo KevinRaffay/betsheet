@@ -23,6 +23,12 @@
   --color-text-muted: var(--mauve-10);
   --color-accent: var(--accent);
   --color-accent-text: #fff;
+  /* D235: a form control announces itself. Radix step 7 is the "UI element
+     border" step - step 6 (--color-border) is for dividers and reads as
+     decoration on a control. The field surface is the LOWEST one, so a field
+     reads as recessed on a card and is carried by its border on the page. */
+  --color-field-bg: var(--mauve-1);
+  --color-field-border: var(--mauve-7);
 
   --radius: 10px;
   --shell-max: 1440px;
@@ -39,6 +45,8 @@
   --color-text-muted: var(--mauve-11);
   --color-accent: #17a86b;
   --color-accent-text: #06130c;
+  --color-field-bg: var(--mauve-1);
+  --color-field-border: var(--mauve-7);
 
   color-scheme: dark;
 }
@@ -182,14 +190,11 @@ label.btn.btn--primary { color: var(--color-accent-text); }
   font-size: 13px;
   color: var(--color-text-muted);
 }
+/* D235: border/background/colour/radius/font now come from the base rule
+   above; this keeps only what is specific to a form row. */
 .formrow input,
 .formrow select {
-  border: 1px solid var(--color-border);
-  background: var(--color-bg);
-  color: var(--color-text);
-  border-radius: 6px;
   padding: 6px 10px;
-  font: inherit;
   font-size: 14px;
   min-width: 130px;
 }
@@ -198,10 +203,7 @@ label.btn.btn--primary { color: var(--color-accent-text); }
 .pastebox { flex: 1; min-width: 420px; display: flex; flex-direction: column; gap: 4px;
   font-size: 13px; color: var(--color-text-muted); }
 .pastebox textarea {
-  border: 1px solid var(--color-border);
-  background: var(--color-bg);
-  color: var(--color-text);
-  border-radius: 6px;
+  /* D235: border/background/colour/radius from the base rule. */
   padding: 8px 10px;
   font: 13px/1.4 ui-monospace, 'Cascadia Mono', Consolas, monospace;
   resize: vertical;
@@ -250,18 +252,60 @@ label.btn.btn--primary { color: var(--color-accent-text); }
 .row--scratched td { opacity: 0.45; text-decoration: line-through; }
 .row--scratched td:last-child { text-decoration: none; opacity: 1; }
 
-.in {
-  border: 1px solid transparent;
-  background: transparent;
+/* D235: EVERY editable control looks editable, at rest.
+   -------------------------------------------------------------------------
+   `.in` used to be `border: 1px solid transparent; background: transparent`
+   with the border appearing only on :hover. That is a label until you touch
+   it: no border, no contrast, and the one affordance hidden behind a hover
+   that a touch device never performs. The app already knew better in two
+   places - `.formrow input` and `.pastebox textarea` both carried a real
+   border and a real background - so the stylesheet held two contradictory
+   answers and `.in` was the wrong one.
+
+   The rule is on the ELEMENTS, not on `.in`, deliberately: 7 of this app's
+   text-ish controls carry no class at all (two date inputs, two number
+   inputs, four selects, a textarea), and a style you have to remember to
+   apply is one that will be forgotten again. `.in` is now layout only.
+
+   Checkboxes, radios and file inputs are excluded - they have their own
+   native affordance and a text-field box around them reads as a mistake. */
+input:not([type='checkbox']):not([type='radio']):not([type='file']),
+select,
+textarea {
+  border: 1px solid var(--color-field-border);
+  background: var(--color-field-bg);
   color: var(--color-text);
-  border-radius: 4px;
-  padding: 3px 6px;
+  border-radius: 6px;
+  padding: 5px 8px;
   font: inherit;
-  width: 100%;
-  min-width: 110px;
 }
-.in:hover { border-color: var(--color-border); }
-.in:focus { border-color: var(--color-accent); outline: none; background: var(--color-bg); }
+input:not([type='checkbox']):not([type='radio']):not([type='file']):hover,
+select:hover,
+textarea:hover { border-color: var(--color-accent); }
+
+/* A REAL focus ring, not a 1px tint. The old rule set `outline: none` and
+   changed the border colour only, which is the minimum a keyboard user can
+   be given and still barely see. `:focus-visible` keeps the ring off a
+   mouse click while guaranteeing it for the keyboard. */
+input:not([type='checkbox']):not([type='radio']):not([type='file']):focus-visible,
+select:focus-visible,
+textarea:focus-visible {
+  outline: none;
+  border-color: var(--color-accent);
+  box-shadow: 0 0 0 3px color-mix(in srgb, var(--color-accent) 30%, transparent);
+}
+
+/* Disabled must read as disabled rather than as an empty field. */
+input:disabled, select:disabled, textarea:disabled {
+  background: var(--color-bg-subtle);
+  color: var(--color-text-muted);
+  cursor: not-allowed;
+}
+
+/* `.in` is now LAYOUT ONLY - width and nothing else. Every visual property it
+   used to carry is on the base rule above, so a control keeps its affordance
+   whether or not anyone remembered the class. */
+.in { width: 100%; min-width: 110px; }
 .in--sm { min-width: 90px; }
 /* D232: the typed live-odds cell in a race's entries table. Narrow on
    purpose - it holds "9/5", never a sentence - and named for the feature
