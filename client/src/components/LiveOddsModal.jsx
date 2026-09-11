@@ -1,3 +1,4 @@
+import { formatPacific } from '@shared/time-format.js';
 import React, { useEffect, useState } from 'react';
 import { getLiveOddsCaptures, previewLiveOdds, saveLiveOdds } from '../api.js';
 
@@ -173,7 +174,7 @@ export default function LiveOddsModal({ dayId, onClose, onSaved }) {
             <ul>
               {captures.map((c) => (
                 <li key={`cap-${c.id}`}>
-                  {c.captured_at ?? `(capture time unknown — saved ${c.ingested_at})`} — {c.prices} price(s)
+                  {formatPacific(c.captured_at) ?? `(capture time unknown — saved ${formatPacific(c.ingested_at)})`} — {c.prices} price(s)
                 </li>
               ))}
             </ul>

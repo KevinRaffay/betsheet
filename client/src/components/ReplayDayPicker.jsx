@@ -1,3 +1,4 @@
+import { formatPacific } from '@shared/time-format.js';
 import React, { useEffect, useState } from 'react';
 import { getRandomReplayDay, getReplayDays } from '../api.js';
 
@@ -55,7 +56,7 @@ export default function ReplayDayPicker({ onBack, onOpenDay, onOpenStanding }) {
                 <td>{d.track}</td>
                 <td className="dim">{d.meet ?? '—'}</td>
                 <td>{d.raceCount}</td>
-                <td className="dim">{d.replayedAt ? d.replayedAt.slice(0, 10) : '—'}</td>
+                <td className="dim">{formatPacific(d.replayedAt, { dateOnly: true }) ?? '—'}</td>
               </tr>
             ))}
           </tbody>
