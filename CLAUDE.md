@@ -636,6 +636,44 @@ it. Rules still in force:
 - **A RAW implied-probability delta is not a move - it carries the difference between the two books' totals, and a scratch forges one on every runner** (D240). `1 / (odds + 1)` is honest per horse and useless per PAIR of horses, because a morning-line book sums to 118-125% and a tote board to its own, different, total. Subtract two such readings and every runner in the race inherits the same offset before anybody has bet a dollar: measured live while building this, a six-horse card whose ML book summed to 126% and whose typed board summed to 136% gave six raw deltas that summed to **+10.4 points** - exactly the gap between the books - so a 4/1 easing to 7/2, which is nothing, printed as **"+2.2"** and looked like support. **A SCRATCH is the same failure and larger**: two of ten scratching redistributes their whole share of the pool across the survivors, so every remaining horse's raw live probability rises and the whole race reads as steaming. The fix is to divide each book by its own total over a stated BASIS before comparing - `shared/entry-flags.js`'s `mlFairProbability`/`liveFairProbability`. Then a race's deltas sum to exactly zero, which is the property to ASSERT (`check-entry-flags` does) because it is the one that fails the instant someone reintroduces a raw comparison. **The basis needs a fallback or the fix breaks something else**: normalising over the comparable set alone blanks the ML column everywhere no board exists, which is the ingest preview and the whole static at-track app, so it falls back to the ML-priced live runners there. **The wider rule: any two odds figures in this codebase are only subtractable after they have been normalised over the same runners**, and that includes anything built on `impliedWinProbability` - `shared/pick-scoring.js`'s `impliedProbabilities` (D229) divides the overround out for the same reason and is the other half of this lesson.
 - **A move flag needs BOTH a proportional test and a share-of-book test, ORed - either alone is blind to one end of the board** (D240). The obvious design is a ratio of normalised probabilities, and it is right for the long end: 20/1 -> 8/1 is 2.2x and the biggest read on the card. It **systematically misses the favorite**, which is where the money actually is - a 5/2 bet down to 8/5 is a 1.24x ratio, under any sane ratio bar, while being +5.5 points of the entire book. The mirror is equally true: a points test alone never fires beyond about 8/1, because nothing out there can move five points. So `classifyMove` fires on `(ratio >= bar AND >= 1 point) OR (points >= bar)`, and the 1-point floor on the ratio branch is not decoration - the long end of a tote is quantised into 50/1, 60/1, 99/1 buckets, so 99/1 -> 60/1 is a 1.5x ratio worth 0.7 of a point and is rounding, not an opinion. All of it sits in the exported `MOVE_THRESHOLDS` so the numbers are a stated contract a findings file can cite, not literals inside a branch. **And the flag is a LABEL, never a recommendation**: "follow the steam" and "the drifter is the value" are both real, contradictory, and unmeasured on this corpus - `docs/requirements/post-time-odds-llm-comparison.md` exists to answer that with an `n`, and asserting it in a tag would be concluding it by UI instead.
 - **Equibase does not publish live odds in any form this project can read - the column is a JS placeholder** (D232). The entries page HAS a `LiveOdds` column, which is why D228 built a capture path around uploading that page. It is EMPTY in the HTML Equibase serves: 123 of 123 cells in this repo's own `DMR090726USA-EQB` fixture, the header carrying `title="Live Odds refreshed every 60 seconds"` and the cells carrying nothing but `id`/`name` hooks for an external `/js/liveOdds.js`. So the values exist only in a live browser DOM. **Both capture shapes this codebase supports are therefore empty by construction, at any hour** - `shared/parsers/equibase-entries.js`'s own header defines them as the original server markup (`view-source:`, and Ctrl+S "Webpage, HTML Only"). The requirements doc's open question 2 read the empty column as "this capture predates wagering" and asked for a second capture closer to post; that was the wrong diagnosis, and a near-post capture of either shape would have been just as empty. **The Apify route is out for the same underlying reason**: the actor scrapes that same page server-side and never sees the JS output - checked across all three real datasets on file, entries rows carry `morningLineOdds`/`morningLineDecimal` and no live-odds field of any kind, results rows only the payoffs. **So the board is TYPED, per race, at post time** (D232), which is the same posture invariant 6 already describes for every other source here. **Chrome's "Webpage, Complete" was the last candidate and it does NOT work either** - tested by the user, 2026-09-11. So NO browser save method reaches the board: not view-source, not "HTML Only", not "Complete", and not the Apify actor. `LiveOddsModal.jsx`'s upload path still functions and is still correct, but **nothing known can feed it** - it is kept because its reconciler, refusals and capture history are what the typed path reuses, not because there is a capture to make. The general lesson: **a column existing in the markup is not the same as a column carrying data**, and the way to tell is to read the served bytes rather than the rendered page.
+- **`shared/static-payload.js`'s validator is ALL-OR-NOTHING across the whole
+  requested range, and a schema rule that is too strict silently produces NO
+  FILE at all, not a partial one** (D337). `buildStaticPayload` refuses the
+  entire bundle if `validateStaticPayload` finds one problem anywhere in it -
+  correct behavior (a broken static app is worse than a stale one), but it
+  means a validator bug reads identically to a data bug: `npm run
+  build-static-payload -- --from ... --to ...` printed "an entry has no
+  program_number" for ~20 entries across a wide date range and wrote nothing,
+  which looked like corrupt data. It was the validator: migration 032 (D180)
+  made `program_number` NULLable for exactly this case (a scratched horse
+  Equibase prints with no number at all), and `CardSheet.jsx`/
+  `EntriesTable.jsx` already render that as `—` - but `validateDay` still
+  required a non-empty string on every entry, unconditionally. Checked the
+  real corpus before trusting that diagnosis (`SELECT ... WHERE program_number
+  IS NULL`): 226 rows, all 226 scratched, none live - exactly the D180 shape.
+  Fixed to accept `program_number: null` only when the entry is scratched (a
+  null on a live entry still fails, as genuine corruption), and to stop
+  treating multiple nulls as duplicate program numbers. **The general lesson**:
+  when a payload/schema validator rejects the whole batch, check whether the
+  rejected VALUE is one the DB itself has ever legitimately produced (grep the
+  migration that touched the column) before assuming the data is wrong - it
+  may be the validator that never learned about a rule the schema already
+  encodes.
+- **`ensureDeliverableLabel`'s "already exists" match could never fire against
+  a REAL GitHub response, and its own check script's fixture hid that for as
+  long as it existed** (D337, a second instance of the D201 lesson below).
+  `scripts/lib/deliverable-issues.js` (D324) swallows a 422 from `POST
+  .../labels` only when `err.message` contains `already_exists` - but
+  GitHub's real 422 body is `{message: "Validation Failed", errors:
+  [{code: "already_exists", ...}]}`, so the code that actually matters was
+  never in the string being tested. Once the `deliverable` label existed (i.e.
+  after the very first successful claim ever made against this repo), every
+  subsequent `npm run allocate-deliverable` call hit this and threw - found
+  live claiming this very deliverable's number. `check-deliverable-issues.js`
+  never caught it because its fixture asserted against `{message:
+  'already_exists'}`, a shape GitHub does not send. Fixed by folding
+  `errors[]` into the thrown message and adding a fixture built from GitHub's
+  actual documented error shape, not a convenient guess at one.
 - **A check script's safety assumption about its target can go stale when
   the target changes independently of the check** (D201). D198 shipped
   `check-pull-apify-cli.js`'s "no token" test on the assumption that
