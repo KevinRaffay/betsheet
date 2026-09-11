@@ -1,6 +1,7 @@
 import React from 'react';
 import { navigate } from './app.jsx';
-import { bundleStats, cashedTickets, dayStats, latestDay, nextRace, orderDays } from './day-stats.js';
+import { bundleStats, cashedTickets, dayStats, orderDays } from './day-stats.js';
+import NextRaceTile from './NextRaceTile.jsx';
 import { producerOf } from './card-label.js';
 import { longDate, money, plural, plClass, signedMoney } from './format.js';
 
@@ -53,8 +54,6 @@ function Meeting({ day }) {
 
 export default function Home({ raceDays, generatedAt }) {
   const stats = bundleStats(raceDays);
-  const next = nextRace(raceDays);
-  const latest = latestDay(raceDays);
   const { upcoming, past } = orderDays(raceDays, todayPacific());
   const cashed = cashedTickets(raceDays, 10);
 
@@ -78,41 +77,9 @@ export default function Home({ raceDays, generatedAt }) {
         </div>
       </section>
 
-      {/* Always rendered (D378, user request): on a historical bundle, which
-          is the ordinary case, it says so and points at the latest day
-          rather than vanishing - the same card the desktop home shows. */}
-      <section className="next-race">
-        <div>
-          <div className="eyebrow">Next race</div>
-          {next ? (
-            <>
-              <div className="next-race__what">{next.day.raceDay.track} · Race {next.race.number}</div>
-              <div className="dim">
-                {next.postTimePacific} · {longDate(next.day.raceDay.date)}
-                {next.race.distance ? ` · ${next.race.distance}` : ''}
-                {' · '}{plural(next.race.entries.filter((e) => !e.scratched).length, 'runner')}
-              </div>
-            </>
-          ) : (
-            <>
-              <div className="next-race__what">No race still to run in this snapshot</div>
-              <div className="dim">
-                {latest ? `Latest day: ${latest.raceDay.track}, ${longDate(latest.raceDay.date)}` : 'No race days bundled.'}
-              </div>
-            </>
-          )}
-        </div>
-        {next ? (
-          <button type="button" className="btn btn--primary"
-            onClick={() => navigate(`/day/${next.day.raceDay.raceDayId}/race/${next.race.number}`)}>
-            View race →
-          </button>
-        ) : latest && (
-          <button type="button" className="btn btn--primary" onClick={() => navigate(`/day/${latest.raceDay.raceDayId}`)}>
-            View day →
-          </button>
-        )}
-      </section>
+      {/* D378/D380: the same tile the calendar shows; always rendered, and
+          its button always opens a race. */}
+      <NextRaceTile raceDays={raceDays} />
 
       <section className="panel">
         <div className="pagehead">

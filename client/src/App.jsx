@@ -34,6 +34,17 @@ export default function App() {
     window.history.pushState(null, '', pathForView(nextView));
   };
 
+  // Open a day scrolled to one of its races: `/day/:id#race-N`, which
+  // RaceDayView reads on mount. Shared by the calendar's race buttons and
+  // the "Next race" card on the home and calendar (D378/D380) - a null
+  // raceNumber opens the day at the top.
+  const openDayAtRace = (id, raceNumber) => {
+    const nextView = { name: 'day', id };
+    setView(nextView);
+    const hash = raceNumber ? `#race-${raceNumber}` : '';
+    window.history.pushState(null, '', pathForView(nextView) + hash);
+  };
+
   useEffect(() => {
     document.documentElement.classList.toggle('dark-theme', theme === 'dark');
   }, [theme]);
@@ -67,6 +78,7 @@ export default function App() {
             refreshKey={refreshKey}
             onNew={() => navigate({ name: 'new' })}
             onOpen={(id) => navigate({ name: 'day', id })}
+            onOpenRace={openDayAtRace}
             onPL={() => navigate({ name: 'pl' })}
             onDistribution={() => navigate({ name: 'distribution' })}
             onSources={() => navigate({ name: 'sources' })}
@@ -77,13 +89,7 @@ export default function App() {
         {view.name === 'calendar' && (
           <RaceDayCalendar
             onBack={() => navigate({ name: 'list' })}
-            onOpenDay={(id, raceNumber) => {
-              const view = { name: 'day', id };
-              setView(view);
-              const path = pathForView(view);
-              const hash = raceNumber ? `#race-${raceNumber}` : '';
-              window.history.pushState(null, '', path + hash);
-            }}
+            onOpenDay={openDayAtRace}
           />
         )}
         {view.name === 'replay' && (

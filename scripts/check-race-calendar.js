@@ -193,7 +193,10 @@ console.log('\n-- server: /api/calendar --');
   // Same track+date shape, but soft-deleted - must not appear at all.
   seedDay('Woodbine', [[1, '1:00 PM']], { deleted: true });
   // A different date entirely - must not appear in a DATE query.
-  db.prepare("INSERT INTO race_days (track, date, correlation_id) VALUES ('Gulfstream Park', '2026-09-13', 'cid-gp')").run();
+  const gp = db.prepare("INSERT INTO race_days (track, date, correlation_id) VALUES ('Gulfstream Park', '2026-09-13', 'cid-gp')").run().lastInsertRowid;
+  // D380: two races with NO post time - never placeable, so never "next", but
+  // the latest day's LAST race is what the card's button lands on.
+  db.prepare('INSERT INTO races (race_day_id, number, post_time) VALUES (?, 1, NULL), (?, 2, NULL)').run(gp, gp);
   db.close();
 
   const PORT = 8908;
@@ -258,8 +261,8 @@ console.log('\n-- server: /api/calendar --');
     check('the deleted Woodbine day never wins: Del Mar race 1 at 10:15 AM PDT is next',
       n1.next?.raceDayId === dmr && n1.next.number === 1 && n1.next.postTimePacific === '10:15 AM PDT'
       && n1.next.at === '2026-09-12T17:15:00.000Z' && n1.next.runners === 0, JSON.stringify(n1.next));
-    check('latest is the most recent stored day (Gulfstream Park 2026-09-13), by date',
-      n1.latest?.track === 'Gulfstream Park' && n1.latest.date === '2026-09-13', JSON.stringify(n1.latest));
+    check('latest is the most recent stored day (Gulfstream Park 2026-09-13), by date, with its last race number (D380)',
+      n1.latest?.track === 'Gulfstream Park' && n1.latest.date === '2026-09-13' && n1.latest.lastRaceNumber === 2, JSON.stringify(n1.latest));
 
     // 18:30Z: Del Mar (17:15Z) and Kentucky Downs (18:00Z) have run; Saratoga 3:05 PM EDT (19:05Z) is next.
     const { body: n2 } = await jget('/api/next-race?now=2026-09-12T18:30:00Z');
@@ -267,8 +270,8 @@ console.log('\n-- server: /api/calendar --');
       n2.next?.track === 'Saratoga' && n2.next.postTimePacific === '12:05 PM PDT', JSON.stringify(n2.next));
 
     const { body: n3 } = await jget('/api/next-race?now=2026-09-13T00:00:00Z');
-    check('once everything has run, next is null and latest still points somewhere',
-      n3.next === null && n3.latest?.track === 'Gulfstream Park', JSON.stringify(n3));
+    check('once everything has run, next is null and latest still points at a race (its unplaceable races were never "next")',
+      n3.next === null && n3.latest?.track === 'Gulfstream Park' && n3.latest.lastRaceNumber === 2, JSON.stringify(n3));
 
     const { status: s4, body: n4 } = await jget('/api/next-race');
     check('without a pinned clock it answers 200 with a real now and a null-or-object next',
