@@ -140,6 +140,15 @@ check('cards.live_odds_present exists, NOT NULL, defaulting 0 so every pre-D234 
 check('llm_card_requests.live_odds_present carries the per-race truth, same shape',
   db.prepare(`SELECT COUNT(*) c FROM pragma_table_info('llm_card_requests')
     WHERE name = 'live_odds_present' AND "notnull" = 1 AND dflt_value = '0'`).get().c === 1);
+// D369: the third input flag - tip sheets - in the same two-column shape as
+// notes and the board. Defaults 0 so every pre-D369 row stays valid; the
+// migration's own backfill then raises it where the stored prompt says so.
+check('cards.tip_sheets_present exists, NOT NULL, defaulting 0 so every pre-D369 card stays valid',
+  db.prepare(`SELECT COUNT(*) c FROM pragma_table_info('cards')
+    WHERE name = 'tip_sheets_present' AND "notnull" = 1 AND dflt_value = '0'`).get().c === 1);
+check('llm_card_requests.tip_sheets_present carries the per-race truth, same shape',
+  db.prepare(`SELECT COUNT(*) c FROM pragma_table_info('llm_card_requests')
+    WHERE name = 'tip_sheets_present' AND "notnull" = 1 AND dflt_value = '0'`).get().c === 1);
 
 // D232 widened this, and retired the premise the D228 version was named for.
 // "the one source that carries a board" was wrong: Equibase's page does NOT
