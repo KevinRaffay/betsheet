@@ -240,7 +240,13 @@ npm run gh -- pr list    # the GitHub API, through the credential git already ha
   pre-push hook (`npm run install-hooks`) - `main` moves by merge, never by
   push, even now.
 - A PR description states what it delivers, how it was tested (with
-  evidence), and any deviations from plan.
+  evidence), and any deviations from plan. **That shape now lives in
+  `.github/pull_request_template.md` (D227)**, which GitHub pre-fills a new
+  PR with and which carries the definition-of-done boxes below. The template
+  is a LAYOUT, never a second rulebook: it deliberately holds no rule of its
+  own, so a new rule goes here and only then, if useful, gets a box there -
+  otherwise the two drift and the file loaded into every session stops being
+  the authority.
 - Too big to review = split it and add rows to DELIVERABLES.md.
 - **QA branch deliverables carry a `-QA` suffix on their ID** (`D44-QA`): a PR
   merged from `qa` gets the suffix in DELIVERABLES.md, in
