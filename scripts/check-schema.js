@@ -35,7 +35,8 @@ const tables = db.prepare(
 
 const expected = [
   'actual_stakes', 'allocations', 'backfill_queue', 'cards', 'consensus_picks', 'entries',
-  'exotic_payoffs', 'fetch_attempts', 'graded_tickets', 'human_race_state', 'llm_card_requests', 'llm_notes', 'publishes',
+  'exotic_payoffs', 'fetch_attempts', 'graded_tickets', 'human_race_state', 'llm_card_requests', 'llm_notes',
+  'odds_capture_entries', 'odds_captures', 'publishes',
   'race_days', 'race_results', 'races', 'result_charts', 'result_scratches',
   'schema_migrations', 'simulation_results', 'simulation_runs', 'sources',
   'strategy_templates', 'tickets', 'tip_picks',
@@ -119,6 +120,20 @@ check('the race_days rebuild recreated idx_race_days_meet (it rides on the table
   db.prepare("SELECT COUNT(*) c FROM sqlite_master WHERE type = 'index' AND name = 'idx_race_days_meet'").get().c === 1);
 check('race_days.odds_captured_at exists and is nullable - one timestamp per CARD, by design',
   db.prepare("SELECT COUNT(*) c FROM pragma_table_info('race_days') WHERE name = 'odds_captured_at' AND \"notnull\" = 0").get().c === 1);
+// D224 (migration 034): the capture HISTORY. `entries.live_odds` keeps its
+// meaning as the latest board - these tables are what a second capture must
+// never overwrite, since the drift between two boards is the whole signal.
+check('odds_captures is per (day, capture) with a nullable captured_at - absent reads as unknown, never fresh',
+  db.prepare("SELECT COUNT(*) c FROM pragma_table_info('odds_captures') WHERE name = 'captured_at' AND \"notnull\" = 0").get().c === 1);
+check("odds_captures.source is CHECK-constrained to the one source that carries a board",
+  /CHECK \(source IN \('equibase_html'\)\)/.test(
+    db.prepare("SELECT sql FROM sqlite_master WHERE name = 'odds_captures'").get().sql));
+check('odds_capture_entries is unique per (capture, race, program number)',
+  db.prepare("SELECT COUNT(*) c FROM pragma_index_list('odds_capture_entries') WHERE \"unique\" = 1").get().c === 1);
+check('odds_capture_entries keeps the price TEXT NOT NULL while its decimal may be null (an unreadable form is still a real price)',
+  db.prepare(`SELECT COUNT(*) c FROM pragma_table_info('odds_capture_entries')
+    WHERE (name = 'live_odds' AND "notnull" = 1) OR (name = 'live_odds_decimal' AND "notnull" = 0)`).get().c === 2);
+
 check('entries gained live odds, medication, age/sex, claim price and the AE flag - all nullable but the flag',
   db.prepare(`SELECT COUNT(*) c FROM pragma_table_info('entries') WHERE name IN
     ('live_odds','live_odds_decimal','medication','age_sex','claim_price','also_eligible')`).get().c === 6);
