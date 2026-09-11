@@ -732,10 +732,35 @@ it. Rules still in force:
   prop, and read by a child's mount-time effect, needs the render-time-key
   pattern) is worth keeping even though this specific screen no longer
   composes anything.
+- **The baseline app is a DESKTOP app and stays one; mobile is in scope ONLY
+  for the static at-track app - HOUSE RULE** (user rule, 2026-09-11, D241).
+  Everything under `client/` and `server/` is built for a desktop browser.
+  A narrow viewport is not a supported case there, a table that overflows at
+  375px is not a defect, and "make it responsive" is not a follow-up someone
+  should file. **The rule is a SCOPE boundary, not a style preference**: it
+  says where effort goes, and the answer is that a phone at a racetrack is
+  served by `static/`, which exists for exactly that and has its own
+  breakpoint, its own CSS and its own check script. Adding a second
+  phone-capable surface would mean maintaining two, and the corpus, the
+  grading and the generation the baseline app is FOR are desktop work.
+  **This is already what the code does rather than a new direction**:
+  `client/src/styles.css` contains no `@media` query at all (verified
+  2026-09-11), while `static/src/static.css` has the one that matters. So
+  nothing is being removed - what changes is that a reviewer stops reading
+  the baseline app's narrow-viewport behaviour as an open item.
+  **Invariant 10 is why this is coherent and not just a preference**: the
+  server binds 127.0.0.1, so no phone can reach the baseline app in the first
+  place; the only thing that ever leaves this machine is the Pages payload.
+  The one thing that does NOT relax: a desktop layout must still be correct
+  at ordinary desktop widths, and D157 below still binds `static/` in full.
 - **A call to action must be reachable without sideways scrolling on a phone
   - HOUSE RULE** (user rule, 2026-09-07, D157). Every UI in this codebase that
   a phone can reach must keep its primary action - the button the screen
-  exists for - inside the viewport at 375px. Found live on the deployed Pages
+  exists for - inside the viewport at 375px. **Which, per the rule ABOVE
+  (D241), means `static/` and only `static/`** - the baseline app is desktop
+  and a phone cannot reach it anyway (invariant 10). Read this rule as binding
+  the static at-track app; it was written from a live failure there, and every
+  example below is one of its tables. Found live on the deployed Pages
   builder: the races grid carried Distance / Surface / Runners between the
   post time and the **Build** button, `.grid { overflow-x: auto }` stopped the
   page from stretching by pushing the RIGHTMOST column out of sight, and the
