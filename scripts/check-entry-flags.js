@@ -22,6 +22,11 @@
 // D223 NEGATIVE CONTROL: make the rank sort `b.ml - a.ml` and the order
 // assertions fail; drop the tie branch and the "1, 1, 3" assertion fails.
 //
+// D224 NEGATIVE CONTROL: drop the `scratched ? null : ...` guard on
+// `mlPayoutCents`/`mlWinProbability` and the scratched-horse assertion fails
+// (a scratch would imply a payout again); change `impliedWinPayoutCents` to
+// use a $1 base instead of $2 and the $7.00/$3.60/$42.00 assertions fail.
+//
 // Run: npm run check-entry-flags
 
 import {
@@ -61,6 +66,57 @@ const ranksOf = (entries) => flagRaceEntries(entries).flags.map((f) => f.mlRank)
   check('five-horse field: the favorite flag and rank 1 name the same horse',
     (() => { const f = flagRaceEntries([e('A', '6/1'), e('B', '5/2'), e('C', '20/1'), e('D', '7/2'), e('E', '8/1')]).flags; return f[1].favorite && f[1].mlRank === 1 && f.filter((x) => x.favorite).length === 1; })());
   check('every flag carries mlRank, null on junk', flagRaceEntries([{}, {}]).flags.every((f) => f.mlRank === null));
+}
+
+console.log('\nImplied $2-to-win and win probability (D224) - a reading aid, never a promise');
+const payoutsOf = (entries) => flagRaceEntries(entries).flags.map((f) => f.mlPayoutCents);
+const probsOf = (entries) => flagRaceEntries(entries).flags.map((f) => f.mlWinProbability);
+{
+  // 5/2 -> $2 * (2.5 + 1) = $7.00 -> 700 cents; probability 1 / 3.5 ~ 0.2857.
+  const one = [e('A', '5/2')];
+  check('5/2 implies a $7.00 $2-win price', payoutsOf(one)[0] === 700, payoutsOf(one)[0]);
+  check('5/2 implies about 28.57% win probability',
+    Math.abs(probsOf(one)[0] - (1 / 3.5)) < 1e-9, probsOf(one)[0]);
+
+  // 4/5 (odds-on) -> $2 * 1.8 = $3.60; probability 1/1.8 ~ 55.6%.
+  const favShot = [e('A', '4/5')];
+  check('an odds-on 4/5 shot implies $3.60 and over 50% - a short line is a SHORT payout, not a big one',
+    payoutsOf(favShot)[0] === 360 && Math.abs(probsOf(favShot)[0] - (1 / 1.8)) < 1e-9,
+    JSON.stringify({ payout: payoutsOf(favShot)[0], prob: probsOf(favShot)[0] }));
+
+  // 20/1 -> $2 * 21 = $42.00; probability 1/21 ~ 4.76%.
+  const longshot = [e('A', '20/1')];
+  check('a 20/1 longshot implies $42.00 and under 5%',
+    payoutsOf(longshot)[0] === 4200 && probsOf(longshot)[0] < 0.05, payoutsOf(longshot)[0]);
+
+  // A real morning line (Del Mar 2026-09-07, race 1) - its implied
+  // probabilities sum well over 1, the OVERROUND, not a bug in this module.
+  const field = ['20/1', '30/1', '3/1', '15/1', '5/1', '5/2', '20/1', '3/1', '15/1', '12/1']
+    .map((ml) => e('X', ml));
+  const overround = probsOf(field).reduce((a, p) => a + (p ?? 0), 0);
+  check('a real race\'s implied probabilities sum well over 100% (the track\'s take)',
+    overround > 1.25 && overround < 1.30, overround);
+
+  // A SCRATCHED horse has no payout or probability even though it carried a
+  // price - it cannot cash, unlike mlRank's own null-for-scratch rule, which
+  // this mirrors.
+  const scr = [e('A', '5/2', { scratched: true }), e('B', '3/1')];
+  check('a scratched horse implies neither a payout nor a probability, despite carrying a line',
+    payoutsOf(scr)[0] === null && probsOf(scr)[0] === null && payoutsOf(scr)[1] === 800,
+    JSON.stringify(payoutsOf(scr)));
+
+  // An unpriced horse: both null, never a fabricated figure.
+  const unpriced = [e('A', null), e('B', '-')];
+  check('an unpriced horse implies nothing', payoutsOf(unpriced).every((x) => x === null)
+    && probsOf(unpriced).every((x) => x === null));
+
+  // The stored decimal wins over the printed string, same rule as mlRank.
+  const stored = [{ trainer: 'X', morning_line: '99/1', morning_line_decimal: 2.5, scratched: 0 }];
+  check('the stored decimal (not the printed string) drives the payout when a caller has one',
+    payoutsOf(stored)[0] === 700, payoutsOf(stored)[0]);
+
+  check('junk never throws and implies nothing',
+    flagRaceEntries([{}, {}]).flags.every((f) => f.mlPayoutCents === null && f.mlWinProbability === null));
 }
 
 console.log('\nTrainer match - the three spellings this corpus really holds');

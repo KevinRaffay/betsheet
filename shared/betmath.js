@@ -214,6 +214,33 @@ export function morningLineToDecimal(ml) {
 
 export const winPayout = (stakeCents, ml) => Math.round(stakeCents * (ml + 1));
 
+/**
+ * The $2 win price a morning line implies - what "$2 to win" would pay if
+ * the horse wins, at winPayout's own $2 minimum. D224.
+ *
+ * NOT A PROMISE: the morning line is the track handicapper's forecast of
+ * where the public's money will go, not a live market - the price actually
+ * paid at post is usually different (often quite different). What was
+ * really paid lives in `race_results.win_cents`, once a day has one.
+ */
+export const impliedWinPayoutCents = (ml) => (
+  typeof ml === 'number' && Number.isFinite(ml) ? winPayout(200, ml) : null
+);
+
+/**
+ * The implied win probability a decimal morning line encodes, 0-1. D224.
+ * `1 / (ml + 1)` is the standard decimal-odds-to-probability conversion -
+ * a 5/2 shot (`ml` 2.5) implies 1/3.5, about 29%.
+ *
+ * Summed across a full field this reads well over 1 (100%) - that is the
+ * OVERROUND, the track's built-in take, made visible rather than a bug in
+ * this function. Every line already prices in the house edge.
+ */
+export function impliedWinProbability(ml) {
+  if (typeof ml !== 'number' || !Number.isFinite(ml) || ml < 0) return null;
+  return 1 / (ml + 1);
+}
+
 /** Place is an estimate band - live places at $6.20/$18.60 taught that. */
 export function placeEstimate(stakeCents, ml) {
   const { placeLow, placeHigh } = BET.estimates;
