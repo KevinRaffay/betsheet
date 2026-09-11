@@ -64,8 +64,11 @@ function TicketsTable({ tickets, totalCents }) {
 }
 
 // LLM cards (D63/D65/D66): a modal walkthrough, one race at a time -
-// Generate (the actual model call) shows a preview, Save confirms it.
-// Every already-generated race carries a collapsible panel in its own row
+// Generate calls the model AND saves the result in one action (D-new): no
+// separate confirm step, matching how "Regenerate All Races" already
+// generated-then-saved each race with nothing in between. A race where every
+// line was refused (D215) saves nothing and reports why; anything that
+// parsed is kept. Every already-generated race carries a collapsible panel in its own row
 // showing the saved card (D66 - replaces the "Open card #N" button, which
 // is gone: there's nothing left to jump elsewhere for). Calls
 // `onCardChanged` after every save so the day's Betting cards table
@@ -88,9 +91,12 @@ export default function LlmCardModal({ dayId, onCardChanged, onClose }) {
   const [notesPostResult, setNotesPostResult] = useState(false);
   const [notesTick, setNotesTick] = useState(0); // re-render on an unflushed local edit
   const [notesUsedByRace, setNotesUsedByRace] = useState(new Map()); // raceNumber -> notesEnteredAt of the generation
-  const [openRace, setOpenRace] = useState(null); // race actively being generated/previewed (unsaved)
+  const [generatingRace, setGeneratingRace] = useState(null); // race number mid-generate (drives the per-race spinner)
   const [lastSavedRace, setLastSavedRace] = useState(null);
-  const [preview, setPreview] = useState(null);
+  // raceNumber -> message, e.g. "3 ticket(s) saved, 1 line(s) refused: ...".
+  // Set only when there is something to say beyond "generated" - a fully
+  // clean generate clears any prior entry rather than leaving stale text.
+  const [raceNotices, setRaceNotices] = useState(new Map());
   const [correlationId, setCorrelationId] = useState(null);
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState(null);
@@ -247,66 +253,76 @@ export default function LlmCardModal({ dayId, onCardChanged, onClose }) {
     });
   };
 
+  /**
+   * Generate AND save one race in a single action (D-new, replacing the
+   * separate preview-then-Save step): calls the model, then immediately
+   * locks whatever parsed - the same generate-then-save shape
+   * `handleRegenerateAll` already used per race, just triggered from one
+   * race's own button rather than a loop over all of them. A `requestId`
+   * from `previewLlmCard`'s response is used exactly once, right away, so
+   * there is never a stale unsaved preview sitting around to confirm.
+   *
+   * `localCorrelationId` bridges the two calls within this one invocation -
+   * `correlationId` state would not yet reflect `previewLlmCard`'s response
+   * by the time the very next line needs it, since a `setState` does not
+   * apply synchronously. `handleRegenerateAll` uses the same pattern for the
+   * same reason.
+   */
   const handleGenerate = async (raceNumber) => {
     await flushNotes(); // a note pasted and Generated in one motion must count
-    setOpenRace(raceNumber);
-    setPreview(null);
+    setGeneratingRace(raceNumber);
     setErrorRace(null);
     setBusy(true);
     setError(null);
+    let localCorrelationId = correlationId;
     try {
-      const p = await previewLlmCard(dayId, raceNumber, cardId, correlationId, selectedModel);
-      if (p.correlationId) setCorrelationId(p.correlationId);
-      setPreview(p);
-    } catch (e) {
-      setErrorRace(raceNumber);
-      setError(String(e.message));
-    } finally {
-      setBusy(false);
-    }
-  };
-
-  const handleSave = async () => {
-    setBusy(true);
-    setError(null);
-    try {
-      const r = await lockLlmCard(dayId, { race: openRace, requestId: preview.requestId, bankrollCents: dayInfo.bankroll_cents, cardId }, correlationId);
+      const p = await previewLlmCard(dayId, raceNumber, cardId, localCorrelationId, selectedModel);
+      if (p.correlationId) { localCorrelationId = p.correlationId; setCorrelationId(p.correlationId); }
+      const refused = p.warnings.filter((w) => w.blocking);
+      const r = await lockLlmCard(dayId, {
+        race: raceNumber, requestId: p.requestId, bankrollCents: dayInfo.bankroll_cents, cardId,
+      }, localCorrelationId);
       // The picker line quotes ticket counts and spend, so a save has to
       // refresh the list too - not just the resolved cardId/lockedModel -
       // or the option this card is showing goes stale next to the race grid.
       await loadCards(r.cardId);
-      const savedRace = openRace;
-      setLastSavedRace(savedRace);
-      setOpenRace(null);
-      setPreview(null);
+      setLastSavedRace(raceNumber);
       refreshTickets(r.cardId);
-      toggleExpanded(savedRace, true); // "the card will display" - open its panel right away
+      toggleExpanded(raceNumber, true); // "the card will display" - open its panel right away
+      // D215: a refused line never silently vanishes - say so beside the
+      // race that saved anyway; a clean generate clears any stale notice.
+      setRaceNotices((prev) => {
+        const next = new Map(prev);
+        if (refused.length) {
+          next.set(raceNumber, `${r.tickets.length} ticket(s) saved, ${refused.length} line(s) refused: ${refused.map((w) => w.message).join(' ')}`);
+        } else next.delete(raceNumber);
+        return next;
+      });
       onCardChanged?.();
     } catch (e) {
-      setErrorRace(openRace);
+      setErrorRace(raceNumber);
       setError(String(e.message));
     } finally {
+      setGeneratingRace(null);
       setBusy(false);
     }
   };
 
-  const handleCancelPreview = () => {
-    setOpenRace(null);
-    setPreview(null);
+  const handleDismissError = () => {
     setErrorRace(null);
     setError(null);
   };
 
   // Switching card identity is a card-SESSION boundary (invariant 8: one
-  // correlation id per card session) - drop the in-progress preview and its
-  // correlation id rather than let a stale one attach to the newly selected
-  // card's next call, and close whatever race panel/regenerate-all summary
-  // was open for the PREVIOUS card. `ticketsByRace` refreshes itself via the
-  // effect keyed on `cardId` below, so it isn't cleared here. Deliberately
-  // does NOT touch notesByRace/cardNote: notes belong to the DAY, not the
-  // card, so switching keeps whatever commentary is on file - the same
-  // reasoning `DayTicketBuilderModal.jsx`'s `switchTo` (D140) gives for
-  // keeping its drafts across a card switch.
+  // correlation id per card session) - drop the correlation id rather than
+  // let a stale one attach to the newly selected card's next call, and close
+  // whatever regenerate-all summary was open for the PREVIOUS card.
+  // `ticketsByRace` refreshes itself via the effect keyed on `cardId` below,
+  // so it isn't cleared here. Deliberately does NOT touch notesByRace/
+  // cardNote: notes belong to the DAY, not the card, so switching keeps
+  // whatever commentary is on file - the same reasoning
+  // `DayTicketBuilderModal.jsx`'s `switchTo` (D140) gives for keeping its
+  // drafts across a card switch.
   const switchTo = (id) => {
     if (busy) return;
     const target = llmCards.find((c) => c.id === id) ?? null;
@@ -314,9 +330,8 @@ export default function LlmCardModal({ dayId, onCardChanged, onClose }) {
     setLockedModel(target?.llm_model ?? null);
     setSelectedModel((prev) => target?.llm_model ?? prev);
     setExpandedRaces(new Set());
-    setOpenRace(null);
     setLastSavedRace(null);
-    setPreview(null);
+    setRaceNotices(new Map());
     setError(null);
     setErrorRace(null);
     setCorrelationId(null);
@@ -344,8 +359,6 @@ export default function LlmCardModal({ dayId, onCardChanged, onClose }) {
   const handleRegenerateAll = async () => {
     await flushNotes();
     if (busy || races.length === 0) return;
-    setOpenRace(null);
-    setPreview(null);
     setErrorRace(null);
     setError(null);
     setRegenerateAllResults(null);
@@ -368,6 +381,15 @@ export default function LlmCardModal({ dayId, onCardChanged, onClose }) {
           race: raceNumber, requestId: p.requestId, bankrollCents: dayInfo.bankroll_cents, cardId: localCardId,
         }, localCorrelationId);
         if (!localCardId) { localCardId = r.cardId; setLockedModel(r.llmModel ?? selectedModel); }
+        // Same per-race notice `handleGenerate` sets, so a race regenerated
+        // from this batch and one regenerated on its own read identically.
+        setRaceNotices((prev) => {
+          const next = new Map(prev);
+          if (refused.length) {
+            next.set(raceNumber, `${r.tickets.length} ticket(s) saved, ${refused.length} line(s) refused: ${refused.map((w) => w.message).join(' ')}`);
+          } else next.delete(raceNumber);
+          return next;
+        });
         results.push(refused.length
           ? {
             race: raceNumber,
@@ -384,7 +406,7 @@ export default function LlmCardModal({ dayId, onCardChanged, onClose }) {
     setCorrelationId(localCorrelationId);
     setRegenerateAllProgress(null);
     setRegenerateAllResults(results);
-    // Same reasoning as handleSave: the picker's ticket-count/spend label
+    // Same reasoning as handleGenerate: the picker's ticket-count/spend label
     // for this card is now stale, and a first save here is also the only
     // way `localCardId` differs from the `cardId` this render started with.
     if (localCardId) await loadCards(localCardId);
@@ -415,10 +437,10 @@ export default function LlmCardModal({ dayId, onCardChanged, onClose }) {
           <>
             <div className="modal__body">
               <p className="dim">
-                Generate one race at a time - reasoning and the raw model response are logged per race regardless of
-                whether you save it.
+                Generate one race at a time - each click calls the model and saves the result immediately.
+                Reasoning and the raw model response are logged per race regardless of whether anything parsed.
               </p>
-              {error && openRace == null && <p className="notice notice--error">{error}</p>}
+              {error && errorRace == null && <p className="notice notice--error">{error}</p>}
 
               {/* One place off the day's latest LLM card - the same shape
                   DayTicketBuilderModal.jsx's "Human card" picker (D140) gives
@@ -537,7 +559,7 @@ export default function LlmCardModal({ dayId, onCardChanged, onClose }) {
               <div className="llm-race-grid">
                 {races.map((r) => {
                   const saved = ticketsByRace.get(r.number);
-                  const generatingThisRace = busy && openRace === r.number && !preview;
+                  const generatingThisRace = busy && generatingRace === r.number;
                   return (
                     <article className="llm-race-card" key={r.id}>
                       <div className="llm-race-card__header">
@@ -585,57 +607,18 @@ export default function LlmCardModal({ dayId, onCardChanged, onClose }) {
                         onEnter={() => setTipRace(r)}
                         onChanged={loadTipPicks}
                       />
-                      {openRace === r.number && (
-                        <div>
-                          {errorRace === r.number && error && (
-                            <p className="notice notice--error" role="alert">{error}</p>
-                          )}
-                          {preview && (
-                            <div className="formrow">
-                              <p className="dim">
-                                Race bankroll {money(preview.perRaceBankrollCents)} · card total {money(preview.cardCostCents)}
-                                {' '}of {money(preview.bankrollCents)}
-                                {preview.overBankroll && <span className="notice notice--warn"> over bankroll</span>}
-                              </p>
-                              {preview.reasoningText && (
-                                <details className="race-bottom-line" open>
-                                  <summary>Model reasoning</summary>
-                                  <p>{preview.reasoningText}</p>
-                                </details>
-                              )}
-                              {preview.warnings.length > 0 && (
-                                <div className={`notice ${preview.warnings.some((w) => w.blocking) ? 'notice--error' : 'notice--warn'}`}>
-                                  <ul>{preview.warnings.map((w, i) => <li key={i}>{w.blocking ? <strong>REFUSED, not saved: </strong> : null}{w.message}</li>)}</ul>
-                                  {/* D215: a refused line is dropped and the rest of the race
-                                      still saves, so the table below IS what Save stores -
-                                      which is what invariant 9 asks the preview to show. */}
-                                  {preview.warnings.some((w) => w.blocking) && (
-                                    <p className="dim">
-                                      {preview.tickets.length === 0
-                                        ? 'Every line was refused, so there is nothing to save on this race.'
-                                        : `Saving keeps the ${preview.tickets.length} ticket(s) below and drops the refused line(s).`}
-                                    </p>
-                                  )}
-                                </div>
-                              )}
-                              {preview.tickets.length === 0 && preview.warnings.length === 0 && (
-                                <p className="dim">The model proposed no bet on this race.</p>
-                              )}
-                              {preview.tickets.length > 0 && <TicketsTable tickets={preview.tickets} totalCents={preview.raceCostCents} />}
-                              <div className="formrow formrow--tight">
-                                <button
-                                  className="btn btn--primary" disabled={busy || preview.tickets.length === 0}
-                                  onClick={handleSave}
-                                >
-                                  Save this race
-                                </button>
-                                <button className="btn" disabled={busy} onClick={handleCancelPreview}>Cancel</button>
-                              </div>
-                            </div>
-                          )}
+                      {errorRace === r.number && error && (
+                        <div className="formrow">
+                          <p className="notice notice--error" role="alert">{error}</p>
+                          <button className="btn btn--sm" disabled={busy} onClick={handleDismissError}>Dismiss</button>
                         </div>
                       )}
-                      {openRace !== r.number && saved && (
+                      {/* D215: a refused line never silently vanishes - the race
+                          still saved whatever parsed, and this says what didn't. */}
+                      {raceNotices.has(r.number) && (
+                        <p className="notice notice--warn">{raceNotices.get(r.number)}</p>
+                      )}
+                      {saved && (
                         <>
                           {saved.reasoningText && (
                             <p className="llm-reasoning"><strong>Model reasoning:</strong> {saved.reasoningText}</p>
