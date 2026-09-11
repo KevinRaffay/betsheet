@@ -331,6 +331,34 @@ input:disabled, select:disabled, textarea:disabled {
 .tag--blue { border-color: var(--accent-2); color: var(--accent-2); }
 .tag--green { border-color: var(--accent); color: var(--accent); }
 
+/* D236: the two BOARD tags. Grepped against this file and against
+   client/src/components/ before being named, per the D216 rule - all four are
+   new here, and they are named for the FEATURE (a price move) rather than for
+   a colour, which is where that rule points even though the four above it
+   predate it.
+
+   STEAM is the accent and DRIFT is gold, NOT green-good / red-bad: neither
+   direction is a recommendation (shared/entry-flags.js's own header is
+   emphatic about it), and red would assert a judgement the data has not
+   earned. A BIG move fills the tag instead of changing its hue, so magnitude
+   reads at a glance without a third colour entering the table. */
+.tag--steam { border-color: var(--accent); color: var(--accent); }
+.tag--drift { border-color: var(--gold); color: var(--gold); }
+.tag--steam.tag--move-big { background: var(--accent); color: var(--color-accent-text); }
+.tag--drift.tag--move-big { background: var(--gold); color: #241a02; }
+/* Filled blue, so it cannot be mistaken for the outlined blue BAFFERT tag. */
+.tag--newfav { background: var(--accent-2); border-color: var(--accent-2); color: #04202e; }
+
+/* The Δ% cell. Right-aligned with tabular figures so a column of signed
+   numbers lines up on the decimal point, which is the only way a reader scans
+   for the big ones. The tint is the same steam/drift pair as the tags and
+   fires on the SAME rule - a cell is coloured only where `move` is non-null,
+   so a 0.4-point wobble stays plain text. */
+.odds-delta { text-align: right; font-variant-numeric: tabular-nums; }
+.odds-delta--flat { color: var(--color-text-muted); }
+.odds-delta--steam { color: var(--accent); font-weight: 600; }
+.odds-delta--drift { color: var(--gold); font-weight: 600; }
+
 /* D216: a flagged entry's whole row, so the horse is findable by scanning the
    table rather than by reading the Trainer column. The rule sits AFTER
    `.row--scratched` deliberately: a scratched flagged horse keeps the struck-
