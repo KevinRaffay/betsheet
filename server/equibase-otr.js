@@ -244,12 +244,30 @@ function parseAgainstDay(db, day, pdfBytes, tmpPath) {
       `This sheet is for ${parsed.parsedTrack ?? '?'} ${parsed.parsedDate ?? '?'}; the race day is ${day.track} ${day.date}. Wrong sheet - nothing saved.`);
   }
 
-  const perRace = parsed.races.map((r) => {
-    const { someReward, higherReward, warnings } = buildRaceTickets(r, r.race, entriesByRace[r.race] ?? []);
-    return { race: r.race, showPick: r.showPick, winPick: r.winPick, box4: r.box4, box3: r.box3, names: r.names, someReward, higherReward, warnings };
-  });
+  // The sheet can print more races than this day has on file - e.g. a
+  // doubleheader/twilight card where entries ingestion only captured the
+  // main card (found live, GP 2026-09-11: a 15-race sheet against a
+  // 9-race day). A race number the day doesn't have is unbuildable, not
+  // just unvalidated - there is no race_id to hang its tickets or
+  // allocation off of - so it is dropped here, before confirm ever sees
+  // it, the same "warn and skip the race, never the whole day" contract
+  // otr_unparsed_race already uses for a race that couldn't be read at all.
+  const raceNumberSet = new Set(raceNumbers);
+  const unmatchedWarnings = parsed.races
+    .filter((r) => !raceNumberSet.has(r.race))
+    .map((r) => ({
+      type: 'otr_unmatched_race', blocking: false, race: r.race,
+      message: `Race ${r.race}: this race day has no race numbered ${r.race} - not saved.`,
+    }));
 
-  const warnings = [...parsed.warnings, ...perRace.flatMap((r) => r.warnings)];
+  const perRace = parsed.races
+    .filter((r) => raceNumberSet.has(r.race))
+    .map((r) => {
+      const { someReward, higherReward, warnings } = buildRaceTickets(r, r.race, entriesByRace[r.race] ?? []);
+      return { race: r.race, showPick: r.showPick, winPick: r.winPick, box4: r.box4, box3: r.box3, names: r.names, someReward, higherReward, warnings };
+    });
+
+  const warnings = [...parsed.warnings, ...unmatchedWarnings, ...perRace.flatMap((r) => r.warnings)];
   return { parsedTrack: parsed.parsedTrack, parsedDate: parsed.parsedDate, perRace, warnings };
 }
 
