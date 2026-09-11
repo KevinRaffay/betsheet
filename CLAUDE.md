@@ -921,7 +921,7 @@ it. Rules still in force:
   sheets are both now entered exactly there, beside that race's entries.
   **The rule is about where a fact is AUTHORED, not about where it may be
   read**: the same note still renders read-only on the card sheet
-  (`RaceNotes.jsx` in `CardView.jsx`), because a card is a record of what was
+  (`RaceNotes.jsx` in `CardSheet.jsx`, D237), because a card is a record of what was
   decided rather than a place to change it. A day-level surface survives only
   for things that are genuinely day-level - the WHOLE-DAY note (race 0), and
   tip-sheet STAKING, which splits the bankroll across every race that has
