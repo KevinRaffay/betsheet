@@ -109,6 +109,73 @@ const hitAt = (live, finishOf, pos) => {
 };
 
 /**
+ * The market's own win probabilities for one race, from the chart's post-time
+ * odds (D225).
+ *
+ * A board's raw implied probabilities sum to MORE than 1 - that excess is the
+ * takeout, typically 15-20% in North America. Dividing by the sum removes it
+ * and leaves a proper distribution, which is what makes `1{won} - q` a fair
+ * question rather than a rigged one: against RAW implied probabilities every
+ * source on earth scores negative, because the track's cut is priced into
+ * every horse.
+ *
+ * Returns a Map of program number -> probability, or null when no finisher in
+ * the race carries a price. NULL is the honest answer for an Apify-sourced day
+ * (win odds per finisher are structurally absent there) and must never be
+ * read as "the race had no board".
+ */
+export function impliedProbabilities(finishers) {
+  if (!Array.isArray(finishers)) return null;
+  const priced = finishers
+    .map((f) => ({
+      pgm: up(f.programNumber ?? f.program_number),
+      odds: f.postTimeOdds ?? f.post_time_odds,
+    }))
+    .filter((f) => typeof f.odds === 'number' && Number.isFinite(f.odds) && f.odds >= 0);
+  if (priced.length === 0) return null;
+  const raw = priced.map((f) => ({ pgm: f.pgm, p: 1 / (1 + f.odds) }));
+  const total = raw.reduce((a, b) => a + b.p, 0);
+  if (!(total > 0)) return null;
+  return new Map(raw.map((r) => [r.pgm, r.p / total]));
+}
+
+/**
+ * The POST-TIME favorite's own result - the baseline `favoriteBaseline` has
+ * always wanted and never had.
+ *
+ * That function's docstring says it plainly: "the post-time favorite is
+ * unavailable: D171 measured `entries.live_odds` empty corpus-wide". It is
+ * available now, from a different source than D171 was looking at - the chart
+ * has printed it all along and D225 stores it. The morning-line favorite stays
+ * exactly where it is, because the two answer different questions and a day
+ * whose results came from Apify still has only the first.
+ *
+ * Prefers the chart's own `favorite` asterisk over deriving one from the odds:
+ * the chart ASSERTS which horse was favorite, including the tie-break, and
+ * re-deriving would mean inventing a rule it already applied. Falls back to
+ * the lowest price when no row is flagged.
+ */
+export function marketBaseline(finishers, finishOf) {
+  if (!Array.isArray(finishers) || finishers.length === 0) return null;
+  const rows = finishers.map((f) => ({
+    pgm: up(f.programNumber ?? f.program_number),
+    odds: f.postTimeOdds ?? f.post_time_odds,
+    flagged: Boolean(f.favorite),
+  }));
+  let favs = rows.filter((r) => r.flagged).map((r) => r.pgm);
+  let tied = favs.length > 1;
+  if (favs.length === 0) {
+    const priced = rows.filter((r) => typeof r.odds === 'number' && Number.isFinite(r.odds));
+    if (priced.length === 0) return null;
+    const min = Math.min(...priced.map((r) => r.odds));
+    favs = priced.filter((r) => r.odds === min).map((r) => r.pgm);
+    tied = favs.length > 1;
+  }
+  const at = (n) => favs.some((p) => { const f = finishOf.get(p); return typeof f === 'number' && f <= n; });
+  return { programNumbers: favs, tied, win: at(1), place: at(2), show: at(3) };
+}
+
+/**
  * The morning-line favorite's own result on this race - the baseline every
  * source rate is read against (the post-time favorite is unavailable: D171
  * measured `entries.live_odds` empty corpus-wide).
@@ -215,6 +282,29 @@ export function scorePickRace(input) {
     winnerProgramNumber: winner ? up(winner.programNumber ?? winner.program_number) : null,
     fieldSize,
     favorite: favoriteBaseline(entries, finishOf, scr),
+    // D225: the same race read against the CLOSING PRICE rather than against
+    // the morning line. `closeEdge` is `1{the primary pick won} - q`, where q
+    // is that horse's own takeout-normalised market probability. Zero means
+    // "you are the market"; positive means the pick won more often than its
+    // price said it would, which is the only shape of evidence that can
+    // distinguish an edge from an opinion. NULL - never 0 - whenever the
+    // board is unavailable, which is every Apify-sourced day.
+    market: marketOf(finishers, finishOf, primaryPgm, primaryFinish),
+  };
+}
+
+/** The market block of a scored race. NULL fields, never zeros, when unpriced. */
+function marketOf(finishers, finishOf, primaryPgm, primaryFinish) {
+  const implied = impliedProbabilities(finishers);
+  const favorite = marketBaseline(finishers, finishOf);
+  if (implied === null) return { priced: false, favorite, primaryImplied: null, closeEdge: null };
+  const q = primaryPgm !== null && implied.has(primaryPgm) ? implied.get(primaryPgm) : null;
+  const won = typeof primaryFinish === 'number' && primaryFinish === 1;
+  return {
+    priced: true,
+    favorite,
+    primaryImplied: q,
+    closeEdge: q === null ? null : (won ? 1 : 0) - q,
   };
 }
 
@@ -275,7 +365,38 @@ export function aggregatePickScores(scores) {
       randomWin: mean(scored.map((s) => (s.fieldSize > 0 ? 1 / s.fieldSize : null))),
       randomTop3: mean(scored.map((s) => (s.fieldSize > 0 ? Math.min(3, s.fieldSize) / s.fieldSize : null))),
       meanFieldSize: mean(scored.map((s) => s.fieldSize)),
+      // D225: the POST-TIME favorite, on the subset of this source's races
+      // whose results actually carried a board. Its `n` is deliberately its
+      // OWN and will be smaller than `favoriteWin`'s - an Apify-sourced day
+      // has a morning line but no closing price, and folding those races in
+      // at 0 would report a market that was never read as a market that was
+      // wrong.
+      marketFavoriteWin: tally(scored, (s) => s.market?.favorite?.win ?? null),
+      marketFavoritePlace: tally(scored, (s) => s.market?.favorite?.place ?? null),
+      marketFavoriteShow: tally(scored, (s) => s.market?.favorite?.show ?? null),
     },
+    // D225: beat-the-close. The mean of `1{the primary pick won} - q` over the
+    // races where a board was read AND the primary pick carried a price.
+    //
+    // This is the one figure here that can distinguish an EDGE from an
+    // opinion. Every other rate on this object answers "did this source pick
+    // winners", which a source can do well simply by preferring short prices -
+    // and a short price is exactly what you get paid least for. `closeEdge`
+    // asks the harder question: did the horses it backed win MORE often than
+    // the money said they would.
+    //
+    // Zero is the null hypothesis, not the floor: a source that is neither
+    // better nor worse than the market scores 0, and negative is both possible
+    // and, going in, the likelier reading.
+    //
+    // `racesPriced` is its own denominator for the same reason the market
+    // baselines above carry theirs, and the figure is NULL at n=0 rather than
+    // 0 - this module's oldest rule.
+    closeEdge: (() => {
+      const edges = scored.map((s) => s.market?.closeEdge).filter((e) => typeof e === 'number' && Number.isFinite(e));
+      return { mean: edges.length ? edges.reduce((a, b) => a + b, 0) / edges.length : null, n: edges.length };
+    })(),
+    racesPriced: sum((s) => (s.market?.priced ? 1 : 0)),
   };
 }
 
