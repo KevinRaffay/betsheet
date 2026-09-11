@@ -10,6 +10,7 @@ import RaceResults from './RaceResults.jsx';
 import TipPicksEntryModal from './TipPicksEntryModal.jsx';
 import RaceDayNotesModal from './RaceDayNotesModal.jsx';
 import LiveOddsModal from './LiveOddsModal.jsx';
+import LlmCardModal from './LlmCardModal.jsx';
 import {
   LiveOddsBar, LiveOddsCell, LiveOddsHistory, useRaceLiveOdds,
 } from './RaceLiveOdds.jsx';
@@ -73,6 +74,13 @@ export default function RaceDayView({ id, onBack, onOpenCard }) {
   // that could disagree about which sources exist.
   const [tipRace, setTipRace] = useState(null);
   const [tipVersion, setTipVersion] = useState(0);
+  // D182/D184 house rule (a race-specific action belongs in the race's own
+  // panel): which race's "Generate Card from LLM" button was clicked. The
+  // modal itself is still the day-wide LlmCardModal (a card is generated one
+  // race at a time regardless of entry point) - this just opens it scrolled
+  // to the race the user was actually looking at instead of the top of the
+  // grid.
+  const [llmRace, setLlmRace] = useState(null);
   const [tipRows, setTipRows] = useState([]);
   const [tipScoring, setTipScoring] = useState(null);
   // The day's analyst notes (same `llm_notes` draft, D92), keyed by race
@@ -346,6 +354,14 @@ export default function RaceDayView({ id, onBack, onOpenCard }) {
           onSaved={bumpTips}
         />
       )}
+      {llmRace && (
+        <LlmCardModal
+          dayId={day.id}
+          initialRace={llmRace.number}
+          onCardChanged={() => setCardsVersion((v) => v + 1)}
+          onClose={() => setLlmRace(null)}
+        />
+      )}
 
       <ResultsPanel dayId={day.id} />
       <EquibaseOtrPanel dayId={day.id} onSaved={() => setCardsVersion((v) => v + 1)} />
@@ -440,6 +456,11 @@ export default function RaceDayView({ id, onBack, onOpenCard }) {
             <LiveOddsBar race={race} ctl={oddsCtl} />
             <LiveOddsHistory race={race} ctl={oddsCtl} />
             {race.wager_menu && <p className="dim wager">{race.wager_menu}</p>}
+            <div className="formrow formrow--tight">
+              <button className="btn btn--sm" onClick={() => setLlmRace(race)}>
+                Generate Card from LLM
+              </button>
+            </div>
             {/* D184: a note about THIS race is typed here, under the house
                 rule that a race-specific input belongs in the Race UI. The
                 day-level dialog now writes the whole-day note only. */}

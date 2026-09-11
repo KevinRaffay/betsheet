@@ -77,7 +77,7 @@ function TicketsTable({ tickets, totalCents }) {
 // D92 analyst notes; the editor, its caps and its source vocabulary now live
 // in AnalystNotesEditor.jsx (D159), shared with RaceDayNotesModal.jsx.
 
-export default function LlmCardModal({ dayId, onCardChanged, onClose }) {
+export default function LlmCardModal({ dayId, initialRace = null, onCardChanged, onClose }) {
   const [dayInfo, setDayInfo] = useState(null);
   const [cardId, setCardId] = useState(null);
   const [llmCards, setLlmCards] = useState([]); // every LLM card on the day, newest first
@@ -234,6 +234,17 @@ export default function LlmCardModal({ dayId, onCardChanged, onClose }) {
     window.addEventListener('keydown', onKey);
     return () => window.removeEventListener('keydown', onKey);
   }, [onClose]);
+
+  // Opened from a specific race's own panel (RaceDayView.jsx) rather than the
+  // day-level "Betting cards" button: bring that race's card into view inside
+  // the grid instead of leaving the user to scroll for it themselves.
+  useEffect(() => {
+    if (initialRace == null || !dayInfo) return;
+    const id = `llm-race-${initialRace}`;
+    requestAnimationFrame(() => {
+      document.getElementById(id)?.scrollIntoView({ behavior: 'smooth', block: 'start' });
+    });
+  }, [initialRace, dayInfo]);
 
   const races = dayInfo?.races ?? [];
   const selectedCard = llmCards.find((c) => c.id === cardId) ?? null;
@@ -561,7 +572,7 @@ export default function LlmCardModal({ dayId, onCardChanged, onClose }) {
                   const saved = ticketsByRace.get(r.number);
                   const generatingThisRace = busy && generatingRace === r.number;
                   return (
-                    <article className="llm-race-card" key={r.id}>
+                    <article className="llm-race-card" key={r.id} id={`llm-race-${r.number}`}>
                       <div className="llm-race-card__header">
                         <div>
                           <strong>Race {r.number}</strong>
