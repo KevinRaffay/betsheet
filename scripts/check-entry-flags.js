@@ -27,10 +27,22 @@
 // (a scratch would imply a payout again); change `impliedWinPayoutCents` to
 // use a $1 base instead of $2 and the $7.00/$3.60/$42.00 assertions fail.
 //
+// D240 NEGATIVE CONTROLS, one per decision the live-board block makes:
+//   - normalise over the WHOLE live field instead of the comparable set (drop
+//     the `Number.isFinite(flags[x.i].mlDecimal)` filter) and the
+//     one-horse-unpriced case reports a move on horses that did not move;
+//   - drop the normalisation entirely (compare raw probabilities) and the
+//     SCRATCH case fails: every survivor reads as steaming;
+//   - AND the two move tests instead of ORing them and the hammered favorite
+//     (5/2 -> 8/5, a 1.24x ratio worth +8 points) stops being flagged;
+//   - drop `minDelta` from the ratio branch and the 99/1 -> 60/1 quantisation
+//     case starts reporting a big steam.
+// All four exit non-zero.
+//
 // Run: npm run check-entry-flags
 
 import {
-  FAVORITE_FIELD_SIZE, flagRaceEntries, isBaffertEntry,
+  FAVORITE_FIELD_SIZE, MOVE_THRESHOLDS, flagRaceEntries, isBaffertEntry,
 } from '../shared/entry-flags.js';
 
 let failures = 0;
@@ -230,6 +242,182 @@ check('five empty entries produce five unflagged entries, not a crash and not a 
   flagRaceEntries([{}, {}, {}, {}, {}]).flags.every((f) => !f.baffert && !f.favorite));
 check('flags are index-aligned with the input array',
   flagRaceEntries(five).flags.length === five.length);
+
+console.log('\nLive board (D240) - the price beside the price it moved from');
+
+// `b(ml, live)` - one runner with both books. Deliberately uses the printed
+// STRINGS rather than stored decimals, because that is the harder path: it
+// proves `liveDecimal`'s fallback reads the same `morningLineToDecimal` the
+// morning line does, so the two prices are comparable by construction.
+const b = (ml, live, extra = {}) => ({ trainer: 'T', morning_line: ml, live_odds: live, scratched: false, ...extra });
+const boardOf = (rows) => flagRaceEntries(rows).flags;
+const pp = (f) => Math.round((f.liveFairProbability - f.mlFairProbability) * 1000) / 10;
+const moveOf = (f) => (f.move ? `${f.move.direction}/${f.move.magnitude}` : null);
+
+{
+  const rows = [b('5/2', '8/5'), b('3/1', '9/2'), b('8/1', '5/1'), b('20/1', '30/1'), b('6/1', '6/1')];
+  const f = boardOf(rows);
+  check('live rank orders by the live board, not the line (the 8/1 at 5/1 passes the 6/1)',
+    JSON.stringify(f.map((x) => x.liveRank)) === '[1,2,3,5,4]', JSON.stringify(f.map((x) => x.liveRank)));
+  // Found by a negative control, not by design: forcing `liveRank` to ignore
+  // ties left every assertion above green, because no fixture had one. The
+  // live board ties FAR more often than a morning line does - a tote prints in
+  // buckets, so two horses at 7/2 in the same race is ordinary.
+  {
+    const tied = [b('5/2', '7/2'), b('3/1', '7/2'), b('9/2', '6/1'), b('8/1', '5/2')];
+    const t = boardOf(tied);
+    check('a live-board tie shares the rank and the next rank is skipped: 2, 2, 4, 1',
+      JSON.stringify(t.map((x) => x.liveRank)) === '[2,2,4,1]', JSON.stringify(t.map((x) => x.liveRank)));
+  }
+  check('ML rank is unchanged by the presence of a board',
+    JSON.stringify(f.map((x) => x.mlRank)) === '[1,2,4,5,3]', JSON.stringify(f.map((x) => x.mlRank)));
+  check('rankDelta is positive for a horse that moved UP the board',
+    f[2].rankDelta === 1 && f[4].rankDelta === -1, `${f[2].rankDelta} / ${f[4].rankDelta}`);
+  check('each book normalises to exactly 1 over the comparable set',
+    Math.abs(f.reduce((a, x) => a + x.mlFairProbability, 0) - 1) < 1e-9
+    && Math.abs(f.reduce((a, x) => a + x.liveFairProbability, 0) - 1) < 1e-9);
+  check('a hammered FAVORITE is flagged on the points test despite a sub-1.25x ratio',
+    moveOf(f[0]) === 'steam/moderate' && f[0].fairRatio < MOVE_THRESHOLDS.moderateRatio
+    && pp(f[0]) >= MOVE_THRESHOLDS.moderateDelta * 100,
+    `${moveOf(f[0])} ratio ${f[0].fairRatio} pts ${pp(f[0])}`);
+  // THE PROPERTY THE WHOLE NORMALISATION EXISTS FOR. A move is a REALLOCATION:
+  // if one horse gained share, another lost it. Measured on a real six-horse
+  // race while building this, the raw deltas summed to +10.4 points - the gap
+  // between a 126% morning-line book and a 136% typed board - so every runner
+  // carried a +1.7 offset before anyone moved, and a 4/1 drifting to 7/2 read
+  // as "+2.2". This assertion is what stops that coming back.
+  check('the deltas across a race sum to ZERO - nobody moves unless someone moved the other way',
+    Math.abs(f.reduce((a, x) => a + (x.liveFairProbability - x.mlFairProbability), 0)) < 1e-12,
+    String(f.reduce((a, x) => a + (x.liveFairProbability - x.mlFairProbability), 0)));
+  check('a drifting second choice is flagged drift/moderate', moveOf(f[1]) === 'drift/moderate', moveOf(f[1]));
+  check('a 6/1 that did not move is not flagged', moveOf(f[4]) === null, moveOf(f[4]));
+}
+
+{
+  // The long end: the ratio test carries it, and the quantisation floor stops
+  // it carrying too much. 99/1 -> 60/1 is the same 1.5x+ ratio as 20/1 -> 8/1
+  // and is worth 0.7 of a point, which is tote rounding, not an opinion.
+  const rows = [b('4/5', '4/5'), b('20/1', '8/1'), b('6/1', '7/1'), b('99/1', '60/1')];
+  const f = boardOf(rows);
+  check('a longshot steaming 20/1 -> 8/1 is big, on the RATIO test alone (under 10 points)',
+    moveOf(f[1]) === 'steam/big' && f[1].fairRatio > 2 && Math.abs(pp(f[1])) < MOVE_THRESHOLDS.bigDelta * 100,
+    `${moveOf(f[1])} ratio ${f[1].fairRatio} pts ${pp(f[1])}`);
+  check('99/1 -> 60/1 is NOT flagged: a 1.5x ratio worth under a point is quantisation',
+    moveOf(f[3]) === null && Math.abs(pp(f[3])) < MOVE_THRESHOLDS.minDelta * 100,
+    `${moveOf(f[3])} ${pp(f[3])}`);
+}
+
+{
+  // THE LOAD-BEARING CASE. Two of five scratch, and the live board prices the
+  // three survivors exactly where the line had them RELATIVE TO EACH OTHER.
+  // The prices are constructed, not eyeballed: 2/1, 3/1 and 5/1 imply .3333,
+  // .25 and .1667, a book of .75, so the same shares over a 1.00 book are
+  // .4444, .3333 and .2222 - which are 5/4, 2/1 and 7/2 exactly. Nobody formed
+  // a new opinion; the pool simply has three horses in it instead of five.
+  // Every raw probability rises by the same third. Normalised, it is nothing,
+  // and "nothing" here means zero to twelve decimal places rather than
+  // "happened to fall under a threshold".
+  const rows = [
+    b('2/1', '5/4'), b('3/1', '2/1'), b('5/1', '7/2'),
+    b('8/5', null, { scratched: true }), b('9/2', null, { scratched: true }),
+  ];
+  const f = boardOf(rows);
+  check('two scratches do not manufacture a move on the three survivors',
+    f.slice(0, 3).every((x) => x.move === null), JSON.stringify(f.slice(0, 3).map(moveOf)));
+  check('...because each survivor holds exactly the SAME share of both books',
+    f.slice(0, 3).every((x) => Math.abs(x.liveFairProbability - x.mlFairProbability) < 1e-12),
+    JSON.stringify(f.slice(0, 3).map((x) => x.liveFairProbability - x.mlFairProbability)));
+  check('...and every one of them HAS risen on the raw reading, which is the confound',
+    f.slice(0, 3).every((x) => x.liveWinProbability > x.mlWinProbability));
+  check('a scratched horse has no live price, no live rank and no move',
+    f[3].liveDecimal === null && f[3].liveRank === null && f[3].move === null && f[3].liveWinProbability === null);
+  check('the comparable set counts only the three that carry both books',
+    flagRaceEntries(rows).comparableCount === 3 && flagRaceEntries(rows).livePricedCount === 3);
+}
+
+{
+  // A horse priced in only ONE book cannot be compared, and must not be
+  // silently reported as unchanged - nor be allowed into either total, which
+  // would make the two books sum over different fields.
+  const rows = [b('2/1', '2/1'), b('3/1', '3/1'), b('8/1', null), b(null, '9/2')];
+  const f = boardOf(rows);
+  check('a horse with no live price is comparable-null, not "unchanged"',
+    f[2].move === null && f[2].fairRatio === null && f[2].liveFairProbability === null);
+  check('a horse with no morning line is comparable-null too, but still ranks live',
+    f[3].move === null && f[3].fairRatio === null && f[3].liveRank === 3, String(f[3].liveRank));
+  check('it still gets a raw live probability - only the COMPARISON is withheld',
+    f[3].liveWinProbability !== null && f[3].mlWinProbability === null);
+  check('comparableCount excludes both of them', flagRaceEntries(rows).comparableCount === 2);
+}
+
+{
+  const rows = [b('7/2', '6/1'), b('9/2', '8/5'), b('5/1', '4/1')];
+  const f = boardOf(rows);
+  check('newFavorite fires on the horse the crowd promoted to the top of the board',
+    f[1].newFavorite === true && f[1].liveRank === 1 && f[1].mlRank === 2);
+  check('...and on nobody else, including the horse that WAS the ML favorite',
+    f[0].newFavorite === false && f[2].newFavorite === false);
+  const stay = [b('2/1', '8/5'), b('3/1', '7/2'), b('5/1', '6/1')];
+  check('an unchanged favorite is not a NEW favorite', boardOf(stay)[0].newFavorite === false);
+}
+
+{
+  // A race with no board at all must be byte-identical to the pre-D240 answer:
+  // this is what keeps the ingest preview and the static at-track builder from
+  // growing three columns of dashes.
+  const rows = [e('A', '2/1'), e('B', '3/1'), e('C', '8/1')];
+  const r = flagRaceEntries(rows);
+  check('no live prices: every board field is null/false and comparableCount is 0',
+    r.comparableCount === 0 && r.livePricedCount === 0
+    && r.flags.every((f) => f.liveDecimal === null && f.liveRank === null && f.move === null
+      && f.fairRatio === null && f.liveFairProbability === null
+      && f.newFavorite === false && f.rankDelta === null));
+  check('...and the D223/D224 morning-line readings are untouched by the new block',
+    JSON.stringify(r.flags.map((f) => f.mlRank)) === '[1,2,3]' && r.flags[0].mlWinProbability !== null);
+  // THE BASIS FALLBACK. With no board there is nothing to compare against, so
+  // the share is taken over the morning-line-priced live runners instead. This
+  // is what keeps the ML Win% column populated in the ingest preview and the
+  // static at-track builder, neither of which has ever seen a live price -
+  // without it, rebasing that column on the comparable set would have blanked
+  // it everywhere a board does not exist.
+  check('ML Win% still resolves with NO board, over the ML-priced live runners, summing to 1',
+    r.flags.every((f) => f.mlFairProbability !== null)
+    && Math.abs(r.flags.reduce((a, f) => a + f.mlFairProbability, 0) - 1) < 1e-12,
+    JSON.stringify(r.flags.map((f) => f.mlFairProbability)));
+  check('...and a 2/1 in a 2/1, 3/1, 8/1 field is 48% of that book',
+    Math.round(r.flags[0].mlFairProbability * 1000) / 10 === 48, String(r.flags[0].mlFairProbability));
+  const one = flagRaceEntries([b('2/1', '8/5'), e('B', '3/1'), e('C', '8/1')]);
+  check('ONE priced runner is not a comparable set - a lone horse normalises to 1.0 either way',
+    one.comparableCount === 1 && one.flags[0].move === null && one.flags[0].fairRatio === null
+    && one.flags[0].liveFairProbability === null);
+  check('...and ML Win% falls back to the no-board basis rather than blanking',
+    one.flags.every((f) => f.mlFairProbability !== null)
+    && Math.abs(one.flags.reduce((a, f) => a + f.mlFairProbability, 0) - 1) < 1e-12);
+}
+
+{
+  // Thresholds are a stated contract, not an implementation detail: the tag
+  // text quotes them and a findings file would cite them.
+  check('MOVE_THRESHOLDS is exported with the five stated numbers',
+    MOVE_THRESHOLDS.moderateRatio === 1.25 && MOVE_THRESHOLDS.bigRatio === 1.6
+    && MOVE_THRESHOLDS.moderateDelta === 0.05 && MOVE_THRESHOLDS.bigDelta === 0.1
+    && MOVE_THRESHOLDS.minDelta === 0.01);
+}
+
+{
+  // camelCase reaches this file too (server/replay.js's `entriesPayload`, the
+  // parse preview), and a stored decimal must win over the printed string.
+  const camel = flagRaceEntries([
+    { morningLine: '2/1', liveOdds: '4/5', scratched: false },
+    { morningLine: '3/1', liveOdds: '5/1', scratched: false },
+  ]).flags;
+  check('camelCase live odds are read', camel[0].liveDecimal === 0.8 && camel[1].liveDecimal === 5);
+  const stored = flagRaceEntries([
+    { morning_line: '2/1', live_odds: '9/9', live_odds_decimal: 1.5, scratched: false },
+    { morning_line: '3/1', live_odds: '5/1', scratched: false },
+  ]).flags;
+  check('a stored live_odds_decimal wins over the printed string', stored[0].liveDecimal === 1.5);
+}
 
 if (failures) {
   console.error(`\ncheck-entry-flags: ${failures} failure(s)`);

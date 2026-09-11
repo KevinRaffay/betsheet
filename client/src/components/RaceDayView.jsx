@@ -22,6 +22,25 @@ import EntryFlagTags from './EntryFlagTags.jsx';
 // D224: the win probability a morning line implies, 0-1 -> a percent string.
 const pct = (p) => (p == null ? '' : `${(p * 100).toFixed(0)}%`);
 
+// D240: the move between the two Win% columns, in percentage POINTS - the
+// plain difference of the two figures beside it, so the arithmetic on screen
+// is checkable by eye. (The columns round to whole points, so a +5.5 can sit
+// beside 28% and 23%.) Both are the NORMALISED readings and so is this, which
+// is what makes a race's deltas sum to zero and makes this number agree with
+// the STEAM/DRIFT tag on the horse's name; shared/entry-flags.js's header has
+// the measurement that forced it.
+const deltaPoints = (f) => {
+  if (!f || f.mlFairProbability == null || f.liveFairProbability == null) return '';
+  const pts = (f.liveFairProbability - f.mlFairProbability) * 100;
+  // U+2212 MINUS, not a hyphen: the column is numeric and right-aligned.
+  return `${pts > 0 ? '+' : pts < 0 ? '\u2212' : ''}${Math.abs(pts).toFixed(1)}`;
+};
+
+// The raw reading, kept one hover away rather than deleted - D224 put it on
+// screen to make the track's take visible, and that is still worth seeing.
+const rawTitle = (p) => (p == null ? undefined
+  : `Raw implied probability ${(p * 100).toFixed(1)}% (1 / (odds + 1)); a full field sums well over 100% because of the track's own take. The column shows this horse's share of the book instead, so a race sums to 100% and the moves sum to zero.`);
+
 // Read-only view of a stored race day - what actually landed in the
 // database, not what the parser proposed.
 export default function RaceDayView({ id, onBack, onOpenCard }) {
@@ -219,9 +238,16 @@ export default function RaceDayView({ id, onBack, onOpenCard }) {
   // rather than inside the races `.map` below - that callback is an expression
   // arrow, and widening it to a block body to hold one `const` would rewrite
   // fifty lines of JSX indentation for nothing.
-  const entryFlags = new Map(
-    day.races.map((r) => [r.number, flagRaceEntries(r.entries ?? []).flags]),
+  const raceFlags = new Map(
+    day.races.map((r) => [r.number, flagRaceEntries(r.entries ?? [])]),
   );
+  const entryFlags = new Map([...raceFlags].map(([n, r]) => [n, r.flags]));
+  // D240: the three board columns appear only on a race that HAS a board -
+  // two or more runners priced both ways, which is exactly when a move can be
+  // computed at all. A race with no live odds typed yet keeps the pre-D240
+  // table rather than gaining three columns of dashes, which also keeps the
+  // width off a phone until there is something on it worth the width.
+  const hasBoard = new Map([...raceFlags].map(([n, r]) => [n, r.comparableCount >= 2]));
 
   return (
     <section>
@@ -362,8 +388,11 @@ export default function RaceDayView({ id, onBack, onOpenCard }) {
               <tr><th>#</th><th>PP</th><th>Horse</th><th>Jockey</th><th>Trainer</th><th>Wt</th><th>M/L</th>
               <th title="The tote board, typed at post time. Equibase's own page cannot supply it - the LiveOdds column is empty in the served HTML and filled by client-side JS - so this is entered by hand, per race, and every save keeps its own capture time">Live</th>
               <th title="What $2-to-win pays if this horse wins - the printed line as a forecast, not the actual tote price">$2 win</th>
-              <th title="The win probability the morning line implies (1 / (odds + 1)); a full field sums well over 100% because of the track's own take">Win %</th>
-              <th title="Predicted order of finish from the morning line (1 = shortest line; ties share a rank)">ML rank</th></tr>
+              <th title="This horse's share of the morning-line book, so a race sums to 100%. Hover a cell for the raw 1 / (odds + 1) reading, which sums to 118-136% because of the track's take">ML Win%</th>
+              {hasBoard.get(race.number) && <th title="The same reading off the typed live board, normalised over the same runners - which is what makes it subtractable from the column beside it">Live Win%</th>}
+              {hasBoard.get(race.number) && <th title="Live Win% minus ML Win%, in percentage points. Both books are normalised over the runners priced in each, so a race's moves sum to zero and a horse reads as moved only if another moved the other way - a raw difference would have shown every runner drifting or steaming together whenever the two books totalled differently, or whenever a scratch re-priced the field">&Delta;%</th>}
+              <th title="Predicted order of finish from the morning line (1 = shortest line; ties share a rank)">ML rank</th>
+              {hasBoard.get(race.number) && <th title="The same ordering read off the live board (1 = shortest live price; ties share a rank). Read against ML rank: a horse moving up the board is one the crowd backed harder than the linemaker predicted">Live rank</th>}</tr>
             </thead>
             <tbody>
               {/* D216: index-aligned with `race.entries`, computed once per race. */}
@@ -389,8 +418,19 @@ export default function RaceDayView({ id, onBack, onOpenCard }) {
                   <td>{e.morning_line ?? ''}</td>
                   <LiveOddsCell race={race} entry={e} ctl={oddsCtl} />
                   <td className="dim">{entryFlags.get(race.number)?.[ei]?.mlPayoutCents != null ? dollars(entryFlags.get(race.number)[ei].mlPayoutCents) : ''}</td>
-                  <td className="dim">{pct(entryFlags.get(race.number)?.[ei]?.mlWinProbability)}</td>
+                  <td className="dim" title={rawTitle(entryFlags.get(race.number)?.[ei]?.mlWinProbability)}>{pct(entryFlags.get(race.number)?.[ei]?.mlFairProbability)}</td>
+                  {hasBoard.get(race.number) && (
+                    <td className="dim" title={rawTitle(entryFlags.get(race.number)?.[ei]?.liveWinProbability)}>
+                      {pct(entryFlags.get(race.number)?.[ei]?.liveFairProbability)}
+                    </td>
+                  )}
+                  {hasBoard.get(race.number) && (
+                    <td className={`odds-delta odds-delta--${(entryFlags.get(race.number)?.[ei]?.move?.direction) ?? 'flat'}`}>
+                      {deltaPoints(entryFlags.get(race.number)?.[ei])}
+                    </td>
+                  )}
                   <td className="dim">{entryFlags.get(race.number)?.[ei]?.mlRank ?? ''}</td>
+                  {hasBoard.get(race.number) && <td className="dim">{entryFlags.get(race.number)?.[ei]?.liveRank ?? ''}</td>}
                 </tr>
               ))}
             </tbody>
