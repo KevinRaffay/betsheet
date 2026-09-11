@@ -42,8 +42,10 @@ None of that kills it. What survives is a **smaller, cheaper, better-posed
 question that the existing corpus can almost answer**, and a data-collection
 step that is the real prerequisite for the full version. Section 4 proposes five
 phases. **PT-0 turned out to be answerable for free from data already stored,
-and was answered while writing this - see 4/PT-0.** PT-1 is worth doing
-regardless of whether the rest ever is, subject to one query named in 1.2.
+and was answered while writing this - see 4/PT-0. PT-4 was then BUILT, at the
+user's request, as D224 - see that phase.** PT-1 is worth doing regardless of
+whether the rest ever is, and 1.2's gating query has since been answered in its
+favour.
 
 ---
 
@@ -123,11 +125,18 @@ Two caveats, both real:
   results page does not print an odds column). For such a day there is nothing
   to re-parse: recovering odds means fetching a DIFFERENT document, the
   Equibase chart, per day. The Apify results route is the same story from the
-  other end - it carries no odds either (1.1). **So the question that decides
-  whether PT-1 is cheap or nearly useless is: of the 7 live days that have
-  results, how many came in as Equibase charts?** That is one query against
-  `result_charts.source_kind` on the live database, and it could not be run
-  from this session.
+  other end - it carries no odds either (1.1).
+
+  **ANSWERED 2026-09-11**, from the corpus the user uploaded to the
+  `data-9-10-26` branch (`data/betsheet.data.zip`, read read-only): of the
+  **8** active days that have results - one more than the 2026-09-10 scope doc
+  counted - **5 came in as `equibase_pdf`** (Saratoga 09-06 and 09-07, Del Mar
+  09-07, Kentucky Downs 09-07, Horseshoe Indianapolis 09-10) and 3 as
+  `equibase_apify` (Finger Lakes and Kentucky Downs and Louisiana Downs, all
+  09-09). So the chart backfill reaches roughly **two thirds of the
+  results-bearing corpus**, and PT-1 is worth doing rather than a dead end. The
+  same read re-measured `entries.live_odds` at 0 of 13,710 rows, confirming
+  D171 still holds.
 
 - **The pre-pivot archive is not a shortcut to corpus depth.** 75 race days,
   699 races and 5,960 result rows look tempting for PT-2. They are not usable:
@@ -411,20 +420,34 @@ Cost at 99 races x 3 arms x 3 replicates = 891 calls: ~$18 on `claude-sonnet-5`,
 ~$45 on `claude-opus-5`, ~$90 on `claude-fable-5-1` ($40 worst case on Sonnet if
 every call runs to `maxTokens`). **Money is not the constraint here - n is.**
 
-### PT-4 - Live capture, to size the 2.2 bias and to make it real
+### PT-4 - Live capture - **BUILT (D224), unused**
 
 A capture of the Equibase board near post fills `entries.live_odds` - the column
-has existed since migration 024 and has never held a row - and
+has existed since migration 024 and had never held a row - and
 `race_days.odds_captured_at` plus D117's staleness indicator already exist to
 label how stale each race's capture is. Capturing at ~2 MTP *and* reading the
 chart's final gives the size of 2.2's optimism directly, and is the only version
 of this thesis that is a strategy rather than a study.
 
-Invariant 6 governs how: BetSheet fetches nothing itself, so this is either a
-saved page a person uploads or the D197-style Apify exception, explicitly
-triggered, never scheduled.
+Invariant 6 governs how: BetSheet fetches nothing itself, so this is a saved
+page a person uploads.
 
----
+**Delivered 2026-09-11 as D224**, at the user's request and ahead of the other
+phases, on the reasoning this document already gave: it is the one piece with
+value regardless of how the thesis turns out. `shared/live-odds.js` reconciles a
+freshly-saved entries page against a day that already exists and emits nothing
+but prices; migration 034 keeps every board rather than one mutable cell,
+because the drift between two boards is the signal. See the D224 ledger row.
+
+**It has captured nothing yet, and that is now the gating step for everything
+else here.** No real near-post Equibase page exists anywhere in this project -
+the only real captures on file were saved before wagering opened, which D224's
+own check script asserts by running the real Del Mar page through the path and
+requiring it to be REFUSED. Until a board is actually captured on a live card,
+`entries.live_odds` stays at 0 of 13,710 and PT-3's Arms B and C have no input.
+The first real capture is worth taking on the next race day, on any card, even
+without a card generated against it: a board is not re-takeable after the fact,
+and every day that passes without one is a day this corpus can never have.
 
 ## 5. Open questions for whoever schedules this
 
