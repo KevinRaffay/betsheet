@@ -83,13 +83,6 @@
 .topnav__link:hover { background: var(--color-bg-raised); color: var(--color-text); }
 .topnav__link--active { background: var(--color-bg-raised); color: var(--color-text); font-weight: 600; }
 
-.eyebrow {
-  font-size: 11px;
-  font-weight: 700;
-  letter-spacing: 0.08em;
-  text-transform: uppercase;
-  color: var(--color-accent);
-}
 .section-sub { margin: 18px 0 6px; font-size: 15px; }
 .static-foot { margin: 24px 0 8px; font-size: 12px; text-align: center; }
 
@@ -111,16 +104,9 @@
 .stat__value { font-size: 26px; font-weight: 700; line-height: 1.1; }
 .stat__label { font-size: 12px; color: var(--color-text-muted); margin-top: 2px; }
 
-/* Next race tile */
-.next-race {
-  display: flex;
-  align-items: center;
-  justify-content: space-between;
-  gap: 12px;
-  flex-wrap: wrap;
-  border-left: 4px solid var(--color-accent);
-}
-.next-race__what { font-size: 18px; font-weight: 700; }
+/* The "Next race" tile and .eyebrow moved to client/src/styles.css (D378):
+   both home pages render them, and static.css may never redeclare a class
+   the desktop stylesheet owns (D367). */
 
 /* Meetings as cards */
 .meeting-grid {

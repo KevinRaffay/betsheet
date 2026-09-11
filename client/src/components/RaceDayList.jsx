@@ -1,6 +1,7 @@
 import React, { useEffect, useRef, useState } from 'react';
 import { bulkDeleteRaceDays, listRaceDays, resetAppApi, restoreRaceDay } from '../api.js';
 import PublishStaticSnapshotModal from './PublishStaticSnapshotModal.jsx';
+import NextRaceCard from './NextRaceCard.jsx';
 
 const SKIP_REASON_LABEL = {
   graded: 'already graded',
@@ -159,6 +160,9 @@ export default function RaceDayList({ onOpen, onNew, onPL, onDistribution, onSou
         </div>
       </div>
       {error && <p className="notice notice--error">{error}</p>}
+      {/* D378: the soonest race still to run, over every stored day - the
+          same card the static app's home shows over its bundle. */}
+      {!showDeleted && <NextRaceCard onOpen={onOpen} refreshKey={refreshKey} />}
       {confirmBulk && (
         <div className="notice notice--warn">
           <p>

@@ -371,6 +371,9 @@ export const getDistribution = (engineVersion, meet) => {
 export const getPickScoring = (track) =>
   fetch(`/api/pick-scoring${track ? `?track=${encodeURIComponent(track)}` : ''}`).then(asJson);
 export const getCalendar = (date) => fetch(`/api/calendar?date=${encodeURIComponent(date)}`).then(asJson);
+// D378: the soonest race still to run across every stored day, for the home
+// page's "Next race" card; `latest` is where to send a person when none is.
+export const getNextRace = () => fetch('/api/next-race').then(asJson);
 
 // ---- TIPSHEET picks (D166 extraction, D169 review/correct) ----------------
 //

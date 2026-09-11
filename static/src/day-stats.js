@@ -4,7 +4,7 @@
 // number on the home and day screens is traceable to a card or grade row
 // already in the bundle.
 
-import { localWallClockToUtc, formatPacific } from '@shared/race-calendar.js';
+import { nextRaceAmong } from '@shared/race-calendar.js';
 
 const liveRunners = (race) => race.entries.filter((e) => !e.scratched).length;
 
@@ -95,18 +95,25 @@ export function cashedTickets(raceDays, limit = 10) {
  * "Next Race" tile. Uses each day's precomputed IANA timezone (the same rule
  * Calendar.jsx follows: the browser never carries the track registry) and
  * prints the post time in Pacific, the only zone a viewer ever sees. `null`
- * when nothing in the bundle is still to run - a historical snapshot.
+ * when nothing in the bundle is still to run - a historical snapshot. D378:
+ * the selection itself is `shared/race-calendar.js`'s `nextRaceAmong`, the
+ * same function `GET /api/next-race` runs for the desktop home, so the two
+ * apps cannot disagree about which race is next.
  */
 export function nextRace(raceDays, now = new Date()) {
-  let best = null;
+  const candidates = [];
   for (const day of raceDays) {
     for (const race of day.races) {
-      const at = localWallClockToUtc(day.raceDay.date, race.postTime, day.raceDay.timezone);
-      if (!at || at < now) continue;
-      if (!best || at < best.at) best = { day, race, at, postTimePacific: formatPacific(at) };
+      candidates.push({ day, race, date: day.raceDay.date, postTime: race.postTime, timezone: day.raceDay.timezone });
     }
   }
-  return best;
+  const best = nextRaceAmong(candidates, now);
+  return best ? { day: best.day, race: best.race, at: best.at, postTimePacific: best.postTimePacific } : null;
+}
+
+/** The most recent bundled day - where the "Next race" card points when nothing is still to run. */
+export function latestDay(raceDays) {
+  return raceDays.reduce((best, d) => (!best || d.raceDay.date > best.raceDay.date ? d : best), null);
 }
 
 /**

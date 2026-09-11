@@ -28,6 +28,7 @@ import {
   formatPacific,
   hourBucket,
   localWallClockToUtc,
+  nextRaceAmong,
   placeRacePacific,
 } from '../shared/race-calendar.js';
 
@@ -135,6 +136,32 @@ console.log('\n-- every registered track\'s timezone actually converts (ties tra
   check(`all ${zones.size} distinct registry zones convert a sample post time`, bad.length === 0, bad.join(', '));
 }
 
+console.log('\n-- nextRaceAmong: the soonest race still to run (D378) --');
+{
+  // 2026-09-12 18:30Z is 11:30 AM PDT / 1:30 PM CDT / 2:30 PM EDT.
+  const now = new Date('2026-09-12T18:30:00.000Z');
+  const c = [
+    { id: 'dmr1', date: '2026-09-12', postTime: '10:15 AM', timezone: 'America/Los_Angeles' }, // 17:15Z, run
+    { id: 'kd1', date: '2026-09-12', postTime: '1:00 PM', timezone: 'America/Chicago' },        // 18:00Z, run
+    { id: 'sar1', date: '2026-09-12', postTime: '3:05 PM', timezone: 'America/New_York' },      // 19:05Z
+    { id: 'dmr2', date: '2026-09-12', postTime: '12:00 PM', timezone: 'America/Los_Angeles' }, // 19:00Z - soonest
+    { id: 'gp', date: '2026-09-13', postTime: '12:30 PM', timezone: 'America/New_York' },       // tomorrow
+    { id: 'unk', date: '2026-09-12', postTime: '11:35 AM', timezone: null },                    // would be soonest if guessed Pacific
+    { id: 'nopt', date: '2026-09-12', postTime: null, timezone: 'America/Los_Angeles' },
+  ];
+  const n = nextRaceAmong(c, now);
+  check('picks Del Mar 12:00 PM PDT (19:00Z) over Saratoga 3:05 PM EDT (19:05Z), across zones',
+    n?.id === 'dmr2' && n.postTimePacific === '12:00 PM PDT' && n.at.toISOString() === '2026-09-12T19:00:00.000Z', JSON.stringify(n));
+  check('the winner carries its own fields through', n?.date === '2026-09-12' && n.timezone === 'America/Los_Angeles');
+  check('a race with no zone is never guessed into first place', nextRaceAmong([c[5]], now) === null);
+  check('a race with no post time is not a candidate', nextRaceAmong([c[6]], now) === null);
+  check('a race exactly at now still counts as next',
+    nextRaceAmong([{ id: 'x', date: '2026-09-12', postTime: '11:30 AM', timezone: 'America/Los_Angeles' }], now)?.id === 'x');
+  check('tomorrow wins once today has run', nextRaceAmong(c, new Date('2026-09-12T23:00:00.000Z'))?.id === 'gp');
+  check('null when everything has run', nextRaceAmong(c, new Date('2026-09-14T00:00:00.000Z')) === null);
+  check('null on an empty or missing list', nextRaceAmong([], now) === null && nextRaceAmong(undefined, now) === null);
+}
+
 // ---------- server: GET /api/calendar (D210, phase C-2) ----------
 console.log('\n-- server: /api/calendar --');
 {
@@ -218,6 +245,34 @@ console.log('\n-- server: /api/calendar --');
 
     const { body: empty } = await jget('/api/calendar?date=2020-01-01');
     check('a date with no race days returns an empty list, not an error', empty.date === '2020-01-01' && empty.tracks.length === 0);
+
+    // ---------- GET /api/next-race (D378) ----------
+    console.log('\n-- server: /api/next-race --');
+    const { status: nowBad } = await jget('/api/next-race?now=yesterday');
+    check('a malformed now is refused 400', nowBad === 400);
+
+    // 16:00Z = 9:00 AM PDT: nothing has run yet. Woodbine 1:00 PM EDT (17:00Z)
+    // would be soonest but is soft-deleted; Del Mar 10:15 AM PDT (17:15Z) is next.
+    const { status: s1, body: n1 } = await jget('/api/next-race?now=2026-09-12T16:00:00Z');
+    check('200 with a pinned clock', s1 === 200 && n1.now === '2026-09-12T16:00:00.000Z');
+    check('the deleted Woodbine day never wins: Del Mar race 1 at 10:15 AM PDT is next',
+      n1.next?.raceDayId === dmr && n1.next.number === 1 && n1.next.postTimePacific === '10:15 AM PDT'
+      && n1.next.at === '2026-09-12T17:15:00.000Z' && n1.next.runners === 0, JSON.stringify(n1.next));
+    check('latest is the most recent stored day (Gulfstream Park 2026-09-13), by date',
+      n1.latest?.track === 'Gulfstream Park' && n1.latest.date === '2026-09-13', JSON.stringify(n1.latest));
+
+    // 18:30Z: Del Mar (17:15Z) and Kentucky Downs (18:00Z) have run; Saratoga 3:05 PM EDT (19:05Z) is next.
+    const { body: n2 } = await jget('/api/next-race?now=2026-09-12T18:30:00Z');
+    check('crosses zones correctly: Saratoga race 1 at 12:05 PM PDT is next at 18:30Z',
+      n2.next?.track === 'Saratoga' && n2.next.postTimePacific === '12:05 PM PDT', JSON.stringify(n2.next));
+
+    const { body: n3 } = await jget('/api/next-race?now=2026-09-13T00:00:00Z');
+    check('once everything has run, next is null and latest still points somewhere',
+      n3.next === null && n3.latest?.track === 'Gulfstream Park', JSON.stringify(n3));
+
+    const { status: s4, body: n4 } = await jget('/api/next-race');
+    check('without a pinned clock it answers 200 with a real now and a null-or-object next',
+      s4 === 200 && typeof n4.now === 'string' && (n4.next === null || typeof n4.next === 'object'));
   } finally {
     server.kill();
     await new Promise((rr) => setTimeout(rr, 300));
