@@ -782,16 +782,16 @@ it. Rules still in force:
   paths for anything node opens; heredocs truncate near 8KB — write long
   files in chunks; git identity may not resolve from the global config —
   this repo carries a local `user.name`/`user.email`. **Files may be CRLF on
-  disk** (`core.autocrlf=true`) while Git Bash's `grep $''`, `cat -A` and
+  disk** (`core.autocrlf=true`) while Git Bash's `grep`, `cat -A` and
   `git diff` all show them as LF - so a python/node string match written
-  with `
-` silently matches nothing (D369, cost three attempts). Read with
-  `newline=''`, normalise `
-` -> `
-`, patch, and write back in the
+  with a bare LF silently matches nothing (D369, cost three attempts). Read
+  with `newline=''`, normalise CRLF to LF, patch, and write back in the
   ORIGINAL convention - and check `git ls-files --eol` first: this file is
   `-text` (never converted by git), so a CRLF write to it lands in the blob
   verbatim and the next merge conflicts on every line (D369, found live).
+  **And the Bash tool unescapes backslashes before the shell sees them**, so
+  a backslash-r typed inside a quoted heredoc reaches python as a real CR -
+  write such text with the Write tool, never through a heredoc (D369, twice).
 - **Ports**: BetSheet uses api :8788 / vite :5175 for the HUMAN's `npm run dev`
   and for `npm start`. An AGENT's browser-verification stack must use
   `npm run dev:preview` (api :8795 / vite :5185, D97) and never the human's
