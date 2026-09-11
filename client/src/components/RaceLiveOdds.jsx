@@ -1,5 +1,5 @@
-import React, { useState } from 'react';
-import { saveRaceLiveOdds } from '../api.js';
+import React, { useEffect, useState } from 'react';
+import { getLiveOddsCaptures, saveRaceLiveOdds } from '../api.js';
 
 // Live odds for ONE race, typed (D232).
 //
@@ -27,6 +27,7 @@ export function useRaceLiveOdds(dayId, onSaved) {
   const [draft, setDraft] = useState(new Map());   // `${race}:${pgm}` -> string
   const [busy, setBusy] = useState(null);          // race number mid-save
   const [result, setResult] = useState(new Map()); // race number -> {ok, text}
+  const [captures, setCaptures] = useState([]);    // every save on this day, newest first
 
   const key = (race, pgm) => `${race}:${pgm}`;
   const valueFor = (race, entry) => {
@@ -34,6 +35,20 @@ export function useRaceLiveOdds(dayId, onSaved) {
     return draft.has(k) ? draft.get(k) : (entry.live_odds ?? '');
   };
   const setValue = (race, pgm, v) => setDraft((m) => new Map(m).set(key(race, pgm), v));
+
+  // Block body (D90, CLAUDE.md Gotchas): an expression-bodied loader returns a
+  // promise, which React would store and call as the effect's own cleanup.
+  const loadCaptures = () => getLiveOddsCaptures(dayId)
+    .then((r) => setCaptures(r.captures ?? []))
+    .catch(() => {}); // supplementary display only - a fetch failure here shouldn't block the page
+  useEffect(() => { loadCaptures(); }, [dayId]); // eslint-disable-line react-hooks/exhaustive-deps
+
+  // Every capture whose `races` list names this race - a per-race typed save
+  // names only itself, a whole-day upload (LiveOddsModal, D228) names every
+  // race it covered.
+  const historyFor = (raceNumber) => captures.filter(
+    (c) => (c.races ?? '').split(',').includes(String(raceNumber)),
+  );
 
   const save = async (race, entries) => {
     setBusy(race.number);
@@ -59,6 +74,7 @@ export function useRaceLiveOdds(dayId, onSaved) {
         return next;
       });
       onSaved?.();
+      await loadCaptures();
     } catch (e) {
       setResult((m) => new Map(m).set(race.number, { ok: false, text: String(e.message), warnings: [] }));
     } finally {
@@ -66,7 +82,7 @@ export function useRaceLiveOdds(dayId, onSaved) {
     }
   };
 
-  return { valueFor, setValue, save, busy, result };
+  return { valueFor, setValue, save, busy, result, historyFor };
 }
 
 /** The cell that goes beside a horse's M/L. A scratch cannot be priced. */
@@ -111,5 +127,30 @@ export function LiveOddsBar({ race, ctl }) {
         </div>
       )}
     </div>
+  );
+}
+
+/** Every past save of this race's board, newest first. Collapsed by default -
+ * a race checked several times before post can accumulate a long list, and
+ * the current board is already on screen above. */
+export function LiveOddsHistory({ race, ctl }) {
+  const history = ctl.historyFor(race.number);
+  if (history.length === 0) return null;
+  return (
+    <details className="race-odds-history">
+      <summary>Odds history ({history.length})</summary>
+      <ul>
+        {history.map((c) => {
+          const wholeDay = (c.races ?? '').split(',').length > 1;
+          return (
+            <li key={`cap-${c.id}`}>
+              {c.captured_at ?? `(time unknown — saved ${c.ingested_at})`}
+              {' — '}
+              {wholeDay ? `full-board upload, ${c.prices} price(s) across the day` : `${c.prices} price(s)`}
+            </li>
+          );
+        })}
+      </ul>
+    </details>
   );
 }

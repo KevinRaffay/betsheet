@@ -11,7 +11,9 @@ import RaceResults from './RaceResults.jsx';
 import TipPicksEntryModal from './TipPicksEntryModal.jsx';
 import RaceDayNotesModal from './RaceDayNotesModal.jsx';
 import LiveOddsModal from './LiveOddsModal.jsx';
-import { LiveOddsBar, LiveOddsCell, useRaceLiveOdds } from './RaceLiveOdds.jsx';
+import {
+  LiveOddsBar, LiveOddsCell, LiveOddsHistory, useRaceLiveOdds,
+} from './RaceLiveOdds.jsx';
 import RaceNotesEditor from './RaceNotesEditor.jsx';
 import { NoteSourceDatalist } from './AnalystNotesEditor.jsx';
 import { entriesStaleness } from '@shared/staleness.js';
@@ -436,6 +438,7 @@ export default function RaceDayView({ id, onBack, onOpenCard }) {
             </tbody>
             </table>
             <LiveOddsBar race={race} ctl={oddsCtl} />
+            <LiveOddsHistory race={race} ctl={oddsCtl} />
             {race.wager_menu && <p className="dim wager">{race.wager_menu}</p>}
             {/* D184: a note about THIS race is typed here, under the house
                 rule that a race-specific input belongs in the Race UI. The
