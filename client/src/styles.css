@@ -29,6 +29,15 @@
      reads as recessed on a card and is carried by its border on the page. */
   --color-field-bg: var(--mauve-1);
   --color-field-border: var(--mauve-7);
+  /* A BUTTON announces itself too (user rule 2026-09-11, the button half of
+     D235's field rule): Radix steps 3/4/5 are the component-background
+     steps (rest / hover / pressed) and step 8 the strong "hovered border"
+     step - one step past a field's, so a button reads as a raised control
+     and a field as a recessed one, never as a chip on the page ground. */
+  --color-btn-bg: var(--mauve-3);
+  --color-btn-bg-hover: var(--mauve-4);
+  --color-btn-bg-active: var(--mauve-5);
+  --color-btn-border: var(--mauve-8);
 
   --radius: 10px;
   --shell-max: 1440px;
@@ -47,6 +56,10 @@
   --color-accent-text: #06130c;
   --color-field-bg: var(--mauve-1);
   --color-field-border: var(--mauve-7);
+  --color-btn-bg: var(--mauve-3);
+  --color-btn-bg-hover: var(--mauve-4);
+  --color-btn-bg-active: var(--mauve-5);
+  --color-btn-border: var(--mauve-8);
 
   color-scheme: dark;
 }
@@ -92,8 +105,9 @@ html, body {
 }
 
 .topbar__theme {
-  border: 1px solid var(--color-border);
-  background: var(--color-bg-subtle);
+  border: 1px solid var(--color-btn-border);
+  background: var(--color-btn-bg);
+  font-weight: 600;
   color: var(--color-text);
   border-radius: var(--radius);
   padding: 6px 14px;
@@ -101,7 +115,7 @@ html, body {
   font-size: 13px;
   cursor: pointer;
 }
-.topbar__theme:hover { background: var(--color-bg-raised); }
+.topbar__theme:hover { background: var(--color-btn-bg-hover); }
 
 .pane {
   flex: 1;
@@ -130,22 +144,31 @@ html, body {
 input::placeholder,
 textarea::placeholder { color: var(--color-text-muted); opacity: 1; }
 
+/* A plain button was `border: --color-border` (the divider step) on the
+   page background - a CHIP, indistinguishable from a tag until hovered, and
+   the user said so (2026-09-11: "these types of buttons need more contrast
+   in all UI versions, they look like chips"). It now sits on the raised
+   button ground with the strong border and the primary button's weight, in
+   both themes, so a control reads as a control at rest - the same rule D235
+   applied to fields. `.btn--primary` is unchanged: it was already right. */
 .btn {
   display: inline-block;
-  border: 1px solid var(--color-border);
-  background: var(--color-bg);
+  border: 1px solid var(--color-btn-border);
+  background: var(--color-btn-bg);
   color: var(--color-text);
   border-radius: var(--radius);
   padding: 7px 16px;
   font: inherit;
   font-size: 14px;
+  font-weight: 600;
   line-height: 1.2;
   cursor: pointer;
 }
 .btn:hover:not(:disabled) {
-  background: var(--color-bg-raised);
+  background: var(--color-btn-bg-hover);
   border-color: var(--color-text-muted);
 }
+.btn:active:not(:disabled) { background: var(--color-btn-bg-active); }
 .btn:disabled { opacity: 0.5; cursor: default; }
 
 /* A label acting as a button (hidden file inputs). Wins over `.formrow
