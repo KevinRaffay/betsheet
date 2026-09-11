@@ -24,24 +24,30 @@
 // for git and its scopes are wider than this needs (gist, workflow, user). The
 // allowlist is the only real constraint here, so read it first.
 //
+// D237: repoSlug/token moved to lib/github-credential.js, shared with the
+// GitHub-Issues-backed deliverable allocator (scripts/lib/deliverable-issues.js)
+// - same secret handling, still gated locally by die() for this CLI's usual
+// refusal path. The repo is public now (checked live while investigating
+// D237), which is why issue/project features are usable at all; this file's
+// own opening incident happened while it was still private.
+//
 // Run: npm run gh -- pr 133
 //      npm run gh -- pr list [--state open|closed|all]
 //      npm run gh -- pr create --title T --body-file f [--base main] [--head b]
 //      npm run gh -- pr merge 133 [--squash|--merge|--rebase]
 //      npm run gh -- pr close 281
+//      npm run gh -- issue 320
+//      npm run gh -- issue list [--state open|closed|all] [--label deliverable]
+//      npm run gh -- issue create --title T [--body B] [--label deliverable]
+//      npm run gh -- issue close 320
 //      npm run gh -- checks [ref]
 //      npm run gh -- raw GET /repos/:owner/:repo/pulls/133
 
 import { execFileSync } from 'node:child_process';
 import fs from 'node:fs';
+import { redact, repoSlug as sharedRepoSlug, token as sharedToken } from './lib/github-credential.js';
 
-// ---------- redaction ----------
-const SECRETISH = [
-  /gh[pousr]_[A-Za-z0-9]{20,}/g,
-  /github_pat_[A-Za-z0-9_]{20,}/g,
-  /sk-ant-[A-Za-z0-9_-]{10,}/g,
-];
-const redact = (s) => SECRETISH.reduce((a, re) => a.replace(re, '[redacted]'), String(s));
+// ---------- output ----------
 const say = (...a) => process.stdout.write(`${a.map(redact).join(' ')}\n`);
 
 // ---------- stopping ----------
@@ -100,36 +106,35 @@ const ALLOW = [
   // how #142 was lost in D104/D105 (see CLAUDE.md's Gotchas), and a stale PR
   // left open because closing was awkward is its own small hazard.
   { m: 'PATCH', re: /^\/repos\/[^/]+\/[^/]+\/pulls\/\d+$/, why: 'close a PR you asked me to close' },
+  // D237: issue tracking, symmetrical with the pr subcommands above and with
+  // the same narrowing - the PATCH subcommand below sends `{ state: 'closed' }`
+  // (or 'open') and nothing else, never a title/body/label rewrite.
+  { m: 'POST', re: /^\/repos\/[^/]+\/[^/]+\/issues$/, why: 'open an issue' },
+  { m: 'PATCH', re: /^\/repos\/[^/]+\/[^/]+\/issues\/\d+$/, why: 'close or reopen an issue' },
 ];
 const permitted = (method, path) => ALLOW.find((a) => a.m === method && a.re.test(path));
 
 // ---------- identity ----------
 const git = (args) => execFileSync('git', args, { encoding: 'utf8' }).trim();
 
+// repoSlug/token now live in lib/github-credential.js (D237), shared with the
+// GitHub-Issues-backed deliverable allocator - both wrap the shared throwing
+// functions in this file's own die() so a bad remote or missing credential
+// still reports through this CLI's usual refusal path.
 function repoSlug() {
-  const url = git(['remote', 'get-url', 'origin']);
-  const m = url.match(/github\.com[:/]+([^/]+)\/(.+?)(?:\.git)?$/i);
-  if (!m) die(`origin does not look like a GitHub remote: ${url}`);
-  return { owner: m[1], repo: m[2] };
+  try {
+    return sharedRepoSlug();
+  } catch (err) {
+    return die(err.message);
+  }
 }
 
-// Read once per process. Not cached to disk, not passed anywhere but the header.
-let TOKEN = null;
 function token() {
-  if (TOKEN) return TOKEN;
-  let out;
   try {
-    out = execFileSync('git', ['credential', 'fill'], {
-      input: 'protocol=https\nhost=github.com\n\n',
-      encoding: 'utf8',
-      stdio: ['pipe', 'pipe', 'ignore'],
-    });
-  } catch {
-    die('git credential fill failed - is Git Credential Manager configured? (git config credential.helper)');
+    return sharedToken();
+  } catch (err) {
+    return die(err.message);
   }
-  TOKEN = (out.match(/^password=(.*)$/m) || [])[1];
-  if (!TOKEN) die('No GitHub credential stored. Push once so Git Credential Manager saves one.');
-  return TOKEN;
 }
 
 // Git Bash rewrites a leading-slash argument into a Windows path before node
@@ -236,6 +241,46 @@ if (cmd === 'pr' && sub === 'list') {
   say(`  mergeable  ${p.mergeable} / ${p.mergeable_state}`);
   say(`  commits    ${p.commits}, +${p.additions}/-${p.deletions} across ${p.changed_files} file(s)`);
   say(`  ${p.html_url}`);
+} else if (cmd === 'issue' && sub === 'list') {
+  const state = flag('state', 'open');
+  const label = flag('label');
+  const q = label ? `state=${state}&labels=${encodeURIComponent(label)}` : `state=${state}`;
+  const items = await api('GET', `${R}/issues?${q}&per_page=50`);
+  // GitHub's issues endpoint returns pull requests too (a PR IS an issue under
+  // the hood) - filtered out here so this only ever lists genuine issues.
+  const issues = items.filter((i) => !i.pull_request);
+  say(`${issues.length} ${state} issue(s) in ${owner}/${repo}:`);
+  for (const i of issues) say(`  #${String(i.number).padEnd(4)} ${i.title}`);
+} else if (cmd === 'issue' && sub === 'create') {
+  const label = flag('label');
+  const payload = {
+    title: flag('title') || die('--title is required'),
+    body: flag('body') || '',
+    ...(label ? { labels: [label] } : {}),
+  };
+  const i = await api('POST', `${R}/issues`, payload);
+  say(`opened #${i.number}: ${i.title}`);
+  say(`  ${i.html_url}`);
+} else if (cmd === 'issue' && sub === 'close') {
+  const n = Number(rest[0]);
+  if (!Number.isInteger(n)) die('usage: issue close <number>');
+  // `{ state: 'closed' }` is the ONLY body this script ever PATCHes onto an
+  // issue - see the ALLOW entry for why that matters.
+  const before = await api('GET', `${R}/issues/${n}`);
+  if (before.state === 'closed') {
+    say(`#${n} is already closed.`);
+  } else {
+    const i = await api('PATCH', `${R}/issues/${n}`, { state: 'closed' });
+    say(`closed #${i.number}: ${i.title}`);
+  }
+} else if (cmd === 'issue') {
+  const n = Number(sub);
+  if (!Number.isInteger(n)) die('usage: issue <n> | issue list | issue create | issue close <n>');
+  const i = await api('GET', `${R}/issues/${n}`);
+  say(`#${i.number}  ${i.title}`);
+  say(`  state  ${i.state}`);
+  say(`  labels ${(i.labels || []).map((l) => (typeof l === 'string' ? l : l.name)).join(', ') || '(none)'}`);
+  say(`  ${i.html_url}`);
 } else if (cmd === 'checks') {
   const ref = sub || git(['rev-parse', 'HEAD']);
   const out = await api('GET', `${R}/commits/${ref}/check-runs`);
@@ -248,7 +293,8 @@ if (cmd === 'pr' && sub === 'list') {
   say(`-> ${method} https://api.github.com${path}`); // the request LINE, never the header
   say(JSON.stringify(await api(method, path), null, 1));
 } else {
-  say('usage: npm run gh -- <pr <n> | pr list | pr create | pr merge <n> | pr close <n> | checks [ref] | raw <METHOD> <path>>');
+  say('usage: npm run gh -- <pr <n> | pr list | pr create | pr merge <n> | pr close <n> | '
+    + 'issue <n> | issue list | issue create | issue close <n> | checks [ref] | raw <METHOD> <path>>');
   // `exitCode`, not `process.exit(2)` - see the note beside `die()`. This
   // branch runs before any fetch and so was never affected, but leaving one
   // `process.exit()` behind is how the next network-touching branch quietly
