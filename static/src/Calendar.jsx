@@ -1,6 +1,7 @@
 import React, { useMemo, useState } from 'react';
 import { CALENDAR_COLUMNS, CALENDAR_START_HOUR, placeRacePacific } from '@shared/race-calendar.js';
 import { navigate } from './app.jsx';
+import NextRaceTile from './NextRaceTile.jsx';
 
 // "Today" is always the Pacific calendar date (the same 2026-09-10 decision
 // the desktop calendar was built under: the user is always Pacific).
@@ -66,6 +67,11 @@ export default function Calendar({ raceDays }) {
           <button className="btn btn--sm" onClick={() => navigate('/')}>Back to list</button>
         </div>
       </div>
+
+      {/* D380: the same "Next race" tile the home shows, over the whole
+          bundle rather than the selected date - "next" is a fact about the
+          clock, not about which day is on screen. */}
+      <NextRaceTile raceDays={raceDays} />
 
       {placed.length === 0 && <p className="placeholder">No race days for {date} in this snapshot.</p>}
 

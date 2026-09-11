@@ -1,6 +1,7 @@
 import React, { useEffect, useRef, useState } from 'react';
 import { getCalendar, listCards } from '../api.js';
 import { CALENDAR_COLUMNS, CALENDAR_START_HOUR } from '@shared/race-calendar.js';
+import NextRaceCard from './NextRaceCard.jsx';
 
 // "Today" is always the Pacific calendar date (D210/2026-09-10 decision: the
 // user is always Pacific), computed explicitly rather than read off the
@@ -120,6 +121,10 @@ export default function RaceDayCalendar({ onBack, onOpenDay }) {
           <button className="btn" onClick={onBack}>Back</button>
         </div>
       </div>
+
+      {/* D380: the same "Next race" card the home shows; its button opens
+          the day scrolled to that race, exactly as a race button below does. */}
+      <NextRaceCard onOpenRace={onOpenDay} refreshKey={date} />
 
       {error && <p className="notice notice--error">{error}</p>}
       {!error && !data && <p className="placeholder">Loading…</p>}

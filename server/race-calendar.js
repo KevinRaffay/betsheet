@@ -66,8 +66,9 @@ calendarRouter.get('/calendar', (req, res) => {
 // next. `now` is accepted as a query parameter for exactly one reason: a
 // check script must be able to pin the clock (shared/race-calendar.js's own
 // rule), and a stale-clock diagnosis in production is a URL away. `latest`
-// is the most recent stored day, so the card has somewhere to send a person
-// when nothing is still to run - the ordinary case on a historical corpus.
+// is the most recent stored day (and its last race number, D380), so the
+// card has a RACE to send a person to when nothing is still to run - the
+// ordinary case on a historical corpus.
 const ISO_RE = /^\d{4}-\d{2}-\d{2}T\d{2}:\d{2}(:\d{2}(\.\d+)?)?Z$/;
 
 calendarRouter.get('/next-race', (req, res) => {
@@ -93,9 +94,13 @@ calendarRouter.get('/next-race', (req, res) => {
   `).all(floor);
   const next = nextRaceAmong(rows.map((row) => ({ ...row, timezone: canonicalizeTrack(row.track).timezone })), now);
 
+  // `lastRaceNumber` (D380): the card's button always opens a RACE, so with
+  // nothing still to run it needs the latest day's last race to land on.
   const latest = db.prepare(`
-    SELECT id AS raceDayId, track, date FROM race_days
-    WHERE deleted_at IS NULL ORDER BY date DESC, id DESC LIMIT 1
+    SELECT rd.id AS raceDayId, rd.track, rd.date,
+           (SELECT MAX(number) FROM races r WHERE r.race_day_id = rd.id) AS lastRaceNumber
+    FROM race_days rd
+    WHERE rd.deleted_at IS NULL ORDER BY rd.date DESC, rd.id DESC LIMIT 1
   `).get() ?? null;
 
   res.json({

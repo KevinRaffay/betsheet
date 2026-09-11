@@ -10,7 +10,7 @@ const SKIP_REASON_LABEL = {
   write_failed: 'delete did not persist',
 };
 
-export default function RaceDayList({ onOpen, onNew, onPL, onDistribution, onSources, onReplay, onCalendar, refreshKey }) {
+export default function RaceDayList({ onOpen, onOpenRace, onNew, onPL, onDistribution, onSources, onReplay, onCalendar, refreshKey }) {
   const [days, setDays] = useState(null);
   const [error, setError] = useState(null);
   const [showDeleted, setShowDeleted] = useState(false);
@@ -162,7 +162,7 @@ export default function RaceDayList({ onOpen, onNew, onPL, onDistribution, onSou
       {error && <p className="notice notice--error">{error}</p>}
       {/* D378: the soonest race still to run, over every stored day - the
           same card the static app's home shows over its bundle. */}
-      {!showDeleted && <NextRaceCard onOpen={onOpen} refreshKey={refreshKey} />}
+      {!showDeleted && <NextRaceCard onOpenRace={onOpenRace} refreshKey={refreshKey} />}
       {confirmBulk && (
         <div className="notice notice--warn">
           <p>

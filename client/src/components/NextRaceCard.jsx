@@ -1,15 +1,20 @@
 import React, { useEffect, useState } from 'react';
 import { getNextRace } from '../api.js';
 
-// The "Next race" card on the desktop home (D378, user request: "add the
-// Next Race card to the home page of the app in all versions"). The static
-// app's Home.jsx renders the same card over its bundle; this one asks
+// The "Next race" card on the desktop home AND calendar (D378, D380; user
+// request: "add the Next Race card to the home page of the app in all
+// versions", then "to the calendar page too"). The static app's
+// NextRaceTile.jsx renders the same card over its bundle; this one asks
 // GET /api/next-race, which runs the same shared/race-calendar.js function
-// over every stored day, so the two homes cannot disagree about what is
-// next. Always rendered: on a historical corpus - the ordinary case - it says
-// nothing is still to run and points at the latest stored day instead of
-// vanishing, which is what would make a person wonder whether it works.
-export default function NextRaceCard({ onOpen, refreshKey }) {
+// over every stored day, so the two apps cannot disagree about what is next.
+//
+// Always rendered, and the button ALWAYS opens a race, never a day (user
+// rule 2026-09-11, D380): the soonest race still to run when there is one,
+// otherwise the last race of the latest stored day - on a historical corpus,
+// the ordinary case, that is the most recent race that ran. `onOpenRace(dayId,
+// raceNumber)` is App.jsx's open-the-day-scrolled-to-that-race navigation,
+// the same one the calendar's race buttons already use.
+export default function NextRaceCard({ onOpenRace, refreshKey }) {
   const [state, setState] = useState(null);
   const [error, setError] = useState(null);
 
@@ -27,7 +32,10 @@ export default function NextRaceCard({ onOpen, refreshKey }) {
   if (!state) return null;
 
   const { next, latest } = state;
-  const target = next ?? latest;
+  const target = next
+    ? { dayId: next.raceDayId, number: next.number }
+    : latest ? { dayId: latest.raceDayId, number: latest.lastRaceNumber ?? null } : null;
+
   return (
     <section className="next-race">
       <div>
@@ -44,14 +52,16 @@ export default function NextRaceCard({ onOpen, refreshKey }) {
           <>
             <div className="next-race__what">No race still to run</div>
             <div className="dim">
-              {latest ? `Latest stored day: ${latest.track}, ${latest.date}` : 'No race days stored yet.'}
+              {latest
+                ? `Latest: ${latest.track}, ${latest.date}${latest.lastRaceNumber ? `, race ${latest.lastRaceNumber}` : ''}`
+                : 'No race days stored yet.'}
             </div>
           </>
         )}
       </div>
       {target && (
-        <button type="button" className="btn btn--primary" onClick={() => onOpen(target.raceDayId)}>
-          Open day →
+        <button type="button" className="btn btn--primary" onClick={() => onOpenRace(target.dayId, target.number)}>
+          Open race →
         </button>
       )}
     </section>
