@@ -249,19 +249,19 @@
 .finish__pay { font-size: 12px; white-space: nowrap; }
 .exotics { margin: 4px 0 0; font-size: 12px; }
 
-.picks {
+.race-pick-grid {
   display: grid;
   grid-template-columns: repeat(auto-fill, minmax(260px, 1fr));
   gap: 10px;
 }
-.pick {
+.race-pick {
   padding: 10px 12px;
   border: 1px solid var(--color-border);
   border-radius: var(--radius);
   background: var(--color-bg-subtle);
   min-width: 0;
 }
-.pick__head {
+.race-pick__head {
   display: flex;
   align-items: center;
   justify-content: space-between;
@@ -269,13 +269,13 @@
   flex-wrap: wrap;
   margin-bottom: 6px;
 }
-.pick__tickets { list-style: none; margin: 0; padding: 0; }
-.pick__ticket { padding: 4px 0; border-top: 1px solid var(--color-border); }
-.pick__ticket:first-child { border-top: 0; }
-.pick__call { display: flex; align-items: baseline; gap: 8px; flex-wrap: wrap; }
-.pick__call code { font-size: 14px; font-weight: 600; }
-.pick__grade { margin-left: auto; white-space: nowrap; font-size: 12px; }
-.pick__why { font-size: 12px; margin-top: 2px; overflow-wrap: anywhere; }
+.race-pick__tickets { list-style: none; margin: 0; padding: 0; }
+.race-pick__ticket { padding: 4px 0; border-top: 1px solid var(--color-border); }
+.race-pick__ticket:first-child { border-top: 0; }
+.race-pick__call { display: flex; align-items: baseline; gap: 8px; flex-wrap: wrap; }
+.race-pick__call code { font-size: 14px; font-weight: 600; }
+.race-pick__grade { margin-left: auto; white-space: nowrap; font-size: 12px; }
+.race-pick__why { font-size: 12px; margin-top: 2px; overflow-wrap: anywhere; }
 
 /* Race screen: prev/next */
 .race-nav { align-items: center; }
@@ -289,6 +289,6 @@
   .stat__value { font-size: 22px; }
   .cashed__link { grid-template-columns: minmax(0, 1fr) auto; }
   .cashed__where { grid-column: 1 / -1; }
-  .picks { grid-template-columns: 1fr; }
+  .race-pick-grid { grid-template-columns: 1fr; }
   .race-section { scroll-margin-top: 56px; }
 }

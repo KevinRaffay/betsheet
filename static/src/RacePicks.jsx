@@ -19,9 +19,9 @@ import { money } from './format.js';
 const OUTCOME_LABEL = { win: 'WIN', loss: 'LOSS', refund: 'REFUND', partial: 'PARTIAL' };
 
 function Outcome({ grade }) {
-  if (!grade) return <span className="dim pick__grade">ungraded</span>;
+  if (!grade) return <span className="dim race-pick__grade">ungraded</span>;
   return (
-    <span className="pick__grade">
+    <span className="race-pick__grade">
       <span className={`outcome outcome--${grade.outcome}`}>{OUTCOME_LABEL[grade.outcome] ?? grade.outcome.toUpperCase()}</span>
       {grade.returned_cents > 0 && (
         // Money back on a REFUND is not a win, so it is not painted like one.
@@ -68,29 +68,29 @@ export default function RacePicks({ day, race }) {
       {groups.length === 0 ? (
         <p className="dim">No card bet this race.</p>
       ) : (
-        <div className="picks">
+        <div className="race-pick-grid">
           {groups.map(({ card, tickets }) => {
             const p = producerOf(card);
             return (
-              <article key={card.id} className="pick">
-                <header className="pick__head">
+              <article key={card.id} className="race-pick">
+                <header className="race-pick__head">
                   <span className={`chip chip--${p.chip}`}>{p.label}</span>
                   <button type="button" className="btn btn--sm"
                     onClick={() => navigate(`/day/${dayId}/card/${card.id}`)}>
                     card #{card.card_number}{p.detail ? ` · ${p.detail}` : ''}
                   </button>
                 </header>
-                <ul className="pick__tickets">
+                <ul className="race-pick__tickets">
                   {tickets.map(({ ticket, grade }) => {
                     const spans = ticket.selections?.races ?? [];
                     return (
-                      <li key={ticket.sequence} className="pick__ticket">
-                        <div className="pick__call">
+                      <li key={ticket.sequence} className="race-pick__ticket">
+                        <div className="race-pick__call">
                           <code>{ticket.teller_call}</code>
                           {spans.length > 1 && <span className="dim"> races {spans.join('–')}</span>}
                           <Outcome grade={grade} />
                         </div>
-                        {ticket.rationale_text && <div className="pick__why dim">{ticket.rationale_text}</div>}
+                        {ticket.rationale_text && <div className="race-pick__why dim">{ticket.rationale_text}</div>}
                       </li>
                     );
                   })}

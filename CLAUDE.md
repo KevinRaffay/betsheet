@@ -984,6 +984,14 @@ it. Rules still in force:
   rule**, and prefer a name that says which feature it belongs to
   (`row--entry-flag`) over one that says how it feels (`row--flagged`) - the
   second is the one two features will both reach for.
+  **D367 found the same collision ACROSS the two stylesheets**: `static/src/static.css`
+  loads after `client/src/styles.css` in the static app, so a class it
+  declares for its own layout also inherits every desktop property it does
+  not override - `.pick` picked up `white-space: nowrap` from a desktop chip
+  and the day page scrolled sideways. `check-static-app` now asserts that no
+  class `static.css` declares is also declared by `styles.css`, outside a
+  named allow-list of deliberate overrides; the grep above still applies to
+  a new CLIENT class, which that check does not cover.
 - **Two sibling components must never both be keyed on a bare remount counter**
   (D181). `RaceDayView` used the D142 "bump a counter, pass it as `key`, get a
   remount" pattern TWICE - `<CardsPanel key={cardsVersion}>` and
