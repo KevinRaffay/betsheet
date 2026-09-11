@@ -72,13 +72,17 @@ export function useRaceLiveOdds(dayId, onSaved) {
 /** The cell that goes beside a horse's M/L. A scratch cannot be priced. */
 export function LiveOddsCell({ race, entry, ctl }) {
   if (entry.scratched) return <td className="dim">—</td>;
+  // D235: the placeholder is NOT the morning line. Now that a field looks
+  // like a field, a greyed "20/1" sitting in it reads as a value already
+  // entered rather than as a hint - and the M/L is in the very next column,
+  // so the hint duplicated the thing it sat beside.
   return (
     <td>
       <input
         className="in in--odds"
         value={ctl.valueFor(race.number, entry)}
         onChange={(ev) => ctl.setValue(race.number, entry.program_number, ev.target.value)}
-        placeholder={entry.morning_line ?? ''}
+        placeholder="odds"
         aria-label={`Live odds for #${entry.program_number}`}
         disabled={ctl.busy === race.number}
       />
