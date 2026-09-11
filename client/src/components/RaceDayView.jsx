@@ -5,7 +5,6 @@ import {
 import CardsPanel from './CardsPanel.jsx';
 import ResultsPanel from './ResultsPanel.jsx';
 import EquibaseOtrPanel from './EquibaseOtrPanel.jsx';
-import TipStakingPanel from './TipStakingPanel.jsx';
 import RaceTipPicks from './RaceTipPicks.jsx';
 import RaceResults from './RaceResults.jsx';
 import TipPicksEntryModal from './TipPicksEntryModal.jsx';
@@ -56,21 +55,22 @@ export default function RaceDayView({ id, onBack, onOpenCard }) {
   const [confirm, setConfirm] = useState(null); // deletion-preview counts
   const [busy, setBusy] = useState(false);
   // Bumped when a SIBLING of CardsPanel writes cards CardsPanel has no way to
-  // know about on its own - the Equibase OTR upload (D142) and the tip-sheet
-  // staking panel (D173). Any future sibling that writes a card needs the same
-  // `onSaved` wire, or its cards appear only after a page reload -
-  // CardsPanel self-fetches on mount, so remounting it via `key` is the
-  // reload. The two in-panel modals don't need this: they're CardsPanel's
-  // own children and call its `reload` directly.
+  // know about on its own - the Equibase OTR upload (D142) and, since tip
+  // sheets stake automatically as soon as they're saved (replacing D183's
+  // manual "Stake all tip sheets into cards" button), every tip-pick save,
+  // correction or delete via `bumpTips` below. Any future sibling that writes
+  // a card needs the same `onSaved`/bump wire, or its cards appear only after
+  // a page reload - CardsPanel self-fetches on mount, so remounting it via
+  // `key` is the reload. The two in-panel modals don't need this: they're
+  // CardsPanel's own children and call its `reload` directly.
   const [cardsVersion, setCardsVersion] = useState(0);
   const [showNotesModal, setShowNotesModal] = useState(false);
   const [showLiveOdds, setShowLiveOdds] = useState(false);
   // D176: which race's tip-pick dialog is open, and a counter that refetches
   // the day's tip rows when anything writes one. D182: the rows and their
-  // scores are loaded ONCE here and passed down to each race's own panel and
-  // to the day-level staking panel - one request for the day rather than one
-  // per race, and no second copy that could disagree about which sources
-  // exist.
+  // scores are loaded ONCE here and passed down to each race's own panel -
+  // one request for the day rather than one per race, and no second copy
+  // that could disagree about which sources exist.
   const [tipRace, setTipRace] = useState(null);
   const [tipVersion, setTipVersion] = useState(0);
   const [tipRows, setTipRows] = useState([]);
@@ -208,7 +208,11 @@ export default function RaceDayView({ id, onBack, onOpenCard }) {
     return () => { cancelled = true; };
   }, [id, tipVersion]);
 
-  const bumpTips = () => setTipVersion((v) => v + 1);
+  // Bumps CardsPanel's remount key too: a tip-pick save, correction or delete
+  // now stakes its source automatically server-side (`autoStake` in
+  // server/tip-picks.js), so cards can change on every one of these, not just
+  // on an explicit staking action.
+  const bumpTips = () => { setTipVersion((v) => v + 1); setCardsVersion((v) => v + 1); };
   const scoreFor = (rowId) => tipScoring?.races?.find((r) => r.id === rowId)?.score ?? null;
 
   const askDelete = async () => {
@@ -343,10 +347,6 @@ export default function RaceDayView({ id, onBack, onOpenCard }) {
         />
       )}
 
-      {/* D182: only STAKING is day-level - it splits the bankroll across every
-          race that has picks, so it cannot be expressed one race at a time.
-          Reviewing and correcting a sheet moved into the race it describes. */}
-      <TipStakingPanel dayId={day.id} rows={tipRows} onSaved={() => setCardsVersion((v) => v + 1)} />
       <ResultsPanel dayId={day.id} />
       <EquibaseOtrPanel dayId={day.id} onSaved={() => setCardsVersion((v) => v + 1)} />
       <div className="races-card" ref={racesContainerRef}>

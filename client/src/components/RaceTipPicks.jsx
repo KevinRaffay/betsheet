@@ -13,9 +13,12 @@ import { correctTipPicks, deleteTipPicks } from '../api.js';
 // first version forever, `edited_at` stamps it). That distinction is why the
 // correction editor lives here and never inside an entry surface.
 //
-// STAKING IS NOT HERE, and that is deliberate: it splits the day's bankroll
-// across every race that has picks (`perRaceBankrollCents`), so it cannot be
-// expressed one race at a time. It stays day-level in TipStakingPanel.jsx.
+// STAKING HAS NO UI HERE, and that is deliberate: it splits the day's
+// bankroll across every race that has picks (`perRaceBankrollCents`), so it
+// cannot be expressed one race at a time or triggered from one race's panel.
+// It happens automatically, server-side, the instant a save/correct/delete
+// below changes what a source has picked (`autoStake` in
+// server/tip-picks.js) - there is no button to press any more.
 
 const oddsOf = (p, key) => (key in p ? p[key] : '');
 
@@ -153,9 +156,9 @@ function CorrectRow({ row, onDone, onCancel }) {
  * race would be one request per race for data that arrives in a single
  * day-level call.
  *
- * `onChanged` tells the day to refetch after a correction or a delete - the
- * staking panel's source list is derived from the same rows, so a race
- * losing its last sheet has to be visible there too.
+ * `onChanged` tells the day to refetch after a correction or a delete, and to
+ * remount CardsPanel - the write that just happened restaked this source
+ * server-side, so cards may have changed too.
  */
 export default function RaceTipPicks({ rows = [], scoreFor = () => null, onEnter, onChanged = () => {} }) {
   const [editing, setEditing] = useState(null);

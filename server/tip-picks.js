@@ -18,11 +18,22 @@
 // through the SAME `validateTipPicks` a model's output used to face, so a
 // person cannot save a ranking the parser would have refused. Correcting a
 // stored row (migration 029) remains a separate, recorded act.
+//
+// STAKING IS AUTOMATIC (D-new, replacing D183's "Stake all tip sheets into
+// cards" button): every write here that changes what a source has picked -
+// manual entry, a correction, a delete - restakes that source immediately via
+// `autoStake` below, rather than leaving the user to press a separate button.
+// A source left with no races-with-picks after the write (every sheet
+// cleared) has nothing to stake; `persistTipCards`'s own "no tip picks"
+// refusal is expected there, not an error, so it is swallowed. A day with no
+// bankroll set is left alone the same way - there is nothing to size a stake
+// from.
 
 import express from 'express';
 import { getDb } from './db.js';
 import { validateTipPicks, hasBlocking } from '../shared/tip-picks.js';
 import { normalizeSourceLabel } from '../shared/source-labels.js';
+import { persistTipCards } from './tip-staking.js';
 
 import { getLogger, newCorrelationId } from './logging.js';
 
@@ -48,6 +59,24 @@ function requireRace(db, day, raceNo) {
   const race = db.prepare('SELECT id FROM races WHERE race_day_id = ? AND number = ?').get(day.id, n);
   if (!race) throw new TipPicksError(404, `This day has no race ${n}.`);
   return n;
+}
+
+/**
+ * Restake ONE source right after its picks changed. Never throws for the
+ * ordinary "nothing to stake" cases - a source with zero races-with-picks
+ * left (`persistTipCards` refuses that with a 404) or a day with no positive
+ * bankroll - so a save/correct/delete never fails because staking had
+ * nothing to do. Any OTHER error (a real bug) still propagates.
+ */
+function autoStake(db, day, sourceLabel, correlationId) {
+  const bankroll = Number(day.bankroll_cents);
+  if (!Number.isFinite(bankroll) || bankroll <= 0) return null;
+  try {
+    return persistTipCards(db, day, sourceLabel, bankroll, correlationId).cards;
+  } catch (err) {
+    if (err?.status === 404) return null;
+    throw err;
+  }
 }
 
 const shapeRow = (r) => ({
@@ -101,6 +130,7 @@ tipPicksRouter.patch('/tip-picks/:tipId', wrap(async (req, res) => {
     });
   }
 
+  const correlationId = req.get('x-correlation-id') || newCorrelationId();
   const ts = now();
   db.prepare(`
     UPDATE tip_picks
@@ -115,8 +145,9 @@ tipPicksRouter.patch('/tip-picks/:tipId', wrap(async (req, res) => {
     sourceLabel: row.source_label, firstEdit: row.edited_at === null,
     before: JSON.parse(row.picks), after: picks,
   });
+  const staked = autoStake(db, day, row.source_label, correlationId);
   const updated = db.prepare('SELECT * FROM tip_picks WHERE id = ?').get(row.id);
-  res.json({ saved: shapeRow({ ...updated, picks: JSON.parse(updated.picks) }), warnings });
+  res.json({ saved: shapeRow({ ...updated, picks: JSON.parse(updated.picks) }), warnings, staked });
 }));
 
 /** Remove a stored row. The archived image and response are NOT deleted. */
@@ -128,7 +159,14 @@ tipPicksRouter.delete('/tip-picks/:tipId', wrap(async (req, res) => {
   traceLog.info('tip_picks_deleted', {
     raceDayId: row.race_day_id, raceNo: row.race_no, tipPicksId: row.id, sourceLabel: row.source_label,
   });
-  res.json({ deleted: row.id });
+  // Removing a race's sheet changes the source's races-with-picks count, which
+  // changes every OTHER race's per-race budget too - restake to keep the
+  // source's cards in sync. A day that is gone or soft-deleted has nothing to
+  // restake into.
+  const day = db.prepare('SELECT * FROM race_days WHERE id = ?').get(row.race_day_id);
+  const correlationId = req.get('x-correlation-id') || newCorrelationId();
+  const staked = day && !day.deleted_at ? autoStake(db, day, row.source_label, correlationId) : null;
+  res.json({ deleted: row.id, staked });
 }));
 
 /**
@@ -222,7 +260,16 @@ tipPicksRouter.post('/race-days/:id/tip-picks/manual', wrap(async (req, res) => 
     }
   });
   write();
-  res.status(201).json({ raceNo, sheets: results, correlationId });
+  // Restake every source this request touched - including a source cleared
+  // to zero picks, which `autoStake` recognises as "nothing to stake" rather
+  // than an error. A source untouched by this request keeps its existing
+  // cards; only sources whose picks just changed need re-pricing.
+  const staked = [];
+  for (const source of new Set(results.map((r) => r.sourceLabel))) {
+    const cards = autoStake(db, day, source, correlationId);
+    if (cards) staked.push({ sourceLabel: source, cards });
+  }
+  res.status(201).json({ raceNo, sheets: results, correlationId, staked });
 }));
 
 /**
