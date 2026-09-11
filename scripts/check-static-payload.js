@@ -95,6 +95,18 @@ console.log('\n-- validateStaticPayload names each problem rather than throwing 
   check('a well-formed payload has no problems', validateStaticPayload(good()).length === 0,
     validateStaticPayload(good()).join('; '));
 
+  // D180: Equibase prints some scratched rows with no program number at all,
+  // and migration 032 made the column NULLable for exactly that case - a null
+  // number here is a fact, not a defect, as long as the row is scratched.
+  const scratchedNoNumber = good();
+  scratchedNoNumber.raceDays[0].races[0].entries.push(
+    { program_number: null, horse_name: 'Scratched One', scratched: true },
+    { program_number: null, horse_name: 'Scratched Two', scratched: true },
+  );
+  check('two scratched entries with no program_number both validate - null is not a duplicate',
+    validateStaticPayload(scratchedNoNumber).length === 0,
+    validateStaticPayload(scratchedNoNumber).join('; '));
+
   const cases = [
     ['wrong schema', (p) => { p.schema = 'something-else'; }],
     ['wrong schemaVersion', (p) => { p.schemaVersion = 2; }],
@@ -108,6 +120,7 @@ console.log('\n-- validateStaticPayload names each problem rather than throwing 
     ['duplicate race number', (p) => { p.raceDays[0].races.push({ ...p.raceDays[0].races[0] }); }],
     ['a race with no entries', (p) => { p.raceDays[0].races[0].entries = []; }],
     ['an entry with no program number', (p) => { delete p.raceDays[0].races[0].entries[0].program_number; }],
+    ['a null program number on a live (non-scratched) entry', (p) => { p.raceDays[0].races[0].entries[0].program_number = null; }],
     ['duplicate program number', (p) => { p.raceDays[0].races[0].entries.push({ ...p.raceDays[0].races[0].entries[0] }); }],
     ['scratched not a boolean', (p) => { p.raceDays[0].races[0].entries[0].scratched = 0; }],
     ['a card with no id', (p) => { delete p.raceDays[0].cards[0].id; }],

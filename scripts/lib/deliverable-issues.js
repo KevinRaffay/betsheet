@@ -79,7 +79,13 @@ export function createDeliverableIssuesClient({
     let json = null;
     try { json = JSON.parse(text); } catch { /* some endpoints return an empty body */ }
     if (!res.ok) {
-      throw new Error(redact(`HTTP ${res.status} on ${method} ${path.replace(`/repos/${owner}/${repo}`, '')}: ${(json && json.message) || text.slice(0, 400)}`));
+      // GitHub's top-level `message` on a 422 is the generic "Validation
+      // Failed" - the actual reason (e.g. `already_exists`) lives one level
+      // down, in `errors[].code`. ensureDeliverableLabel below matches on
+      // this thrown message to treat "label already there" as success, so
+      // that code must be folded in here or it can never match.
+      const detail = json?.errors?.length ? ` ${JSON.stringify(json.errors)}` : '';
+      throw new Error(redact(`HTTP ${res.status} on ${method} ${path.replace(`/repos/${owner}/${repo}`, '')}: ${(json && json.message) || text.slice(0, 400)}${detail}`));
     }
     return json;
   }

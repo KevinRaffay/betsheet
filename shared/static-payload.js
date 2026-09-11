@@ -105,11 +105,23 @@ function validateDay(day, at, problems) {
         // snake_case is NOT a slip: the shape the DB itself uses, so a
         // reader that already understands DB-shaped entries needs no
         // adapter that could drift.
-        if (typeof e?.program_number !== 'string' || !e.program_number) { bad(`${raceAt}: an entry has no program_number`); continue; }
-        if (pgms.has(e.program_number)) bad(`${raceAt}: duplicate program number ${e.program_number}`);
-        pgms.add(e.program_number);
-        if (typeof e.horse_name !== 'string' || !e.horse_name) bad(`${raceAt}: #${e.program_number} has no horse_name`);
-        if (typeof e.scratched !== 'boolean') bad(`${raceAt}: #${e.program_number} scratched must be a boolean`);
+        //
+        // NULL is a legitimate program_number (migration 032, D180): Equibase
+        // prints some scratched rows with no number at all, and the DB stores
+        // that as NULL rather than a placeholder. Only a SCRATCHED entry may
+        // take that value - a null number on a live entry is data corruption,
+        // not a fact worth shipping.
+        if (e?.program_number === null) {
+          if (!e.scratched) bad(`${raceAt}: an entry has no program_number but is not scratched`);
+        } else if (typeof e?.program_number !== 'string' || !e.program_number) {
+          bad(`${raceAt}: an entry has no program_number`);
+          continue;
+        } else {
+          if (pgms.has(e.program_number)) bad(`${raceAt}: duplicate program number ${e.program_number}`);
+          pgms.add(e.program_number);
+        }
+        if (typeof e.horse_name !== 'string' || !e.horse_name) bad(`${raceAt}: #${e.program_number ?? '?'} has no horse_name`);
+        if (typeof e.scratched !== 'boolean') bad(`${raceAt}: #${e.program_number ?? '?'} scratched must be a boolean`);
       }
     }
   }

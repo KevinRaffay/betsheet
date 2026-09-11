@@ -94,6 +94,25 @@ console.log('\nensureDeliverableLabel is idempotent against an existing label');
   check('one call made', calls.length === 1, String(calls.length));
 }
 
+// GitHub's REAL shape for this exact case (verified live, D333-ish): the
+// top-level `message` is the generic "Validation Failed" and the actionable
+// code lives one level down, in `errors[].code`. The fixture above tests a
+// message the API never actually sends - it passed while the real call to
+// api.github.com 422'd every time after the label's first creation, because
+// `already_exists` was never in `err.message` for a real response. This is
+// the D201 lesson again: a check's fixture is only a valid test of a real
+// call for as long as it matches what the real endpoint actually returns.
+console.log('\nensureDeliverableLabel is idempotent against a REAL GitHub already_exists response shape');
+{
+  const { impl, calls } = fakeFetch([
+    { status: 422, body: { message: 'Validation Failed', errors: [{ resource: 'Label', code: 'already_exists', field: 'name' }] } },
+  ]);
+  let threw = null;
+  try { await client(impl).ensureDeliverableLabel(); } catch (err) { threw = err; }
+  check('does not throw on the real already_exists shape', threw === null, String(threw));
+  check('one call made', calls.length === 1, String(calls.length));
+}
+
 console.log('\nensureDeliverableLabel still throws on a real failure');
 {
   const { impl } = fakeFetch([
