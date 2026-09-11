@@ -214,13 +214,27 @@
 .win__pay { font-size: 15px; }
 
 /* One race section on the day page */
-.race-section { scroll-margin-top: 64px; }
+/* Each race is its own bordered card (user request 2026-09-11, D370): the
+   `panel` class the static app has carried since D150 has no rule behind it
+   in either stylesheet, so a race section had no visible edge and one race's
+   picks ran straight into the next. The pick panels inside sit on the
+   SUBTLE background, so they still read as cards within the card. */
+.race-section {
+  scroll-margin-top: 64px;
+  margin: 14px 0;
+  padding: 14px 16px 16px;
+  border: 1px solid var(--color-border);
+  border-radius: var(--radius);
+  background: var(--color-bg);
+}
 .race-section__head {
   display: flex;
   align-items: flex-start;
   justify-content: space-between;
   gap: 12px;
   flex-wrap: wrap;
+  padding-bottom: 10px;
+  border-bottom: 1px solid var(--color-border);
 }
 .race-section__title { margin: 0; font-size: 20px; }
 .race-section__facts { margin: 2px 0 0; font-size: 13px; }
@@ -290,5 +304,5 @@
   .cashed__link { grid-template-columns: minmax(0, 1fr) auto; }
   .cashed__where { grid-column: 1 / -1; }
   .race-pick-grid { grid-template-columns: 1fr; }
-  .race-section { scroll-margin-top: 56px; }
+  .race-section { scroll-margin-top: 56px; padding: 10px 10px 12px; }
 }
