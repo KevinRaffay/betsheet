@@ -83,6 +83,41 @@ export const DEFAULT_NEXT_NUMBER = 203;
 // cannot see a number minted on an unmerged branch in a different clone -
 // the same limitation as before, now with a far better floor. A number
 // already in a merged row is exactly what it does see.
+//
+// D230: TWO HOLES IN THAT, BOTH OF WHICH BIT A REAL SESSION ON 2026-09-11,
+// and both fixed by raising the floor on EVERY CLAIM rather than once.
+//
+// 1. SEED-ONCE. The seed above is read only when the counter row is absent,
+//    and the comment below says why: once seeded, the persisted counter
+//    governs forever. That is exactly right for the worktree case it was
+//    written for, where the counter is shared and therefore authoritative.
+//    In a SEPARATE CLONE it is the bug: the counter is private to that
+//    clone, so nothing ever teaches it about a number merged upstream since
+//    the session began. A long session claiming a second number hands out
+//    one the ledger could already have told it was gone.
+// 2. A STALE LEDGER. `DELIVERABLES.md` in the working tree is a snapshot of
+//    whenever that clone last pulled. On 2026-09-11 a cloud session seeded
+//    from a checkout whose ledger topped out at D223 and claimed D224 - a
+//    number that had been MERGED TO MAIN 69 MINUTES EARLIER (#296 at
+//    02:20Z; the claim at 03:29Z). The local file was not wrong, just old,
+//    and nothing looked anywhere fresher.
+//
+// The fix for both is `syncCounterFloor`, below: before every claim, raise
+// the counter to `max(counter, local ledger + 1, ORIGIN's ledger + 1)`. It
+// only ever raises, so it cannot recycle a number or fight the shared
+// counter on a machine that has one - on that machine the counter is already
+// at or above the ledger and the sync is a no-op.
+//
+// WHAT THIS STILL DOES NOT FIX, stated plainly so the next reader does not
+// have to discover it the way this one did: two clones claiming within the
+// same minute, before either has merged, still collide. The window shrinks
+// from "everything merged since my clone" to "everything merged since my
+// last fetch", which is minutes rather than hours, and it is the D225 half
+// of the same incident (#298 merged at 03:36Z, seven minutes AFTER the
+// colliding claim). Closing it completely needs a server-side atomic claim -
+// pushing a unique sha to `refs/deliverables/<n>`, where a second pusher is
+// rejected as non-fast-forward - which costs push credentials on every
+// claim. Worth doing if the residual window ever actually bites; it has not.
 const LEDGER_ROW_ID_RE = /^\|\s*D(\d{1,6})(?:-[A-Za-z0-9]+)?\s*\|/;
 
 /** The ledger to seed from - override wins, else this checkout's DELIVERABLES.md. */
@@ -125,6 +160,116 @@ export function resolveSeedNumber({ ledgerPath } = {}) {
   const fromLedger = highWater === null ? null : highWater + 1;
   const seed = fromLedger !== null && fromLedger > DEFAULT_NEXT_NUMBER ? fromLedger : DEFAULT_NEXT_NUMBER;
   return { seed, highWater, source: seed === fromLedger ? 'ledger' : 'floor' };
+}
+
+/**
+ * The ledger as ORIGIN sees it (D230), read with `git show`.
+ *
+ * `origin/main` rather than the working tree is the whole point: the working
+ * tree's copy is as old as this clone's last pull, and a number merged since
+ * then is invisible to it. Reading the remote-tracking ref costs nothing
+ * beyond the optional fetch.
+ *
+ * NEVER THROWS, and every failure path returns null so the caller falls back
+ * to the local ledger: no remote, no network, a detached CI checkout, a
+ * repository whose default branch is not `main`, a `DELIVERABLES.md` that
+ * does not exist on that ref. A seed that cannot see the remote must still
+ * work exactly as it did before this function existed - the allocator is not
+ * allowed to become something that needs a network.
+ *
+ * `fetch: true` refreshes `origin/main` first. That is a WRITE to the
+ * remote-tracking ref and nothing else - no working tree change, no merge -
+ * and it is bounded by `timeoutMs` so an unreachable remote costs seconds,
+ * not a hung command.
+ */
+export function remoteLedgerHighWaterMark({
+  ref = 'origin/main', file = 'DELIVERABLES.md', fetch: doFetch = true, timeoutMs = 15000, cwd,
+} = {}) {
+  const run = (args) => execFileSync('git', args, {
+    encoding: 'utf8', timeout: timeoutMs, stdio: ['ignore', 'pipe', 'ignore'], cwd,
+  });
+  if (doFetch) {
+    const [remote, branch] = ref.split('/');
+    // A failed fetch is not a failure of this function: whatever `origin/main`
+    // already points at is still fresher than nothing, so fall through to the
+    // read rather than giving up on the remote entirely.
+    try { run(['fetch', '--quiet', remote, branch]); } catch { /* offline - use the ref we have */ }
+  }
+  let text;
+  try {
+    text = run(['show', `${ref}:${file}`]);
+  } catch {
+    return null;
+  }
+  let max = null;
+  for (const line of text.split(/\r?\n/)) {
+    const m = LEDGER_ROW_ID_RE.exec(line);
+    if (!m) continue;
+    const n = Number(m[1]);
+    if (Number.isInteger(n) && (max === null || n > max)) max = n;
+  }
+  return max;
+}
+
+/**
+ * Raise the counter to the highest floor any source knows about (D230).
+ *
+ * Called before every claim, not just at seed time. Returns
+ * `{ raised, from, to, floor, sources }` - `raised` false when the counter
+ * was already at or above every floor, which is the normal case on a machine
+ * whose counter is shared and therefore authoritative.
+ *
+ * RAISES ONLY, NEVER LOWERS. That is what makes it safe to run unconditionally:
+ * it cannot recycle a number (the never-recycle rule), cannot undo a claim
+ * another worktree just made, and cannot be tricked into going backwards by a
+ * truncated or rewritten ledger. Every ambiguity resolves upward, exactly as
+ * D226's seeding already did.
+ */
+export function syncCounterFloor(db, { ledgerPath, remote = true, remoteOptions = {} } = {}) {
+  const sources = { counter: null, localLedger: ledgerHighWaterMark(ledgerPath), remoteLedger: null };
+  if (remote) {
+    try {
+      sources.remoteLedger = remoteLedgerHighWaterMark(remoteOptions);
+    } catch {
+      sources.remoteLedger = null; // belt and braces - the helper already swallows
+    }
+  }
+  // The floor the SOURCES imply. Deliberately NOT max'd with the counter here:
+  // that comparison happens in SQL below, against the counter's value at write
+  // time rather than at read time.
+  const floor = Math.max(
+    sources.localLedger === null ? 0 : sources.localLedger + 1,
+    sources.remoteLedger === null ? 0 : sources.remoteLedger + 1,
+    DEFAULT_NEXT_NUMBER,
+  );
+
+  // MAX() IN SQL, INSIDE AN IMMEDIATE TRANSACTION, and this is the whole
+  // correctness argument - an earlier draft of this function did the compare
+  // in JS (`if (floor > from) UPDATE ... SET next_number = floor`) and that is
+  // RACY in a way that bites hard:
+  //
+  //   A syncs, reads 203, decides 601, writes 601
+  //   B syncs, reads 203 CONCURRENTLY, also decides 601
+  //   A claims 601, counter -> 602; C claims 602, counter -> 603
+  //   B's write finally lands: counter := 601, BACKWARDS past two live claims
+  //   the next claimer reads 601 and hits UNIQUE constraint on
+  //   deliverable_claims.number
+  //
+  // That is not hypothetical - this repo's own check script reproduced it at
+  // roughly 1 run in 5 with 25 concurrent processes, which is exactly the
+  // flake rate that gets a failure dismissed as noise. `MAX(next_number, ?)`
+  // cannot go backwards no matter how stale the value that reached it, because
+  // the comparison reads the counter in the same statement that writes it.
+  const applied = withRetry(() => db.transaction(() => {
+    const before = db.prepare('SELECT next_number FROM deliverable_counter WHERE id = 1').get();
+    if (!before) return { from: null, to: null };
+    db.prepare('UPDATE deliverable_counter SET next_number = MAX(next_number, ?) WHERE id = 1').run(floor);
+    const after = db.prepare('SELECT next_number FROM deliverable_counter WHERE id = 1').get();
+    return { from: before.next_number, to: after.next_number };
+  }).immediate());
+
+  sources.counter = applied.from;
+  return { raised: applied.to !== null && applied.to > applied.from, from: applied.from, to: applied.to, floor, sources };
 }
 
 function sleepSync(ms) {
@@ -219,11 +364,33 @@ export function closeAllocatorDb(db) {
   db.close();
 }
 
-/** Atomically claims the next D number. Returns { number, claimedAt }. */
-export function claimDeliverableNumber(db, { title, branch = null, claimedBy = null } = {}) {
+/**
+ * Atomically claims the next D number. Returns { number, claimedAt, floor }.
+ *
+ * D230: the floor is re-synced before every claim, not just at seed time.
+ * `syncFloor: false` opts out entirely (the concurrency test wants a counter
+ * that only its own claims move). `remote` defaults OFF here and is turned ON
+ * by the CLI: a library caller should not make a network call it did not ask
+ * for, and the check script's 25 concurrent children must not each fetch.
+ * `BETSHEET_DELIVERABLE_NO_REMOTE=1` forces it off everywhere, for a machine
+ * or a CI box that should never reach the network from this tool.
+ *
+ * The sync is a SEPARATE transaction from the claim, deliberately. Another
+ * worktree claiming in between is harmless: the raise is monotonic, and the
+ * claim below re-reads the counter inside its own immediate transaction, so
+ * it takes whatever is next at that instant rather than a value it cached.
+ */
+export function claimDeliverableNumber(db, {
+  title, branch = null, claimedBy = null,
+  syncFloor = true, remote = false, ledgerPath, remoteOptions,
+} = {}) {
   if (!title || !title.trim()) {
     throw new Error('claimDeliverableNumber requires a non-empty title');
   }
+  const useRemote = remote && process.env.BETSHEET_DELIVERABLE_NO_REMOTE !== '1';
+  const floor = syncFloor
+    ? syncCounterFloor(db, { ledgerPath, remote: useRemote, remoteOptions })
+    : null;
   const runClaim = db.transaction(() => {
     const row = db.prepare('SELECT next_number FROM deliverable_counter WHERE id = 1').get();
     const number = row.next_number;
@@ -233,7 +400,7 @@ export function claimDeliverableNumber(db, { title, branch = null, claimedBy = n
       INSERT INTO deliverable_claims (number, title, branch, claimed_by, claimed_at, status)
       VALUES (?, ?, ?, ?, ?, 'claimed')
     `).run(number, title.trim(), branch, claimedBy, claimedAt);
-    return { number, claimedAt };
+    return { number, claimedAt, floor };
   });
   // BEGIN IMMEDIATE - the read-then-write inside must not start deferred,
   // or two processes can both read the same next_number before either
