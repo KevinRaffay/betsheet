@@ -83,10 +83,10 @@ export default function LiveOddsModal({ dayId, onClose, onSaved }) {
           </p>
           <p>
             <strong>Type the board into each race instead</strong>, in the Live column beside the
-            morning line on the day view. This dialog still works for any capture that <em>does</em>
-            {' '}carry prices — Chrome&apos;s &ldquo;Webpage, Complete&rdquo; serializes the live
-            page and may — but it will refuse a capture whose board is empty rather than store a
-            blank one.
+            morning line on the day view. No browser save method reaches these values —
+            {' '}<em>view-source</em>, &ldquo;HTML Only&rdquo; and &ldquo;Webpage, Complete&rdquo;
+            were all tried and all come back empty — so this upload is kept only for a source that
+            genuinely carries prices, and it will refuse an empty board rather than store one.
           </p>
         </div>
         <p className="dim">
