@@ -153,14 +153,54 @@ console.log('-- the endpoint, on a real day --');
     }
     const mlFavorite = db.prepare(`SELECT e.program_number FROM entries e JOIN races r ON r.id = e.race_id
       WHERE r.race_day_id = ? AND r.number = 1 AND e.scratched = 0 ORDER BY e.morning_line_decimal ASC LIMIT 1`).get(dayId).program_number;
+    // ---- D234: a morning card and a post-time card must not pool ----------
+    //
+    // The whole point of the flag. Two LLM cards on the SAME race, same model,
+    // same inputs - one generated from the morning line, one with the board in
+    // the prompt. Before D234 they shared a group key, so two genuinely
+    // different experiments reported one number.
+    {
+      const r1 = db.prepare('SELECT id FROM races WHERE race_day_id = ? AND number = 1').get(dayId).id;
+      const mk = (n, board, pgm) => {
+        const cid = db.prepare(`INSERT INTO cards (race_day_id, card_number, variant, bankroll_cents, status,
+            correlation_id, consensus_completeness, engine_version, llm_model, live_odds_present)
+          VALUES (?, ?, 'default', 20000, 'final', ?, 'LLM_GENERATED', 'llm', 'board-probe', ?)`)
+          .run(dayId, 90 + n, `corr-board-${n}`, board ? 1 : 0).lastInsertRowid;
+        db.prepare(`INSERT INTO tickets (card_id, race_id, sequence, bet_type, selections, stake_cents, cost_cents, teller_call)
+          VALUES (?, ?, 1, 'win', ?, 2000, 2000, 'win')`)
+          .run(cid, r1, JSON.stringify({ races: [1], legs: [[pgm]] }));
+        db.prepare(`INSERT INTO llm_card_requests (race_day_id, card_id, race_number, prompt_text, model, requested_at, live_odds_present)
+          VALUES (?, ?, 1, ?, 'board-probe', '2026-09-11T00:00:00Z', ?)`)
+          .run(dayId, cid, 'RACE 1 of 1\\n\\nENTRIES\\n#4 A - ML 5/2', board ? 1 : 0);
+        return cid;
+      };
+      mk(1, false, '4');
+      mk(2, true, '6');
+    }
+
     db.close();
 
     const res = await jget('/api/pick-scoring');
     const by = (k) => res.bySource.find((s) => s.groupKey === k);
+    {
+      const probe = res.bySource.filter((b) => b.source === 'board-probe');
+      check('D234: the morning card and the board card land in DIFFERENT groups',
+        probe.length === 2
+        && probe.some((b) => b.groupKey.includes('+board'))
+        && probe.some((b) => !b.groupKey.includes('+board')),
+        probe.map((b) => b.groupKey).join(' | '));
+      check('D234: each group carries exactly its own one race, never the other\'s',
+        probe.every((b) => b.n === 1));
+      check('D234: the per-race rows say which saw a board, so the split is auditable',
+        res.races.some((r) => r.groupKey.includes('+board') && r.sawBoard === true)
+        && res.races.some((r) => r.groupKey.startsWith('board-probe [') && !r.groupKey.includes('+board') && r.sawBoard === false));
+    }
     const rowsFor = (k) => res.races.filter((r) => r.groupKey === k);
 
     check('every group is keyed by source (and inputs for LLM); no TIPSHEET CARD is ever read and there is no pooled total',
-      same(res.bySource.map((s) => s.groupKey).sort(), ['EQB_OTR', 'HUMAN', 'claude-fable-5-1 [otr]', 'claude-fable-5-1 [tipsheet]', 'claude-sonnet-5 [none]', 'trackmaster'])
+      // D234 adds the two board-probe groups: the same model on the same race,
+      // split by whether that generation saw the tote board.
+      same(res.bySource.map((s) => s.groupKey).sort(), ['EQB_OTR', 'HUMAN', 'board-probe [none +board]', 'board-probe [none]', 'claude-fable-5-1 [otr]', 'claude-fable-5-1 [tipsheet]', 'claude-sonnet-5 [none]', 'trackmaster'])
       && !res.races.some((r) => r.bucket === 'TIPSHEET' && r.cardIds.length > 0) && res.bySource.every((s) => s.groupKey !== 'all'), JSON.stringify(res.bySource.map((s) => s.groupKey)));
 
     const otr = by('EQB_OTR');
@@ -207,7 +247,7 @@ console.log('-- the endpoint, on a real day --');
       res.unscoredDays.length === 1 && res.unscoredDays[0].raceDayId === dayId && res.unscoredDays[0].rows === 1);
 
     check('?track=DMR keeps everything; ?track=XXX keeps nothing',
-      (await jget('/api/pick-scoring?track=dmr')).bySource.length === 6
+      (await jget('/api/pick-scoring?track=dmr')).bySource.length === 8
       && (await jget('/api/pick-scoring?track=XXX')).bySource.length === 0);
 
     // INVARIANT 12: a soft-deleted day leaves every aggregate, and comes back.
@@ -216,7 +256,7 @@ console.log('-- the endpoint, on a real day --');
     check('a soft-deleted day drops out entirely (invariant 12)',
       afterDelete.bySource.length === 0 && afterDelete.races.length === 0 && afterDelete.unscoredDays.length === 0);
     await jpost(`/api/race-days/${dayId}/restore`);
-    check('  and restoring brings it back', (await jget('/api/pick-scoring')).bySource.length === 6);
+    check('  and restoring brings it back', (await jget('/api/pick-scoring')).bySource.length === 8);
   } finally {
     server.kill();
   }

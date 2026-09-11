@@ -981,6 +981,55 @@ Place | #1 | $20 | Safe.
   check('every card on this day carries a producer label, never lean-1.1',
     (await jget(`/api/race-days/${dayId}/cards`)).every((c) => c.engine_version !== 'lean-1.1'));
 
+
+  // Placed LAST on purpose: this block PERSISTS two cards, and several
+  // assertions above count cards per bucket and per model. Running it
+  // earlier shifted those counts and failed them - the counts were right
+  // and this block was in the wrong place, so it moved rather than they
+  // being relaxed.
+  // -- D234: does a generation actually RECORD whether it saw the board? -----
+  //
+  // This gap was found by a negative control: forcing the flag to false broke
+  // nothing, because nothing asserted it was ever set. Without these, a wrong
+  // wiring would silently label every card "morning line only" and the whole
+  // morning-vs-post-time split would read as one-sided forever.
+  {
+    const wdb = notesDb();
+    const reqOf = (rid) => wdb.prepare('SELECT live_odds_present, card_id FROM llm_card_requests WHERE id = ?').get(rid);
+    check('D234: a generation with NO board records live_odds_present = 0',
+      reqOf(p1.requestId).live_odds_present === 0);
+
+    // Give race 2 a board the way D232's route does, then generate it.
+    const r2 = wdb.prepare('SELECT id FROM races WHERE race_day_id = ? AND number = 2').get(dayId).id;
+    wdb.prepare("UPDATE entries SET live_odds = '9/5', live_odds_decimal = 1.8 WHERE race_id = ? AND program_number = '1'").run(r2);
+
+    const p2 = await (await jpost(`/api/race-days/${dayId}/llm-cards/preview`, {
+      race: 2, __stubResponse: wellFormedResponse(1, 25, 'Board says 9/5.'),
+    })).json();
+    check('D234: a generation WITH a board records live_odds_present = 1',
+      reqOf(p2.requestId).live_odds_present === 1, JSON.stringify(reqOf(p2.requestId)));
+    check('D234: and its prompt actually carries the LIVE field',
+      wdb.prepare('SELECT prompt_text FROM llm_card_requests WHERE id = ?').get(p2.requestId).prompt_text.includes('· LIVE 9/5'));
+    check('D234: while the odds-free race\'s prompt still carries none',
+      !wdb.prepare('SELECT prompt_text FROM llm_card_requests WHERE id = ?').get(p1.requestId).prompt_text.includes('LIVE'));
+
+    // Persisting must LATCH it onto the card, the way notes does.
+    const saved = await (await jpost(`/api/race-days/${dayId}/llm-cards`, { race: 2, requestId: p2.requestId, bankrollCents: 20000 })).json();
+    check('D234: persisting latches the flag onto the CARD',
+      wdb.prepare('SELECT live_odds_present FROM cards WHERE id = ?').get(saved.cardId).live_odds_present === 1);
+
+    // And a later odds-free race on the SAME card must not clear it - the flag
+    // means "at least one race saw a board", exactly as notes_present does.
+    const p3 = await (await jpost(`/api/race-days/${dayId}/llm-cards/preview`, {
+      race: 1, cardId: saved.cardId, __stubResponse: wellFormedResponse(1, 25, 'No board here.'),
+    })).json();
+    await jpost(`/api/race-days/${dayId}/llm-cards`, { race: 1, requestId: p3.requestId, cardId: saved.cardId });
+    check('D234: a later odds-free race does NOT clear the card flag - it latches',
+      wdb.prepare('SELECT live_odds_present FROM cards WHERE id = ?').get(saved.cardId).live_odds_present === 1);
+    check('D234: ...while that race\'s own request row correctly says 0 - per-race truth survives',
+      reqOf(p3.requestId).live_odds_present === 0);
+  }
+
   dbCheck.close();
 } finally {
   server.kill();

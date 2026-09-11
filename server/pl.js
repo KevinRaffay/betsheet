@@ -35,6 +35,7 @@ plRouter.get('/pl', (req, res) => {
            c.card_number AS cardNumber, c.variant, st.name AS template,
            c.consensus_completeness AS completeness, c.bankroll_cents AS bankrollCents,
            c.engine_version AS engineVersion, c.llm_model AS llmModel, c.notes_present AS notesPresent,
+           c.live_odds_present AS liveOddsPresent,
            c.tip_source_label AS tipSource,
            SUM(t.cost_cents) AS costCents,
            SUM(gt.returned_cents) AS returnedCents,
@@ -80,6 +81,7 @@ plRouter.get('/pl', (req, res) => {
   // "every race did". Deliberately NOT cross-tabbed with model - with a handful
   // of cards each cell would be a pool of one.
   const byNotes = new Map();
+  const byLiveOdds = new Map();
   // D175: TIPSHEET variants are MUTUALLY EXCLUSIVE - three ways to bet one
   // source's picks, only one of which is ever real money. Summing them made a
   // $500 bankroll report ~$1,498 spent. So exactly ONE variant per (day,
@@ -162,6 +164,28 @@ plRouter.get('/pl', (req, res) => {
           cards: 0, tickets: 0, costCents: 0, returnedCents: 0, plCents: 0, bankrollCents: 0,
         });
       }
+      // D234: the same split on the board. Two LLM cards on one race - one
+      // generated from the morning line, one with the tote board in the
+      // prompt - are two different experiments, and pooling them reports one
+      // number for both. The key is "saw a board", not "was generated late":
+      // a card made at 4pm with nobody having typed the board has a prompt
+      // byte-identical to the morning one.
+      const oddsKey = row.liveOddsPresent ? 'live_odds' : 'no_live_odds';
+      if (!byLiveOdds.has(oddsKey)) {
+        byLiveOdds.set(oddsKey, {
+          liveOdds: Boolean(row.liveOddsPresent),
+          label: row.liveOddsPresent ? 'Saw the live board' : 'Morning line only',
+          cards: 0, tickets: 0, costCents: 0, returnedCents: 0, plCents: 0, bankrollCents: 0,
+        });
+      }
+      const lb = byLiveOdds.get(oddsKey);
+      lb.cards++;
+      lb.tickets += row.tickets;
+      lb.costCents += row.costCents;
+      lb.returnedCents += row.returnedCents;
+      lb.plCents += row.plCents;
+      lb.bankrollCents += row.bankrollCents ?? 0;
+
       const nb = byNotes.get(notesKey);
       nb.cards++;
       nb.tickets += row.tickets;
@@ -188,6 +212,7 @@ plRouter.get('/pl', (req, res) => {
       ...b,
       byModel: [...byModel.values()].sort((a, b2) => b2.plCents - a.plCents),
       byNotes: [...byNotes.values()].sort((a, b2) => Number(b2.notes) - Number(a.notes)),
+      byLiveOdds: [...byLiveOdds.values()].sort((a, b2) => Number(b2.liveOdds) - Number(a.liveOdds)),
     };
   });
 
@@ -213,7 +238,7 @@ plRouter.get('/pl', (req, res) => {
   // the same way it tests every other flag on the row.
   const cardsOut = cardRows
     .filter((r) => selectedMeet === 'all' || r.meet === selectedMeet)
-    .map((r) => ({ ...r, notesPresent: Boolean(r.notesPresent) }));
+    .map((r) => ({ ...r, notesPresent: Boolean(r.notesPresent), liveOddsPresent: Boolean(r.liveOddsPresent) }));
   res.json({ buckets, cards: cardsOut, ungraded: ungraded.filter((r) => selectedMeet === 'all' || r.meet === selectedMeet), engineVersions, selectedVersion, meets, selectedMeet });
 });
 
@@ -229,7 +254,7 @@ plRouter.get('/race-days/:id/pl', (req, res) => {
 
   const cards = db.prepare(`
     SELECT c.id, c.card_number, c.variant, st.name AS template, c.bankroll_cents,
-           c.consensus_completeness, c.engine_version, c.llm_model, c.notes_present, c.created_at
+           c.consensus_completeness, c.engine_version, c.llm_model, c.notes_present, c.live_odds_present, c.created_at
     FROM cards c
     LEFT JOIN strategy_templates st ON st.id = c.strategy_template_id
     WHERE c.race_day_id = ? ORDER BY c.card_number
@@ -270,7 +295,8 @@ plRouter.get('/race-days/:id/pl', (req, res) => {
     return {
       cardId: c.id, cardNumber: c.card_number, variant: c.variant, template: c.template,
       bankrollCents: c.bankroll_cents, completeness: c.consensus_completeness,
-      engineVersion: c.engine_version, llmModel: c.llm_model, notesPresent: Boolean(c.notes_present), createdAt: c.created_at, graded: perRace.length > 0, perRace,
+      engineVersion: c.engine_version, llmModel: c.llm_model, notesPresent: Boolean(c.notes_present),
+      liveOddsPresent: Boolean(c.live_odds_present), createdAt: c.created_at, graded: perRace.length > 0, perRace,
       costCents: sum('costCents'), returnedCents: sum('returnedCents'), plCents: sum('plCents'),
     };
   });

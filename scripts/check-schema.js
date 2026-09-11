@@ -132,6 +132,15 @@ check('race_results.favorite defaults to 0 so every pre-existing result row stay
 // never overwrite, since the drift between two boards is the whole signal.
 check('odds_captures is per (day, capture) with a nullable captured_at - absent reads as unknown, never fresh',
   db.prepare("SELECT COUNT(*) c FROM pragma_table_info('odds_captures') WHERE name = 'captured_at' AND \"notnull\" = 0").get().c === 1);
+// D234: which generations saw the tote board. Two columns, mirroring notes:
+// the per-race truth on the request, the latched summary on the card.
+check('cards.live_odds_present exists, NOT NULL, defaulting 0 so every pre-D234 card stays valid',
+  db.prepare(`SELECT COUNT(*) c FROM pragma_table_info('cards')
+    WHERE name = 'live_odds_present' AND "notnull" = 1 AND dflt_value = '0'`).get().c === 1);
+check('llm_card_requests.live_odds_present carries the per-race truth, same shape',
+  db.prepare(`SELECT COUNT(*) c FROM pragma_table_info('llm_card_requests')
+    WHERE name = 'live_odds_present' AND "notnull" = 1 AND dflt_value = '0'`).get().c === 1);
+
 // D232 widened this, and retired the premise the D228 version was named for.
 // "the one source that carries a board" was wrong: Equibase's page does NOT
 // carry live odds - its LiveOdds column is empty in the served HTML and filled

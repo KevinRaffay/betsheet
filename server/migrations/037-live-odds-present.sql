@@ -1,0 +1,41 @@
+-- 037: which LLM cards actually SAW the tote board (D234).
+--
+-- D232 made the board enterable and D233 put it in the prompt, so a race day
+-- can now carry two LLM cards on the same race: one generated in the morning
+-- from the morning line, one generated at post time with the board in front of
+-- the model. Both are `consensus_completeness = 'LLM_GENERATED'` and
+-- `engine_version = 'llm'`, so every aggregate pools them - which is exactly
+-- the "completeness buckets never pool" failure of invariant 13, one level
+-- down: two genuinely different experiments reported as one number.
+--
+-- THE LABEL IS "SAW THE BOARD", NOT "POST TIME", and the difference is not
+-- pedantry. A card generated at 4pm without anyone having typed the board is
+-- not a post-time card in any measurable sense - its prompt is byte-identical
+-- to the morning one (D233 renders the LIVE field only when a price exists).
+-- The clock is not the variable; the information is. So the flag records the
+-- fact the corpus can actually be split on.
+--
+-- STORED, NOT DERIVED FROM THE PROMPT TEXT. `server/pick-scoring.js`'s
+-- `llmInputsLabel` (D221) greps the stored prompt for the BASELINE PICKS block
+-- because that input was never recorded anywhere else. This project's own
+-- preference when it HAS the choice is the opposite: `cards.notes_present`
+-- (D92) is a column, not a grep. A grep for "· LIVE " would be a bet on a
+-- prompt-rendering detail in a template this file's own history shows changing
+-- repeatedly (D112/D125/D136/D145/D160...), and the day it changes every
+-- historical label silently flips.
+--
+-- TWO COLUMNS, MIRRORING NOTES EXACTLY, because the per-race truth and the
+-- card-level summary are different facts:
+--   * llm_card_requests.live_odds_present - did THIS race's generation carry a
+--     board. The real per-race record.
+--   * cards.live_odds_present - did AT LEAST ONE race on this card. It LATCHES,
+--     for the reason D92 gives about notes: a user realistically prices the 3
+--     races they are betting out of 8, and a flag meaning "every race" would be
+--     false on every real card.
+--
+-- Ordinary ALTERs - no CHECK touches either column, so no table rebuild - and
+-- both default 0, so every one of the existing rows stays valid and reads as
+-- what it is: generated without a board, because until D232 there was none.
+
+ALTER TABLE cards ADD COLUMN live_odds_present INTEGER NOT NULL DEFAULT 0;
+ALTER TABLE llm_card_requests ADD COLUMN live_odds_present INTEGER NOT NULL DEFAULT 0;

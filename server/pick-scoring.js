@@ -127,7 +127,14 @@ function days(db) {
 function ticketRows(db) {
   const rows = db.prepare(`
     SELECT c.id AS card_id, c.race_day_id, c.consensus_completeness AS bucket, c.llm_model,
-           ra.number AS race_number, t.bet_type, t.selections, t.stake_cents, t.sequence
+           ra.number AS race_number, t.bet_type, t.selections, t.stake_cents, t.sequence,
+           -- D234: did THIS race's generation on THIS card carry the tote
+           -- board. Per race, from the request row, because the card-level
+           -- flag latches: a card with a board on race 3 and none on race 4
+           -- is 1 at the card level and would mislabel race 4.
+           (SELECT q.live_odds_present FROM llm_card_requests q
+             WHERE q.card_id = c.id AND q.race_number = ra.number
+             ORDER BY q.id DESC LIMIT 1) AS saw_board
       FROM tickets t
       JOIN cards c ON c.id = t.card_id
       JOIN races ra ON ra.id = t.race_id
@@ -140,8 +147,19 @@ function ticketRows(db) {
   const groups = new Map();
   for (const r of rows) {
     const source = r.bucket === 'LLM_GENERATED' ? (r.llm_model ?? 'llm:unknown-model') : r.bucket;
-    const gk = `${r.race_day_id}|${r.race_number}|${source}`;
-    if (!groups.has(gk)) groups.set(gk, { raceDayId: r.race_day_id, raceNo: r.race_number, bucket: r.bucket, source, cards: new Map() });
+    // D234: THE BOARD IS PART OF THE DEDUPE KEY, not just the label.
+    //
+    // "Newest card per (day, model, race)" was right while a second card on a
+    // race could only be a REGENERATION - the same experiment run again, where
+    // the newest is the one that counts (D28's append-only rule). D233 changed
+    // that: a second card may now be a DIFFERENT experiment, the same race
+    // generated with the tote board in the prompt. Keeping the old key would
+    // silently discard the morning card and report the post-time one as though
+    // it were the only card there ever was - which is worse than pooling them,
+    // because pooling at least shows both.
+    const sawBoard = r.bucket === 'LLM_GENERATED' && Boolean(r.saw_board);
+    const gk = `${r.race_day_id}|${r.race_number}|${source}|${sawBoard ? 'board' : 'ml'}`;
+    if (!groups.has(gk)) groups.set(gk, { raceDayId: r.race_day_id, raceNo: r.race_number, bucket: r.bucket, source, sawBoard, cards: new Map() });
     const g = groups.get(gk);
     if (!g.cards.has(r.card_id)) g.cards.set(r.card_id, []);
     let legs = [];
@@ -161,7 +179,7 @@ function ticketRows(db) {
       cardIds = [newest];
       tickets = g.cards.get(newest);
     }
-    out.push({ raceDayId: g.raceDayId, raceNo: g.raceNo, bucket: g.bucket, source: g.source, cardIds, roles: rolesFromTickets(tickets) });
+    out.push({ raceDayId: g.raceDayId, raceNo: g.raceNo, bucket: g.bucket, source: g.source, sawBoard: g.sawBoard, cardIds, roles: rolesFromTickets(tickets) });
   }
   return out;
 }
@@ -206,7 +224,10 @@ export function scoredPickRows(db, { track = null, meet = null } = {}) {
       const day = dayMap.get(r.raceDayId);
       if (!day) return null;
       const k = key(r.raceDayId, r.raceNo);
-      const label = r.bucket === 'LLM_GENERATED' ? (inputs.get(`${r.cardIds[0]}|${r.raceNo}`) ?? 'none') : null;
+      const isLlm = r.bucket === 'LLM_GENERATED';
+      const label = isLlm ? (inputs.get(`${r.cardIds[0]}|${r.raceNo}`) ?? 'none') : null;
+      // Carried up from ticketRows, where it is already part of the dedupe key.
+      const sawBoard = Boolean(r.sawBoard);
       const score = scorePickRace({
         roles: r.roles,
         finishers: ctx.finishers.get(k) ?? [],
@@ -215,10 +236,11 @@ export function scoredPickRows(db, { track = null, meet = null } = {}) {
       });
       return {
         raceDayId: r.raceDayId, date: day.date, track: day.track, trackCode: day.track_code, meet: day.meet,
-        raceNo: r.raceNo, bucket: r.bucket, source: r.source, inputs: label, cardIds: r.cardIds,
+        raceNo: r.raceNo, bucket: r.bucket, source: r.source, inputs: label, sawBoard, cardIds: r.cardIds,
         // The group key: source alone for every bucket but LLM, where the
-        // inputs label is part of the identity (decision 6 - never pooled).
-        groupKey: label ? `${r.source} [${label}]` : r.source,
+        // inputs label (decision 6) and the board (D234) are both part of the
+        // identity - never pooled.
+        groupKey: label ? `${r.source} [${label}${sawBoard ? ' +board' : ''}]` : r.source,
         roles: r.roles,
         score,
       };
@@ -242,7 +264,7 @@ pickScoringRouter.get('/pick-scoring', (req, res) => {
   const rows = scoredPickRows(db, { track, meet });
 
   const meta = new Map();
-  for (const r of rows) if (!meta.has(r.groupKey)) meta.set(r.groupKey, { bucket: r.bucket, source: r.source, inputs: r.inputs });
+  for (const r of rows) if (!meta.has(r.groupKey)) meta.set(r.groupKey, { bucket: r.bucket, source: r.source, inputs: r.inputs, sawBoard: r.sawBoard });
   const grouped = bySource(rows.map((r) => ({ source: r.groupKey, score: r.score })))
     .map(({ source: groupKey, ...agg }) => ({ groupKey, ...meta.get(groupKey), ...agg }));
 
