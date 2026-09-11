@@ -321,6 +321,9 @@ export const getDistribution = (engineVersion, meet) => {
 // Race day calendar (D210): every track racing on a date, each race placed
 // on the Pacific-anchored hour grid server-side (shared/race-calendar.js) -
 // the client never converts a time zone itself.
+// D222: pick-source scoring, corpus-wide, optionally one track.
+export const getPickScoring = (track) =>
+  fetch(`/api/pick-scoring${track ? `?track=${encodeURIComponent(track)}` : ''}`).then(asJson);
 export const getCalendar = (date) => fetch(`/api/calendar?date=${encodeURIComponent(date)}`).then(asJson);
 
 // ---- TIPSHEET picks (D166 extraction, D169 review/correct) ----------------

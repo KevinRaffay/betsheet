@@ -1,6 +1,6 @@
 # Pick-source scoring: which sources name winners, with no money involved
 
-**Status: SPECIFIED; PS-1 is D220 (merged, #290), PS-2 is D221 (branch `pick-scoring-endpoint`), PS-3 not yet claimed.** Each
+**Status: ALL THREE PHASES DELIVERED - PS-1 (D220, #290), PS-2 (D221, #291), PS-3 (D222).** Each
 phase claims its own with `npm run allocate-deliverable` when it is picked up,
 the way `race-day-calendar.md` and `multi-parser-entries-ingest.md` were
 worked. Written 2026-09-10 from a user question ("Does TrackMaster pick a lot
