@@ -79,7 +79,7 @@ function raceContext(db) {
      WHERE d.deleted_at IS NULL`).all()) {
     const k = key(r.race_day_id, r.race_number);
     if (!finishers.has(k)) finishers.set(k, []);
-    // D225: the closing price rides along. NULL on every row of an
+    // D229: the closing price rides along. NULL on every row of an
     // Apify-sourced day, which `impliedProbabilities` turns into a NULL market
     // block rather than a zero - a board that was never read is not a board
     // the source beat or lost to.
@@ -277,7 +277,7 @@ pickScoringRouter.get('/pick-scoring', (req, res) => {
       winnerProgramNumber: score?.winnerProgramNumber ?? null,
       fieldSize: score?.fieldSize ?? null,
       favorite: score?.favorite ?? null,
-      // D225: the per-race market read, so every aggregate closeEdge above is
+      // D229: the per-race market read, so every aggregate closeEdge above is
       // re-derivable by hand from these rows - the same reason the favorite
       // and the winner are already here.
       market: score?.market ?? null,

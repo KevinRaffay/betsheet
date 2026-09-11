@@ -43,7 +43,7 @@ question that the existing corpus can almost answer**, and a data-collection
 step that is the real prerequisite for the full version. Section 4 proposes five
 phases. **PT-0 turned out to be answerable for free from data already stored,
 and was answered while writing this - see 4/PT-0. PT-4 was then BUILT at the
-user's request as D224, and PT-1 as D225 - see those phases.** 1.2's gating
+user's request as D228, and PT-1 as D229 - see those phases.** 1.2's gating
 query has since been answered in PT-1's favour; what PT-1 now waits on is not
 code but a chart re-upload per day, and PT-3/PT-4 wait on a real board being
 captured at a live card.
@@ -343,13 +343,13 @@ one in this section: group `llm_card_requests` by (race_day_id, race_number,
 model, hash(prompt_text)) and keep the groups of size > 1 - post-D149 rows carry
 `user_prompt_hash` and `prompt_template_version` directly, so it is cheaper still.
 
-### PT-1 - Does the EXISTING corpus beat the close? - **BUILT (D225), awaiting a backfill**
+### PT-1 - Does the EXISTING corpus beat the close? - **BUILT (D229), awaiting a backfill**
 
 Backfill post-time odds (1.2), then compute beat-the-close over the stored LLM
 races, alongside the post-time favorite and the morning-line favorite on the
 same races.
 
-**Delivered 2026-09-11 as D225.** Migration 035 gives `race_results` the
+**Delivered 2026-09-11 as D229.** Migration 035 gives `race_results` the
 `post_time_odds` and `favorite` that `shared/chart-parser.js` has always
 extracted and `saveResults` always dropped; `shared/pick-scoring.js` gains
 `impliedProbabilities` (takeout-normalised), `marketBaseline` (the post-time
@@ -357,14 +357,14 @@ favorite - the baseline its own docstring has wanted since D171) and
 `closeEdge` = `1{the primary pick won} - q`; `/sources` shows both. Verified by
 cross-checking stored odds against the winner's own $2 payout on a real chart,
 by re-deriving the endpoint's figure by hand, and by a real negative control on
-the normalisation. See the D225 ledger row.
+the normalisation. See the D229 ledger row.
 
 **It has no data yet, and the remaining step is manual.** `result_charts` keeps
 only a `raw_digest` and nothing archives chart text, so there is nothing on disk
 to re-parse: filling these columns for a stored day means uploading that day's
 chart again through the ordinary results path, which replaces its results and
 regrades it (both by design - a corrected chart was always meant to be
-re-ingestable, and D225 asserts directly that a re-save backfills prices while
+re-ingestable, and D229 asserts directly that a re-save backfills prices while
 leaving `graded_tickets` untouched).
 
 On the 2026-09-10 corpus that is **5 days already sourced from Equibase charts**:
@@ -448,7 +448,7 @@ Cost at 99 races x 3 arms x 3 replicates = 891 calls: ~$18 on `claude-sonnet-5`,
 ~$45 on `claude-opus-5`, ~$90 on `claude-fable-5-1` ($40 worst case on Sonnet if
 every call runs to `maxTokens`). **Money is not the constraint here - n is.**
 
-### PT-4 - Live capture - **BUILT (D224), unused**
+### PT-4 - Live capture - **BUILT (D228), unused**
 
 A capture of the Equibase board near post fills `entries.live_odds` - the column
 has existed since migration 024 and had never held a row - and
@@ -460,16 +460,16 @@ of this thesis that is a strategy rather than a study.
 Invariant 6 governs how: BetSheet fetches nothing itself, so this is a saved
 page a person uploads.
 
-**Delivered 2026-09-11 as D224**, at the user's request and ahead of the other
+**Delivered 2026-09-11 as D228**, at the user's request and ahead of the other
 phases, on the reasoning this document already gave: it is the one piece with
 value regardless of how the thesis turns out. `shared/live-odds.js` reconciles a
 freshly-saved entries page against a day that already exists and emits nothing
 but prices; migration 034 keeps every board rather than one mutable cell,
-because the drift between two boards is the signal. See the D224 ledger row.
+because the drift between two boards is the signal. See the D228 ledger row.
 
 **It has captured nothing yet, and that is now the gating step for everything
 else here.** No real near-post Equibase page exists anywhere in this project -
-the only real captures on file were saved before wagering opened, which D224's
+the only real captures on file were saved before wagering opened, which D228's
 own check script asserts by running the real Del Mar page through the path and
 requiring it to be REFUSED. Until a board is actually captured on a live card,
 `entries.live_odds` stays at 0 of 13,710 and PT-3's Arms B and C have no input.

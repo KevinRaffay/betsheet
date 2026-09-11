@@ -1,4 +1,4 @@
-// Live odds capture (D224): refresh a stored race day's tote board from a
+// Live odds capture (D228): refresh a stored race day's tote board from a
 // freshly-saved Equibase entries page, WITHOUT touching anything else on it.
 //
 // The board is the one input this project has never had. `entries.live_odds`

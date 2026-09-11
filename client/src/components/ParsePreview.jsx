@@ -1,6 +1,10 @@
 import React from 'react';
 import { flagRaceEntries } from '@shared/entry-flags.js';
+import { dollars } from '@shared/betmath.js';
 import EntryFlagTags from './EntryFlagTags.jsx';
+
+// D224: the win probability a morning line implies, 0-1 -> a percent string.
+const pct = (p) => (p == null ? '' : `${(p * 100).toFixed(0)}%`);
 
 // The READ-ONLY ingest preview (invariant 9): exactly what Save will store,
 // warnings first. Shared by the New race day screen and the Backfill queue
@@ -41,7 +45,10 @@ export function RacePreview({ race }) {
         <thead>
           <tr>
             <th>#</th><th>PP</th><th>Horse</th><th>Jockey</th><th>Trainer</th>
-            <th>Wt</th><th>M/L</th><th title="Predicted order of finish from the morning line (1 = shortest line; ties share a rank)">ML rank</th>
+            <th>Wt</th><th>M/L</th>
+            <th title="What $2-to-win pays if this horse wins - the printed line as a forecast, not the actual tote price">$2 win</th>
+            <th title="The win probability the morning line implies (1 / (odds + 1)); a full field sums well over 100% because of the track's own take">Win %</th>
+            <th title="Predicted order of finish from the morning line (1 = shortest line; ties share a rank)">ML rank</th>
           </tr>
         </thead>
         <tbody>
@@ -65,6 +72,8 @@ export function RacePreview({ race }) {
               <td>{e.trainer ?? ''}</td>
               <td>{e.weight ?? ''}</td>
               <td>{e.morningLine ?? ''}</td>
+              <td className="dim">{flags[ei]?.mlPayoutCents != null ? dollars(flags[ei].mlPayoutCents) : ''}</td>
+              <td className="dim">{pct(flags[ei]?.mlWinProbability)}</td>
               <td className="dim">{flags[ei]?.mlRank ?? ''}</td>
             </tr>
           ))}

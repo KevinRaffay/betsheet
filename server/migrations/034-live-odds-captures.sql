@@ -1,5 +1,5 @@
 -- 034: live odds captures - a HISTORY of tote boards, not a single mutable
--- cell (D224).
+-- cell (D228).
 --
 -- `entries.live_odds` / `live_odds_decimal` have existed since migration 024
 -- and have never held a row (D171 measured 0 of 13,710; re-measured 0 of

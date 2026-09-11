@@ -26,7 +26,7 @@ export const parseEquibaseEntries = (html, { oddsCapturedAt = null, correlationI
     body: JSON.stringify({ html, oddsCapturedAt }),
   }).then(asJson);
 
-// Live odds capture (D224): refresh a STORED day's tote board from a freshly
+// Live odds capture (D228): refresh a STORED day's tote board from a freshly
 // saved Equibase entries page. The same client-side file read
 // `parseEquibaseEntries` uses, pointed at a different endpoint - this one
 // reconciles against a day that already exists and only ever writes prices.

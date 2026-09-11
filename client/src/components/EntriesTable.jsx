@@ -1,6 +1,10 @@
 import React from 'react';
 import { flagRaceEntries } from '@shared/entry-flags.js';
+import { dollars } from '@shared/betmath.js';
 import EntryFlagTags from './EntryFlagTags.jsx';
+
+// D224: the win probability a morning line implies, 0-1 -> a percent string.
+const pct = (p) => (p == null ? '—' : `${(p * 100).toFixed(0)}%`);
 
 // Shared entries dropdown for a single race, used by the LLM card generator,
 // the day-level ticket builder (D134) and the Replay blind race view (D135)
@@ -30,6 +34,12 @@ const normalizeEntry = (e) => ({
 // rank (`flags[i].mlRank`, shared/entry-flags.js) - the predicted order of
 // finish from the line alone - and no longer reads `program_rank`, which
 // D113 stopped ingesting and which rendered as a dash on every row since.
+//
+// D224 added `$2 win` and `Win %`, unconditional (unlike `showRank`) - they
+// derive from the morning line, which the static payload DOES carry (unlike
+// `program_rank`), so a phone at the track gets these for free. Both come
+// from `flags[i]`, computed once in shared/entry-flags.js so the SAME
+// forecast a person sees here is the one `mlRank`'s ordering already used.
 export default function EntriesTable({ entries, open = false, showRank = true }) {
   // D216: computed from the RAW rows, before `normalizeEntry` - the flags need
   // the morning line (and, where the caller has it, the stored decimal), which
@@ -43,6 +53,8 @@ export default function EntriesTable({ entries, open = false, showRank = true })
         <thead>
           <tr>
             <th>#</th><th>Horse</th><th>Jockey</th><th>Trainer</th><th>M/L</th>
+            <th title="What $2-to-win pays if this horse wins - the printed line as a forecast, not the actual tote price">$2 win</th>
+            <th title="The win probability the morning line implies (1 / (odds + 1)); a full field sums well over 100% because of the track's own take">Win %</th>
             {showRank && <th title="Predicted order of finish from the morning line (1 = shortest line; ties share a rank)">ML rank</th>}
           </tr>
         </thead>
@@ -63,6 +75,8 @@ export default function EntriesTable({ entries, open = false, showRank = true })
               <td>{e.jockey ?? '—'}</td>
               <td>{e.trainer ?? '—'}</td>
               <td>{e.morningLine ?? '—'}</td>
+              <td className="dim">{flags[i]?.mlPayoutCents != null ? dollars(flags[i].mlPayoutCents) : '—'}</td>
+              <td className="dim">{pct(flags[i]?.mlWinProbability)}</td>
               {showRank && <td>{flags[i]?.mlRank ?? '—'}</td>}
             </tr>
           ))}

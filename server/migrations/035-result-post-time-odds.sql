@@ -1,5 +1,5 @@
 -- 035: the post-time odds an Equibase chart has always printed, finally stored
--- (D225, PT-1 of docs/requirements/post-time-odds-llm-comparison.md).
+-- (D229, PT-1 of docs/requirements/post-time-odds-llm-comparison.md).
 --
 -- `shared/chart-parser.js` has extracted `odds` and `favorite` for EVERY
 -- finisher since it was written (see `parseResultLine` - the odds token is how

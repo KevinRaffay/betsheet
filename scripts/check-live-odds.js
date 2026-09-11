@@ -1,4 +1,4 @@
-// Verification for the live odds capture (D224): shared/live-odds.js and
+// Verification for the live odds capture (D228): shared/live-odds.js and
 // server/live-odds.js. Run: npm run check-live-odds
 //
 // Two halves. The PURE half asserts every refusal the reconciler makes, by

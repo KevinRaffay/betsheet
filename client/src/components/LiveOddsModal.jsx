@@ -1,7 +1,7 @@
 import React, { useEffect, useState } from 'react';
 import { getLiveOddsCaptures, previewLiveOdds, saveLiveOdds } from '../api.js';
 
-// Live odds capture (D224): upload a freshly-saved Equibase entries page for a
+// Live odds capture (D228): upload a freshly-saved Equibase entries page for a
 // day that ALREADY EXISTS, and write nothing but prices.
 //
 // Why this is its own dialog rather than a re-run of the entries ingest: the

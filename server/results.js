@@ -61,7 +61,7 @@ export function saveResults(db, day, p, correlationId) {
     db.prepare('DELETE FROM exotic_payoffs WHERE race_day_id = ?').run(day.id);
     db.prepare('DELETE FROM result_scratches WHERE race_day_id = ?').run(day.id);
 
-    // D225: `post_time_odds` and `favorite` ride along from the chart, which
+    // D229: `post_time_odds` and `favorite` ride along from the chart, which
     // has always printed both. A source that carries neither (every Apify
     // results day - win odds per finisher are structurally absent there)
     // stores NULL and 0, which reads as "this capture saw no board", never as

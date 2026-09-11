@@ -83,6 +83,18 @@ const server = spawn(process.execPath, [path.join(ROOT, 'server', 'index.js')], 
     BETSHEET_DB: path.join(tmp, 'check.sqlite'),
     BETSHEET_LOG_DIR: logDir,
     BETSHEET_DISABLE_BUILTIN_FETCHERS: '1',
+    // D225: this file seeds the LLM_GENERATED bucket by posting
+    // `__stubResponse` to the preview endpoint, and server/llm-cards.js only
+    // reads that field when BETSHEET_LLM_TEST_MODE === '1'. Without the flag
+    // the stub is silently IGNORED, the preview tries a real Anthropic call,
+    // no LLM card is ever created, and four assertions below fail on a bucket
+    // that simply is not there. The empty key is the second half of the
+    // guard, exactly as in check-llm-cards / check-llm-input-capture /
+    // check-human-picks / check-equibase-otr: the stub path must never need a
+    // key, so a regression that reaches the network fails loudly here instead
+    // of quietly spending money against the .env key on a machine that has one.
+    BETSHEET_LLM_TEST_MODE: '1',
+    ANTHROPIC_API_KEY: '',
   },
   stdio: ['ignore', 'pipe', 'pipe'],
 });

@@ -1,4 +1,4 @@
-// Live odds capture: reconcile a tote board against a stored race day (D224).
+// Live odds capture: reconcile a tote board against a stored race day (D228).
 //
 // PURE and browser-safe - no `node:` import, ever. It reads no database,
 // fetches nothing and writes nothing. Given the races a day already has and

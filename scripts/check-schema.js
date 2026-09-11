@@ -120,14 +120,14 @@ check('the race_days rebuild recreated idx_race_days_meet (it rides on the table
   db.prepare("SELECT COUNT(*) c FROM sqlite_master WHERE type = 'index' AND name = 'idx_race_days_meet'").get().c === 1);
 check('race_days.odds_captured_at exists and is nullable - one timestamp per CARD, by design',
   db.prepare("SELECT COUNT(*) c FROM pragma_table_info('race_days') WHERE name = 'odds_captured_at' AND \"notnull\" = 0").get().c === 1);
-// D225 (migration 035): the closing price the chart has always printed.
+// D229 (migration 035): the closing price the chart has always printed.
 check('race_results.post_time_odds is nullable - NULL means this source carried no board, never "no board existed"',
   db.prepare("SELECT COUNT(*) c FROM pragma_table_info('race_results') WHERE name = 'post_time_odds' AND \"notnull\" = 0").get().c === 1);
 check('race_results.favorite defaults to 0 so every pre-existing result row stays valid',
   db.prepare(`SELECT COUNT(*) c FROM pragma_table_info('race_results')
     WHERE name = 'favorite' AND "notnull" = 1 AND dflt_value = '0'`).get().c === 1);
 
-// D224 (migration 034): the capture HISTORY. `entries.live_odds` keeps its
+// D228 (migration 034): the capture HISTORY. `entries.live_odds` keeps its
 // meaning as the latest board - these tables are what a second capture must
 // never overwrite, since the drift between two boards is the whole signal.
 check('odds_captures is per (day, capture) with a nullable captured_at - absent reads as unknown, never fresh',

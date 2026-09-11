@@ -10,6 +10,17 @@
 // active day carried one (D178), so every "Rank" column was a column of
 // dashes. The stored column is untouched; only the reading of it moved.
 //
+// D224 added two more, for a person reading odds rather than building a
+// ticket: `mlPayoutCents` (what "$2 to win" implies from the SAME line -
+// shared/betmath.js's `impliedWinPayoutCents`) and `mlWinProbability` (the
+// same line read as 0-1 odds - `impliedWinProbability`). Both are a
+// FORECAST off the printed line, never the actual tote price - a day's
+// `race_results.win_cents`, rendered in its own results panel once a day
+// is graded, is what was really paid, and this module never reads that
+// table (it would be a second, contradicting source of "what did the line
+// say" mixed into "what happened"). Both are null for a scratched horse
+// (it cannot cash, whatever its line said) and for an unpriced one.
+//
 // PURE and browser-safe - no `node:` import, ever (the same contract
 // shared/tip-staking.js holds, and for the same reason: this file is reached
 // from the static at-track builder through @client/components/EntriesTable.jsx).
@@ -33,7 +44,7 @@
 // (shared/track-codes.js's shape): that is the right answer for a staking
 // rule that must be reproducible across sources, and overkill for a highlight.
 
-import { morningLineToDecimal } from './betmath.js';
+import { impliedWinPayoutCents, impliedWinProbability, morningLineToDecimal } from './betmath.js';
 
 /**
  * The field size the favorite flag fires at.
@@ -82,9 +93,12 @@ function mlDecimal(entry) {
  * Never throws; a race it cannot read simply produces no flags.
  *
  * Returns `{ flags, liveCount, favoriteCount }` where each flag is
- * `{ baffert, favorite, mlRank }`. `mlRank` is null for a scratched or
- * unpriced horse - a scratch has no predicted finish, and "no line" is not
- * "last".
+ * `{ baffert, favorite, mlRank, mlDecimal, mlPayoutCents, mlWinProbability }`.
+ * `mlRank` is null for a scratched or unpriced horse - a scratch has no
+ * predicted finish, and "no line" is not "last". `mlPayoutCents` and
+ * `mlWinProbability` follow the same rule (see the D224 note above) plus
+ * one more: they are null for a SCRATCHED horse even when it carried a
+ * price, since a scratch cannot cash.
  *
  * A scratched horse can still be flagged `baffert` - the row is already struck
  * through, and "the Baffert horse is the one that scratched" is worth seeing -
@@ -98,10 +112,24 @@ function mlDecimal(entry) {
  */
 export function flagRaceEntries(entries) {
   const list = Array.isArray(entries) ? entries : [];
-  const flags = list.map((e) => ({ baffert: isBaffertEntry(e), favorite: false, mlRank: null }));
+  const flags = list.map((e) => {
+    const scratched = Boolean(pick(e, 'scratched', 'scratched'));
+    const decimal = mlDecimal(e);
+    return {
+      baffert: isBaffertEntry(e),
+      favorite: false,
+      mlRank: null,
+      mlDecimal: decimal,
+      // D224: null for a scratch regardless of what its line said (it
+      // cannot cash); impliedWinPayoutCents/impliedWinProbability already
+      // return null on their own for an unpriced line.
+      mlPayoutCents: scratched ? null : impliedWinPayoutCents(decimal),
+      mlWinProbability: scratched ? null : impliedWinProbability(decimal),
+    };
+  });
 
   const live = [];
-  list.forEach((e, i) => { if (!pick(e, 'scratched', 'scratched')) live.push({ i, ml: mlDecimal(e) }); });
+  list.forEach((e, i) => { if (!pick(e, 'scratched', 'scratched')) live.push({ i, ml: flags[i].mlDecimal }); });
   const liveCount = live.length;
   const priced = live.filter((x) => typeof x.ml === 'number' && Number.isFinite(x.ml));
 

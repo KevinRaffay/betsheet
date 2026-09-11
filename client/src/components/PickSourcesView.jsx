@@ -16,7 +16,7 @@ const rate = (t) => {
 const pct = (x) => (x == null ? '—' : `${(100 * x).toFixed(0)}%`);
 const num = (x, d = 1) => (x == null ? '—' : x.toFixed(d));
 const yn = (v) => (v === true ? 'yes' : v === false ? 'no' : <span className="dim">—</span>);
-// D225: beat-the-close. SIGNED and always shown with its own n, because the
+// D229: beat-the-close. SIGNED and always shown with its own n, because the
 // sign is the whole reading - 0 is the null hypothesis ("you are the market"),
 // not a floor. A dash at n=0 rather than a 0%, this module's oldest rule.
 const edge = (e) => {

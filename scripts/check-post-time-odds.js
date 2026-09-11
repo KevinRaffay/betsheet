@@ -1,4 +1,4 @@
-// Verification for PT-1 (D225): the chart's post-time odds, stored and used.
+// Verification for PT-1 (D229): the chart's post-time odds, stored and used.
 // Run: npm run check-post-time-odds
 //
 // Three things are being proved, in increasing order of how much they matter.
@@ -238,7 +238,7 @@ console.log('\npost-time odds - the real server, end to end');
     // --- the re-save a backfill actually is ---------------------------------
     const before = db.prepare('SELECT COUNT(*) c FROM graded_tickets').get().c;
     db.prepare('UPDATE race_results SET post_time_odds = NULL, favorite = 0 WHERE race_day_id = ?').run(dayId);
-    check('simulating a pre-D225 day: prices cleared',
+    check('simulating a pre-D229 day: prices cleared',
       db.prepare('SELECT COUNT(*) c FROM race_results WHERE race_day_id = ? AND post_time_odds IS NOT NULL').get(dayId).c === 0);
     await jpost(`/api/race-days/${dayId}/results`, saveBody);
     const after = db.prepare('SELECT COUNT(*) c FROM race_results WHERE race_day_id = ? AND post_time_odds IS NOT NULL').get(dayId).c;

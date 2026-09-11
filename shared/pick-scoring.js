@@ -29,6 +29,8 @@
 // This is the project's oldest surviving discipline ("no figure without its
 // n"), and the reason `{ hits, n, rate }` is the only shape a rate takes here.
 
+import { impliedWinProbability } from './betmath.js';
+
 const up = (pgm) => String(pgm).trim().toUpperCase();
 const uniq = (arr) => [...new Set(arr)];
 
@@ -110,7 +112,7 @@ const hitAt = (live, finishOf, pos) => {
 
 /**
  * The market's own win probabilities for one race, from the chart's post-time
- * odds (D225).
+ * odds (D229).
  *
  * A board's raw implied probabilities sum to MORE than 1 - that excess is the
  * takeout, typically 15-20% in North America. Dividing by the sum removes it
@@ -126,14 +128,19 @@ const hitAt = (live, finishOf, pos) => {
  */
 export function impliedProbabilities(finishers) {
   if (!Array.isArray(finishers)) return null;
-  const priced = finishers
+  const raw = finishers
     .map((f) => ({
       pgm: up(f.programNumber ?? f.program_number),
-      odds: f.postTimeOdds ?? f.post_time_odds,
+      // `impliedWinProbability` (D224, betmath) is this exact conversion, and
+      // the two functions are deliberate complements: it makes the OVERROUND
+      // visible - its own docstring says a full field sums well over 1 - and
+      // this one divides it back out. Reused rather than re-derived so the
+      // morning-line and post-time readings can never drift apart on the
+      // arithmetic; all that differs is which price is fed in.
+      p: impliedWinProbability(f.postTimeOdds ?? f.post_time_odds),
     }))
-    .filter((f) => typeof f.odds === 'number' && Number.isFinite(f.odds) && f.odds >= 0);
-  if (priced.length === 0) return null;
-  const raw = priced.map((f) => ({ pgm: f.pgm, p: 1 / (1 + f.odds) }));
+    .filter((f) => f.p !== null);
+  if (raw.length === 0) return null;
   const total = raw.reduce((a, b) => a + b.p, 0);
   if (!(total > 0)) return null;
   return new Map(raw.map((r) => [r.pgm, r.p / total]));
@@ -146,7 +153,7 @@ export function impliedProbabilities(finishers) {
  * That function's docstring says it plainly: "the post-time favorite is
  * unavailable: D171 measured `entries.live_odds` empty corpus-wide". It is
  * available now, from a different source than D171 was looking at - the chart
- * has printed it all along and D225 stores it. The morning-line favorite stays
+ * has printed it all along and D229 stores it. The morning-line favorite stays
  * exactly where it is, because the two answer different questions and a day
  * whose results came from Apify still has only the first.
  *
@@ -282,7 +289,7 @@ export function scorePickRace(input) {
     winnerProgramNumber: winner ? up(winner.programNumber ?? winner.program_number) : null,
     fieldSize,
     favorite: favoriteBaseline(entries, finishOf, scr),
-    // D225: the same race read against the CLOSING PRICE rather than against
+    // D229: the same race read against the CLOSING PRICE rather than against
     // the morning line. `closeEdge` is `1{the primary pick won} - q`, where q
     // is that horse's own takeout-normalised market probability. Zero means
     // "you are the market"; positive means the pick won more often than its
@@ -365,7 +372,7 @@ export function aggregatePickScores(scores) {
       randomWin: mean(scored.map((s) => (s.fieldSize > 0 ? 1 / s.fieldSize : null))),
       randomTop3: mean(scored.map((s) => (s.fieldSize > 0 ? Math.min(3, s.fieldSize) / s.fieldSize : null))),
       meanFieldSize: mean(scored.map((s) => s.fieldSize)),
-      // D225: the POST-TIME favorite, on the subset of this source's races
+      // D229: the POST-TIME favorite, on the subset of this source's races
       // whose results actually carried a board. Its `n` is deliberately its
       // OWN and will be smaller than `favoriteWin`'s - an Apify-sourced day
       // has a morning line but no closing price, and folding those races in
@@ -375,7 +382,7 @@ export function aggregatePickScores(scores) {
       marketFavoritePlace: tally(scored, (s) => s.market?.favorite?.place ?? null),
       marketFavoriteShow: tally(scored, (s) => s.market?.favorite?.show ?? null),
     },
-    // D225: beat-the-close. The mean of `1{the primary pick won} - q` over the
+    // D229: beat-the-close. The mean of `1{the primary pick won} - q` over the
     // races where a board was read AND the primary pick carried a price.
     //
     // This is the one figure here that can distinguish an EDGE from an
