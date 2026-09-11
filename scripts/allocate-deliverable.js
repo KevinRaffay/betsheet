@@ -8,6 +8,12 @@
 // DELIVERABLES.md and incrementing the highest row by hand is exactly the
 // race this replaces - don't.
 //
+// D226: on a brand-new database (a fresh clone, a cloud session - anywhere
+// the shared .git counter does not exist) the first number is SEEDED FROM
+// DELIVERABLES.md's high-water mark rather than a hardcoded constant, and
+// this CLI prints to stderr which seed it picked and where from. stdout is
+// still exactly `D<number>` and nothing else.
+//
 // Usage:
 //   npm run allocate-deliverable -- --title "Short deliverable title" [--branch name] [--who name]
 //   npm run allocate-deliverable -- --list [--status claimed|released|all]
@@ -26,6 +32,7 @@ import {
   releaseDeliverableNumber,
   listDeliverableClaims,
   getDeliverableClaim,
+  resolveLedgerPath,
 } from './lib/deliverable-numbers.js';
 
 const USAGE = `Usage:
@@ -50,7 +57,23 @@ function parseArgs(argv) {
 }
 
 const args = parseArgs(process.argv.slice(2));
-const db = openAllocatorDb();
+// D226: say so, loudly, when this process creates the counter from nothing.
+// A brand-new database means a clone that cannot see any other machine's
+// counter, and the seed it picked is the single most important thing to be
+// able to check afterwards - silence here is what let a cloud session take
+// D203 and only notice because a human recognised the number.
+const db = openAllocatorDb(undefined, {
+  onSeed: ({ seed, highWater, source }) => {
+    console.error(
+      source === 'ledger'
+        ? `New allocator database seeded at D${seed}, from the ledger high-water mark D${highWater} (${resolveLedgerPath()}).`
+        : `New allocator database seeded at D${seed}, the built-in floor - the ledger `
+          + `${highWater === null ? 'could not be read' : `stops at D${highWater}`} `
+          + `(${resolveLedgerPath()}). If this checkout's DELIVERABLES.md is incomplete, `
+          + `verify the number before using it.`,
+    );
+  },
+});
 
 try {
   if (args.list) {
