@@ -18,12 +18,18 @@ cards. Phase 4's at-track surfaces (PDF, here.now publish, mobile) only start
 once backtesting proves out. Nothing in Phases 1–3 waits on anything in
 Phase 4.
 
-**One deliberate exception, user decision 2026-09-07 (D150-D155):** the
-at-track MOBILE surface was built ahead of that sequencing. It is a card
-CONSTRUCTION surface only - no corpus, no grading, no generation, no database
-- so it adds HUMAN cards to the corpus rather than consuming a benchmark that
-does not exist yet, and nothing in Phases 1–3 depends on it. The rule stands
-for everything else in Phase 4.
+**D150-D155 built one deliberate exception, user decision 2026-09-07, and
+D236 (user decision 2026-09-11) removed it.** The at-track MOBILE surface was
+built ahead of that sequencing as a card CONSTRUCTION surface - no corpus, no
+grading, no generation, no database - so it added HUMAN cards to the corpus
+rather than consuming a benchmark that did not exist yet, which is what
+earned it the exception. D236 removed construction entirely: the GitHub Pages
+app is now a READ-ONLY viewer over race days, cards and grades the rest of
+the app already produced. It is no longer an exception to the rule above,
+because it no longer does the thing the rule was written to gate - it adds
+nothing to the corpus and consumes only what Phases 1-3 already built, the
+same as any other reporting surface in this codebase. The rule stands
+unchanged for everything else in Phase 4.
 
 ---
 
@@ -703,21 +709,27 @@ it. Rules still in force:
   time the corpus was hidden. Set a `cancelled` flag in the effect and return
   `() => { cancelled = true; }` as the cleanup, which is a FUNCTION and so
   also satisfies the rule above.
-- **State that must track a prop is adjusted during RENDER, not in an effect**
-  (D155). `RaceView.jsx` keeps a snapshot of a race's already-saved ticket
-  text and composes the builder's output on top of it. Reading that text LIVE
-  duplicates every ticket: the saved card flows back down as a prop, the
-  snapshot becomes the sum, and the next render recomputes `$20 W 1` as
-  `$20 W 1 / $20 W 1` - with no new event at all, the render alone does it.
-  Moving the snapshot into a `useEffect` fixes that and breaks something
-  worse: **child effects run before parent effects**, so `TicketBuilder`'s
-  mount-time `onChange('')` fires while the parent still holds the previous
-  (empty) snapshot and writes an empty race over saved text - re-opening a
-  race erased the work in it. Both are fixed by React's documented pattern
-  for this exact case: compare a key during render and `setState` right there,
-  so the new value is in place before any child commits. Neither bug is
-  reachable from a check script (they need a real render tree) and both were
-  found by driving the app in a browser.
+- **HISTORICAL (the mechanism is gone, the lesson is kept - D236 removed the
+  static app's ticket construction, this is now a record of what its bug
+  taught, not a live warning about current code). State that must track a
+  prop is adjusted during RENDER, not in an effect** (D155). `RaceView.jsx`
+  used to keep a snapshot of a race's already-saved ticket text and compose
+  the builder's output on top of it. Reading that text LIVE duplicated every
+  ticket: the saved card flowed back down as a prop, the snapshot became the
+  sum, and the next render recomputed `$20 W 1` as `$20 W 1 / $20 W 1` - with
+  no new event at all, the render alone did it. Moving the snapshot into a
+  `useEffect` fixed that and broke something worse: **child effects run
+  before parent effects**, so `TicketBuilder`'s mount-time `onChange('')`
+  fired while the parent still held the previous (empty) snapshot and wrote
+  an empty race over saved text - re-opening a race erased the work in it.
+  Both were fixed by React's documented pattern for this exact case: compare
+  a key during render and `setState` right there, so the new value is in
+  place before any child commits. Neither bug was reachable from a check
+  script (they needed a real render tree) and both were found by driving the
+  app in a browser - which is why the general lesson (a value derived from a
+  prop, and read by a child's mount-time effect, needs the render-time-key
+  pattern) is worth keeping even though this specific screen no longer
+  composes anything.
 - **A call to action must be reachable without sideways scrolling on a phone
   - HOUSE RULE** (user rule, 2026-09-07, D157). Every UI in this codebase that
   a phone can reach must keep its primary action - the button the screen
@@ -889,16 +901,18 @@ it. Rules still in force:
   wrong move - it spent real time, left a stray junction behind that could make
   a later session think dependencies were installed locally, and bought
   nothing. Check the static app's IMPORT SURFACE instead - it is a separate
-  Vite entry and reaches outside `static/` in exactly seven places (verified
-  2026-09-08, and the list is the thing to re-derive rather than trust):
-  `@client/components/TicketBuilder.jsx`, `@client/components/EntriesTable.jsx`,
-  `@client/styles.css`, `@shared/betmath.js`, `@shared/parsers/human-picks.js`,
-  `@shared/static-export.js`, `@shared/static-payload.js`. A change touching
-  none of those, nor `static/` itself, nor anything they transitively import,
-  provably cannot move the static bundle. When a change DOES touch them, run
-  the check from the primary checkout, where it works as designed. State plainly in the final message that it was skipped as
-  out of scope per this rule - never imply the suite ran clean when this one
-  did not run at all.
+  Vite entry and reaches outside `static/` in exactly three places as of D236
+  (re-derived that day; before it the count was seven, and TicketBuilder.jsx,
+  human-picks.js and static-export.js all fell off once construction was
+  removed and nothing under `static/src/` imported them directly any more -
+  the list is the thing to re-derive rather than trust, every time):
+  `@client/components/EntriesTable.jsx`, `@client/styles.css`,
+  `@shared/static-payload.js`. A change touching none of those, nor `static/`
+  itself, nor anything they transitively import, provably cannot move the
+  static bundle. When a change DOES touch them, run the check from the
+  primary checkout, where it works as designed. State plainly in the final
+  message that it was skipped as out of scope per this rule - never imply the
+  suite ran clean when this one did not run at all.
 - **A race-specific input or edit belongs in the Race UI component - HOUSE
   RULE** (user rule, 2026-09-08, D182/D184). If a thing is an opinion about,
   or a property of, ONE race, the place to type it is that race's own panel,
