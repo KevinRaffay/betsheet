@@ -1,12 +1,14 @@
 # Deploy the static BetSheet app to GitHub Pages (D154).
 #
-# WHAT GETS DEPLOYED IS ONE RACE DAY. `static/public/payload.json` is a
-# committed file built by `npm run build-static-payload -- <raceDayId>`, so
-# publishing a new payload is an ordinary commit and push, and it REPLACES the
-# deployed race day. There is no per-day URL and no archive of past days yet.
-# D236 removed the app's card-CONSTRUCTION half; it is a read-only viewer now,
-# not a ticket builder - see CLAUDE.md's rewritten "one deliberate exception"
-# note for what that changes about why this app exists at all.
+# WHAT GETS DEPLOYED IS A BUNDLE OF RACE DAYS (D329). `static/public/payload.json`
+# is a committed file built by `npm run build-static-payload -- <raceDayId>
+# [<raceDayId> ...]` (or `--from`/`--to`), so publishing a new payload is an
+# ordinary commit and push, and it REPLACES whatever was deployed before with
+# whichever days that build named - a real, browsable multi-day snapshot, not
+# a single day. D236 removed the app's card-CONSTRUCTION half; it is a
+# read-only viewer now, not a ticket builder - see CLAUDE.md's rewritten "one
+# deliberate exception" note for what that changes about why this app exists
+# at all.
 #
 # The build is deliberately the only thing this workflow can do. It has no
 # database, no secrets and no network access to anything but npm - every piece
@@ -27,11 +29,12 @@
 #
 # NOTE, BEFORE ENABLING: a GitHub Pages site is PUBLICLY READABLE even when it
 # is built from a private repository (private Pages needs Enterprise Cloud).
-# Whatever is in payload.json is on the open internet at a guessable URL. Race
-# entries are public information that Equibase already publishes; the day's own
-# LLM and OTR picks are not, and `--reference-cards` puts them in the payload.
-# Build the deployed payload WITHOUT that flag unless publishing those picks is
-# a deliberate choice.
+# Whatever is in payload.json is on the open internet at a guessable URL. As
+# of D329 that is EVERY card and grade on a bundled day, unconditionally -
+# there is no more "reference cards" opt-in flag, because showing the cards
+# that exist is the whole point of a read-only viewer. See invariant 10 in
+# CLAUDE.md for the exact privacy floor this still respects (nothing about
+# the person who ran the builder, ever).
 
 name: Deploy static app
 
@@ -43,9 +46,15 @@ on:
       # The payload is the race day, so a payload commit is a deploy.
       - 'static/**'
       - 'shared/**'
-      # The desktop component the static app reuses rather than forking.
+      # The desktop components the static app reuses rather than forking.
       - 'client/src/components/EntriesTable.jsx'
+      - 'client/src/components/CardSheet.jsx'
+      - 'client/src/components/RaceNotes.jsx'
+      - 'client/src/components/EntryFlagTags.jsx'
       - 'client/src/styles.css'
+      - 'shared/entry-flags.js'
+      - 'shared/card-notices.js'
+      - 'shared/race-calendar.js'
       - 'vite.static.config.js'
       - 'package.json'
       - 'package-lock.json'
@@ -111,8 +120,13 @@ jobs:
             const p = JSON.parse(fs.readFileSync('static/public/payload.json', 'utf8'));
             const problems = validateStaticPayload(p);
             if (problems.length) { console.error('::error::payload.json is not valid:\n- ' + problems.join('\n- ')); process.exit(1); }
-            console.log(\`Deploying \${p.raceDay.track} \${p.raceDay.date} (race day \${p.raceDay.raceDayId}), \${p.races.length} races, \${p.payloadHash}\`);
-            if (p.referenceCards) console.log('::warning::This payload embeds reference cards, which will be publicly readable.');
+            console.log(\`Deploying \${p.raceDays.length} race day(s):\`);
+            for (const d of p.raceDays) {
+              const cards = d.cards.length;
+              const graded = d.cards.filter((c) => c.grades.summary).length;
+              console.log(\`  \${d.raceDay.track} \${d.raceDay.date} (race day \${d.raceDay.raceDayId}), \${d.races.length} races, \${cards} card(s) (\${graded} graded), \${d.payloadHash}\`);
+            }
+            console.log('Every card and grade on each of these days will be publicly readable - see invariant 10 in CLAUDE.md.');
           "
 
       - name: Verify the bundle ships no generator code

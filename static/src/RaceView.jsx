@@ -6,15 +6,16 @@ import { useIsMobile } from './mobile.js';
 // One race, read-only. D236 removed the ticket builder, the lock/PASS/discard
 // state machine and the render-time committed-text snapshot that used to live
 // here - there is no ticket being composed on this screen any more.
-export default function RaceView({ payload, raceNumber }) {
-  const race = payload.races.find((r) => r.number === raceNumber);
+export default function RaceView({ day, raceNumber }) {
+  const race = day.races.find((r) => r.number === raceNumber);
   const isMobile = useIsMobile();
+  const dayId = day.raceDay.raceDayId;
 
   if (!race) {
     return (
       <section className="panel">
-        <p className="notice notice--error">No race {raceNumber} in this payload.</p>
-        <button className="btn" onClick={() => navigate('/')}>Back to the day</button>
+        <p className="notice notice--error">No race {raceNumber} on this day.</p>
+        <button className="btn" onClick={() => navigate(`/day/${dayId}`)}>Back to the day</button>
       </section>
     );
   }
@@ -22,7 +23,7 @@ export default function RaceView({ payload, raceNumber }) {
   return (
     <section className="panel">
       <div className="formrow formrow--tight">
-        <button className="btn btn--sm" onClick={() => navigate('/')}>← All races</button>
+        <button className="btn btn--sm" onClick={() => navigate(`/day/${dayId}`)}>← All races</button>
         <h2>Race {race.number}</h2>
         <span className="dim">
           {[race.postTime, race.distance, race.surface, race.raceType].filter(Boolean).join(' · ')}

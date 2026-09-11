@@ -18,6 +18,10 @@
 // that property is no longer one the app makes any claim about. Payload
 // correctness itself is scripts/check-static-payload.js's job and is
 // unaffected by this change.
+//
+// D329 added the multi-day calendar/list navigation and, via CardSheet.jsx
+// (D237), the card sheet WITH grades - genuinely new code this script must
+// now prove IS shipped, alongside everything it already proved is not.
 
 import fs from 'node:fs';
 import path from 'node:path';
@@ -43,12 +47,20 @@ console.log('-- the built bundle ships no server, construction or generator code
   check('the build produced at least one JS bundle', files.length > 0);
   const js = files.map((f) => fs.readFileSync(path.join(outDir, 'assets', f), 'utf8')).join('\n');
 
-  // POSITIVE CONTROL FIRST. Without this, a scan that read an empty string
-  // would report every exclusion as satisfied. `pagehead--static` is a class
-  // name literal in app.jsx's own header markup and has no reason to
-  // disappear from a read-only build.
+  // POSITIVE CONTROLS FIRST. Without these, a scan that read an empty string
+  // would report every exclusion as satisfied.
   check('POSITIVE CONTROL: the app itself IS in the bundle',
     js.includes('pagehead--static'), 'the scan is not reading the app bundle');
+  // `outcome outcome--` is a literal class-name prefix in CardSheet.jsx's
+  // TicketRow, only ever emitted alongside a real grade. D329 makes grade
+  // DISPLAY a required feature (every card, unconditionally) - this proves
+  // it shipped, not just that the app compiled.
+  check('POSITIVE CONTROL: the graded-card outcome display IS in the bundle',
+    js.includes('outcome outcome--'), 'CardSheet.jsx\'s grading display did not make it into the build');
+  // A heading literal from Calendar.jsx - proves the new multi-day
+  // navigation shipped, not just the day/race screens that predate D329.
+  check('POSITIVE CONTROL: the calendar navigation IS in the bundle',
+    js.includes('Race day calendar'), 'Calendar.jsx did not make it into the build');
 
   const forbidden = [
     ['the Anthropic client', /anthropic|x-api-key|ANTHROPIC_API_KEY/i],
@@ -58,9 +70,12 @@ console.log('-- the built bundle ships no server, construction or generator code
     ['an Equibase fetch', /equibase\.com/i],
     ['the server API client', /\/api\/race-days|\/api\/cards|\/api\/llm/i],
     // Grading COMPUTATION, not display: a read-only bundle must never ship
-    // the engine that produces a grade, even once it ships code that
-    // RENDERS one (a future deliverable). These two facts are not in
-    // tension - see CLAUDE.md's D236 gotcha.
+    // the engine that produces a grade, even though (as of D329) it ships
+    // CardSheet.jsx's rendering of one - see the two POSITIVE controls
+    // above. These two facts are not in tension: CardSheet.jsx only ever
+    // destructures already-computed grade VALUES handed to it as props/JSON
+    // data; it never imports server/grading.js or references
+    // `graded_tickets` as an identifier.
     ['grading', /gradeAndPersist|graded_tickets/i],
     // The removed construction surface. If any of these reappear, something
     // reintroduced ticket-building or local card storage.
@@ -138,7 +153,7 @@ console.log('\n-- calls to action stay reachable on a phone (D157 house rule) --
   check('static.css hides .col-detail at mobile width',
     /\.col-detail\s*\{[^}]*display:\s*none/.test(mobileBlock), 'the rule is missing or outside the media query');
 
-  const views = ['DayView.jsx'];
+  const views = ['DayView.jsx', 'DayList.jsx'];
   for (const v of views) {
     const src = fs.readFileSync(path.join(ROOT, 'static', 'src', v), 'utf8');
     const hasActionColumn = /<th \/>/.test(src);
