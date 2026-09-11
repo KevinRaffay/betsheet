@@ -46,6 +46,18 @@ export const saveLiveOdds = (dayId, html, { oddsCapturedAt = null, correlationId
     body: JSON.stringify({ html, oddsCapturedAt }),
   }).then(asJson);
 
+// Manual live odds for ONE race (D232). Equibase's own page cannot supply the
+// board - its LiveOdds column is empty in the served HTML and filled by
+// client-side JS - and the Apify actor, scraping that same page server-side,
+// carries no live-odds field either. So the board is typed. Per race, and
+// per-race in its timing: each save stamps its own capture time.
+export const saveRaceLiveOdds = (dayId, raceNumber, odds, { oddsCapturedAt = null, correlationId } = {}) =>
+  fetch(`/api/race-days/${dayId}/races/${raceNumber}/live-odds`, {
+    method: 'POST',
+    headers: { 'content-type': 'application/json', ...(correlationId ? { 'x-correlation-id': correlationId } : {}) },
+    body: JSON.stringify({ odds, oddsCapturedAt }),
+  }).then(asJson);
+
 export const getLiveOddsCaptures = (dayId) =>
   fetch(`/api/race-days/${dayId}/live-odds`).then(asJson);
 

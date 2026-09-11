@@ -31,7 +31,7 @@
 import crypto from 'node:crypto';
 import express from 'express';
 import { parseEquibaseEntriesHtml } from '../shared/parsers/equibase-entries.js';
-import { reconcileOddsCapture } from '../shared/live-odds.js';
+import { reconcileManualOdds, reconcileOddsCapture } from '../shared/live-odds.js';
 import { getDb } from './db.js';
 import { getLogger, newCorrelationId } from './logging.js';
 import { recordAttempt, upsertSource } from './source-audit.js';
@@ -43,6 +43,13 @@ export const liveOddsRouter = express.Router();
 
 const SOURCE_NAME = 'Equibase live odds (manual upload)';
 const sha256 = (text) => crypto.createHash('sha256').update(String(text ?? '')).digest('hex');
+// D232: the default capture time when a caller does not supply one - which is
+// the normal case for the typed route, since the moment of saving IS the
+// moment the board was read. Same second-precision ISO shape the rest of the
+// codebase stores. (Its absence was a live ReferenceError: the happy-path
+// test passed an explicit time and never reached it, so every real save from
+// the UI - which sends none - would have 500'd.)
+const now = () => new Date().toISOString().replace(/\.\d+Z$/, 'Z');
 
 /** The stored day in the exact shape `reconcileOddsCapture` reads. */
 export function loadStoredDay(db, dayId) {
@@ -198,6 +205,72 @@ liveOddsRouter.post('/race-days/:id/live-odds', (req, res) => {
   res.json({ correlationId, captureId, counts: out.counts, warnings: out.warnings, capturesOnDay: captures });
 });
 
+/**
+ * ONE race's typed board (D232).
+ *
+ * Per-race by design, and per-race in its TIMING too (user decision
+ * 2026-09-11): each save stamps its own `captured_at`, because a board typed
+ * at 12:30 for a 5pm race is not as fresh as one typed at 4:58 and must not be
+ * labelled as though it were. That is also why this route deliberately does
+ * NOT touch `race_days.odds_captured_at` - that column is one-per-day by
+ * construction (D116/D117) and is the HTML ingest's to own; writing a
+ * per-race time into it would make the day-level staleness indicator claim a
+ * freshness no race actually has.
+ *
+ * The typed numbers go through `reconcileManualOdds`, so the same four
+ * refusals apply as to an uploaded page: no morning line, no entry list, no
+ * scratch, no unmatched race.
+ */
+liveOddsRouter.post('/race-days/:id/races/:n/live-odds', (req, res) => {
+  const db = getDb();
+  const dayId = Number(req.params.id);
+  const raceNumber = Number(req.params.n);
+  const capturedAt = typeof req.body?.oddsCapturedAt === 'string' ? req.body.oddsCapturedAt : now();
+  const odds = Array.isArray(req.body?.odds) ? req.body.odds : null;
+  if (!odds) return res.status(400).json({ error: 'odds (an array of {programNumber, liveOdds}) is required.' });
+
+  const stored = loadStoredDay(db, dayId);
+  if (!stored) return res.status(404).json({ error: 'Race day not found.' });
+  const storedRace = stored.races.find((r) => r.number === raceNumber);
+  if (!storedRace) return res.status(404).json({ error: `Race ${raceNumber} not found on this day.` });
+
+  const out = reconcileManualOdds({ storedRace, odds });
+  const correlationId = req.get('x-correlation-id') || stored.correlationId || newCorrelationId();
+  if (!out.ok) {
+    return res.status(422).json({ error: 'Nothing was saved.', warnings: out.warnings, counts: out.counts });
+  }
+
+  let captureId = null;
+  db.transaction(() => {
+    captureId = db.prepare(`INSERT INTO odds_captures
+        (race_day_id, captured_at, source, raw_digest, correlation_id)
+        VALUES (?, ?, 'manual', NULL, ?)`).run(dayId, capturedAt, correlationId).lastInsertRowid;
+    const insRow = db.prepare(`INSERT INTO odds_capture_entries
+        (capture_id, race_number, program_number, live_odds, live_odds_decimal)
+        VALUES (?, ?, ?, ?, ?)`);
+    const updEntry = db.prepare('UPDATE entries SET live_odds = ?, live_odds_decimal = ? WHERE race_id = ? AND program_number = ?');
+    for (const u of out.updates) {
+      insRow.run(captureId, u.raceNumber, u.programNumber, u.liveOdds, u.liveOddsDecimal);
+      updEntry.run(u.liveOdds, u.liveOddsDecimal, storedRace.id, u.programNumber);
+    }
+  })();
+
+  traceLog.info('live_odds_captured', {
+    correlationId, raceDayId: dayId, raceNumber, captureId, capturedAt, source: 'manual',
+    priced: out.counts.priced, changed: out.counts.changed,
+    firstPrice: out.counts.firstPrice, unchanged: out.counts.unchanged,
+  });
+  appLog.info('parse_completed', {
+    correlationId, kind: 'live_odds_manual', race: raceNumber,
+    priced: out.counts.priced, warnings: out.warnings.length,
+  });
+
+  res.json({
+    correlationId, captureId, capturedAt, raceNumber,
+    counts: out.counts, warnings: out.warnings, races: out.races,
+  });
+});
+
 /** Read-only: every capture on a day, newest first. The drift is the point. */
 liveOddsRouter.get('/race-days/:id/live-odds', (req, res) => {
   const db = getDb();
@@ -205,7 +278,10 @@ liveOddsRouter.get('/race-days/:id/live-odds', (req, res) => {
   const day = db.prepare('SELECT id FROM race_days WHERE id = ? AND deleted_at IS NULL').get(dayId);
   if (!day) return res.status(404).json({ error: 'Race day not found.' });
   const captures = db.prepare(`SELECT c.id, c.captured_at, c.source, c.ingested_at, c.correlation_id,
-      (SELECT COUNT(*) FROM odds_capture_entries WHERE capture_id = c.id) AS prices
+      (SELECT COUNT(*) FROM odds_capture_entries WHERE capture_id = c.id) AS prices,
+      -- D232: which races this capture covered. One number for a typed
+      -- per-race board; every race on the card for an uploaded page.
+      (SELECT GROUP_CONCAT(DISTINCT race_number) FROM odds_capture_entries WHERE capture_id = c.id) AS races
       FROM odds_captures c WHERE c.race_day_id = ? ORDER BY COALESCE(c.captured_at, c.ingested_at) DESC, c.id DESC`).all(dayId);
   res.json({ captures });
 });

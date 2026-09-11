@@ -263,6 +263,10 @@ label.btn.btn--primary { color: var(--color-accent-text); }
 .in:hover { border-color: var(--color-border); }
 .in:focus { border-color: var(--color-accent); outline: none; background: var(--color-bg); }
 .in--sm { min-width: 90px; }
+/* D232: the typed live-odds cell in a race's entries table. Narrow on
+   purpose - it holds "9/5", never a sentence - and named for the feature
+   rather than for how it looks, per the D216 global-namespace gotcha. */
+.in--odds { width: 5.5em; min-width: 0; text-align: right; }
 .in--xs { min-width: 0; width: 52px; }
 
 .tag {

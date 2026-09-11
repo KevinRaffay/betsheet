@@ -132,9 +132,19 @@ check('race_results.favorite defaults to 0 so every pre-existing result row stay
 // never overwrite, since the drift between two boards is the whole signal.
 check('odds_captures is per (day, capture) with a nullable captured_at - absent reads as unknown, never fresh',
   db.prepare("SELECT COUNT(*) c FROM pragma_table_info('odds_captures') WHERE name = 'captured_at' AND \"notnull\" = 0").get().c === 1);
-check("odds_captures.source is CHECK-constrained to the one source that carries a board",
-  /CHECK \(source IN \('equibase_html'\)\)/.test(
+// D232 widened this, and retired the premise the D228 version was named for.
+// "the one source that carries a board" was wrong: Equibase's page does NOT
+// carry live odds - its LiveOdds column is empty in the served HTML and filled
+// by client-side JS - and the Apify actor, scraping that same page
+// server-side, has no live-odds field at all. A typed board is the only real
+// source, so 'manual' is a first-class provenance value here rather than an
+// absence.
+check('odds_captures.source admits exactly the two real provenances, uploaded and typed',
+  /CHECK \(source IN \('equibase_html', 'manual'\)\)/.test(
     db.prepare("SELECT sql FROM sqlite_master WHERE name = 'odds_captures'").get().sql));
+check('odds_captures still cascades from its race day, and its rows from it',
+  db.prepare("SELECT COUNT(*) c FROM pragma_foreign_key_list('odds_captures') WHERE \"table\" = 'race_days' AND on_delete = 'CASCADE'").get().c === 1
+  && db.prepare("SELECT COUNT(*) c FROM pragma_foreign_key_list('odds_capture_entries') WHERE \"table\" = 'odds_captures' AND on_delete = 'CASCADE'").get().c === 1);
 check('odds_capture_entries is unique per (capture, race, program number)',
   db.prepare("SELECT COUNT(*) c FROM pragma_index_list('odds_capture_entries') WHERE \"unique\" = 1").get().c === 1);
 check('odds_capture_entries keeps the price TEXT NOT NULL while its decimal may be null (an unreadable form is still a real price)',

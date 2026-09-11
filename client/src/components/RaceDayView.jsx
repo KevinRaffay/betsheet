@@ -11,6 +11,7 @@ import RaceResults from './RaceResults.jsx';
 import TipPicksEntryModal from './TipPicksEntryModal.jsx';
 import RaceDayNotesModal from './RaceDayNotesModal.jsx';
 import LiveOddsModal from './LiveOddsModal.jsx';
+import { LiveOddsBar, LiveOddsCell, useRaceLiveOdds } from './RaceLiveOdds.jsx';
 import RaceNotesEditor from './RaceNotesEditor.jsx';
 import { NoteSourceDatalist } from './AnalystNotesEditor.jsx';
 import { entriesStaleness } from '@shared/staleness.js';
@@ -88,6 +89,11 @@ export default function RaceDayView({ id, onBack, onOpenCard }) {
   const loadDay = () => getRaceDay(id).then(setDay).catch((e) => setError(String(e.message)));
 
   useEffect(() => { loadDay(); }, [id]); // eslint-disable-line react-hooks/exhaustive-deps
+
+  // D232: typed live odds. The drafts live here so the inputs can sit inside
+  // the entries table while the save bar sits under it; re-reading the day on
+  // save is what flushes the drafts back to stored values.
+  const oddsCtl = useRaceLiveOdds(id, loadDay);
 
   const loadNotes = () => getLlmNotes(id)
     .then((n) => {
@@ -354,6 +360,7 @@ export default function RaceDayView({ id, onBack, onOpenCard }) {
             <table className="grid">
             <thead>
               <tr><th>#</th><th>PP</th><th>Horse</th><th>Jockey</th><th>Trainer</th><th>Wt</th><th>M/L</th>
+              <th title="The tote board, typed at post time. Equibase's own page cannot supply it - the LiveOdds column is empty in the served HTML and filled by client-side JS - so this is entered by hand, per race, and every save keeps its own capture time">Live</th>
               <th title="What $2-to-win pays if this horse wins - the printed line as a forecast, not the actual tote price">$2 win</th>
               <th title="The win probability the morning line implies (1 / (odds + 1)); a full field sums well over 100% because of the track's own take">Win %</th>
               <th title="Predicted order of finish from the morning line (1 = shortest line; ties share a rank)">ML rank</th></tr>
@@ -380,6 +387,7 @@ export default function RaceDayView({ id, onBack, onOpenCard }) {
                   <td>{e.trainer ?? ''}</td>
                   <td>{e.weight ?? ''}</td>
                   <td>{e.morning_line ?? ''}</td>
+                  <LiveOddsCell race={race} entry={e} ctl={oddsCtl} />
                   <td className="dim">{entryFlags.get(race.number)?.[ei]?.mlPayoutCents != null ? dollars(entryFlags.get(race.number)[ei].mlPayoutCents) : ''}</td>
                   <td className="dim">{pct(entryFlags.get(race.number)?.[ei]?.mlWinProbability)}</td>
                   <td className="dim">{entryFlags.get(race.number)?.[ei]?.mlRank ?? ''}</td>
@@ -387,6 +395,7 @@ export default function RaceDayView({ id, onBack, onOpenCard }) {
               ))}
             </tbody>
             </table>
+            <LiveOddsBar race={race} ctl={oddsCtl} />
             {race.wager_menu && <p className="dim wager">{race.wager_menu}</p>}
             {/* D184: a note about THIS race is typed here, under the house
                 rule that a race-specific input belongs in the Race UI. The
