@@ -11,6 +11,9 @@ const RESPONSIBLE_LINE =
 const money = (cents) => (cents == null ? '—'
   : cents % 100 === 0 ? `$${cents / 100}` : `$${(cents / 100).toFixed(2)}`);
 
+// D224: the win probability a morning line implies, 0-1 -> a percent string.
+const pct = (p) => (p == null ? '—' : `${(p * 100).toFixed(0)}%`);
+
 const estDisplay = (t) => {
   if (t.est_payout_min_cents == null) return '—';
   if (!t.est_is_range) return money(t.est_payout_min_cents);
@@ -278,7 +281,10 @@ export default function CardView({ cardId, onBack, onDeleted, embedded = false }
               <summary>Entries ({entries.length})</summary>
               <table className="grid grid--entries">
                 <thead>
-                  <tr><th>#</th><th>Horse</th><th>Jockey</th><th>Trainer</th><th>M/L</th><th title="Predicted order of finish from the morning line (1 = shortest line; ties share a rank)">ML rank</th></tr>
+                  <tr><th>#</th><th>Horse</th><th>Jockey</th><th>Trainer</th><th>M/L</th>
+                    <th title="What $2-to-win pays if this horse wins - the printed line as a forecast, not the actual tote price">$2 win</th>
+                    <th title="The win probability the morning line implies (1 / (odds + 1)); a full field sums well over 100% because of the track's own take">Win %</th>
+                    <th title="Predicted order of finish from the morning line (1 = shortest line; ties share a rank)">ML rank</th></tr>
                 </thead>
                 <tbody>
                   {entries.map((entry, ei) => (
@@ -292,6 +298,8 @@ export default function CardView({ cardId, onBack, onDeleted, embedded = false }
                       <td>{entry.jockey ?? '—'}</td>
                       <td>{entry.trainer ?? '—'}</td>
                       <td>{entry.morning_line ?? '—'}</td>
+                      <td className="dim">{entryFlags[ei]?.mlPayoutCents != null ? money(entryFlags[ei].mlPayoutCents) : '—'}</td>
+                      <td className="dim">{pct(entryFlags[ei]?.mlWinProbability)}</td>
                       <td>{entryFlags[ei]?.mlRank ?? '—'}</td>
                     </tr>
                   ))}

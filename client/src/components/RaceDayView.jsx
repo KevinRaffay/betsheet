@@ -14,7 +14,11 @@ import RaceNotesEditor from './RaceNotesEditor.jsx';
 import { NoteSourceDatalist } from './AnalystNotesEditor.jsx';
 import { entriesStaleness } from '@shared/staleness.js';
 import { flagRaceEntries } from '@shared/entry-flags.js';
+import { dollars } from '@shared/betmath.js';
 import EntryFlagTags from './EntryFlagTags.jsx';
+
+// D224: the win probability a morning line implies, 0-1 -> a percent string.
+const pct = (p) => (p == null ? '' : `${(p * 100).toFixed(0)}%`);
 
 // Read-only view of a stored race day - what actually landed in the
 // database, not what the parser proposed.
@@ -339,7 +343,10 @@ export default function RaceDayView({ id, onBack, onOpenCard }) {
             {race.conditions && <p className="conditions">{race.conditions}</p>}
             <table className="grid">
             <thead>
-              <tr><th>#</th><th>PP</th><th>Horse</th><th>Jockey</th><th>Trainer</th><th>Wt</th><th>M/L</th><th title="Predicted order of finish from the morning line (1 = shortest line; ties share a rank)">ML rank</th></tr>
+              <tr><th>#</th><th>PP</th><th>Horse</th><th>Jockey</th><th>Trainer</th><th>Wt</th><th>M/L</th>
+              <th title="What $2-to-win pays if this horse wins - the printed line as a forecast, not the actual tote price">$2 win</th>
+              <th title="The win probability the morning line implies (1 / (odds + 1)); a full field sums well over 100% because of the track's own take">Win %</th>
+              <th title="Predicted order of finish from the morning line (1 = shortest line; ties share a rank)">ML rank</th></tr>
             </thead>
             <tbody>
               {/* D216: index-aligned with `race.entries`, computed once per race. */}
@@ -363,6 +370,8 @@ export default function RaceDayView({ id, onBack, onOpenCard }) {
                   <td>{e.trainer ?? ''}</td>
                   <td>{e.weight ?? ''}</td>
                   <td>{e.morning_line ?? ''}</td>
+                  <td className="dim">{entryFlags.get(race.number)?.[ei]?.mlPayoutCents != null ? dollars(entryFlags.get(race.number)[ei].mlPayoutCents) : ''}</td>
+                  <td className="dim">{pct(entryFlags.get(race.number)?.[ei]?.mlWinProbability)}</td>
                   <td className="dim">{entryFlags.get(race.number)?.[ei]?.mlRank ?? ''}</td>
                 </tr>
               ))}
