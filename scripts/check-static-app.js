@@ -182,8 +182,13 @@ console.log('\n-- the race screen fits a phone (D158) --');
 
   // The payload half of the same fact: if a rank ever DID ship, the column
   // being off would be hiding real data rather than a column of dashes.
+  // D336 moved the entry-building code that would ever emit it out of
+  // scripts/build-static-payload.js and into server/static-payload-builder.js
+  // (shared with the new publish route) - reading the OLD path here would
+  // pass vacuously forever, checking a file that no longer builds an entry
+  // at all (the D205/D201 class of stale check assumption).
   check('the payload builder still emits no program_rank',
-    !/program_rank/.test(fs.readFileSync(path.join(ROOT, 'scripts', 'build-static-payload.js'), 'utf8')));
+    !/program_rank/.test(fs.readFileSync(path.join(ROOT, 'server', 'static-payload-builder.js'), 'utf8')));
 
   // The shared component must stay unchanged for its three desktop callers.
   check('EntriesTable defaults showRank TRUE so desktop is untouched',

@@ -1,4 +1,4 @@
-// Static payload builder (D150, redesigned to v4 by D329).
+// Static payload builder CLI (D150, redesigned to v4 by D329).
 //
 //   npm run build-static-payload -- <raceDayId> [<raceDayId> ...] [--out <path>]
 //   npm run build-static-payload -- --from <YYYY-MM-DD> --to <YYYY-MM-DD> [--track "Del Mar"] [--out <path>]
@@ -16,11 +16,17 @@
 // one file; it never inserts, updates or deletes. A payload build is not an
 // event in a card's history and does not appear in any trace.
 //
-// STILL A MANUAL, DELIBERATE CLI COMMAND - no scheduling of any kind, ever
-// (invariant 6/D197's rule, unaffected by this redesign). `--from`/`--to` is
-// a convenience over raw ids (opaque autoincrement values with no meaning to
-// the person running the command), not a standing job: someone still runs
-// this once, on purpose, to publish a chosen set of days.
+// STILL MANUAL AND DELIBERATE - no scheduling of any kind, ever (invariant
+// 6/D197's rule, unaffected by this redesign or by D336 below). `--from`/
+// `--to` is a convenience over raw ids (opaque autoincrement values with no
+// meaning to the person running the command), not a standing job: someone
+// still triggers this once, on purpose, to publish a chosen set of days.
+// **D336 added a second way to trigger it - a "Publish snapshot" button on
+// the race day list, `POST /api/static-payload/publish`** - but it is the
+// same one-shot, no-scheduling action a person chooses to run right now; the
+// CLI and the route share the exact build logic below, in
+// `server/static-payload-builder.js`, so this file itself is now just the
+// argument parsing, console reporting and file-writing around it.
 //
 // EVERY CARD ON A REQUESTED DAY IS INCLUDED, unconditionally - HUMAN, LLM and
 // EQUIBASE-OTR alike, with grades where they exist. There is no more
@@ -31,171 +37,13 @@
 
 import fs from 'node:fs';
 import path from 'node:path';
-import crypto from 'node:crypto';
 import { fileURLToPath, URL } from 'node:url';
 import { openDb } from '../server/db.js';
-import { getCardCore, getDayRaces, getDayFooter } from '../server/cards.js';
-import { getCardGrades } from '../server/grading.js';
-import { readNotes } from '../server/llm-notes.js';
-import { canonicalizeTrack } from '../shared/track-codes.js';
-import { KNOWN_MODELS } from '../server/anthropic-client.js';
-import { canonicalPayloadText, STATIC_PAYLOAD_SCHEMA, STATIC_PAYLOAD_SCHEMA_VERSION, validateStaticPayload } from '../shared/static-payload.js';
+import { buildStaticPayload, DEFAULT_OUT, summarizePayload } from '../server/static-payload-builder.js';
+
+export { DEFAULT_OUT, buildStaticDay, buildStaticPayload, payloadHashOf, resolveDayIds } from '../server/static-payload-builder.js';
 
 const ROOT = fileURLToPath(new URL('../', import.meta.url));
-export const DEFAULT_OUT = path.join(ROOT, 'static', 'public', 'payload.json');
-
-/** sha256 of a day's canonical text, in the "sha256:<hex>" form the rest of the codebase uses. */
-export function payloadHashOf(day) {
-  return `sha256:${crypto.createHash('sha256').update(canonicalPayloadText(day), 'utf8').digest('hex')}`;
-}
-
-/**
- * Display label for an LLM model id, resolved at BUILD TIME (Node, home
- * side) from the same `KNOWN_MODELS` list `server/anthropic-client.js`
- * already maintains - never a second copy of the mapping. The browser gets
- * the resolved string; it must never import anthropic-client.js itself
- * (check-static-app.js forbids the Anthropic client from the bundle).
- */
-function modelLabel(id) {
-  if (!id) return null;
-  return KNOWN_MODELS.find((m) => m.id === id)?.label ?? id;
-}
-
-/** Every non-deleted card on a day, in the exact shape CardSheet.jsx already reads (snake_case, D237). */
-function loadCards(db, dayId) {
-  const rows = db.prepare('SELECT id FROM cards WHERE race_day_id = ? ORDER BY card_number').all(dayId);
-  return rows.map(({ id }) => {
-    const card = getCardCore(db, id);
-    const graded = getCardGrades(db, id);
-    return {
-      id: card.id,
-      card_number: card.card_number,
-      name: card.name,
-      variant: card.variant,
-      template: card.template,
-      llm_model: card.llm_model,
-      llm_model_label: modelLabel(card.llm_model),
-      notes_present: card.notes_present,
-      consensus_completeness: card.consensus_completeness,
-      engine_version: card.engine_version,
-      bankroll_cents: card.bankroll_cents,
-      per_race_min_cents: card.per_race_min_cents,
-      created_at: card.created_at,
-      allocations: card.allocations,
-      tickets: card.tickets,
-      grades: { rows: graded.grades, summary: graded.summary },
-    };
-  });
-}
-
-/**
- * Build the bundle entry for one race day. Returns `{day}` or `{error}` -
- * never throws for an ordinary "no such day" case, so a caller can report
- * rather than stack-trace.
- */
-export function buildStaticDay(db, raceDayId) {
-  const rd = db.prepare('SELECT * FROM race_days WHERE id = ?').get(raceDayId);
-  if (!rd) return { error: `No race day ${raceDayId}.` };
-  // Invariant 12: a soft-deleted day is excluded everywhere by default, and
-  // publishing one would be the loudest possible violation.
-  if (rd.deleted_at) return { error: `Race day ${raceDayId} is deleted (${rd.track} ${rd.date}). Restore it first.` };
-
-  const races = getDayRaces(db, rd.id);
-  if (!races.length) return { error: `Race day ${raceDayId} (${rd.track} ${rd.date}) has no races.` };
-
-  const day = {
-    raceDay: {
-      raceDayId: rd.id,
-      track: rd.track,
-      trackCode: rd.track_code,
-      date: rd.date,
-      meet: rd.meet,
-      bankrollCents: rd.bankroll_cents,
-      perRaceMinCents: rd.per_race_min_cents,
-      oddsCapturedAt: rd.odds_captured_at,
-      // Precomputed here, at build time, so the browser's calendar never
-      // needs the track registry itself - only shared/race-calendar.js's
-      // pure hour-placement math against this one string.
-      timezone: canonicalizeTrack(rd.track).timezone,
-    },
-    races: races.map((r) => ({
-      number: r.number,
-      postTime: r.post_time,
-      distance: r.distance,
-      surface: r.surface,
-      raceType: r.race_type,
-      conditions: r.conditions,
-      bottomLine: r.bottom_line,
-      // LOAD-BEARING, not decoration: a null wager menu silently falls back
-      // to Del Mar's minimums (CLAUDE.md, Gotchas). Ship whatever the day
-      // actually has.
-      wagerMenu: r.wager_menu,
-      entries: r.entries.map((e) => ({
-        // snake_case: the DB's own shape, which CardSheet.jsx and
-        // EntriesTable.jsx already read directly.
-        program_number: e.program_number,
-        horse_name: e.horse_name,
-        post_position: e.post_position,
-        jockey: e.jockey,
-        trainer: e.trainer,
-        morning_line: e.morning_line,
-        morning_line_decimal: e.morning_line_decimal,
-        scratched: Boolean(e.scratched),
-        also_eligible: Boolean(e.also_eligible),
-      })),
-    })),
-  };
-
-  const { sources, scratches, results } = getDayFooter(db, rd.id);
-  day.sources = sources;
-  day.scratches = scratches;
-  day.results = results;
-  const { byRace } = readNotes(db, rd.id);
-  day.notesByRace = byRace;
-  day.cards = loadCards(db, rd.id);
-
-  // Hash last, over the race-day-and-races region only - see
-  // shared/static-payload.js for what is excluded and why.
-  day.payloadHash = payloadHashOf(day);
-
-  return { day };
-}
-
-/** Resolve which race-day ids a build call covers: explicit ids, or a date range. */
-function resolveDayIds(db, { dayIds, from, to, track }) {
-  if (dayIds && dayIds.length) return dayIds;
-  let sql = 'SELECT id FROM race_days WHERE deleted_at IS NULL AND date >= ? AND date <= ?';
-  const params = [from, to];
-  if (track) { sql += ' AND track = ?'; params.push(track); }
-  sql += ' ORDER BY date, track';
-  return db.prepare(sql).all(...params).map((r) => r.id);
-}
-
-/** Build the full bundle. Returns `{payload}` or `{error}`. */
-export function buildStaticPayload(db, resolveArgs) {
-  const dayIds = resolveDayIds(db, resolveArgs);
-  if (!dayIds.length) return { error: 'No race days matched the given ids/range.' };
-
-  const raceDays = [];
-  for (const id of dayIds) {
-    const { day, error } = buildStaticDay(db, id);
-    if (error) return { error };
-    raceDays.push(day);
-  }
-
-  const payload = {
-    schema: STATIC_PAYLOAD_SCHEMA,
-    schemaVersion: STATIC_PAYLOAD_SCHEMA_VERSION,
-    generatedAt: new Date().toISOString(),
-    raceDays,
-  };
-
-  const problems = validateStaticPayload(payload);
-  if (problems.length) {
-    return { error: `Payload failed validation:\n  - ${problems.join('\n  - ')}` };
-  }
-  return { payload };
-}
 
 function parseArgs(argv) {
   const out = { dayIds: [], from: null, to: null, track: null, out: DEFAULT_OUT };
@@ -246,13 +94,10 @@ function main() {
   fs.writeFileSync(outPath, `${JSON.stringify(payload, null, 2)}\n`, 'utf8');
 
   console.log(`${payload.raceDays.length} race day(s):`);
-  for (const day of payload.raceDays) {
-    const entries = day.races.reduce((a, r) => a + r.entries.length, 0);
-    const scratched = day.races.reduce((a, r) => a + r.entries.filter((e) => e.scratched).length, 0);
-    const graded = day.cards.filter((c) => c.grades.summary).length;
-    console.log(`  ${day.raceDay.track} ${day.raceDay.date} (race day ${day.raceDay.raceDayId})`);
-    console.log(`    ${day.races.length} race(s), ${entries} entr${entries === 1 ? 'y' : 'ies'}${scratched ? `, ${scratched} scratched` : ''}`);
-    console.log(`    ${day.cards.length} card(s)${day.cards.length ? `, ${graded} graded` : ''}`);
+  for (const day of summarizePayload(payload)) {
+    console.log(`  ${day.track} ${day.date} (race day ${day.raceDayId})`);
+    console.log(`    ${day.races} race(s), ${day.entries} entr${day.entries === 1 ? 'y' : 'ies'}${day.scratched ? `, ${day.scratched} scratched` : ''}`);
+    console.log(`    ${day.cards} card(s)${day.cards ? `, ${day.graded} graded` : ''}`);
     console.log(`    ${day.payloadHash}`);
   }
   console.log(`\nWrote ${path.relative(ROOT, outPath) || outPath}`);

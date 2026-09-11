@@ -197,6 +197,17 @@ export const resetAppApi = () =>
     body: JSON.stringify({ confirm: 'RESET' }),
   }).then(asJson);
 
+// Publish the static Pages snapshot (D336) - a UI trigger over the same
+// build logic `npm run build-static-payload` already used. Writes
+// static/public/payload.json on THIS machine only; it does not commit,
+// push, or deploy anything.
+export const publishStaticPayload = ({ dayIds, from, to, track } = {}) =>
+  fetch('/api/static-payload/publish', {
+    method: 'POST',
+    headers: { 'content-type': 'application/json' },
+    body: JSON.stringify({ dayIds, from, to, track }),
+  }).then(asJson);
+
 export const manualPicksPreview = (id, sourceName, text) =>
   fetch(`/api/race-days/${id}/consensus/manual-preview`, {
     method: 'POST',
