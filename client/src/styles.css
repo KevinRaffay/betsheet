@@ -197,6 +197,32 @@ label.btn.btn--primary { color: var(--color-accent-text); }
 }
 .btn--danger { border-color: var(--loss); color: var(--loss); }
 
+/* ---- the "Next race" card (D378) ----
+   Rendered on BOTH home pages - RaceDayList.jsx over the database and the
+   static app's Home.jsx over its bundle - so it lives here, not in
+   static.css (which may never redeclare a class this file owns - D367). */
+.eyebrow {
+  font-size: 11px;
+  font-weight: 700;
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+  color: var(--color-accent);
+}
+.next-race {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+  flex-wrap: wrap;
+  margin: 12px 0;
+  padding: 12px 16px;
+  border: 1px solid var(--color-border);
+  border-left: 4px solid var(--color-accent);
+  border-radius: var(--radius);
+  background: var(--color-bg-subtle);
+}
+.next-race__what { font-size: 18px; font-weight: 700; }
+
 /* ---- forms ---- */
 
 .formrow {

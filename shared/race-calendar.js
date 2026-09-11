@@ -99,3 +99,23 @@ export function placeRacePacific(dateStr, postTime, ianaZone) {
   if (!utc) return null;
   return { hourBucket: hourBucket(utc), postTimePacific: formatPacific(utc) };
 }
+
+/**
+ * The soonest race still to run (D378): `candidates` are anything carrying
+ * `{ date, postTime, timezone }` - a DB row, a payload race - and the winner
+ * comes back as the same object plus `at` (the UTC instant) and
+ * `postTimePacific`, or `null` when nothing is at or after `now`. A race that
+ * cannot be placed (no post time, no zone) is never guessed into first place
+ * - it is simply not a candidate, the same refusal `placeRacePacific` makes.
+ * Ties keep the earlier candidate, so a caller's own ordering breaks them.
+ * `now` is a parameter, never `Date.now()` read here, so a check can pin it.
+ */
+export function nextRaceAmong(candidates, now = new Date()) {
+  let best = null;
+  for (const c of candidates ?? []) {
+    const at = localWallClockToUtc(c?.date, c?.postTime, c?.timezone);
+    if (!at || at < now) continue;
+    if (!best || at < best.at) best = { ...c, at, postTimePacific: formatPacific(at) };
+  }
+  return best;
+}

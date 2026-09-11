@@ -12,7 +12,7 @@
 import express from 'express';
 import { getDb } from './db.js';
 import { canonicalizeTrack } from '../shared/track-codes.js';
-import { placeRacePacific } from '../shared/race-calendar.js';
+import { nextRaceAmong, placeRacePacific } from '../shared/race-calendar.js';
 
 export const calendarRouter = express.Router();
 
@@ -57,4 +57,54 @@ calendarRouter.get('/calendar', (req, res) => {
   tracks.sort((a, b) => (a.races[0]?.hourBucket ?? Infinity) - (b.races[0]?.hourBucket ?? Infinity) || a.track.localeCompare(b.track));
 
   res.json({ date, tracks });
+});
+
+// GET /api/next-race[?now=ISO] (D378): the soonest race still to run across
+// every non-deleted race day, for the home page's "Next race" card - the
+// same tile the static app's home shows over its bundle, computed by the
+// same shared function so the two apps cannot disagree about which race is
+// next. `now` is accepted as a query parameter for exactly one reason: a
+// check script must be able to pin the clock (shared/race-calendar.js's own
+// rule), and a stale-clock diagnosis in production is a URL away. `latest`
+// is the most recent stored day, so the card has somewhere to send a person
+// when nothing is still to run - the ordinary case on a historical corpus.
+const ISO_RE = /^\d{4}-\d{2}-\d{2}T\d{2}:\d{2}(:\d{2}(\.\d+)?)?Z$/;
+
+calendarRouter.get('/next-race', (req, res) => {
+  const nowRaw = req.query.now;
+  const now = nowRaw == null ? new Date() : new Date(String(nowRaw));
+  if (nowRaw != null && (!ISO_RE.test(String(nowRaw)) || Number.isNaN(now.getTime()))) {
+    return res.status(400).json({ error: 'now must be an ISO-8601 UTC instant (YYYY-MM-DDTHH:MM[:SS]Z).' });
+  }
+  // A track's local date can trail the UTC date by a day, so the floor is
+  // yesterday-UTC: everything earlier has certainly run, and everything from
+  // there on is left to the instant comparison.
+  const floor = new Date(now.getTime() - 24 * 3600 * 1000).toISOString().slice(0, 10);
+
+  const db = getDb();
+  const rows = db.prepare(`
+    SELECT rd.id AS raceDayId, rd.track, rd.track_code AS trackCode, rd.date,
+           r.number, r.post_time AS postTime,
+           (SELECT COUNT(*) FROM entries e WHERE e.race_id = r.id AND e.scratched = 0) AS runners
+    FROM race_days rd
+    JOIN races r ON r.race_day_id = rd.id
+    WHERE rd.deleted_at IS NULL AND rd.date >= ?
+    ORDER BY rd.date, rd.track, r.number
+  `).all(floor);
+  const next = nextRaceAmong(rows.map((row) => ({ ...row, timezone: canonicalizeTrack(row.track).timezone })), now);
+
+  const latest = db.prepare(`
+    SELECT id AS raceDayId, track, date FROM race_days
+    WHERE deleted_at IS NULL ORDER BY date DESC, id DESC LIMIT 1
+  `).get() ?? null;
+
+  res.json({
+    now: now.toISOString(),
+    next: next ? {
+      raceDayId: next.raceDayId, track: next.track, trackCode: next.trackCode, date: next.date,
+      number: next.number, postTime: next.postTime, postTimePacific: next.postTimePacific,
+      at: next.at.toISOString(), runners: next.runners,
+    } : null,
+    latest,
+  });
 });
