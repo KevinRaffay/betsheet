@@ -1,6 +1,6 @@
 # Pick-source scoring: which sources name winners, with no money involved
 
-**Status: SPECIFIED; PS-1 picked up 2026-09-10.** No deliverable IDs are claimed here; each
+**Status: SPECIFIED; PS-1 is D220 (branch `pick-scoring-shared`), PS-2 and PS-3 not yet claimed.** Each
 phase claims its own with `npm run allocate-deliverable` when it is picked up,
 the way `race-day-calendar.md` and `multi-parser-entries-ingest.md` were
 worked. Written 2026-09-10 from a user question ("Does TrackMaster pick a lot
