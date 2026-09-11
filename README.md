@@ -68,6 +68,61 @@ eposetsheet-alt` — see
 > reset against this checkout deletes the whole corpus and every log, with no
 > undo.
 
+## Deploying the static app
+
+The static at-track viewer (`static/`) is published to GitHub Pages by
+`.github/workflows/deploy-pages.yml`, which runs on a push to the
+**`deploy-static-app`** branch, never on `main` (D345). What it deploys is the
+code on that branch plus the committed `static/public/payload.json`, so a
+deploy is always the same two moves: put `main`'s code on the branch, then a
+fresh payload commit on top.
+
+**Do not merge `main` into `deploy-static-app`** (or the other way). Both
+sides carry a `payload.json`, so a merge conflicts inside a megabyte of JSON,
+and there is nothing on the deploy branch worth merging - its only commits of
+its own are payload snapshots, which are regenerated from the database every
+time. Reset the branch instead.
+
+Run these from the primary checkout, not a worktree: `check-static-app` only
+works there (see the D168 house rule in `CLAUDE.md`), and it is the one check
+that proves the built bundle ships no server, LLM or grading code.
+
+```bash
+git checkout main && git pull
+```
+
+```bash
+git checkout -B deploy-static-app main       # reset the branch to main's code
+```
+
+```bash
+npm run build-static-payload -- --from 2026-09-06 --to 2026-09-11   # or the "Publish snapshot" button on the race day list
+```
+
+```bash
+npm run check-static-app
+```
+
+```bash
+git add static/public/payload.json && git commit -m "Publish snapshot: 2026-09-06 to 2026-09-11"
+```
+
+```bash
+git push --force-with-lease origin deploy-static-app
+```
+
+The force is needed because the branch is being rewritten to `main` plus one
+commit; `--force-with-lease` refuses if someone else pushed to it since your
+last fetch. The tracked pre-push hook guards only `main`, so this push goes
+straight through, and the payload commit touches `static/**`, which is in the
+workflow's path filter, so it triggers the deploy. `main` never carries a
+snapshot commit.
+
+A Pages site is publicly readable even from a private repository. Everything
+in the payload - every entry, card and grade on a bundled day - is on the open
+internet at a guessable URL; see invariant 10 in `CLAUDE.md` for the privacy
+floor (nothing about the person who ran the builder, ever).
+
 ## The scratch environment (`betsheet-alt`)
 
 **A factory reset destroys data. Never run one against the main checkout.**
