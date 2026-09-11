@@ -206,7 +206,7 @@ The four you need before you can read anything else:
 ```bash
 npm start                # build + serve on 127.0.0.1:8788
 npm run dev:preview      # the AGENT's dev stack (api :8795 / vite :5185) - never the human's pair
-npm run allocate-deliverable -- --title "..."   # claim a D number BEFORE naming a branch (D203)
+npm run allocate-deliverable -- --title "..."   # claim a D number BEFORE naming a branch (D324: opens a GitHub issue, atomically, server-side)
 npm run gh -- pr list    # the GitHub API, through the credential git already has (D101)
 ```
 
@@ -220,12 +220,19 @@ npm run gh -- pr list    # the GitHub API, through the credential git already ha
   status, notes) in the same PR.
 - `REQUIREMENTS.md` maps requirements → deliverable IDs.
 - **Claim the D number with `npm run allocate-deliverable -- --title "..."`
-  BEFORE naming a branch or writing a ledger row (D203).** Reading
+  BEFORE naming a branch or writing a ledger row.** Reading
   DELIVERABLES.md/CLAUDE.md and picking "the highest number plus one" by eye
   is the exact race that let two concurrent sessions both claim D200 - the
-  loser had to renumber to D201 on rebase (see that row). The allocator
-  claims atomically from a database shared by every worktree on this
-  machine; see `scripts/lib/deliverable-numbers.js`'s own header for how.
+  loser had to renumber to D201 on rebase (see that row). **D324 replaced the
+  mechanism entirely**: claiming now opens a GitHub Issue labeled
+  `deliverable`, and the issue's number IS the D-number - GitHub allocates
+  issue numbers atomically, server-side, with no coordination needed between
+  worktrees, clones, or machines, which is what three iterations of a local
+  SQLite counter (D203/D226/D230, see Gotchas) were trying to approximate
+  and never fully closed. D1-D236 are untouched legacy numbers from the
+  retired scheme; see `scripts/lib/deliverable-issues.js`'s own header for
+  the full argument and for why the first number under the new scheme jumped
+  straight to D324 rather than continuing from D237.
 - Feature branches off `main`, short kebab-case names, PR into `main`.
   **Claude opens AND merges its own PRs into `main`, without asking each
   time** - a standing authorization for the duration of this project (user
@@ -512,6 +519,10 @@ it. Rules still in force:
   with the entry above, a retry saved with `--replace` also destroys
   whatever was there before. Cross-check against a manually-saved HTML page
   first if one exists or can be gotten.
+- **SUPERSEDED BY D324** (below): the SQLite counter this entry describes is
+  retired. Kept as the record of why three iterations of local coordination
+  were needed and what each one fixed - the reasoning is still the argument
+  for why D324 moved to GitHub Issues instead of a fourth local fix.
 - **D numbers are claimed from a database now, not read off the highest row
   in a file - `npm run allocate-deliverable`** (D203). Multiple worktree
   agents used to pick their D number by reading DELIVERABLES.md/CLAUDE.md
@@ -571,6 +582,48 @@ it. Rules still in force:
   D225 half of the same incident (#298 merged seven minutes AFTER the
   colliding claim). Closing it needs a server-side atomic claim; see the
   module header for the shape it would take.
+- **D324 closed the residual D230 window by replacing the local counter
+  entirely: a D-number is now a GitHub Issue.** Investigated at the user's
+  request (issue tracking + deliverable IDs, GitHub Projects) alongside
+  whether GitHub Projects (v2) could help too - it can't be automated today:
+  a live GraphQL call against this repo with the token `git credential fill`
+  already provides (the same one `npm run gh` uses) came back
+  `INSUFFICIENT_SCOPES` for `read:project`, because that token was issued
+  with `repo`/`workflow`/`gist`/`read:org` only. Issues needed no new scope at
+  all - `repo` already covers them - so `scripts/lib/deliverable-numbers.js`
+  (D203/D226/D230) is deleted outright rather than patched a fourth time:
+  `scripts/lib/deliverable-issues.js` opens an issue labeled `deliverable` per
+  claim, and the issue number returned by GitHub's own atomic assignment IS
+  the D-number. That deletes the entire class of bug the other three
+  deliverables fought - there is no counter to seed, no floor to sync, no
+  "which clone is authoritative" question, because the claim and the number
+  assignment are the same server-side operation with zero race window,
+  reachable identically from a worktree, a separate clone, or a cloud
+  session. **The cost is a hard network dependency** (the old allocator could
+  at least claim offline against a stale floor; this one cannot claim at all
+  without reaching api.github.com) and a numbering discontinuity: D237 was
+  claimed by an unrelated concurrent session while this investigation was
+  still in progress - caught live by `syncCounterFloor`'s own remote-ledger
+  read the moment this branch synced with origin - so the first number the
+  new mechanism actually handed out was D324, not D238; GitHub's shared
+  issue/PR counter had moved on in the meantime and there is no way to mint a
+  number behind where that counter already is. Treated as expected rather
+  than a bug, on the same never-recycle reasoning invariant 12 and every
+  D-number rule before this one already rest on: a gap costs nothing, a
+  renumber costs a citation everywhere the old number was already written.
+  `npm run gh` grew symmetrical `issue <n>`/`issue list`/`issue create`/
+  `issue close <n>` subcommands alongside this, both gated by the same
+  allowlist discipline (D217/D218) the `pr` subcommands already use - the
+  broader "issue tracking" half of the investigation, kept minimal because
+  DELIVERABLES.md remains the prose ledger; issues only replace how the
+  NUMBER is minted. `scripts/gh-api.js` and `scripts/lib/deliverable-issues.js`
+  now share credential/repo-slug handling via `scripts/lib/github-credential.js`
+  rather than duplicating the secret-handling logic D101/D218 were careful
+  about. Verified offline via `npm run check-deliverable-issues` (a fake-fetch
+  DI seam, `createDeliverableIssuesClient`, mirroring `runActor`'s own
+  `client` parameter in `server/apifyEquibase.js` - a check script may never
+  actually open a real public issue) and `npm run check-gh-api` (the
+  allowlist re-derived from source, as before D217).
 
 - **Equibase does not publish live odds in any form this project can read - the column is a JS placeholder** (D232). The entries page HAS a `LiveOdds` column, which is why D228 built a capture path around uploading that page. It is EMPTY in the HTML Equibase serves: 123 of 123 cells in this repo's own `DMR090726USA-EQB` fixture, the header carrying `title="Live Odds refreshed every 60 seconds"` and the cells carrying nothing but `id`/`name` hooks for an external `/js/liveOdds.js`. So the values exist only in a live browser DOM. **Both capture shapes this codebase supports are therefore empty by construction, at any hour** - `shared/parsers/equibase-entries.js`'s own header defines them as the original server markup (`view-source:`, and Ctrl+S "Webpage, HTML Only"). The requirements doc's open question 2 read the empty column as "this capture predates wagering" and asked for a second capture closer to post; that was the wrong diagnosis, and a near-post capture of either shape would have been just as empty. **The Apify route is out for the same underlying reason**: the actor scrapes that same page server-side and never sees the JS output - checked across all three real datasets on file, entries rows carry `morningLineOdds`/`morningLineDecimal` and no live-odds field of any kind, results rows only the payoffs. **So the board is TYPED, per race, at post time** (D232), which is the same posture invariant 6 already describes for every other source here. **Chrome's "Webpage, Complete" was the last candidate and it does NOT work either** - tested by the user, 2026-09-11. So NO browser save method reaches the board: not view-source, not "HTML Only", not "Complete", and not the Apify actor. `LiveOddsModal.jsx`'s upload path still functions and is still correct, but **nothing known can feed it** - it is kept because its reconciler, refusals and capture history are what the typed path reuses, not because there is a capture to make. The general lesson: **a column existing in the markup is not the same as a column carrying data**, and the way to tell is to read the served bytes rather than the rendered page.
 - **A check script's safety assumption about its target can go stale when

@@ -20,7 +20,6 @@
 
 import fs from 'node:fs';
 import path from 'node:path';
-import os from 'node:os';
 import { execFileSync } from 'node:child_process';
 import { fileURLToPath } from 'node:url';
 
@@ -43,10 +42,10 @@ const ALLOW = [...block[1].matchAll(/\{\s*m:\s*'([A-Z]+)',\s*re:\s*(\/.*?\/),\s*
 const permitted = (method, p) => ALLOW.some((a) => a.m === method && a.re.test(p));
 
 console.log('\nThe allowlist parsed out of the source');
-check('every entry parsed (5 expected: read, open, comment, merge, close)',
-  ALLOW.length === 5, `${ALLOW.length}`);
-check('the verbs are exactly GET/POST/POST/PUT/PATCH',
-  ALLOW.map((a) => a.m).join(',') === 'GET,POST,POST,PUT,PATCH', ALLOW.map((a) => a.m).join(','));
+check('every entry parsed (7 expected: read, open PR, comment, merge, close PR, open issue, close issue - D237)',
+  ALLOW.length === 7, `${ALLOW.length}`);
+check('the verbs are exactly GET/POST/POST/PUT/PATCH/POST/PATCH',
+  ALLOW.map((a) => a.m).join(',') === 'GET,POST,POST,PUT,PATCH,POST,PATCH', ALLOW.map((a) => a.m).join(','));
 
 const R = '/repos/KevinRaffay/betsheet';
 
@@ -56,30 +55,36 @@ check('POST to open a PR', permitted('POST', `${R}/pulls`));
 check('POST a comment', permitted('POST', `${R}/issues/281/comments`));
 check('PUT to merge a PR', permitted('PUT', `${R}/pulls/281/merge`));
 check('PATCH a PR (D217: close)', permitted('PATCH', `${R}/pulls/281`));
+check('POST to open an issue (D237)', permitted('POST', `${R}/issues`));
+check('PATCH an issue to close/reopen it (D237)', permitted('PATCH', `${R}/issues/281`));
 
 console.log('\nWhat must still be refused - the point of the allowlist');
-// The close entry is anchored with `$` precisely so that adding PATCH does
-// not open the door to every sub-resource hanging off a pull request.
+// The close entries are anchored with `$` precisely so that adding PATCH does
+// not open the door to every sub-resource hanging off a pull request or issue.
 check('PATCH cannot reach the MERGE endpoint', !permitted('PATCH', `${R}/pulls/281/merge`));
 check('PATCH cannot reach a PR review', !permitted('PATCH', `${R}/pulls/281/reviews/1`));
 check('PATCH cannot reach the repository itself (settings, default branch)', !permitted('PATCH', R));
-check('PATCH cannot reach an issue', !permitted('PATCH', `${R}/issues/281`));
+check('PATCH cannot reach an issue\'s comments or labels (only the issue root)',
+  !permitted('PATCH', `${R}/issues/281/comments`) && !permitted('PATCH', `${R}/issues/281/labels`));
 check('PATCH cannot reach a branch-protection rule', !permitted('PATCH', `${R}/branches/main/protection`));
 check('DELETE is not permitted anywhere at all', ALLOW.every((a) => a.m !== 'DELETE'));
 check('...including a git ref (this is why closing a PR must not mean deleting its branch)',
   !permitted('DELETE', `${R}/git/refs/heads/some-branch`));
 check('PUT cannot reach anything but merge', !permitted('PUT', `${R}/pulls/281`));
 check('POST cannot reach a merge', !permitted('POST', `${R}/pulls/281/merge`));
+check('POST cannot create a label (label creation is deliverable-issues.js\'s own direct call, not routed through this CLI)',
+  !permitted('POST', `${R}/labels`));
 check('no verb reaches another repository root than /repos, /user, /orgs, /search, /rate_limit',
   !permitted('GET', '/gists') && !permitted('GET', '/admin/hooks'));
 
 console.log('\nThe body a PATCH may carry');
 // The allowlist cannot say "this verb but only this field", so the guard is
-// that exactly one PATCH call exists in the file and its body is a literal.
+// that every PATCH call in the file carries the same literal body - one for
+// closing a PR (D217), one for closing/reopening an issue (D237).
 const patchCalls = [...src.matchAll(/api\('PATCH',[^)]*\)/g)].map((m) => m[0]);
-check('exactly one PATCH call exists in the whole script', patchCalls.length === 1, String(patchCalls.length));
-check("...and its body is the literal { state: 'closed' }",
-  patchCalls[0] && /\{\s*state:\s*'closed'\s*\}/.test(patchCalls[0]), patchCalls[0]);
+check('exactly two PATCH calls exist in the whole script (PR close, issue close)', patchCalls.length === 2, String(patchCalls.length));
+check("...and both bodies are the literal { state: 'closed' }",
+  patchCalls.length === 2 && patchCalls.every((c) => /\{\s*state:\s*'closed'\s*\}/.test(c)), patchCalls.join(' | '));
 // `raw` is the one path where a caller picks the verb, so PATCH became
 // reachable through it too. It stays harmless because `raw` has no body flag:
 // `api(method, path)` sends `body: undefined`, and a PATCH with no fields
@@ -132,7 +137,13 @@ check('a non-sentinel error is reported with its STACK, through redact()',
 // The fatal path exercised for real, on a COPY with a throw injected before
 // the command dispatch - so no request is made and the real script is never
 // modified. This is the same technique the negative controls use.
-const tmp = path.join(os.tmpdir(), `gh-api-fatal-${process.pid}.mjs`);
+//
+// D237: the copy must live NEXT TO scripts/lib/, not in os.tmpdir() - gh-api.js
+// now has a relative import (`./lib/github-credential.js`) that only resolves
+// from inside scripts/, so a copy dropped in tmpdir threw ERR_MODULE_NOT_FOUND
+// before it ever reached the injected throw. Cleaned up in the same `finally`
+// as before.
+const tmp = path.join(HERE, `gh-api-fatal-${process.pid}.mjs`);
 const marker = 'const [cmd, sub, ...rest] = argv;';
 check('the injection point still exists in the source', src.includes(marker));
 fs.writeFileSync(tmp, src.replace(marker, `throw new TypeError('injected-not-a-sentinel');\n${marker}`), 'utf8');
