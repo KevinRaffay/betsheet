@@ -1,9 +1,11 @@
 import React, { useEffect, useState } from 'react';
 import {
-  getLlmModels, getLlmNotes, getLlmRequests, getRaceDay, listCards, lockLlmCard, modelLabel, previewLlmCard, saveLlmNote,
+  getLlmModels, getLlmNotes, getLlmRequests, getRaceDay, listCards, listTipPicks, lockLlmCard, modelLabel, previewLlmCard, saveLlmNote,
 } from '../api.js';
 import EntriesTable from './EntriesTable.jsx';
 import { NoteSourceDatalist, NotesEditor } from './AnalystNotesEditor.jsx';
+import RaceTipPicks from './RaceTipPicks.jsx';
+import TipPicksEntryModal from './TipPicksEntryModal.jsx';
 
 const money = (cents) => (cents == null ? '—' : cents % 100 === 0 ? `$${cents / 100}` : `$${(cents / 100).toFixed(2)}`);
 
@@ -106,6 +108,9 @@ export default function LlmCardModal({ dayId, onCardChanged, onClose }) {
   // model never drifts mid-comparison. Free again once null (a new day
   // with no LLM card yet, or after "Start a New Card").
   const [lockedModel, setLockedModel] = useState(null);
+  // Tip picks management - similar to analyst notes, but day-level load
+  const [tipRows, setTipRows] = useState([]);
+  const [tipRace, setTipRace] = useState(null);
 
   // Keeps the whole list, not just the resolved target - the picker below
   // needs every card to offer, and a card generated with a different model
@@ -125,9 +130,16 @@ export default function LlmCardModal({ dayId, onCardChanged, onClose }) {
     if (on?.llm_model) setSelectedModel(on.llm_model);
   }).catch(() => {});
 
+  const loadTipPicks = () => {
+    listTipPicks(dayId).then((data) => {
+      setTipRows(data.rows ?? []);
+    }).catch(() => {});
+  };
+
   const reload = () => {
     getRaceDay(dayId).then(setDayInfo).catch((e) => setError(String(e.message)));
     loadCards();
+    loadTipPicks();
     getLlmModels().then((m) => {
       setModels(m.models ?? []);
       setSelectedModel((prev) => prev || m.default || m.models?.[0]?.id || '');
@@ -491,6 +503,17 @@ export default function LlmCardModal({ dayId, onCardChanged, onClose }) {
 
               <NoteSourceDatalist />
 
+              {tipRace && (
+                <TipPicksEntryModal
+                  dayId={dayId}
+                  race={tipRace}
+                  entries={tipRace.entries ?? []}
+                  existing={tipRows.filter((r) => r.raceNo === tipRace.number)}
+                  onClose={() => setTipRace(null)}
+                  onSaved={loadTipPicks}
+                />
+              )}
+
               {notesPostResult && (
                 <p className="notice notice--warn">
                   This day's results are already recorded. Notes written after a result is known are not blind -
@@ -556,6 +579,12 @@ export default function LlmCardModal({ dayId, onCardChanged, onClose }) {
                         <NotesEditor scope="race" draft={draftOf(r.number)} disabled={busy}
                           onEdit={(patch) => editNote(r.number, patch)} onFlush={flushNotes} />
                       </details>
+                      <RaceTipPicks
+                        rows={tipRows.filter((row) => row.raceNo === r.number)}
+                        scoreFor={() => null}
+                        onEnter={() => setTipRace(r)}
+                        onChanged={loadTipPicks}
+                      />
                       {openRace === r.number && (
                         <div>
                           {errorRace === r.number && error && (
