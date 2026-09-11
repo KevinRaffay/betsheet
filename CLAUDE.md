@@ -1135,6 +1135,35 @@ it. Rules still in force:
   parameter instead, since a real Apify call costs real money and no
   check script may ever make one - that belongs to a person running a CLI
   script (Phase 4) on purpose.
+- **`server/` never imports from `scripts/` - when a script's logic needs to
+  be reachable from a live route too, extract it INTO `server/`, never have
+  the route reach into `scripts/`** (D336). `scripts/build-static-payload.js`
+  already imported `server/cards.js`/`server/grading.js`/`server/db.js`
+  before D336 added a "Publish snapshot" UI button needing the exact same
+  build logic from a route - importing the script from the route would have
+  made `server/some-route.js -> scripts/build-static-payload.js ->
+  server/cards.js` a real cycle in the dependency graph. Fixed the same way
+  D329 already fixed the one layer down (`getCardCore`/`getDayRaces`/
+  `getDayFooter`/`getCardGrades`, extracted into `server/` so both the route
+  and the script call them): the buildable logic
+  (`buildStaticDay`/`resolveDayIds`/`buildStaticPayload`/`payloadHashOf`/
+  `summarizePayload`/`DEFAULT_OUT`) moved into new `server/
+  static-payload-builder.js`, and `scripts/build-static-payload.js` shrank to
+  argument parsing, console reporting and file-writing around it. The rule to
+  take forward: `scripts/` is the one-way consumer of `server/`, never the
+  reverse, and a shared need is a sign the logic belongs in `server/` from
+  the start.
+- **`BETSHEET_STATIC_PAYLOAD_OUT`** (env var, not `.env` - a check-script-only
+  override, same shape as `BETSHEET_DB`/`BETSHEET_LOG_DIR`) redirects where
+  `server/static-payload-builder.js`'s `DEFAULT_OUT` points, so
+  `scripts/check-publish-static-payload.js` can exercise `POST
+  /api/static-payload/publish` without overwriting the real committed
+  `static/public/payload.json`. The CLI's own `--out` flag already covers a
+  terminal invocation's need to redirect; the route itself takes NO
+  client-supplied output path at all - a browser choosing an arbitrary file
+  to write on this machine is not a request parameter this app will ever
+  accept, so the env var is the only way to redirect what the route writes,
+  and it is meant for a check script's own process env, never for a real run.
 - **Every PROGRAM_ONLY figure in the corpus is a backfill figure.** No
   consensus source ever ran on an archived day, so that bucket measures Bottom
   Line + morning line and nothing else - never read one of its numbers as the

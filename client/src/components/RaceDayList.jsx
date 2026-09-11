@@ -1,5 +1,6 @@
 import React, { useEffect, useRef, useState } from 'react';
 import { bulkDeleteRaceDays, listRaceDays, resetAppApi, restoreRaceDay } from '../api.js';
+import PublishStaticSnapshotModal from './PublishStaticSnapshotModal.jsx';
 
 const SKIP_REASON_LABEL = {
   graded: 'already graded',
@@ -22,6 +23,7 @@ export default function RaceDayList({ onOpen, onNew, onPL, onDistribution, onSou
   const [confirmBulk, setConfirmBulk] = useState(false);
   const [bulkResult, setBulkResult] = useState(null);
   const selectAllRef = useRef(null);
+  const [showPublish, setShowPublish] = useState(false);
 
   const reload = (deleted = showDeleted) =>
     listRaceDays(deleted).then(setDays).catch((e) => setError(String(e.message)));
@@ -140,6 +142,7 @@ export default function RaceDayList({ onOpen, onNew, onPL, onDistribution, onSou
           {!showDeleted && <button className="btn" onClick={onSources}>Pick sources</button>}
           {!showDeleted && <button className="btn" onClick={onReplay}>Replay</button>}
           {!showDeleted && <button className="btn" onClick={onCalendar}>Race calendar</button>}
+          {!showDeleted && <button className="btn" onClick={() => setShowPublish(true)}>Publish snapshot</button>}
           <button className="btn" onClick={() => setShowDeleted((v) => !v)}>
             {showDeleted ? 'Show active' : 'Show deleted'}
           </button>
@@ -308,6 +311,12 @@ export default function RaceDayList({ onOpen, onNew, onPL, onDistribution, onSou
             </div>
           )}
         </div>
+      )}
+      {showPublish && days && (
+        // `days` is already the active (non-deleted) list here - the button
+        // only renders when `!showDeleted` - so invariant 12's exclusion is
+        // inherited for free rather than re-checked.
+        <PublishStaticSnapshotModal days={days} onClose={() => setShowPublish(false)} />
       )}
     </section>
   );
