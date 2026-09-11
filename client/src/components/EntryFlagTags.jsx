@@ -6,7 +6,7 @@ import React from 'react';
 // wording and the colour drift apart - the same reason `RaceNotes.jsx` (D165)
 // and `EntriesTable.jsx` (D135) exist at all.
 //
-// D236 added the two BOARD tags - a price move and a new favorite - to the
+// D240 added the two BOARD tags - a price move and a new favorite - to the
 // same one place for the same reason. They render only where a live price
 // exists, so the ingest preview and the static at-track builder (neither of
 // which has ever seen a board) are untouched without needing a prop.

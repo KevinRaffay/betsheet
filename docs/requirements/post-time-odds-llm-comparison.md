@@ -48,7 +48,7 @@ query has since been answered in PT-1's favour; what PT-1 now waits on is not
 code but a chart re-upload per day, and PT-3/PT-4 wait on a real board being
 captured at a live card.
 
-**D236 added the HUMAN-READABLE half of this comparison**, which is not a
+**D240 added the HUMAN-READABLE half of this comparison**, which is not a
 phase here and does not answer any of them: once a board is typed, the race
 card shows the morning-line and live books side by side as normalised win
 percentages, their difference, both ranks, and a STEAM/DRIFT tag on runners

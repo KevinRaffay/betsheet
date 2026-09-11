@@ -27,7 +27,7 @@
 // (a scratch would imply a payout again); change `impliedWinPayoutCents` to
 // use a $1 base instead of $2 and the $7.00/$3.60/$42.00 assertions fail.
 //
-// D236 NEGATIVE CONTROLS, one per decision the live-board block makes:
+// D240 NEGATIVE CONTROLS, one per decision the live-board block makes:
 //   - normalise over the WHOLE live field instead of the comparable set (drop
 //     the `Number.isFinite(flags[x.i].mlDecimal)` filter) and the
 //     one-horse-unpriced case reports a move on horses that did not move;
@@ -243,7 +243,7 @@ check('five empty entries produce five unflagged entries, not a crash and not a 
 check('flags are index-aligned with the input array',
   flagRaceEntries(five).flags.length === five.length);
 
-console.log('\nLive board (D236) - the price beside the price it moved from');
+console.log('\nLive board (D240) - the price beside the price it moved from');
 
 // `b(ml, live)` - one runner with both books. Deliberately uses the printed
 // STRINGS rather than stored decimals, because that is the harder path: it
@@ -362,7 +362,7 @@ const moveOf = (f) => (f.move ? `${f.move.direction}/${f.move.magnitude}` : null
 }
 
 {
-  // A race with no board at all must be byte-identical to the pre-D236 answer:
+  // A race with no board at all must be byte-identical to the pre-D240 answer:
   // this is what keeps the ingest preview and the static at-track builder from
   // growing three columns of dashes.
   const rows = [e('A', '2/1'), e('B', '3/1'), e('C', '8/1')];

@@ -1,18 +1,20 @@
 // The static-payload shape (D150): everything the GitHub Pages ticket builder
 // needs about one race day, and nothing else.
 //
-// PURE and browser-safe - no `node:` import, ever. Three callers share this
+// PURE and browser-safe - no `node:` import, ever. Two callers share this
 // file so the shape can only be defined once:
 //   * scripts/build-static-payload.js  builds a payload at home,
-//   * the static app (static/src/) reads one in the browser,
-//   * scripts/import-static-cards.js   RE-builds one to verify a returned
-//     card was built against the race day this repo still holds.
+//   * the static app (static/src/) reads one in the browser.
 //
-// That third caller is why canonicalization lives here rather than in the
-// builder. `payloadHash` is only worth checking if the home side can
-// reproduce it byte for byte months later, so the hashed text must be a
-// function of the race day alone - never of the clock, of key insertion
-// order, or of which optional flags the build used.
+// (A third caller, scripts/import-static-cards.js, used to re-build a payload
+// to verify a returned card was built against the race day this repo still
+// holds - it was deleted along with the static app's card-construction
+// feature, D236. Canonicalization stays here rather than in the builder
+// regardless: `payloadHash` is only worth checking if a reproduction can
+// match it byte for byte, so the hashed text must be a function of the race
+// day alone - never of the clock, of key insertion order, or of which
+// optional flags the build used - and that property is worth keeping for
+// whatever the next verifier turns out to be.)
 //
 // WHAT IS DELIBERATELY NOT HASHED, and why:
 //   * `generatedAt` - a build stamp. Hashing it would make every rebuild a

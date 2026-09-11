@@ -66,15 +66,17 @@ npm run fix-grade-set-versions [-- --yes]  # D99: re-stamp grade sets written un
 npm run export-trace -- --card N [--out f]  # the LLM feed for one card
 npm run reset -- --yes  # FACTORY RESET: wipe every record AND every log file
 
-# The static Pages target (D150-D155) - the at-the-track card builder
+# The static Pages target - a read-only viewer as of D236 (was a card
+# CONSTRUCTION surface, D150-D158, until the user retired that in favor of
+# this). The payload/builder below are still the D150 shape (one race day,
+# --reference-cards) - a later deliverable redesigns them for multiple days
+# and unconditional cards/grades.
 npm run build-static-payload -- <raceDayId> [--out f] [--reference-cards]  # D150: one race day -> static/public/payload.json (read-only; --reference-cards embeds the day's LLM/OTR cards, which the deploy then publishes PUBLICLY)
 npm run dev:static      # D151: the static app on vite :5186 (needs a payload built first)
 npm run preview:static  # D155: serves the BUILT dist-static on :5187 - the only way to exercise the service worker (it registers in production builds only)
 npm run build:static    # D151: build dist-static (BETSHEET_STATIC_BASE sets the deploy sub-path)
 npm run check-static-payload  # D150: canonicalization, the 13 validation refusals, a real day, hash stability incl. a negative control
-npm run check-static-app      # NOT RUNNABLE IN A WORKTREE - out of scope there by house rule (D168, see Gotchas); run it from the primary checkout. D151+D154+D155: payload rows and DB rows parse IDENTICALLY, the built bundle ships no LLM/OTR/grading/API code (with a positive control), the Pages base, the service-worker strategies
-npm run import-static-cards -- <path> [--yes]  # D153: import phone-built cards (dry run by default; a directory of rolling backups is one safe import)
-npm run check-static-import   # D153: migration 027, the same file imported three times producing ONE card, all four refusals, invariant 15's lock times
+npm run check-static-app      # NOT RUNNABLE IN A WORKTREE - out of scope there by house rule (D168, see Gotchas); run it from the primary checkout. D236: the built bundle ships no server/LLM/OTR/grading/construction code (with a positive control), the Pages base, the service-worker strategies, D157/D158 mobile rules
 npm run check-module-bindings # D172: no module uses a name it only re-exports - the blank-page class that build and every server-side check structurally miss
 npm run dedupe-tip-cards [-- --yes]  # D174: fold D171 duplicate TIPSHEET card sets to one per (day, source, variant); keeps the NEWEST (the one a later stake reuses) and REFUSES to delete a graded card. Dry run by default
 npm run check-tip-staking     # D171 + D174 (re-staking reuses the same three cards; a third race re-prices the whole card; a second SOURCE gets its own three; migration 031 backfill; a graded card warned then regraded cleanly): the three variants, the 8/1 place-money threshold (and that 7/1 does not fire), refusals instead of unpayable stakes, migration 030's cards REBUILD keeping every child row and both indexes, preview writing nothing, three cards appended not edited, and a TIPSHEET card grading through the ORDINARY grader into its own P/L bucket

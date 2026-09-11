@@ -21,7 +21,7 @@
 // say" mixed into "what happened"). Both are null for a scratched horse
 // (it cannot cash, whatever its line said) and for an unpriced one.
 //
-// D236 added the LIVE BOARD beside the line, because a price only means
+// D240 added the LIVE BOARD beside the line, because a price only means
 // something next to the price it moved from: `liveDecimal`, `liveWinProbability`
 // and `liveRank` (the same three readings as the morning line, off
 // `entries.live_odds_decimal` - typed at post time, D232), plus the comparison
@@ -99,7 +99,7 @@ import { impliedWinPayoutCents, impliedWinProbability, morningLineToDecimal } fr
 export const FAVORITE_FIELD_SIZE = 5;
 
 /**
- * When a price move is worth pointing at (D236).
+ * When a price move is worth pointing at (D240).
  *
  * `moderateRatio` / `bigRatio` are ratios of NORMALISED win probability
  * (live / morning line), so they are scale-free: 20/1 -> 12/1 and 2/1 -> 6/5
@@ -167,7 +167,7 @@ function mlDecimal(entry) {
 
 /**
  * The live board as a decimal RATIO, same convention and same fallback shape
- * as `mlDecimal` (D236).
+ * as `mlDecimal` (D240).
  *
  * `entries.live_odds_decimal` is written by shared/live-odds.js through the
  * very same `morningLineToDecimal`, so the two prices are arithmetically
@@ -237,7 +237,7 @@ export function flagRaceEntries(entries) {
       // return null on their own for an unpriced line.
       mlPayoutCents: scratched ? null : impliedWinPayoutCents(decimal),
       mlWinProbability: scratched ? null : impliedWinProbability(decimal),
-      // D236. Null on a scratch for the same reason the two above are: a
+      // D240. Null on a scratch for the same reason the two above are: a
       // horse that is out cannot be backed, whatever the board still shows.
       liveDecimal: scratched ? null : board,
       liveWinProbability: scratched ? null : impliedWinProbability(board),
@@ -267,7 +267,7 @@ export function flagRaceEntries(entries) {
     flags[x.i].mlRank = pos > 0 && ordered[pos - 1].ml === x.ml ? flags[ordered[pos - 1].i].mlRank : pos + 1;
   });
 
-  // ---- the live board (D236) ----------------------------------------------
+  // ---- the live board (D240) ----------------------------------------------
   // Same three readings as the morning line, off the typed post-time price,
   // and then the one thing neither price can say alone: what CHANGED.
   const livePriced = live.filter((x) => Number.isFinite(flags[x.i].liveDecimal));

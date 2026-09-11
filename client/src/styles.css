@@ -331,7 +331,7 @@ input:disabled, select:disabled, textarea:disabled {
 .tag--blue { border-color: var(--accent-2); color: var(--accent-2); }
 .tag--green { border-color: var(--accent); color: var(--accent); }
 
-/* D236: the two BOARD tags. Grepped against this file and against
+/* D240: the two BOARD tags. Grepped against this file and against
    client/src/components/ before being named, per the D216 rule - all four are
    new here, and they are named for the FEATURE (a price move) rather than for
    a colour, which is where that rule points even though the four above it

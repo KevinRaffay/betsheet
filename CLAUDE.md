@@ -18,12 +18,18 @@ cards. Phase 4's at-track surfaces (PDF, here.now publish, mobile) only start
 once backtesting proves out. Nothing in Phases 1–3 waits on anything in
 Phase 4.
 
-**One deliberate exception, user decision 2026-09-07 (D150-D155):** the
-at-track MOBILE surface was built ahead of that sequencing. It is a card
-CONSTRUCTION surface only - no corpus, no grading, no generation, no database
-- so it adds HUMAN cards to the corpus rather than consuming a benchmark that
-does not exist yet, and nothing in Phases 1–3 depends on it. The rule stands
-for everything else in Phase 4.
+**D150-D155 built one deliberate exception, user decision 2026-09-07, and
+D236 (user decision 2026-09-11) removed it.** The at-track MOBILE surface was
+built ahead of that sequencing as a card CONSTRUCTION surface - no corpus, no
+grading, no generation, no database - so it added HUMAN cards to the corpus
+rather than consuming a benchmark that did not exist yet, which is what
+earned it the exception. D236 removed construction entirely: the GitHub Pages
+app is now a READ-ONLY viewer over race days, cards and grades the rest of
+the app already produced. It is no longer an exception to the rule above,
+because it no longer does the thing the rule was written to gate - it adds
+nothing to the corpus and consumes only what Phases 1-3 already built, the
+same as any other reporting surface in this codebase. The rule stands
+unchanged for everything else in Phase 4.
 
 ---
 
@@ -566,8 +572,8 @@ it. Rules still in force:
   colliding claim). Closing it needs a server-side atomic claim; see the
   module header for the shape it would take.
 
-- **A RAW implied-probability delta is not a move - it carries the difference between the two books' totals, and a scratch forges one on every runner** (D236). `1 / (odds + 1)` is honest per horse and useless per PAIR of horses, because a morning-line book sums to 118-125% and a tote board to its own, different, total. Subtract two such readings and every runner in the race inherits the same offset before anybody has bet a dollar: measured live while building this, a six-horse card whose ML book summed to 126% and whose typed board summed to 136% gave six raw deltas that summed to **+10.4 points** - exactly the gap between the books - so a 4/1 easing to 7/2, which is nothing, printed as **"+2.2"** and looked like support. **A SCRATCH is the same failure and larger**: two of ten scratching redistributes their whole share of the pool across the survivors, so every remaining horse's raw live probability rises and the whole race reads as steaming. The fix is to divide each book by its own total over a stated BASIS before comparing - `shared/entry-flags.js`'s `mlFairProbability`/`liveFairProbability`. Then a race's deltas sum to exactly zero, which is the property to ASSERT (`check-entry-flags` does) because it is the one that fails the instant someone reintroduces a raw comparison. **The basis needs a fallback or the fix breaks something else**: normalising over the comparable set alone blanks the ML column everywhere no board exists, which is the ingest preview and the whole static at-track app, so it falls back to the ML-priced live runners there. **The wider rule: any two odds figures in this codebase are only subtractable after they have been normalised over the same runners**, and that includes anything built on `impliedWinProbability` - `shared/pick-scoring.js`'s `impliedProbabilities` (D229) divides the overround out for the same reason and is the other half of this lesson.
-- **A move flag needs BOTH a proportional test and a share-of-book test, ORed - either alone is blind to one end of the board** (D236). The obvious design is a ratio of normalised probabilities, and it is right for the long end: 20/1 -> 8/1 is 2.2x and the biggest read on the card. It **systematically misses the favorite**, which is where the money actually is - a 5/2 bet down to 8/5 is a 1.24x ratio, under any sane ratio bar, while being +5.5 points of the entire book. The mirror is equally true: a points test alone never fires beyond about 8/1, because nothing out there can move five points. So `classifyMove` fires on `(ratio >= bar AND >= 1 point) OR (points >= bar)`, and the 1-point floor on the ratio branch is not decoration - the long end of a tote is quantised into 50/1, 60/1, 99/1 buckets, so 99/1 -> 60/1 is a 1.5x ratio worth 0.7 of a point and is rounding, not an opinion. All of it sits in the exported `MOVE_THRESHOLDS` so the numbers are a stated contract a findings file can cite, not literals inside a branch. **And the flag is a LABEL, never a recommendation**: "follow the steam" and "the drifter is the value" are both real, contradictory, and unmeasured on this corpus - `docs/requirements/post-time-odds-llm-comparison.md` exists to answer that with an `n`, and asserting it in a tag would be concluding it by UI instead.
+- **A RAW implied-probability delta is not a move - it carries the difference between the two books' totals, and a scratch forges one on every runner** (D240). `1 / (odds + 1)` is honest per horse and useless per PAIR of horses, because a morning-line book sums to 118-125% and a tote board to its own, different, total. Subtract two such readings and every runner in the race inherits the same offset before anybody has bet a dollar: measured live while building this, a six-horse card whose ML book summed to 126% and whose typed board summed to 136% gave six raw deltas that summed to **+10.4 points** - exactly the gap between the books - so a 4/1 easing to 7/2, which is nothing, printed as **"+2.2"** and looked like support. **A SCRATCH is the same failure and larger**: two of ten scratching redistributes their whole share of the pool across the survivors, so every remaining horse's raw live probability rises and the whole race reads as steaming. The fix is to divide each book by its own total over a stated BASIS before comparing - `shared/entry-flags.js`'s `mlFairProbability`/`liveFairProbability`. Then a race's deltas sum to exactly zero, which is the property to ASSERT (`check-entry-flags` does) because it is the one that fails the instant someone reintroduces a raw comparison. **The basis needs a fallback or the fix breaks something else**: normalising over the comparable set alone blanks the ML column everywhere no board exists, which is the ingest preview and the whole static at-track app, so it falls back to the ML-priced live runners there. **The wider rule: any two odds figures in this codebase are only subtractable after they have been normalised over the same runners**, and that includes anything built on `impliedWinProbability` - `shared/pick-scoring.js`'s `impliedProbabilities` (D229) divides the overround out for the same reason and is the other half of this lesson.
+- **A move flag needs BOTH a proportional test and a share-of-book test, ORed - either alone is blind to one end of the board** (D240). The obvious design is a ratio of normalised probabilities, and it is right for the long end: 20/1 -> 8/1 is 2.2x and the biggest read on the card. It **systematically misses the favorite**, which is where the money actually is - a 5/2 bet down to 8/5 is a 1.24x ratio, under any sane ratio bar, while being +5.5 points of the entire book. The mirror is equally true: a points test alone never fires beyond about 8/1, because nothing out there can move five points. So `classifyMove` fires on `(ratio >= bar AND >= 1 point) OR (points >= bar)`, and the 1-point floor on the ratio branch is not decoration - the long end of a tote is quantised into 50/1, 60/1, 99/1 buckets, so 99/1 -> 60/1 is a 1.5x ratio worth 0.7 of a point and is rounding, not an opinion. All of it sits in the exported `MOVE_THRESHOLDS` so the numbers are a stated contract a findings file can cite, not literals inside a branch. **And the flag is a LABEL, never a recommendation**: "follow the steam" and "the drifter is the value" are both real, contradictory, and unmeasured on this corpus - `docs/requirements/post-time-odds-llm-comparison.md` exists to answer that with an `n`, and asserting it in a tag would be concluding it by UI instead.
 - **Equibase does not publish live odds in any form this project can read - the column is a JS placeholder** (D232). The entries page HAS a `LiveOdds` column, which is why D228 built a capture path around uploading that page. It is EMPTY in the HTML Equibase serves: 123 of 123 cells in this repo's own `DMR090726USA-EQB` fixture, the header carrying `title="Live Odds refreshed every 60 seconds"` and the cells carrying nothing but `id`/`name` hooks for an external `/js/liveOdds.js`. So the values exist only in a live browser DOM. **Both capture shapes this codebase supports are therefore empty by construction, at any hour** - `shared/parsers/equibase-entries.js`'s own header defines them as the original server markup (`view-source:`, and Ctrl+S "Webpage, HTML Only"). The requirements doc's open question 2 read the empty column as "this capture predates wagering" and asked for a second capture closer to post; that was the wrong diagnosis, and a near-post capture of either shape would have been just as empty. **The Apify route is out for the same underlying reason**: the actor scrapes that same page server-side and never sees the JS output - checked across all three real datasets on file, entries rows carry `morningLineOdds`/`morningLineDecimal` and no live-odds field of any kind, results rows only the payoffs. **So the board is TYPED, per race, at post time** (D232), which is the same posture invariant 6 already describes for every other source here. **Chrome's "Webpage, Complete" was the last candidate and it does NOT work either** - tested by the user, 2026-09-11. So NO browser save method reaches the board: not view-source, not "HTML Only", not "Complete", and not the Apify actor. `LiveOddsModal.jsx`'s upload path still functions and is still correct, but **nothing known can feed it** - it is kept because its reconciler, refusals and capture history are what the typed path reuses, not because there is a capture to make. The general lesson: **a column existing in the markup is not the same as a column carrying data**, and the way to tell is to read the served bytes rather than the rendered page.
 - **A check script's safety assumption about its target can go stale when
   the target changes independently of the check** (D201). D198 shipped
@@ -705,21 +711,27 @@ it. Rules still in force:
   time the corpus was hidden. Set a `cancelled` flag in the effect and return
   `() => { cancelled = true; }` as the cleanup, which is a FUNCTION and so
   also satisfies the rule above.
-- **State that must track a prop is adjusted during RENDER, not in an effect**
-  (D155). `RaceView.jsx` keeps a snapshot of a race's already-saved ticket
-  text and composes the builder's output on top of it. Reading that text LIVE
-  duplicates every ticket: the saved card flows back down as a prop, the
-  snapshot becomes the sum, and the next render recomputes `$20 W 1` as
-  `$20 W 1 / $20 W 1` - with no new event at all, the render alone does it.
-  Moving the snapshot into a `useEffect` fixes that and breaks something
-  worse: **child effects run before parent effects**, so `TicketBuilder`'s
-  mount-time `onChange('')` fires while the parent still holds the previous
-  (empty) snapshot and writes an empty race over saved text - re-opening a
-  race erased the work in it. Both are fixed by React's documented pattern
-  for this exact case: compare a key during render and `setState` right there,
-  so the new value is in place before any child commits. Neither bug is
-  reachable from a check script (they need a real render tree) and both were
-  found by driving the app in a browser.
+- **HISTORICAL (the mechanism is gone, the lesson is kept - D236 removed the
+  static app's ticket construction, this is now a record of what its bug
+  taught, not a live warning about current code). State that must track a
+  prop is adjusted during RENDER, not in an effect** (D155). `RaceView.jsx`
+  used to keep a snapshot of a race's already-saved ticket text and compose
+  the builder's output on top of it. Reading that text LIVE duplicated every
+  ticket: the saved card flowed back down as a prop, the snapshot became the
+  sum, and the next render recomputed `$20 W 1` as `$20 W 1 / $20 W 1` - with
+  no new event at all, the render alone did it. Moving the snapshot into a
+  `useEffect` fixed that and broke something worse: **child effects run
+  before parent effects**, so `TicketBuilder`'s mount-time `onChange('')`
+  fired while the parent still held the previous (empty) snapshot and wrote
+  an empty race over saved text - re-opening a race erased the work in it.
+  Both were fixed by React's documented pattern for this exact case: compare
+  a key during render and `setState` right there, so the new value is in
+  place before any child commits. Neither bug was reachable from a check
+  script (they needed a real render tree) and both were found by driving the
+  app in a browser - which is why the general lesson (a value derived from a
+  prop, and read by a child's mount-time effect, needs the render-time-key
+  pattern) is worth keeping even though this specific screen no longer
+  composes anything.
 - **A call to action must be reachable without sideways scrolling on a phone
   - HOUSE RULE** (user rule, 2026-09-07, D157). Every UI in this codebase that
   a phone can reach must keep its primary action - the button the screen
@@ -891,16 +903,18 @@ it. Rules still in force:
   wrong move - it spent real time, left a stray junction behind that could make
   a later session think dependencies were installed locally, and bought
   nothing. Check the static app's IMPORT SURFACE instead - it is a separate
-  Vite entry and reaches outside `static/` in exactly seven places (verified
-  2026-09-08, and the list is the thing to re-derive rather than trust):
-  `@client/components/TicketBuilder.jsx`, `@client/components/EntriesTable.jsx`,
-  `@client/styles.css`, `@shared/betmath.js`, `@shared/parsers/human-picks.js`,
-  `@shared/static-export.js`, `@shared/static-payload.js`. A change touching
-  none of those, nor `static/` itself, nor anything they transitively import,
-  provably cannot move the static bundle. When a change DOES touch them, run
-  the check from the primary checkout, where it works as designed. State plainly in the final message that it was skipped as
-  out of scope per this rule - never imply the suite ran clean when this one
-  did not run at all.
+  Vite entry and reaches outside `static/` in exactly three places as of D236
+  (re-derived that day; before it the count was seven, and TicketBuilder.jsx,
+  human-picks.js and static-export.js all fell off once construction was
+  removed and nothing under `static/src/` imported them directly any more -
+  the list is the thing to re-derive rather than trust, every time):
+  `@client/components/EntriesTable.jsx`, `@client/styles.css`,
+  `@shared/static-payload.js`. A change touching none of those, nor `static/`
+  itself, nor anything they transitively import, provably cannot move the
+  static bundle. When a change DOES touch them, run the check from the
+  primary checkout, where it works as designed. State plainly in the final
+  message that it was skipped as out of scope per this rule - never imply the
+  suite ran clean when this one did not run at all.
 - **A race-specific input or edit belongs in the Race UI component - HOUSE
   RULE** (user rule, 2026-09-08, D182/D184). If a thing is an opinion about,
   or a property of, ONE race, the place to type it is that race's own panel,
@@ -909,7 +923,7 @@ it. Rules still in force:
   sheets are both now entered exactly there, beside that race's entries.
   **The rule is about where a fact is AUTHORED, not about where it may be
   read**: the same note still renders read-only on the card sheet
-  (`RaceNotes.jsx` in `CardView.jsx`), because a card is a record of what was
+  (`RaceNotes.jsx` in `CardSheet.jsx`, D237), because a card is a record of what was
   decided rather than a place to change it. A day-level surface survives only
   for things that are genuinely day-level - the WHOLE-DAY note (race 0), and
   tip-sheet STAKING, which splits the bankroll across every race that has

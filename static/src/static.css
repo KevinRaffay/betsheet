@@ -1,9 +1,9 @@
-/* Additions for the at-the-track builder only (D151). Everything else comes
-   from client/src/styles.css, unmodified, so the shared components render
+/* Additions for the static app only. Everything else comes from
+   client/src/styles.css, unmodified, so the shared components render
    identically here and on the desktop.
 
    The desktop app is deliberately desktop-first and data-dense. This one is
-   used one-handed, outdoors, on a phone, so the few overrides below are all
+   read one-handed, outdoors, on a phone, so the few overrides below are all
    about touch targets and horizontal room - never about restyling a shared
    component, which would let the two copies drift. */
 
@@ -15,11 +15,6 @@
   flex-wrap: wrap;
 }
 
-.static-counter { white-space: nowrap; }
-
-/* A restored-but-unlocked race's text, wrapped: a day's worth of teller calls
-   is long, and a phone has no horizontal room to spare. */
-.draft-line code,
 .wrap { white-space: pre-wrap; overflow-wrap: anywhere; }
 
 @media (max-width: 720px) {
@@ -33,13 +28,11 @@
      without sideways scrolling on a phone. `overflow-x: auto` below keeps a
      wide table from stretching the page, but it does so by pushing the
      RIGHTMOST column out of sight - and in this app the rightmost column is
-     always the button (Build, Export, Forget). So the descriptive columns are
-     dropped at this width instead, leaving identity, state and the action.
-     Nothing is lost that the race screen does not show in full. */
+     always the primary link. So the descriptive columns are dropped at this
+     width instead, leaving identity and the link. Nothing is lost that the
+     race screen does not show in full. */
   .col-detail { display: none; }
 
-  /* Long generated ids (a device-namespaced card id) wrap rather than
-     setting a minimum table width that reintroduces the scroll. */
   .grid code { overflow-wrap: anywhere; }
 
   /* Wide tables scroll inside themselves rather than widening the page. */

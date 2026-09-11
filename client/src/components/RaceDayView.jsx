@@ -22,7 +22,7 @@ import EntryFlagTags from './EntryFlagTags.jsx';
 // D224: the win probability a morning line implies, 0-1 -> a percent string.
 const pct = (p) => (p == null ? '' : `${(p * 100).toFixed(0)}%`);
 
-// D236: the move between the two Win% columns, in percentage POINTS - the
+// D240: the move between the two Win% columns, in percentage POINTS - the
 // plain difference of the two figures beside it, so the arithmetic on screen
 // is checkable by eye. (The columns round to whole points, so a +5.5 can sit
 // beside 28% and 23%.) Both are the NORMALISED readings and so is this, which
@@ -242,9 +242,9 @@ export default function RaceDayView({ id, onBack, onOpenCard }) {
     day.races.map((r) => [r.number, flagRaceEntries(r.entries ?? [])]),
   );
   const entryFlags = new Map([...raceFlags].map(([n, r]) => [n, r.flags]));
-  // D236: the three board columns appear only on a race that HAS a board -
+  // D240: the three board columns appear only on a race that HAS a board -
   // two or more runners priced both ways, which is exactly when a move can be
-  // computed at all. A race with no live odds typed yet keeps the pre-D236
+  // computed at all. A race with no live odds typed yet keeps the pre-D240
   // table rather than gaining three columns of dashes, which also keeps the
   // width off a phone until there is something on it worth the width.
   const hasBoard = new Map([...raceFlags].map(([n, r]) => [n, r.comparableCount >= 2]));

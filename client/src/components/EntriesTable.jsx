@@ -6,7 +6,7 @@ import EntryFlagTags from './EntryFlagTags.jsx';
 // D224: the win probability a morning line implies, 0-1 -> a percent string.
 const pct = (p) => (p == null ? '—' : `${(p * 100).toFixed(0)}%`);
 
-// D236: the move between the two Win% columns, in percentage POINTS - the
+// D240: the move between the two Win% columns, in percentage POINTS - the
 // plain difference of the two columns beside it. Both are the NORMALISED
 // readings and so is this, which is what makes a race's deltas sum to zero
 // and makes this number agree with the STEAM/DRIFT tag on the horse's name.
@@ -34,7 +34,7 @@ const normalizeEntry = (e) => ({
   jockey: e.jockey,
   trainer: e.trainer,
   morningLine: e.morningLine ?? e.morning_line,
-  liveOdds: e.liveOdds ?? e.live_odds,   // D236; undefined wherever no board was typed
+  liveOdds: e.liveOdds ?? e.live_odds,   // D240; undefined wherever no board was typed
   bestBet: Boolean(e.bestBet ?? e.best_bet),
   scratched: Boolean(e.scratched),
 });
@@ -63,7 +63,7 @@ export default function EntriesTable({ entries, open = false, showRank = true })
   // the render shape does not carry. `.map` preserves order, so index i lines
   // the two up.
   //
-  // D236: `comparableCount` is how many runners carry BOTH a morning line and
+  // D240: `comparableCount` is how many runners carry BOTH a morning line and
   // a typed live price, so it is also the test for whether a board exists to
   // show. Deriving it rather than taking a prop is what keeps the static
   // at-track builder and the ingest preview - neither of which has ever seen a
