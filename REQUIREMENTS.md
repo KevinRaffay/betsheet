@@ -254,15 +254,29 @@ Specified but NOT scheduled - deliverable IDs get claimed when the work is picke
 
 ## Static Pages target: build HUMAN cards at the track (requested 2026-09-07)
 
+**SUPERSEDED 2026-09-11 (D236/D237/D329), kept as the historical record of
+what D150-D158 actually built.** The user retired this card-CONSTRUCTION
+surface in favor of a read-only viewer over the corpus - no browser-side
+ticket builder, no IndexedDB draft storage, no export/import round trip, no
+`--reference-cards` reveal-and-stamp flow. It is no longer "the one deliberate
+exception to benchmark first, bet later" either: a read-only viewer adds
+nothing to the corpus, so it is not an exception to that sequencing at all -
+see CLAUDE.md's rewritten opening-rule paragraph. The table below documents
+the requirements the NOW-DELETED construction feature satisfied; it is not a
+description of the current app. See `docs/requirements/` for what replaced
+it, if anything has been specified there, and `DELIVERABLES.md`'s D236/D237/
+D329 rows for what the current read-only app actually does.
+
 A build-only deploy of a **card construction surface** - not an instance of the
 application. Workflow: create the race day at home -> generate OTR/LLM cards at
 home -> build the payload and deploy -> build HUMAN cards on a phone at the
 track -> carry the export files home -> import, upload results, grade.
 
-**This is the one deliberate exception to "benchmark first, bet later"** (user
-decision 2026-09-07, recorded in CLAUDE.md's opening rule): it is a Phase 4
-mobile surface built ahead of the sequencing, allowed because it only ADDS
-HUMAN cards to the corpus and nothing in Phases 1-3 depends on it.
+**This WAS the one deliberate exception to "benchmark first, bet later"** (user
+decision 2026-09-07, recorded in CLAUDE.md's opening rule, since superseded as
+described above): it was a Phase 4 mobile surface built ahead of the
+sequencing, allowed because it only ADDED HUMAN cards to the corpus and
+nothing in Phases 1-3 depended on it.
 
 | Requirement | Deliverables |
 | --- | --- |
