@@ -73,11 +73,26 @@ export default function LiveOddsModal({ dayId, onClose, onSaved }) {
           <button type="button" className="btn" disabled={busy} onClick={onClose}>Close</button>
         </div>
 
+        <div className="notice notice--warn">
+          <p>
+            <strong>Equibase&apos;s saved page does not carry live odds.</strong> Its
+            {' '}<code>LiveOdds</code> column is empty in the HTML the server sends — the values are
+            written in your browser by a script, refreshed every 60 seconds — so a page saved with
+            {' '}<em>view-source</em> or Ctrl+S &ldquo;HTML Only&rdquo; has empty cells whatever the
+            hour. The Apify pull has no live-odds field either.
+          </p>
+          <p>
+            <strong>Type the board into each race instead</strong>, in the Live column beside the
+            morning line on the day view. This dialog still works for any capture that <em>does</em>
+            {' '}carry prices — Chrome&apos;s &ldquo;Webpage, Complete&rdquo; serializes the live
+            page and may — but it will refuse a capture whose board is empty rather than store a
+            blank one.
+          </p>
+        </div>
         <p className="dim">
-          Save the track&apos;s Equibase entries page again, close to post, and upload it here.
-          This only ever writes <strong>prices</strong> — never the morning line, never the entry
-          list, never a scratch, and never a card. Every capture is kept, so an earlier board is
-          still readable after a later one lands.
+          Whatever the source, this only ever writes <strong>prices</strong> — never the morning
+          line, never the entry list, never a scratch, and never a card. Every capture is kept, so
+          an earlier board is still readable after a later one lands.
         </p>
 
         <label className="btn">

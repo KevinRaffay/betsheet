@@ -173,6 +173,11 @@ export async function previewLlmRace(db, day, raceNumber, cardId, {
     race: { surface: race.surface, distance: race.distance, raceType: race.race_type, postTime: race.post_time, wagerMenu: race.wager_menu },
     entries: entries.map((e) => ({
       programNumber: e.program_number, horseName: e.horse_name, morningLine: e.morning_line,
+      // D233: the tote board, when this race has one. `loadRace` already
+      // SELECTs *, so nothing had to change to reach it - only this line,
+      // which is why it stayed invisible for so long: the column has existed
+      // since migration 024 and the prompt simply never read it.
+      liveOdds: e.live_odds,
       scratched: Boolean(e.scratched),
     })),
     bankroll: { perRaceCents, remainingCents, racesRemaining: remaining },
@@ -183,6 +188,10 @@ export async function previewLlmRace(db, day, raceNumber, cardId, {
   const systemPromptText = buildSystemPrompt({
     hasNotes: notes.present,
     hasBaseline: baseline.tipsheets.length > 0 || baseline.otrTickets.length > 0,
+    // Only when a LIVE horse in this race actually carries a price. A card
+    // generated in the morning and one generated at post time therefore
+    // differ in their prompt only when the board was really entered.
+    hasLiveOdds: entries.some((e) => !e.scratched && e.live_odds),
   });
 
   let responseText = stubResponseText ?? null;

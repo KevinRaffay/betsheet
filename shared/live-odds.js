@@ -44,7 +44,12 @@
 import { morningLineToDecimal } from './betmath.js';
 
 const up = (pgm) => String(pgm ?? '').trim().toUpperCase();
-const blank = (v) => v == null || v === '' || v === '-' || v === '--';
+// Whitespace-only counts as blank. Found by check-live-odds: `readOdds('  ')`
+// used to return `{ text: '', decimal: null }` - truthy - so a typed space
+// stored an EMPTY price and counted toward `priced`. The UI happens to trim
+// and filter before sending, but a reconciler that relies on its caller
+// having done that is a reconciler with a hole in it.
+const blank = (v) => v == null || String(v).trim() === '' || String(v).trim() === '-' || String(v).trim() === '--';
 
 /**
  * A price the board actually showed, and the number we can do arithmetic on.
@@ -234,4 +239,132 @@ export function reconcileOddsCapture({ stored, parsed } = {}) {
   }
 
   return { ok: true, races, updates, warnings, counts };
+}
+
+/**
+ * Reconcile ONE race's TYPED odds against that race's stored entries (D232).
+ *
+ * The sibling of `reconcileOddsCapture` above, and deliberately the same
+ * shape: same `{ ok, races, updates, warnings, counts }`, same four refusals,
+ * same "the only thing it can emit is a price" guarantee. What differs is only
+ * where the numbers came from - a person typing them at post time rather than
+ * a saved page - because the page turns out not to carry them at all.
+ *
+ * WHY TYPED AT ALL. Equibase's entries page has a LiveOdds column that is
+ * EMPTY in the served HTML (123 of 123 cells in this repo's own fixture); the
+ * values are written client-side by `/js/liveOdds.js`, "refreshed every 60
+ * seconds" per the page's own tooltip. Both capture shapes
+ * `shared/parsers/equibase-entries.js` supports are the original server
+ * markup, so both are empty whatever the hour. The Apify actor scrapes the
+ * same page server-side and never sees the JS output either - all three real
+ * datasets on file carry `morningLineOdds` and no live-odds field of any kind.
+ * Typing is not a fallback here; it is the only route that exists.
+ *
+ * `storedRace` - { number, entries: [{ programNumber, horseName, morningLine,
+ *                  liveOdds, scratched }] }
+ * `odds`       - [{ programNumber, liveOdds }] - only the horses the person
+ *                actually priced. A partial board is NORMAL and not a warning:
+ *                at the track you price the horses you are betting.
+ *
+ * Never throws.
+ */
+export function reconcileManualOdds({ storedRace, odds } = {}) {
+  const warnings = [];
+  const updates = [];
+  const counts = {
+    racesMatched: 0, entriesMatched: 0, priced: 0, changed: 0, unchanged: 0,
+    firstPrice: 0, unreadable: 0, unknownEntries: 0, unpricedEntries: 0,
+    racesOnlyInCapture: 0, racesOnlyOnDay: 0, scratchDrift: 0, scratchedSkipped: 0,
+  };
+  const fail = (type, message) => {
+    warnings.push({ type, blocking: true, message });
+    return { ok: false, races: [], updates, warnings, counts };
+  };
+
+  if (!storedRace || !Array.isArray(storedRace.entries)) {
+    return fail('no_stored_race', 'No stored race was supplied to reconcile against.');
+  }
+  if (!Array.isArray(odds)) return fail('no_odds', 'No odds were supplied.');
+
+  const number = Number(storedRace.number);
+  const storedEntries = new Map(storedRace.entries
+    .filter((e) => e && e.programNumber !== null && e.programNumber !== undefined)
+    .map((e) => [up(e.programNumber), e]));
+  counts.racesMatched = 1;
+
+  const rows = [];
+  const seen = new Set();
+  for (const item of odds) {
+    const pgm = up(item?.programNumber);
+    if (!pgm) continue;
+    if (seen.has(pgm)) {
+      warnings.push({
+        type: 'duplicate_entry', race: number, programNumber: pgm, blocking: false,
+        message: `Race ${number}: #${pgm} was given a price twice - the later one was ignored.`,
+      });
+      continue;
+    }
+    const storedEntry = storedEntries.get(pgm);
+    if (!storedEntry) {
+      counts.unknownEntries += 1;
+      warnings.push({
+        type: 'entry_not_on_race', race: number, programNumber: pgm, blocking: false,
+        message: `Race ${number}: #${pgm} is not in this race's stored entries - no price was recorded for it.`,
+      });
+      continue;
+    }
+    seen.add(pgm);
+    counts.entriesMatched += 1;
+
+    const price = readOdds(item.liveOdds);
+    if (!price) { counts.unpricedEntries += 1; continue; }  // left blank on purpose
+
+    // A scratched horse cannot be priced, and typing one is a slip worth
+    // naming rather than storing. The scratched flag itself is never changed
+    // here, exactly as in the HTML path.
+    if (storedEntry.scratched) {
+      counts.scratchedSkipped += 1;
+      warnings.push({
+        type: 'scratched_not_priced', race: number, programNumber: pgm, blocking: false,
+        message: `Race ${number}: #${pgm} is scratched on the stored card, so the price typed for it `
+          + 'was not stored. This refresh never changes a scratch.',
+      });
+      continue;
+    }
+
+    if (price.decimal === null) {
+      counts.unreadable += 1;
+      warnings.push({
+        type: 'odds_unreadable', race: number, programNumber: pgm, odds: price.text, blocking: false,
+        message: `Race ${number}: #${pgm} reads "${price.text}", which is not a price this app can do `
+          + 'arithmetic on. The text is stored as-is; nothing derived from it will use a number.',
+      });
+    }
+    counts.priced += 1;
+    const previous = storedEntry.liveOdds ?? null;
+    const state = previous === null ? 'first' : (previous === price.text ? 'unchanged' : 'changed');
+    if (state === 'first') counts.firstPrice += 1;
+    else if (state === 'changed') counts.changed += 1;
+    else counts.unchanged += 1;
+
+    rows.push({
+      programNumber: pgm, horseName: storedEntry.horseName ?? null,
+      morningLine: storedEntry.morningLine ?? null,
+      previousOdds: previous, newOdds: price.text, newOddsDecimal: price.decimal, state,
+    });
+    updates.push({ raceNumber: number, programNumber: pgm, liveOdds: price.text, liveOddsDecimal: price.decimal });
+  }
+
+  // A PARTIAL BOARD IS FINE AND IS NOT WARNED ABOUT - unlike the HTML path,
+  // where a stored horse missing from the capture means the page disagreed
+  // with the card. Here it means the person did not type that one, which is
+  // the normal way to use this at a track.
+  if (counts.priced === 0) {
+    return fail('no_prices',
+      `Race ${number}: no usable price was entered, so nothing was saved. `
+      + 'Type at least one horse\'s odds before saving.');
+  }
+
+  rows.sort((a, b) => String(a.programNumber).localeCompare(String(b.programNumber), undefined, { numeric: true }));
+  return { ok: true, races: [{ number, entries: rows }], updates, warnings, counts };
 }

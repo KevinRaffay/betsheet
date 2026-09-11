@@ -22,7 +22,7 @@ import fs from 'node:fs';
 import os from 'node:os';
 import path from 'node:path';
 import { fileURLToPath, URL } from 'node:url';
-import { readOdds, reconcileOddsCapture } from '../shared/live-odds.js';
+import { readOdds, reconcileManualOdds, reconcileOddsCapture } from '../shared/live-odds.js';
 import { parseEquibaseEntriesHtml } from '../shared/parsers/equibase-entries.js';
 
 const ROOT = fileURLToPath(new URL('../', import.meta.url));
@@ -61,6 +61,10 @@ console.log('\nlive odds - pure reconciler');
 // --- readOdds -------------------------------------------------------------
 check('readOdds: blank forms are all null',
   ['', '-', '--', null, undefined].every((v) => readOdds(v) === null));
+// Regression: a typed space used to come back {text:'', decimal:null}, which is
+// truthy, so it was stored as an empty price and counted as one.
+check('readOdds: WHITESPACE-only is blank too, not an empty price',
+  ['  ', '\t', ' - ', '\n'].every((v) => readOdds(v) === null));
 check('readOdds: 9/5 -> 1.8', readOdds('9/5').decimal === 1.8 && readOdds('9/5').text === '9/5');
 check('readOdds: 6/1 -> 6', readOdds('6/1').decimal === 6);
 check('readOdds: 4.5 -> 4.5', readOdds('4.5').decimal === 4.5);
@@ -234,6 +238,106 @@ function page({ track, date, races }) {
   return `<html><body>${head}${tables}</body></html>`;
 }
 
+// ---------------------------------------------------------------------------
+console.log('\nlive odds - TYPED, per race (D232)');
+//
+// Equibase cannot supply the board: its LiveOdds column is empty in the served
+// HTML (asserted on the real page above) and the Apify actor scrapes that same
+// page server-side. So these are numbers a person types, and the reconciler
+// has to make the same four promises the upload path makes.
+{
+  const race = {
+    number: 3,
+    entries: [
+      se('1', '5/2'), se('2', '8/1', '10/1'), se('3', '3/1', null, 1), se('4', '20/1'),
+    ],
+  };
+  const r = reconcileManualOdds({ storedRace: race, odds: [
+    { programNumber: '1', liveOdds: '9/5' },     // first price
+    { programNumber: '2', liveOdds: '14/1' },    // drifted
+    { programNumber: '3', liveOdds: '5/1' },     // SCRATCHED - must not store
+    { programNumber: '9', liveOdds: '2/1' },     // not in this race
+    // #4 deliberately left blank - a partial board is the normal case
+  ] });
+  check('typed: ok, two prices stored', r.ok && r.counts.priced === 2, JSON.stringify(r.counts));
+  check('typed: a SCRATCHED horse is never priced, and says why',
+    !r.updates.some((u) => u.programNumber === '3')
+    && r.warnings.some((w) => w.type === 'scratched_not_priced' && w.message.includes('never changes a scratch')));
+  check('typed: a horse not in the race is reported, never inserted',
+    !r.updates.some((u) => u.programNumber === '9')
+    && r.warnings.some((w) => w.type === 'entry_not_on_race'));
+  // #4 was simply not submitted, which is what the UI does with an empty box.
+  // It must be absent from the updates AND unmentioned in the warnings: a
+  // partial board is how this gets used at a track, not a problem to report.
+  check('typed: a horse left blank is absent from the updates and unwarned - a PARTIAL board is normal',
+    !r.updates.some((u) => u.programNumber === '4')
+    && !r.warnings.some((w) => w.programNumber === '4'));
+  check('typed: updates carry ONLY prices, never a morning line or a scratch',
+    r.updates.every((u) => Object.keys(u).sort().join(',') === 'liveOdds,liveOddsDecimal,programNumber,raceNumber'));
+  check('typed: the drift against the stored price is reported',
+    r.races[0].entries.find((e) => e.programNumber === '2').state === 'changed');
+  checkMessages('typed', r.warnings);
+}
+{
+  const race = { number: 1, entries: [se('1', '5/2')] };
+  const empty = reconcileManualOdds({ storedRace: race, odds: [{ programNumber: '1', liveOdds: '  ' }] });
+  check('typed: a board with nothing usable on it is REFUSED, nothing written',
+    !empty.ok && empty.updates.length === 0 && empty.warnings.some((w) => w.type === 'no_prices' && w.blocking));
+  const dup = reconcileManualOdds({ storedRace: race, odds: [
+    { programNumber: '1', liveOdds: '9/5' }, { programNumber: '1', liveOdds: '4/1' }] });
+  check('typed: a duplicate program number keeps the FIRST price and warns',
+    dup.ok && dup.updates.length === 1 && dup.updates[0].liveOdds === '9/5'
+    && dup.warnings.some((w) => w.type === 'duplicate_entry'));
+  const bad = reconcileManualOdds({ storedRace: race, odds: [{ programNumber: '1', liveOdds: '7-2' }] });
+  check('typed: an unreadable price is kept as TEXT with a null decimal, and warns',
+    bad.ok && bad.updates[0].liveOdds === '7-2' && bad.updates[0].liveOddsDecimal === null
+    && bad.warnings.some((w) => w.type === 'odds_unreadable'));
+  for (const [label, arg] of [['undefined', undefined], ['no race', { odds: [] }], ['no odds', { storedRace: race }]]) {
+    let threw = false; let out = null;
+    try { out = reconcileManualOdds(arg); } catch { threw = true; }
+    check(`typed: ${label} refuses rather than throwing`, !threw && out && out.ok === false);
+  }
+}
+
+// ---------------------------------------------------------------------------
+console.log('\nlive odds - the LLM prompt (D233)');
+{
+  const { buildSystemPrompt, SYSTEM_PROMPT, buildLlmRaceUserPrompt } = await import('../server/llm-prompt.js');
+  // THE ASSERTION THAT PROTECTS THE STORED CORPUS. LLM cards have no version
+  // axis - engine_version is the literal string 'llm' for all of them - so a
+  // race with no live odds must render EXACTLY the prompt it rendered before
+  // D233, or every future odds-free card becomes incomparable with the 293
+  // already on file.
+  check('a race with NO live odds gets the byte-identical system prompt',
+    buildSystemPrompt({}) === SYSTEM_PROMPT);
+  check('...and adding the block is opt-in, not a default',
+    buildSystemPrompt({ hasLiveOdds: true }).startsWith(SYSTEM_PROMPT)
+    && buildSystemPrompt({ hasLiveOdds: true }).includes('LIVE ODDS'));
+
+  const base = {
+    raceNumber: 1, totalRaces: 8, track: 'DMR', date: '2026-09-11', race: {},
+    bankroll: { perRaceCents: 2000, remainingCents: 2000, racesRemaining: 1 },
+  };
+  const without = buildLlmRaceUserPrompt({ ...base, entries: [{ programNumber: '1', horseName: 'A', morningLine: '5/2' }] });
+  const with_ = buildLlmRaceUserPrompt({ ...base, entries: [{ programNumber: '1', horseName: 'A', morningLine: '5/2', liveOdds: '9/5' }] });
+  check('an odds-free entry line is byte-identical to the pre-D233 shape',
+    without.includes('#1 A - ML 5/2') && !without.includes('LIVE'));
+  check('an entry WITH a price appends it, morning line still intact',
+    with_.includes('#1 A - ML 5/2 · LIVE 9/5'));
+  const partial = buildLlmRaceUserPrompt({ ...base, entries: [
+    { programNumber: '1', horseName: 'A', morningLine: '5/2', liveOdds: '9/5' },
+    { programNumber: '2', horseName: 'B', morningLine: '8/1' },
+  ] });
+  check('a partial board prices only the horse that has one',
+    partial.includes('#1 A - ML 5/2 · LIVE 9/5')
+    && partial.includes('#2 B - ML 8/1')
+    && !partial.includes('#2 B - ML 8/1 ·'));
+  check('the clause block names the DRIFT as the signal, not the level',
+    buildSystemPrompt({ hasLiveOdds: true }).includes('THE DRIFT IS THE SIGNAL'));
+  check('...and warns that agreeing with the market is not the goal',
+    buildSystemPrompt({ hasLiveOdds: true }).includes('AGREEING WITH THE MARKET IS NOT THE GOAL'));
+}
+
 console.log('\nlive odds - the real server');
 {
   const { spawn } = await import('node:child_process');
@@ -357,6 +461,34 @@ console.log('\nlive odds - the real server');
     check('GET: three captures, newest first',
       hist.captures.length === 3 && hist.captures[0].captured_at === CAP2
       && hist.captures[0].prices === 3);
+
+    // --- D232: the TYPED per-race route, end to end ------------------------
+    {
+      const url = `/api/race-days/${dayId}/races/1/live-odds`;
+      const before = count('odds_captures');
+      const r = await (await jpost(url, { odds: [
+        { programNumber: '1', liveOdds: '7/5' },
+        { programNumber: '2', liveOdds: '25/1' },
+      ], oddsCapturedAt: '2026-09-07T21:40:00Z' })).json();
+      check('typed route: saved, own capture time, source manual',
+        r.counts.priced === 2 && r.capturedAt === '2026-09-07T21:40:00Z'
+        && count('odds_captures', "WHERE source = 'manual'") === 1,
+        JSON.stringify(r.counts ?? r));
+      check('typed route: it is a NEW capture, the uploaded ones are untouched',
+        count('odds_captures') === before + 1);
+      check('typed route: entries.live_odds now holds the typed board',
+        oddsOf().find((e) => e.n === 1 && e.p === '1').o === '7/5'
+        && oddsOf().find((e) => e.n === 1 && e.p === '1').d === 1.4);
+      check('typed route: race 2 is untouched - this is PER RACE',
+        oddsOf().find((e) => e.n === 2 && e.p === '1').o !== '7/5');
+
+      // The decision that a per-race time must not masquerade as a day time.
+      const dayStamp = db.prepare('SELECT odds_captured_at o FROM race_days WHERE id = ?').get(dayId).o;
+      check('typed route: race_days.odds_captured_at is NOT touched - a per-race time would lie there',
+        dayStamp === CAP2, `${dayStamp} vs ${CAP2}`);
+
+      const empty = await jpost(url, { odds: [{ programNumber: '1', liveOdds: '' }] });
+    }
 
     // --- a soft-deleted day is invisible here too (invariant 12) -----------
     await fetch(`${BASE}/api/race-days/${dayId}`, { method: 'DELETE' });
