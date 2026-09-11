@@ -1,10 +1,12 @@
-# Deploy the at-the-track ticket builder to GitHub Pages (D154).
+# Deploy the static BetSheet app to GitHub Pages (D154).
 #
 # WHAT GETS DEPLOYED IS ONE RACE DAY. `static/public/payload.json` is a
 # committed file built by `npm run build-static-payload -- <raceDayId>`, so
 # publishing a new payload is an ordinary commit and push, and it REPLACES the
-# deployed race day. There is no per-day URL and no archive of past days: the
-# app is a construction surface for the day you are at, not a corpus.
+# deployed race day. There is no per-day URL and no archive of past days yet.
+# D236 removed the app's card-CONSTRUCTION half; it is a read-only viewer now,
+# not a ticket builder - see CLAUDE.md's rewritten "one deliberate exception"
+# note for what that changes about why this app exists at all.
 #
 # The build is deliberately the only thing this workflow can do. It has no
 # database, no secrets and no network access to anything but npm - every piece
@@ -31,7 +33,7 @@
 # Build the deployed payload WITHOUT that flag unless publishing those picks is
 # a deliberate choice.
 
-name: Deploy static ticket builder
+name: Deploy static app
 
 on:
   workflow_dispatch:
@@ -41,8 +43,7 @@ on:
       # The payload is the race day, so a payload commit is a deploy.
       - 'static/**'
       - 'shared/**'
-      # The two desktop components the static app reuses rather than forking.
-      - 'client/src/components/TicketBuilder.jsx'
+      # The desktop component the static app reuses rather than forking.
       - 'client/src/components/EntriesTable.jsx'
       - 'client/src/styles.css'
       - 'vite.static.config.js'
