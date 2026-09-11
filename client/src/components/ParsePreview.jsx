@@ -41,7 +41,7 @@ export function RacePreview({ race }) {
         <thead>
           <tr>
             <th>#</th><th>PP</th><th>Horse</th><th>Jockey</th><th>Trainer</th>
-            <th>Wt</th><th>M/L</th><th>Rank</th>
+            <th>Wt</th><th>M/L</th><th title="Predicted order of finish from the morning line (1 = shortest line; ties share a rank)">ML rank</th>
           </tr>
         </thead>
         <tbody>
@@ -65,7 +65,7 @@ export function RacePreview({ race }) {
               <td>{e.trainer ?? ''}</td>
               <td>{e.weight ?? ''}</td>
               <td>{e.morningLine ?? ''}</td>
-              <td className="dim">{e.programRank ?? ''}</td>
+              <td className="dim">{flags[ei]?.mlRank ?? ''}</td>
             </tr>
           ))}
         </tbody>

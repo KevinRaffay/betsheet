@@ -19,6 +19,9 @@
 // spelling assertions fail; change `FAVORITE_FIELD_SIZE` to 6 and the
 // field-size assertions fail. Both exit non-zero.
 //
+// D223 NEGATIVE CONTROL: make the rank sort `b.ml - a.ml` and the order
+// assertions fail; drop the tie branch and the "1, 1, 3" assertion fails.
+//
 // Run: npm run check-entry-flags
 
 import {
@@ -36,6 +39,29 @@ const e = (trainer, ml, extra = {}) => ({ trainer, morning_line: ml, scratched: 
 const flagsOf = (entries) => flagRaceEntries(entries).flags;
 const favIdx = (entries) => flagsOf(entries).map((f, i) => (f.favorite ? i : -1)).filter((i) => i >= 0);
 const bafIdx = (entries) => flagsOf(entries).map((f, i) => (f.baffert ? i : -1)).filter((i) => i >= 0);
+
+console.log('\nMorning-line rank (D223) - the predicted order of finish, on every race');
+const ranksOf = (entries) => flagRaceEntries(entries).flags.map((f) => f.mlRank);
+{
+  const eight = [e('A', '6/1'), e('B', '5/2'), e('C', '20/1'), e('D', '7/2'), e('E', '8/1'), e('F', '4/5'), e('G', '12/1'), e('H', '9/2')];
+  check('ranked by the line, shortest first, on an 8-horse field (no favorite flag fires)',
+    JSON.stringify(ranksOf(eight)) === '[5,2,8,3,6,1,7,4]' && flagRaceEntries(eight).favoriteCount === 0, JSON.stringify(ranksOf(eight)));
+  const tied = [e('A', '5/2'), e('B', '3/1'), e('C', '5/2'), e('D', '10/1')];
+  check('a tie shares the rank and the next rank is skipped: 1, 3, 1, 4',
+    JSON.stringify(ranksOf(tied)) === '[1,3,1,4]', JSON.stringify(ranksOf(tied)));
+  const scr = [e('A', '4/5', { scratched: true }), e('B', '3/1'), e('C', '6/1')];
+  check('a scratched horse has no rank and does not hold a place in the order',
+    JSON.stringify(ranksOf(scr)) === '[null,1,2]', JSON.stringify(ranksOf(scr)));
+  const unpriced = [e('A', null), e('B', '3/1'), e('C', '-')];
+  check('an unpriced horse is null, never last', JSON.stringify(ranksOf(unpriced)) === '[null,1,null]', JSON.stringify(ranksOf(unpriced)));
+  const camel = [{ trainer: 'X', morningLine: '6/1', scratched: false }, { trainer: 'Y', morningLine: '2/1', scratched: false }];
+  const stored = [{ trainer: 'X', morning_line: '99/1', morning_line_decimal: 6, scratched: 0 }, { trainer: 'Y', morning_line: '1/1', morning_line_decimal: 2, scratched: 0 }];
+  check('camelCase (replay/preview) and the stored decimal (DB rows, which win over the printed string) both rank',
+    JSON.stringify(ranksOf(camel)) === '[2,1]' && JSON.stringify(ranksOf(stored)) === '[2,1]');
+  check('five-horse field: the favorite flag and rank 1 name the same horse',
+    (() => { const f = flagRaceEntries([e('A', '6/1'), e('B', '5/2'), e('C', '20/1'), e('D', '7/2'), e('E', '8/1')]).flags; return f[1].favorite && f[1].mlRank === 1 && f.filter((x) => x.favorite).length === 1; })());
+  check('every flag carries mlRank, null on junk', flagRaceEntries([{}, {}]).flags.every((f) => f.mlRank === null));
+}
 
 console.log('\nTrainer match - the three spellings this corpus really holds');
 
