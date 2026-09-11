@@ -10,6 +10,7 @@ import RaceTipPicks from './RaceTipPicks.jsx';
 import RaceResults from './RaceResults.jsx';
 import TipPicksEntryModal from './TipPicksEntryModal.jsx';
 import RaceDayNotesModal from './RaceDayNotesModal.jsx';
+import LiveOddsModal from './LiveOddsModal.jsx';
 import RaceNotesEditor from './RaceNotesEditor.jsx';
 import { NoteSourceDatalist } from './AnalystNotesEditor.jsx';
 import { entriesStaleness } from '@shared/staleness.js';
@@ -41,6 +42,7 @@ export default function RaceDayView({ id, onBack, onOpenCard }) {
   // own children and call its `reload` directly.
   const [cardsVersion, setCardsVersion] = useState(0);
   const [showNotesModal, setShowNotesModal] = useState(false);
+  const [showLiveOdds, setShowLiveOdds] = useState(false);
   // D176: which race's tip-pick dialog is open, and a counter that refetches
   // the day's tip rows when anything writes one. D182: the rows and their
   // scores are loaded ONCE here and passed down to each race's own panel and
@@ -80,9 +82,12 @@ export default function RaceDayView({ id, onBack, onOpenCard }) {
     }
   };
 
-  useEffect(() => {
-    getRaceDay(id).then(setDay).catch((e) => setError(String(e.message)));
-  }, [id]);
+  // Named so a capture that changed this day's prices can re-read it, not just
+  // the mount effect. Block body (D90): an expression-bodied loader would be
+  // stored as the effect's cleanup and called on unmount.
+  const loadDay = () => getRaceDay(id).then(setDay).catch((e) => setError(String(e.message)));
+
+  useEffect(() => { loadDay(); }, [id]); // eslint-disable-line react-hooks/exhaustive-deps
 
   const loadNotes = () => getLlmNotes(id)
     .then((n) => {
@@ -222,6 +227,7 @@ export default function RaceDayView({ id, onBack, onOpenCard }) {
               through the same draft store the LLM generator's own notes UI
               reads and writes. D184: WHOLE-DAY note only; a race's own note is
               typed in that race's panel. */}
+          <button className="btn" onClick={() => setShowLiveOdds(true)}>Capture live odds</button>
           <button className="btn" onClick={() => setShowNotesModal(true)}>Day Analyst Notes</button>
           <button className="btn btn--danger" disabled={busy} onClick={askDelete}>Delete race day</button>
           <button className="btn" onClick={onBack}>Back</button>
@@ -231,6 +237,10 @@ export default function RaceDayView({ id, onBack, onOpenCard }) {
       {/* The source datalist is referenced by id from every race's notes
           editor, so it is rendered ONCE for the page rather than per race. */}
       <NoteSourceDatalist />
+
+      {showLiveOdds && (
+        <LiveOddsModal dayId={day.id} onClose={() => setShowLiveOdds(false)} onSaved={() => loadDay()} />
+      )}
 
       {showNotesModal && (
         <RaceDayNotesModal dayId={day.id} onClose={() => { setShowNotesModal(false); loadNotes(); }} />

@@ -73,12 +73,20 @@ const key = (dayId, raceNo) => `${dayId}|${raceNo}`;
 function raceContext(db) {
   const finishers = new Map();
   for (const r of db.prepare(`
-    SELECT r.race_day_id, r.race_number, r.program_number, r.finish_position
+    SELECT r.race_day_id, r.race_number, r.program_number, r.finish_position,
+           r.post_time_odds, r.favorite
       FROM race_results r JOIN race_days d ON d.id = r.race_day_id
      WHERE d.deleted_at IS NULL`).all()) {
     const k = key(r.race_day_id, r.race_number);
     if (!finishers.has(k)) finishers.set(k, []);
-    finishers.get(k).push({ programNumber: r.program_number, finishPosition: r.finish_position });
+    // D229: the closing price rides along. NULL on every row of an
+    // Apify-sourced day, which `impliedProbabilities` turns into a NULL market
+    // block rather than a zero - a board that was never read is not a board
+    // the source beat or lost to.
+    finishers.get(k).push({
+      programNumber: r.program_number, finishPosition: r.finish_position,
+      postTimeOdds: r.post_time_odds, favorite: Boolean(r.favorite),
+    });
   }
   const scratched = new Map();
   for (const r of db.prepare(`
@@ -269,6 +277,10 @@ pickScoringRouter.get('/pick-scoring', (req, res) => {
       winnerProgramNumber: score?.winnerProgramNumber ?? null,
       fieldSize: score?.fieldSize ?? null,
       favorite: score?.favorite ?? null,
+      // D229: the per-race market read, so every aggregate closeEdge above is
+      // re-derivable by hand from these rows - the same reason the favorite
+      // and the winner are already here.
+      market: score?.market ?? null,
     })),
   });
 });

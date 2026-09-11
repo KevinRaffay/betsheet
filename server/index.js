@@ -11,6 +11,7 @@ import { getLogger } from './logging.js';
 import { ingestRouter } from './ingest.js';
 import { equibaseApifyEntriesRouter } from './equibase-apify-entries.js';
 import { entriesZipRouter } from './entries-zip.js';
+import { liveOddsRouter } from './live-odds.js';
 import { cardsRouter } from './cards.js';
 import { humanCardsRouter } from './human-cards.js';
 import { llmCardsRouter } from './llm-cards.js';
@@ -82,6 +83,7 @@ app.get('/api/health', (_req, res) => {
 app.use('/api', ingestRouter);
 app.use('/api', equibaseApifyEntriesRouter);
 app.use('/api', entriesZipRouter);
+app.use('/api', liveOddsRouter);
 app.use('/api', cardsRouter);
 app.use('/api', humanCardsRouter);
 app.use('/api', llmCardsRouter);

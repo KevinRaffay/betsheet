@@ -36,6 +36,11 @@ const WIPE_ORDER = [
   'cards', 'simulation_results', 'simulation_runs', 'strategy_templates',
   'consensus_picks', 'fetch_attempts', 'sources',
   'result_scratches', 'exotic_payoffs', 'race_results', 'result_charts',
+  // D228: children of race_days, and of each other. Named explicitly rather
+  // than left to the `unnamed` catch-all above so a reset's own audit event
+  // reports their row counts by name - which is the exact thing that went
+  // missing for llm_notes and friends between migrations 015 and 023.
+  'odds_capture_entries', 'odds_captures',
   'entries', 'races', 'llm_notes', 'tip_picks', 'race_days', 'backfill_queue',
 ];
 

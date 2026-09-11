@@ -55,16 +55,21 @@ export function saveResults(db, day, p, correlationId) {
   const digest = crypto.createHash('sha256')
     .update(JSON.stringify(p.races)).digest('hex');
 
-  const counts = { results: 0, exotics: 0, scratches: 0, unresolvedFinishers: 0 };
+  const counts = { results: 0, exotics: 0, scratches: 0, unresolvedFinishers: 0, priced: 0 };
   const save = db.transaction(() => {
     db.prepare('DELETE FROM race_results WHERE race_day_id = ?').run(day.id);
     db.prepare('DELETE FROM exotic_payoffs WHERE race_day_id = ?').run(day.id);
     db.prepare('DELETE FROM result_scratches WHERE race_day_id = ?').run(day.id);
 
+    // D229: `post_time_odds` and `favorite` ride along from the chart, which
+    // has always printed both. A source that carries neither (every Apify
+    // results day - win odds per finisher are structurally absent there)
+    // stores NULL and 0, which reads as "this capture saw no board", never as
+    // "the race had no board".
     const insResult = db.prepare(`INSERT INTO race_results
         (race_day_id, race_number, program_number, horse_name, finish_position,
-         win_cents, place_cents, show_cents)
-        VALUES (?, ?, ?, ?, ?, ?, ?, ?)`);
+         win_cents, place_cents, show_cents, post_time_odds, favorite)
+        VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`);
     const insExotic = db.prepare(`INSERT INTO exotic_payoffs
         (race_day_id, race_number, bet_type, base_cents, combination, payout_cents)
         VALUES (?, ?, ?, ?, ?, ?)`);
@@ -86,8 +91,11 @@ export function saveResults(db, day, p, correlationId) {
         if (pgm == null && r.horseName) pgm = entriesFor.find((e) => nameKey(e.horse_name) === nameKey(r.horseName))?.program_number ?? null;
         if (pgm == null) { counts.unresolvedFinishers++; continue; }
         insResult.run(day.id, race.number, pgm, r.horseName ?? null,
-          r.finishPosition ?? null, r.winCents ?? null, r.placeCents ?? null, r.showCents ?? null);
+          r.finishPosition ?? null, r.winCents ?? null, r.placeCents ?? null, r.showCents ?? null,
+          typeof r.odds === 'number' && Number.isFinite(r.odds) ? r.odds : null,
+          r.favorite ? 1 : 0);
         counts.results++;
+        if (typeof r.odds === 'number' && Number.isFinite(r.odds)) counts.priced++;
       }
       for (const x of race.exotics ?? []) {
         insExotic.run(day.id, race.number, x.betType, x.baseCents, x.combination, x.payoutCents);

@@ -1,0 +1,47 @@
+-- 035: the post-time odds an Equibase chart has always printed, finally stored
+-- (D229, PT-1 of docs/requirements/post-time-odds-llm-comparison.md).
+--
+-- `shared/chart-parser.js` has extracted `odds` and `favorite` for EVERY
+-- finisher since it was written (see `parseResultLine` - the odds token is how
+-- it finds the finish position in the first place, so the value was never
+-- optional to the parse). `saveResults` then dropped both on the floor,
+-- because `race_results` had nowhere to put them. The Apify results parser's
+-- own comment records the consequence as settled fact: "this is not a gap
+-- against what `race_results` persists, since none of those are stored
+-- columns; chart-parser.js only extracts them in passing."
+--
+-- WHY IT MATTERS NOW. The post-time board is the market's own opinion, and
+-- without it every measurement in this codebase has had to use the MORNING
+-- LINE as its market proxy - `shared/pick-scoring.js`'s `favoriteBaseline`
+-- says so in its own docstring, and D171's empty `entries.live_odds`
+-- measurement is why. A morning line is one person's pre-entry guess; the
+-- closing price is what everybody betting the race concluded. Storing it turns
+-- "did this source pick winners" into "did this source beat the price it would
+-- have been paid", which is the only version of the question that can show an
+-- edge rather than an opinion.
+--
+-- TWO ORDINARY ALTERs, both nullable-or-defaulted, so every one of the 6,733
+-- existing result rows stays valid and unchanged:
+--
+--   * post_time_odds - the chart's own decimal ratio (2.86 is 2.86-1, not
+--     European 3.86). NULL means "this row's source did not carry odds",
+--     which is the honest and permanent state for every Apify-sourced day:
+--     `shared/parsers/equibase-apify-results.js` declares win odds per
+--     finisher structurally absent. NULL must never be read as "no odds
+--     existed" - the race had a board, this capture just did not see it.
+--   * favorite - the chart's asterisk. Derivable from the odds within a race,
+--     but stored because the chart ASSERTS it and a derivation would have to
+--     invent a tie-break the chart already made.
+--
+-- BACKFILLING EXISTING DAYS IS A RE-SAVE, NOT A QUERY. `result_charts` keeps
+-- only a `raw_digest`, never the chart text, and nothing archives result
+-- pastes to disk - so there is nothing on disk to re-parse. The existing
+-- results route already replaces a day's results on re-save (a corrected chart
+-- was always meant to be re-ingestable) and regrades the day afterwards, so
+-- filling these columns for a stored day means uploading its chart again
+-- through the ordinary path. On the 2026-09-10 corpus that is 5 of the 8
+-- active days with results - the `equibase_pdf` ones; the other 3 came from
+-- Apify and cannot be filled from their own source at all.
+
+ALTER TABLE race_results ADD COLUMN post_time_odds REAL;
+ALTER TABLE race_results ADD COLUMN favorite INTEGER NOT NULL DEFAULT 0;

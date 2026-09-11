@@ -26,6 +26,29 @@ export const parseEquibaseEntries = (html, { oddsCapturedAt = null, correlationI
     body: JSON.stringify({ html, oddsCapturedAt }),
   }).then(asJson);
 
+// Live odds capture (D228): refresh a STORED day's tote board from a freshly
+// saved Equibase entries page. The same client-side file read
+// `parseEquibaseEntries` uses, pointed at a different endpoint - this one
+// reconciles against a day that already exists and only ever writes prices.
+// Preview never writes; the confirm re-parses the same markup server-side, so
+// the browser never hands the server a price.
+export const previewLiveOdds = (dayId, html, { correlationId } = {}) =>
+  fetch(`/api/race-days/${dayId}/live-odds/preview`, {
+    method: 'POST',
+    headers: { 'content-type': 'application/json', ...(correlationId ? { 'x-correlation-id': correlationId } : {}) },
+    body: JSON.stringify({ html }),
+  }).then(asJson);
+
+export const saveLiveOdds = (dayId, html, { oddsCapturedAt = null, correlationId } = {}) =>
+  fetch(`/api/race-days/${dayId}/live-odds`, {
+    method: 'POST',
+    headers: { 'content-type': 'application/json', ...(correlationId ? { 'x-correlation-id': correlationId } : {}) },
+    body: JSON.stringify({ html, oddsCapturedAt }),
+  }).then(asJson);
+
+export const getLiveOddsCaptures = (dayId) =>
+  fetch(`/api/race-days/${dayId}/live-odds`).then(asJson);
+
 // Live Apify entries pull (Phase 3/4 building blocks, UI flow decided
 // 2026-09-09): ONE track, ONE date - the server makes the actual paid call
 // (the browser never holds APIFY_TOKEN), returning the same preview shape
