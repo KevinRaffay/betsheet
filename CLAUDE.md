@@ -963,6 +963,19 @@ it. Rules still in force:
   bug exits 0 and looks like success. A negative control in `check-gh-api`
   pins exactly that, because it is the worse bug of the two.
 - **An editable field must look editable AT REST, not on hover - HOUSE RULE** (user rule, 2026-09-11, D235). `.in` was `border: 1px solid transparent; background: transparent`, with the border appearing only on `:hover`. That is a LABEL until you touch it - no border, no contrast, and the single affordance hidden behind a gesture a touch device never performs. The user's report was exactly that: *"they look like labels... I shouldn't have to hover a field to indicate that is an update."* **The stylesheet already held the right answer twice** - `.formrow input` and `.pastebox textarea` both carried a real border and background - so there were two contradictory styles for one concept and the ghost was the one on the newest fields. **The fix is on the ELEMENTS, not on a class**: `input:not([type=checkbox]):not([type=radio]):not([type=file])`, `select` and `textarea` carry the border, field background, radius, padding and focus ring; `.in` is layout only (width). That is deliberate - 7 of this app's text-ish controls carried NO class at all (two date inputs, two number inputs, four selects, a textarea), and a style you must remember to apply is one that will be forgotten again. Tokens: `--color-field-border` is Radix step 7 (the "UI element border" step), not step 6 (`--color-border`, for dividers, which reads as decoration on a control). `:focus-visible` gets a real 3px ring - the old rule set `outline: none` and tinted a 1px border, which is the least a keyboard user can be given while still technically having focus. **Verified by driving the real app**, both themes and four routes, asserting `getComputedStyle` on every control: 0 borderless fields anywhere. **And one thing the new clarity exposed**: D232 had set the live-odds placeholder to the horse's morning line, which read as a hint on a ghost field and reads as a VALUE ALREADY ENTERED on a real one - it is now `"odds"`, and the M/L is in the adjacent column anyway.
+- **A BUTTON must look like a button AT REST, in both apps and both themes -
+  HOUSE RULE** (user rule, 2026-09-11, D373; the button half of D235). A plain
+  `.btn` was the divider-step border on the page ground at normal weight - a
+  chip until hovered, and in the dark theme barely that. The user's words:
+  *"these types of buttons need more contrast in all UI versions, they look
+  like chips"*, pointing at the filled `.btn--primary` as the model. So a
+  button sits on `--color-btn-bg` (Radix step 3) with `--color-btn-border`
+  (step 8, one past a field's 7 - raised, where a field is recessed) at
+  weight 600, with hover/active steps 4/5. **The tokens live in the SHARED
+  stylesheet**, so a new control in either app gets this by using `.btn`,
+  and a control that avoids `.btn` (a bespoke class with its own transparent
+  background) is reintroducing the chip - `.topbar__theme` and the static
+  `.pill` were exactly that and now take the same tokens.
 - **A CSS class name in `client/src/styles.css` is a GLOBAL, and the file is
   long enough that a second meaning for one silently wins the cascade**
   (D216). There is one stylesheet for the whole client and no CSS modules, so
