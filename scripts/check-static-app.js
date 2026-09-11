@@ -205,6 +205,38 @@ console.log('\n-- the race screen fits a phone (D158) --');
     `mobile.js says ${jsBreakpoint}, static.css says ${cssBreakpoint}`);
 }
 
+console.log('\n-- static.css never redeclares a class the desktop stylesheet owns (D367) --');
+{
+  // client/src/styles.css is ONE global stylesheet with no CSS modules, and
+  // the static app loads it in full before static.css (main.jsx). So a class
+  // static.css declares for its own layout is also, silently, whatever the
+  // desktop already meant by that name - and the desktop rule's properties
+  // that the static rule does not override survive the cascade. Found live
+  // (D367): static.css's `.pick` card inherited `.pick { display:
+  // inline-block; white-space: nowrap }` from styles.css (a chip on the
+  // desktop card page), so every pick card on the day page refused to wrap
+  // and the page scrolled sideways on a phone - the exact D216 class-name
+  // collision, one stylesheet over. Mechanical, so asserted mechanically:
+  // every class selector static.css declares must be absent from styles.css.
+  const declared = (css) => new Set(
+    [...css.replace(/\/\*[\s\S]*?\*\//g, '').matchAll(/(?:^|[\s,>+~{}])\.([a-zA-Z_][\w-]*)/g)].map((m) => m[1]));
+  const staticCss = fs.readFileSync(path.join(ROOT, 'static', 'src', 'static.css'), 'utf8');
+  const desktopCss = fs.readFileSync(path.join(ROOT, 'client', 'src', 'styles.css'), 'utf8');
+  const desktop = declared(desktopCss);
+  // Deliberate overrides of a desktop rule - the touch-target and table
+  // rules that ARE about restyling the shared components on a phone - are
+  // listed here by name, so a new collision cannot hide among them.
+  const intendedOverrides = new Set(['btn', 'in', 'pgm-chip', 'col-detail', 'grid', 'formrow', 'app', 'pagehead', 'wrap']);
+  const collisions = [...declared(staticCss)].filter((c) => desktop.has(c) && !intendedOverrides.has(c));
+  check('no static.css class is also declared by client/src/styles.css', collisions.length === 0,
+    collisions.length ? `collides: ${collisions.map((c) => `.${c}`).join(', ')}` : '');
+  // Negative control: the scan must actually see desktop classes, or an
+  // empty read would pass every name.
+  check('NEGATIVE CONTROL: the desktop scan sees .pick, the class that collided',
+    desktop.has('pick'), 'styles.css no longer declares .pick - update this control');
+  check('NEGATIVE CONTROL: a known override IS listed as intended', intendedOverrides.has('col-detail'));
+}
+
 if (failures) {
   console.error(`\ncheck-static-app: ${failures} failure(s)`);
   process.exit(1);

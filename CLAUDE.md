@@ -781,14 +781,17 @@ it. Rules still in force:
   different directories (bash → AppData, node → `C:\tmp`) so use full Windows
   paths for anything node opens; heredocs truncate near 8KB — write long
   files in chunks; git identity may not resolve from the global config —
-  this repo carries a local `user.name`/`user.email`. **Files are CRLF on
+  this repo carries a local `user.name`/`user.email`. **Files may be CRLF on
   disk** (`core.autocrlf=true`) while Git Bash's `grep $''`, `cat -A` and
   `git diff` all show them as LF - so a python/node string match written
   with `
-` silently matches nothing (D369, cost three attempts); read with
+` silently matches nothing (D369, cost three attempts). Read with
   `newline=''`, normalise `
 ` -> `
-`, patch, and restore on write.
+`, patch, and write back in the
+  ORIGINAL convention - and check `git ls-files --eol` first: this file is
+  `-text` (never converted by git), so a CRLF write to it lands in the blob
+  verbatim and the next merge conflicts on every line (D369, found live).
 - **Ports**: BetSheet uses api :8788 / vite :5175 for the HUMAN's `npm run dev`
   and for `npm start`. An AGENT's browser-verification stack must use
   `npm run dev:preview` (api :8795 / vite :5185, D97) and never the human's
@@ -1007,6 +1010,14 @@ it. Rules still in force:
   rule**, and prefer a name that says which feature it belongs to
   (`row--entry-flag`) over one that says how it feels (`row--flagged`) - the
   second is the one two features will both reach for.
+  **D367 found the same collision ACROSS the two stylesheets**: `static/src/static.css`
+  loads after `client/src/styles.css` in the static app, so a class it
+  declares for its own layout also inherits every desktop property it does
+  not override - `.pick` picked up `white-space: nowrap` from a desktop chip
+  and the day page scrolled sideways. `check-static-app` now asserts that no
+  class `static.css` declares is also declared by `styles.css`, outside a
+  named allow-list of deliberate overrides; the grep above still applies to
+  a new CLIENT class, which that check does not cover.
 - **Two sibling components must never both be keyed on a bare remount counter**
   (D181). `RaceDayView` used the D142 "bump a counter, pass it as `key`, get a
   remount" pattern TWICE - `<CardsPanel key={cardsVersion}>` and
