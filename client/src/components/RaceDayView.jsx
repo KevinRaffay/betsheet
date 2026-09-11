@@ -339,7 +339,7 @@ export default function RaceDayView({ id, onBack, onOpenCard }) {
             {race.conditions && <p className="conditions">{race.conditions}</p>}
             <table className="grid">
             <thead>
-              <tr><th>#</th><th>PP</th><th>Horse</th><th>Jockey</th><th>Trainer</th><th>Wt</th><th>M/L</th><th>Rank</th></tr>
+              <tr><th>#</th><th>PP</th><th>Horse</th><th>Jockey</th><th>Trainer</th><th>Wt</th><th>M/L</th><th title="Predicted order of finish from the morning line (1 = shortest line; ties share a rank)">ML rank</th></tr>
             </thead>
             <tbody>
               {/* D216: index-aligned with `race.entries`, computed once per race. */}
@@ -363,7 +363,7 @@ export default function RaceDayView({ id, onBack, onOpenCard }) {
                   <td>{e.trainer ?? ''}</td>
                   <td>{e.weight ?? ''}</td>
                   <td>{e.morning_line ?? ''}</td>
-                  <td className="dim">{e.program_rank ?? ''}</td>
+                  <td className="dim">{entryFlags.get(race.number)?.[ei]?.mlRank ?? ''}</td>
                 </tr>
               ))}
             </tbody>

@@ -14,7 +14,6 @@ const normalizeEntry = (e) => ({
   jockey: e.jockey,
   trainer: e.trainer,
   morningLine: e.morningLine ?? e.morning_line,
-  programRank: e.programRank ?? e.program_rank,
   bestBet: Boolean(e.bestBet ?? e.best_bet),
   scratched: Boolean(e.scratched),
 });
@@ -25,12 +24,12 @@ const normalizeEntry = (e) => ({
 // day-builder modals stack every race in one scroll, so theirs default
 // collapsed (the historical behavior, unchanged).
 //
-// `showRank` (D158) exists for the static at-track builder, whose payload
-// carries no `program_rank` at all - the column renders a dash on every row
-// there, which is width a phone does not have to spare. It defaults TRUE so
-// all three desktop callers are untouched: they read a real DB row, where the
-// program handicapper's rank is a genuine column and a null means "this day
-// has no program analysis", which is worth showing as such.
+// `showRank` (D158) exists for the static at-track builder, where the column
+// is width a phone does not have to spare. It defaults TRUE so all three
+// desktop callers are untouched. D223: the column is now the MORNING-LINE
+// rank (`flags[i].mlRank`, shared/entry-flags.js) - the predicted order of
+// finish from the line alone - and no longer reads `program_rank`, which
+// D113 stopped ingesting and which rendered as a dash on every row since.
 export default function EntriesTable({ entries, open = false, showRank = true }) {
   // D216: computed from the RAW rows, before `normalizeEntry` - the flags need
   // the morning line (and, where the caller has it, the stored decimal), which
@@ -44,7 +43,7 @@ export default function EntriesTable({ entries, open = false, showRank = true })
         <thead>
           <tr>
             <th>#</th><th>Horse</th><th>Jockey</th><th>Trainer</th><th>M/L</th>
-            {showRank && <th>Rank</th>}
+            {showRank && <th title="Predicted order of finish from the morning line (1 = shortest line; ties share a rank)">ML rank</th>}
           </tr>
         </thead>
         <tbody>
@@ -64,7 +63,7 @@ export default function EntriesTable({ entries, open = false, showRank = true })
               <td>{e.jockey ?? '—'}</td>
               <td>{e.trainer ?? '—'}</td>
               <td>{e.morningLine ?? '—'}</td>
-              {showRank && <td>{e.programRank ?? '—'}</td>}
+              {showRank && <td>{flags[i]?.mlRank ?? '—'}</td>}
             </tr>
           ))}
         </tbody>

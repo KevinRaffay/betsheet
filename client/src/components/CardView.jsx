@@ -278,7 +278,7 @@ export default function CardView({ cardId, onBack, onDeleted, embedded = false }
               <summary>Entries ({entries.length})</summary>
               <table className="grid grid--entries">
                 <thead>
-                  <tr><th>#</th><th>Horse</th><th>Jockey</th><th>Trainer</th><th>M/L</th><th>Rank</th></tr>
+                  <tr><th>#</th><th>Horse</th><th>Jockey</th><th>Trainer</th><th>M/L</th><th title="Predicted order of finish from the morning line (1 = shortest line; ties share a rank)">ML rank</th></tr>
                 </thead>
                 <tbody>
                   {entries.map((entry, ei) => (
@@ -292,7 +292,7 @@ export default function CardView({ cardId, onBack, onDeleted, embedded = false }
                       <td>{entry.jockey ?? '—'}</td>
                       <td>{entry.trainer ?? '—'}</td>
                       <td>{entry.morning_line ?? '—'}</td>
-                      <td>{entry.program_rank ?? '—'}</td>
+                      <td>{entryFlags[ei]?.mlRank ?? '—'}</td>
                     </tr>
                   ))}
                 </tbody>

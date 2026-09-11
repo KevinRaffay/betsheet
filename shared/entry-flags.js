@@ -1,6 +1,15 @@
 // Entry flags (D216): the two signals a person building a HUMAN ticket asked
 // to see at a glance, computed once and rendered by every entries table.
 //
+// D223 added a third reading aid to the same flag object: `mlRank`, the
+// predicted order of finish from the morning line alone (1 = the shortest
+// line among LIVE, priced runners; ties share a rank and the next rank is
+// skipped, so two 5/2 shots are both 1 and the 3/1 behind them is 3). It
+// REPLACES the display of `entries.program_rank`, the Del Mar program
+// handicapper's rank that D113 stopped ingesting - 0 of 574 entries on an
+// active day carried one (D178), so every "Rank" column was a column of
+// dashes. The stored column is untouched; only the reading of it moved.
+//
 // PURE and browser-safe - no `node:` import, ever (the same contract
 // shared/tip-staking.js holds, and for the same reason: this file is reached
 // from the static at-track builder through @client/components/EntriesTable.jsx).
@@ -73,7 +82,9 @@ function mlDecimal(entry) {
  * Never throws; a race it cannot read simply produces no flags.
  *
  * Returns `{ flags, liveCount, favoriteCount }` where each flag is
- * `{ baffert, favorite }`.
+ * `{ baffert, favorite, mlRank }`. `mlRank` is null for a scratched or
+ * unpriced horse - a scratch has no predicted finish, and "no line" is not
+ * "last".
  *
  * A scratched horse can still be flagged `baffert` - the row is already struck
  * through, and "the Baffert horse is the one that scratched" is worth seeing -
@@ -87,14 +98,22 @@ function mlDecimal(entry) {
  */
 export function flagRaceEntries(entries) {
   const list = Array.isArray(entries) ? entries : [];
-  const flags = list.map((e) => ({ baffert: isBaffertEntry(e), favorite: false }));
+  const flags = list.map((e) => ({ baffert: isBaffertEntry(e), favorite: false, mlRank: null }));
 
   const live = [];
   list.forEach((e, i) => { if (!pick(e, 'scratched', 'scratched')) live.push({ i, ml: mlDecimal(e) }); });
   const liveCount = live.length;
-  if (liveCount !== FAVORITE_FIELD_SIZE) return { flags, liveCount, favoriteCount: 0 };
-
   const priced = live.filter((x) => typeof x.ml === 'number' && Number.isFinite(x.ml));
+
+  // D223: the morning-line rank, on every race regardless of field size.
+  // Competition ranking ("1, 1, 3"): a tie is reported as a tie, the same
+  // reasoning as co-favorites both being flagged rather than neither.
+  const ordered = [...priced].sort((a, b) => a.ml - b.ml);
+  ordered.forEach((x, pos) => {
+    flags[x.i].mlRank = pos > 0 && ordered[pos - 1].ml === x.ml ? flags[ordered[pos - 1].i].mlRank : pos + 1;
+  });
+
+  if (liveCount !== FAVORITE_FIELD_SIZE) return { flags, liveCount, favoriteCount: 0 };
   if (priced.length === 0) return { flags, liveCount, favoriteCount: 0 };
 
   const shortest = Math.min(...priced.map((x) => x.ml));
