@@ -41,7 +41,9 @@ three reasons are independent, so fixing one does not unblock the others.
 None of that kills it. What survives is a **smaller, cheaper, better-posed
 question that the existing corpus can almost answer**, and a data-collection
 step that is the real prerequisite for the full version. Section 4 proposes five
-phases; PT-0 and PT-1 are worth doing regardless of whether the rest ever is.
+phases. **PT-0 turned out to be answerable for free from data already stored,
+and was answered while writing this - see 4/PT-0.** PT-1 is worth doing
+regardless of whether the rest ever is, subject to one query named in 1.2.
 
 ---
 
@@ -111,9 +113,28 @@ Two caveats, both real:
   (`server/equibase-otr.js:127-136`). Already-stored days must have their charts
   re-pasted; the charts are still on Equibase, so this is manual work, not lost
   data.
-- **It does not help the Apify-sourced days at all** (1.1, fourth bullet).
-  Whatever fraction of the live corpus came in through D196/D206 needs a
-  different source for odds.
+- **It only helps days whose results came from an EQUIBASE CHART.** This is a
+  bigger restriction than "re-paste it" suggests, and it was measured rather
+  than assumed. In the committed pre-pivot archive
+  (`archive/betsheet-pre-pivot-2026-09-06.db`, read read-only 2026-09-11),
+  `result_charts.source_kind` is **72 `dmtc_html` to 3 `equibase_pdf`** - and
+  `shared/dmtc-results-parser.js` extracts *no odds at all* (it reads program
+  number, horse, jockey, trainer, finish and the WPS payouts; the track's own
+  results page does not print an odds column). For such a day there is nothing
+  to re-parse: recovering odds means fetching a DIFFERENT document, the
+  Equibase chart, per day. The Apify results route is the same story from the
+  other end - it carries no odds either (1.1). **So the question that decides
+  whether PT-1 is cheap or nearly useless is: of the 7 live days that have
+  results, how many came in as Equibase charts?** That is one query against
+  `result_charts.source_kind` on the live database, and it could not be run
+  from this session.
+
+- **The pre-pivot archive is not a shortcut to corpus depth.** 75 race days,
+  699 races and 5,960 result rows look tempting for PT-2. They are not usable:
+  72 of 75 carry no recoverable odds per the bullet above, the schema predates
+  `entries.live_odds` entirely (migration 024 - the column does not exist in
+  that file), and 70 of its 108 cards are lean-era `PROGRAM_ONLY`, a bucket
+  every current measurement excludes.
 
 ### 1.3 Corpus size is the binding constraint
 
@@ -262,27 +283,55 @@ Three things fall out of that table:
 
 ## 4. What is actually checkable, in order
 
-### PT-0 - Does the model even agree with itself? (pilot, ~$2)
+### PT-0 - Does the model even agree with itself? (LARGELY ANSWERED, for free)
 
 `DEFAULT_REQUEST_PARAMS` is `{maxTokens: 4000, temperature: 1}`
 (`server/anthropic-client.js:47`), and **temperature cannot be pinned to 0**:
 D166 found that newer models answer a 400 to `temperature: 0`, and the gotcha in
-CLAUDE.md records it. Generation is irreducibly stochastic.
+CLAUDE.md records it. Generation is irreducibly stochastic, so an A/B that runs
+one generation per arm risks measuring sampling noise.
 
-So before any A/B, measure the within-arm noise: generate the SAME race from the
-SAME prompt k=5 times, on ~20 races, and report how often the primary pick
-changes. **If the model disagrees with itself on half the races, a
-one-generation-per-arm A/B at n=99 is measuring sampling noise and nothing else**,
-and every later phase needs k replicates per arm (which multiplies its cost by k
-and its effective n by rather less).
+**This was billed as a ~$2 pilot. It turned out to be free** - `llm_card_requests`
+already stores every call verbatim (D63/D92/D149), so repeated generations of the
+same race under the same prompt are replicate data sitting in the corpus.
+Measured 2026-09-11 against the committed archive
+(`archive/betsheet-pre-pivot-2026-09-06.db`, read-only, 129 usable requests):
+7 (day, race, model) groups carry more than one generation from a byte-identical
+prompt, 20 generations in all.
 
-Cost: 100 Sonnet calls. At the measured prompt size - `SYSTEM_PROMPT` is 8,894
-chars, ~2,300 tokens, plus ~300 for a race's entries and menu - and with adaptive
-thinking billed as output, a call is roughly 2,600 in / 1,500 out: about $0.02 on
-`claude-sonnet-5` ($2/$10 per Mtok), $0.05 on `claude-opus-5`, $0.10 on
-`claude-fable-5-1`. Ceiling at `maxTokens: 4000` is $0.045 on Sonnet.
+| day | race | model | gens | primary win pick each time |
+| --- | --- | --- | --- | --- |
+| 73 | 1 | claude-sonnet-5 | 5 | 4, 4, 4, 4, 4 |
+| 73 | 4 | claude-sonnet-5 | 5 | 4, 4, 4, 4, 4 |
+| 73 | 8 | claude-sonnet-5 | 2 | 5, 5 |
+| 75 | 1 | claude-fable-5-1 | 2 | 2, 2 |
+| 75 | 1 | claude-opus-5 | 2 | 1, 1 |
+| 76 | 1 | claude-fable-5-1 | 2 | 4, 4 |
+| 76 | 2 | claude-sonnet-5 | 2 | 6, 7 |
 
-This phase needs no odds, no backfill and no schema change. It can be run today.
+**Pairwise agreement on the primary win pick: 24 of 25 pairs, 96%** - and every
+one of the 20 responses was textually distinct, so this is stability of the
+DECISION, not a cached answer.
+
+That is the good news for the whole experiment: **a change in primary pick
+between arms is signal, not noise**, so one generation per arm is defensible for
+the pick-level metrics and the replicate multiplier drops out of PT-3's cost.
+
+Three things the same data says *not* to extend it to. The secondary win
+selections DO move (day 73 race 4 backed `1,4` three times and `4` alone twice),
+the ticket COUNT moves (3 lines vs 5 on day 73 race 8; 10 vs 6 on day 75 race 1),
+and therefore **total money staked is materially noisier than the primary pick**.
+Any stake-weighted or ROI-based comparison still wants replicates even though the
+pick-level one does not.
+
+Caveats, stated because n is small: 25 pairs over 7 races and 3 models, all from
+the pre-pivot archive, under a prompt that has been edited many times since
+(`SYSTEM_PROMPT`'s hash is the version - today `d77fc1f078fa`). **Re-run this
+query against the live database before relying on it**, and consider ~$2 of
+deliberate replicates on the CURRENT prompt as confirmation. The query is the
+one in this section: group `llm_card_requests` by (race_day_id, race_number,
+model, hash(prompt_text)) and keep the groups of size > 1 - post-D149 rows carry
+`user_prompt_hash` and `prompt_template_version` directly, so it is cheaper still.
 
 ### PT-1 - Does the EXISTING corpus beat the close? (no API calls)
 
