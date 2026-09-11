@@ -2,10 +2,15 @@ import React from 'react';
 import EntriesTable from '@client/components/EntriesTable.jsx';
 import { navigate } from './app.jsx';
 import { useIsMobile } from './mobile.js';
+import RacePicks from './RacePicks.jsx';
 
 // One race, read-only. D236 removed the ticket builder, the lock/PASS/discard
 // state machine and the render-time committed-text snapshot that used to live
 // here - there is no ticket being composed on this screen any more.
+//
+// D364 added what emubets.com puts on a race: previous/next race links, and
+// the same picks-and-result block the day screen shows (RacePicks.jsx), so a
+// person who opened a race for its runners also sees what was bet on it.
 export default function RaceView({ day, raceNumber }) {
   const race = day.races.find((r) => r.number === raceNumber);
   const isMobile = useIsMobile();
@@ -20,15 +25,23 @@ export default function RaceView({ day, raceNumber }) {
     );
   }
 
+  const numbers = day.races.map((r) => r.number);
+  const idx = numbers.indexOf(race.number);
+  const prev = idx > 0 ? numbers[idx - 1] : null;
+  const next = idx < numbers.length - 1 ? numbers[idx + 1] : null;
+
   return (
     <section className="panel">
-      <div className="formrow formrow--tight">
-        <button className="btn btn--sm" onClick={() => navigate(`/day/${dayId}`)}>← All races</button>
-        <h2>Race {race.number}</h2>
-        <span className="dim">
-          {[race.postTime, race.distance, race.surface, race.raceType].filter(Boolean).join(' · ')}
-        </span>
+      <div className="formrow formrow--tight race-nav">
+        <button className="btn btn--sm" onClick={() => navigate(`/day/${dayId}`)}>← {day.raceDay.track}</button>
+        <span className="race-nav__spacer" />
+        <button className="btn btn--sm" disabled={prev == null} onClick={() => navigate(`/day/${dayId}/race/${prev}`)}>‹ R{prev ?? ''}</button>
+        <button className="btn btn--sm" disabled={next == null} onClick={() => navigate(`/day/${dayId}/race/${next}`)}>R{next ?? ''} ›</button>
       </div>
+      <h2 className="race-section__title">Race {race.number}</h2>
+      <p className="dim">
+        {[race.postTime, race.distance, race.surface, race.raceType].filter(Boolean).join(' · ')}
+      </p>
       {/* The race CONDITIONS line is deliberately not rendered (D158). It is
           three lines of eligibility boilerplate that push the entries below
           the fold on a phone for information nobody reads a card for. It
@@ -48,6 +61,8 @@ export default function RaceView({ day, raceNumber }) {
         open={!isMobile}
         showRank={false}
       />
+
+      <RacePicks day={day} race={race} />
     </section>
   );
 }

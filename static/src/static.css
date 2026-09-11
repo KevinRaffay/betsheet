@@ -44,3 +44,251 @@
   .formrow { flex-wrap: wrap; }
   .formrow > label { flex: 1 1 100%; }
 }
+
+/* ---- D364: the emubets.com layout ---------------------------------------
+   Home = stats strip + next race + meetings as cards + cashed tickets; day =
+   header, race pills, every race in one scroll with its picks and result.
+   Every colour is a token from client/src/styles.css so both themes work
+   and nothing here restyles a shared component. */
+
+.app { max-width: 1100px; margin: 0 auto; }
+
+/* Top bar: brand, section links, theme. Sticky so the links are one thumb
+   away at the bottom of a long day page. */
+.topnav {
+  position: sticky;
+  top: 0;
+  z-index: 5;
+  align-items: center;
+  margin: 0 -16px 12px;
+  padding: 10px 16px;
+  background: var(--color-bg);
+  border-bottom: 1px solid var(--color-border);
+}
+.topnav__brand {
+  font-size: 20px;
+  font-weight: 700;
+  letter-spacing: 0.02em;
+  color: var(--color-text);
+  text-decoration: none;
+}
+.topnav__links { display: flex; gap: 4px; flex-wrap: wrap; }
+.topnav__link {
+  padding: 6px 12px;
+  border-radius: var(--radius);
+  color: var(--color-text-muted);
+  text-decoration: none;
+  font-size: 14px;
+}
+.topnav__link:hover { background: var(--color-bg-raised); color: var(--color-text); }
+.topnav__link--active { background: var(--color-bg-raised); color: var(--color-text); font-weight: 600; }
+
+.eyebrow {
+  font-size: 11px;
+  font-weight: 700;
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+  color: var(--color-accent);
+}
+.section-sub { margin: 18px 0 6px; font-size: 15px; }
+.static-foot { margin: 24px 0 8px; font-size: 12px; text-align: center; }
+
+/* Hero + stats strip */
+.hero { padding: 8px 0 4px; }
+.hero__title { margin: 0 0 4px; font-size: 28px; line-height: 1.15; }
+.hero__sub { margin: 0 0 14px; max-width: 70ch; }
+.stats {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(130px, 1fr));
+  gap: 10px;
+}
+.stat {
+  padding: 12px 14px;
+  border: 1px solid var(--color-border);
+  border-radius: var(--radius);
+  background: var(--color-bg-subtle);
+}
+.stat__value { font-size: 26px; font-weight: 700; line-height: 1.1; }
+.stat__label { font-size: 12px; color: var(--color-text-muted); margin-top: 2px; }
+
+/* Next race tile */
+.next-race {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+  flex-wrap: wrap;
+  border-left: 4px solid var(--color-accent);
+}
+.next-race__what { font-size: 18px; font-weight: 700; }
+
+/* Meetings as cards */
+.meeting-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(230px, 1fr));
+  gap: 10px;
+  margin: 8px 0 4px;
+}
+.meeting {
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+  padding: 14px;
+  border: 1px solid var(--color-border);
+  border-radius: var(--radius);
+  background: var(--color-bg-subtle);
+}
+.meeting__track { margin: 0; font-size: 17px; }
+.meeting__date { margin: 0; font-size: 13px; }
+.meeting__facts { margin: 0 0 10px; font-size: 13px; }
+.meeting__cta { margin-top: auto; align-self: flex-start; }
+
+/* Cashed tickets (home) */
+.cashed { list-style: none; margin: 0; padding: 0; }
+.cashed__row { border-bottom: 1px solid var(--color-border); }
+.cashed__row:last-child { border-bottom: 0; }
+.cashed__link {
+  display: grid;
+  grid-template-columns: minmax(0, 1.2fr) minmax(0, 1.4fr) auto auto;
+  align-items: center;
+  gap: 10px;
+  width: 100%;
+  padding: 8px 4px;
+  border: 0;
+  background: transparent;
+  color: inherit;
+  font: inherit;
+  text-align: left;
+  cursor: pointer;
+  border-radius: var(--radius);
+}
+.cashed__link:hover { background: var(--color-bg-subtle); }
+.cashed__where { font-size: 13px; }
+.cashed__pay { font-size: 16px; text-align: right; }
+
+/* Day header + race pills */
+.dayhead { padding: 4px 0 8px; }
+.dayhead__title { margin: 4px 0 0; font-size: 30px; line-height: 1.1; }
+.dayhead__accent { color: var(--gold); }
+.dayhead__date { margin: 2px 0 4px; font-weight: 600; }
+.race-pills {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 6px;
+  margin-top: 10px;
+}
+.race-pills__label {
+  font-size: 11px;
+  font-weight: 700;
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+  color: var(--color-text-muted);
+  margin-right: 4px;
+}
+.pill {
+  border: 1px solid var(--color-border);
+  background: var(--color-bg-subtle);
+  color: var(--color-text);
+  border-radius: 999px;
+  padding: 4px 12px;
+  font: inherit;
+  font-size: 13px;
+  font-weight: 600;
+  cursor: pointer;
+}
+.pill:hover { border-color: var(--color-accent); color: var(--color-accent); }
+
+/* Cashed on this day */
+.wins { list-style: none; margin: 4px 0 0; padding: 0; }
+.win {
+  display: grid;
+  grid-template-columns: auto minmax(0, 1fr) auto;
+  gap: 10px;
+  align-items: center;
+  padding: 6px 0;
+  border-bottom: 1px solid var(--color-border);
+}
+.win:last-child { border-bottom: 0; }
+.win__where { font-size: 13px; }
+.win__pay { font-size: 15px; }
+
+/* One race section on the day page */
+.race-section { scroll-margin-top: 64px; }
+.race-section__head {
+  display: flex;
+  align-items: flex-start;
+  justify-content: space-between;
+  gap: 12px;
+  flex-wrap: wrap;
+}
+.race-section__title { margin: 0; font-size: 20px; }
+.race-section__facts { margin: 2px 0 0; font-size: 13px; }
+
+/* Result + picks (shared by the day and race screens) */
+.race-picks h4 { margin: 12px 0 6px; font-size: 13px; text-transform: uppercase; letter-spacing: 0.06em; color: var(--color-text-muted); }
+.finish-list { list-style: none; margin: 0; padding: 0; }
+.finish {
+  display: grid;
+  grid-template-columns: 24px minmax(0, 1fr) auto;
+  gap: 8px;
+  align-items: center;
+  padding: 3px 0;
+  font-size: 14px;
+}
+.finish__pos {
+  display: inline-block;
+  width: 22px; height: 22px; line-height: 22px;
+  text-align: center;
+  border-radius: 50%;
+  background: var(--color-bg-raised);
+  font-size: 12px;
+  font-weight: 700;
+}
+.finish:first-child .finish__pos { background: var(--gold); color: #241a02; }
+.finish__pay { font-size: 12px; white-space: nowrap; }
+.exotics { margin: 4px 0 0; font-size: 12px; }
+
+.picks {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(260px, 1fr));
+  gap: 10px;
+}
+.pick {
+  padding: 10px 12px;
+  border: 1px solid var(--color-border);
+  border-radius: var(--radius);
+  background: var(--color-bg-subtle);
+  min-width: 0;
+}
+.pick__head {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 8px;
+  flex-wrap: wrap;
+  margin-bottom: 6px;
+}
+.pick__tickets { list-style: none; margin: 0; padding: 0; }
+.pick__ticket { padding: 4px 0; border-top: 1px solid var(--color-border); }
+.pick__ticket:first-child { border-top: 0; }
+.pick__call { display: flex; align-items: baseline; gap: 8px; flex-wrap: wrap; }
+.pick__call code { font-size: 14px; font-weight: 600; }
+.pick__grade { margin-left: auto; white-space: nowrap; font-size: 12px; }
+.pick__why { font-size: 12px; margin-top: 2px; overflow-wrap: anywhere; }
+
+/* Race screen: prev/next */
+.race-nav { align-items: center; }
+.race-nav__spacer { flex: 1; }
+
+@media (max-width: 720px) {
+  .topnav { margin: 0 -8px 8px; padding: 8px; }
+  .topnav__link { padding: 8px 10px; }
+  .hero__title { font-size: 22px; }
+  .dayhead__title { font-size: 24px; }
+  .stat__value { font-size: 22px; }
+  .cashed__link { grid-template-columns: minmax(0, 1fr) auto; }
+  .cashed__where { grid-column: 1 / -1; }
+  .picks { grid-template-columns: 1fr; }
+  .race-section { scroll-margin-top: 56px; }
+}
