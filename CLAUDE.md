@@ -112,14 +112,22 @@ things live code can break. **Invariant 4 went with the consensus removal
     here.now publish feature's job (Phase 4). Published cards contain card
     data only, never personal information. **D154 added the one other thing
     that leaves this machine**: the GitHub Pages static builder publishes a
-    race-day PAYLOAD (entries, morning lines, wager menus - what Equibase
-    already prints publicly) so cards can be built on a phone at the track.
-    The server is untouched and still loopback-only; the Pages app has no
-    server at all. Two rules ride on it: a **Pages site is publicly readable
-    even from a private repo**, so the deployed payload is built WITHOUT
-    `--reference-cards` unless publishing the day's own LLM/OTR picks is a
-    deliberate choice; and nothing personal, no grade and no corpus row ever
-    enters a payload.
+    PAYLOAD (entries, morning lines, wager menus - what Equibase already
+    prints publicly) so the read-only viewer (D236/D329) has a snapshot to
+    show. The server is untouched and still loopback-only; the Pages app has
+    no server at all. **D329 changed what the payload carries, on purpose**:
+    a bundled day's entries, cards and grades are exactly what belongs in
+    it - the same information anyone running this codebase locally could
+    already read off its own reporting surfaces (`/pl`, `/card/:id`,
+    `/distribution`), now shown on a page built for exactly that. There is no
+    more `--reference-cards` opt-in; every card on a bundled day publishes,
+    unconditionally, because showing the cards that exist is the whole point
+    of the app now. **The floor that survives is narrower but absolute: no
+    payload may ever carry anything ABOUT THE PERSON who ran the builder** -
+    no real name, no device identifier, no account or financial detail beyond
+    the bet amounts and outcomes already stored on the card itself. A **Pages
+    site is publicly readable even from a private repo**, so this floor is
+    the whole privacy model - there is no second gate behind it.
 11. **A failing source must be visible.** Every fetch attempt lands in the
     fetch audit log; a source going quiet must surface in the UI, never
     silently thin the cards.
@@ -605,7 +613,7 @@ it. Rules still in force:
   claimed by an unrelated concurrent session while this investigation was
   still in progress - caught live by `syncCounterFloor`'s own remote-ledger
   read the moment this branch synced with origin - so the first number the
-  new mechanism actually handed out was D324, not D238; GitHub's shared
+  new mechanism actually handed out was D324, not D329; GitHub's shared
   issue/PR counter had moved on in the meantime and there is no way to mint a
   number behind where that counter already is. Treated as expected rather
   than a bug, on the same never-recycle reasoning invariant 12 and every
@@ -981,13 +989,21 @@ it. Rules still in force:
   wrong move - it spent real time, left a stray junction behind that could make
   a later session think dependencies were installed locally, and bought
   nothing. Check the static app's IMPORT SURFACE instead - it is a separate
-  Vite entry and reaches outside `static/` in exactly three places as of D236
-  (re-derived that day; before it the count was seven, and TicketBuilder.jsx,
-  human-picks.js and static-export.js all fell off once construction was
-  removed and nothing under `static/src/` imported them directly any more -
-  the list is the thing to re-derive rather than trust, every time):
-  `@client/components/EntriesTable.jsx`, `@client/styles.css`,
-  `@shared/static-payload.js`. A change touching none of those, nor `static/`
+  Vite entry and reaches outside `static/` in exactly FIVE places as of D329
+  (re-derived that day; it was three at D236, before it seven, and
+  TicketBuilder.jsx, human-picks.js and static-export.js all fell off once
+  construction was removed and nothing under `static/src/` imported them
+  directly any more; D329 added two more - `CardSheet.jsx`, imported by the
+  static app's own new `CardView.jsx`, and `shared/race-calendar.js`,
+  imported by the new `Calendar.jsx` - the list is the thing to re-derive
+  rather than trust, every time): `@client/components/EntriesTable.jsx`,
+  `@client/styles.css`, `@shared/static-payload.js`,
+  `@client/components/CardSheet.jsx`, `@shared/race-calendar.js`.
+  **`CardSheet.jsx`'s own transitive imports** (`RaceNotes.jsx`,
+  `EntryFlagTags.jsx`, `shared/entry-flags.js`, `shared/card-notices.js`) are
+  reached only through it, not directly from any `static/src/` file, so they
+  are covered by "anything they transitively import" below rather than being
+  separate entries on this list. A change touching none of those, nor `static/`
   itself, nor anything they transitively import, provably cannot move the
   static bundle. When a change DOES touch them, run the check from the
   primary checkout, where it works as designed. State plainly in the final

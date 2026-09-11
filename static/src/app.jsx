@@ -1,29 +1,35 @@
 import React, { useEffect, useState } from 'react';
 import { validateStaticPayload } from '@shared/static-payload.js';
+import DayList from './DayList.jsx';
+import Calendar from './Calendar.jsx';
 import DayView from './DayView.jsx';
 import RaceView from './RaceView.jsx';
+import CardView from './CardView.jsx';
 
-// The static app's shell (D150-D151, construction removed by D236).
+// The static app's shell (D150, redesigned to a read-only multi-day viewer
+// by D236/D329).
 //
 // This app has no corpus, no grading, no generation and no database - it
-// reads one payload file and renders it. D236 removed the CONSTRUCTION half
-// (card building, IndexedDB drafts, export/import) that used to live here;
-// what's left is view-only, on the same read-only payload this app always
-// consumed. A future deliverable (D150-D158's schema is unchanged in this
-// commit) will redesign the payload itself for a multi-day, cards-included
-// snapshot - this shell does not anticipate that shape.
+// reads one bundled payload file and renders it. D236 removed the
+// CONSTRUCTION half that used to live here; D329 redesigned the payload
+// itself to bundle multiple race days, each carrying every card on it
+// (including grades), so a real calendar and card sheets have something to
+// navigate.
 //
 // HASH ROUTING, deliberately (D154): GitHub Pages serves static files and
 // answers an unknown path with its own 404, so a History-API deep link would
-// break on refresh. A fragment never reaches the server, so `#/race/3`
+// break on refresh. A fragment never reaches the server, so `#/day/3/race/2`
 // survives a reload, a bookmark and a share with no SPA fallback to configure.
 
 function useHashRoute() {
   const read = () => {
     const raw = window.location.hash.replace(/^#/, '') || '/';
-    const m = /^\/race\/(\d+)$/.exec(raw);
-    if (m) return { name: 'race', number: Number(m[1]) };
-    return { name: 'day' };
+    let m;
+    if ((m = /^\/day\/(\d+)\/race\/(\d+)$/.exec(raw))) return { name: 'race', dayId: Number(m[1]), number: Number(m[2]) };
+    if ((m = /^\/day\/(\d+)\/card\/(\d+)$/.exec(raw))) return { name: 'card', dayId: Number(m[1]), cardId: Number(m[2]) };
+    if ((m = /^\/day\/(\d+)$/.exec(raw))) return { name: 'day', dayId: Number(m[1]) };
+    if (raw === '/calendar') return { name: 'calendar' };
+    return { name: 'list' };
   };
   const [route, setRoute] = useState(read);
   useEffect(() => {
@@ -43,7 +49,7 @@ async function loadPayload() {
   // the HTTP cache after a redeploy. The service worker (D155) has its own,
   // stronger rule for the same problem.
   const res = await fetch(url, { cache: 'no-cache' });
-  if (!res.ok) throw new Error(`payload.json came back ${res.status}. No race day is deployed here yet.`);
+  if (!res.ok) throw new Error(`payload.json came back ${res.status}. No race days are deployed here yet.`);
   const payload = await res.json();
   const problems = validateStaticPayload(payload);
   if (problems.length) throw new Error(`The deployed payload is not valid:\n- ${problems.join('\n- ')}`);
@@ -76,25 +82,44 @@ export default function App() {
   }
 
   if (!payload) {
-    return <div className="app"><p className="dim">Loading the race day…</p></div>;
+    return <div className="app"><p className="dim">Loading the snapshot…</p></div>;
   }
 
-  const day = payload.raceDay;
+  const { raceDays } = payload;
+  const day = 'dayId' in route ? raceDays.find((d) => d.raceDay.raceDayId === route.dayId) : null;
+
+  let body;
+  if (route.name === 'calendar') {
+    body = <Calendar raceDays={raceDays} />;
+  } else if (route.name === 'list') {
+    body = <DayList raceDays={raceDays} onOpenCalendar={() => navigate('/calendar')} />;
+  } else if (!day) {
+    body = (
+      <section className="panel">
+        <p className="notice notice--error">No race day {route.dayId} in this snapshot.</p>
+        <button className="btn" onClick={() => navigate('/')}>Back to the list</button>
+      </section>
+    );
+  } else if (route.name === 'race') {
+    body = <RaceView day={day} raceNumber={route.number} />;
+  } else if (route.name === 'card') {
+    body = <CardView day={day} cardId={route.cardId} />;
+  } else {
+    body = <DayView day={day} />;
+  }
 
   return (
     <div className="app">
       <header className="pagehead pagehead--static">
         <div>
-          <h1>{day.track} — {day.date}</h1>
-          <p className="dim">{payload.races.length} race(s)</p>
+          <h1>BetSheet</h1>
+          <p className="dim">
+            {raceDays.length} race day{raceDays.length === 1 ? '' : 's'} in this snapshot ·
+            {' '}generated {payload.generatedAt}
+          </p>
         </div>
       </header>
-
-      {route.name === 'race' ? (
-        <RaceView payload={payload} raceNumber={route.number} />
-      ) : (
-        <DayView payload={payload} />
-      )}
+      {body}
     </div>
   );
 }

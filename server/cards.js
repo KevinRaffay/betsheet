@@ -118,16 +118,23 @@ cardsRouter.post('/cards/bulk-delete', (req, res) => {
   res.json({ deleted, skipped });
 });
 
-cardsRouter.get('/cards/:id', (req, res) => {
-  const db = getDb();
+/**
+ * One card's own fields plus its allocations/tickets - everything that is
+ * per-CARD rather than per-DAY. Extracted (D329) so `scripts/build-static-payload.js`
+ * can call the same query the route does instead of hand-rolling a second,
+ * inevitably-drifting version of this shape - the same "never a second
+ * renderer" discipline D237 already applied to `CardSheet.jsx`. Returns
+ * `null` for no such card, never throws.
+ */
+export function getCardCore(db, cardId) {
   const card = db.prepare(`
     SELECT c.*, rd.track, rd.date, st.name AS template,
            COALESCE(c.per_race_min_cents, rd.per_race_min_cents) AS per_race_min_cents
     FROM cards c JOIN race_days rd ON rd.id = c.race_day_id
     LEFT JOIN strategy_templates st ON st.id = c.strategy_template_id
     WHERE c.id = ?
-  `).get(Number(req.params.id));
-  if (!card) return res.status(404).json({ error: 'No such card.' });
+  `).get(cardId);
+  if (!card) return null;
   const allocations = db.prepare(`
     SELECT a.*, r.number AS race_number, r.classification, r.post_time, r.distance,
            r.surface, r.race_type, r.wager_menu, r.contrarian_flags
@@ -135,19 +142,37 @@ cardsRouter.get('/cards/:id', (req, res) => {
     WHERE a.card_id = ?
     ORDER BY r.number
   `).all(card.id);
-  const races = db.prepare('SELECT * FROM races WHERE race_day_id = ? ORDER BY number').all(card.race_day_id);
-  const entriesFor = db.prepare('SELECT * FROM entries WHERE race_id = ?');
-  for (const race of races) race.entries = entriesFor.all(race.id);
   const tickets = db.prepare('SELECT * FROM tickets WHERE card_id = ? ORDER BY sequence').all(card.id)
     .map((t) => ({ ...t, selections: JSON.parse(t.selections), rule_tags: JSON.parse(t.rule_tags ?? '[]') }));
+  return { ...card, allocations, tickets };
+}
 
-  // Footer material: which sources fed this day (latest attempt each, with
-  // its timestamp) and the day's known scratches.
+/** A day's races WITH entries attached - day-level, shared across every card on it. */
+export function getDayRaces(db, dayId) {
+  const races = db.prepare('SELECT * FROM races WHERE race_day_id = ? ORDER BY number').all(dayId);
+  const entriesFor = db.prepare('SELECT * FROM entries WHERE race_id = ?');
+  for (const race of races) race.entries = entriesFor.all(race.id);
+  return races;
+}
+
+/**
+ * The card sheet's day-level footer material: which sources fed the day
+ * (latest attempt each, with its timestamp), the day's known program-time
+ * scratches, and the day's results (finishers/exotics/result-time
+ * scratches) for the per-race results panel. Nested rather than flattened:
+ * `scratches` here is PROGRAM-time (`entries.scratched`), while
+ * `results.scratches` comes off the result chart, and silently merging two
+ * different scratch sets under one name is how a card would start claiming
+ * a horse was scratched at a time it wasn't. `results` arrays are empty,
+ * never omitted, when the day has no results yet - a caller renders a panel
+ * only where there is a finisher.
+ */
+export function getDayFooter(db, dayId) {
   const attemptRows = db.prepare(`
     SELECT s.name, fa.outcome, fa.ts, fa.fallback_reason
     FROM fetch_attempts fa JOIN sources s ON s.id = fa.source_id
     WHERE fa.race_day_id = ? ORDER BY fa.id
-  `).all(card.race_day_id);
+  `).all(dayId);
   const latest = new Map();
   for (const r of attemptRows) latest.set(r.name, r);
   const sources = { used: [], unavailable: [] };
@@ -160,26 +185,26 @@ cardsRouter.get('/cards/:id', (req, res) => {
     FROM entries e JOIN races r ON r.id = e.race_id
     WHERE r.race_day_id = ? AND e.scratched = 1
     ORDER BY r.number
-  `).all(card.race_day_id);
-
-  // The day's results, for the per-race results panel on the sheet. Nested
-  // rather than flattened alongside the footer's `scratches` above: those are
-  // PROGRAM-time scratches (entries.scratched), while these come off the
-  // result chart, and silently merging two different scratch sets under one
-  // name is how a card would start claiming a horse was scratched at a time
-  // it wasn't. Empty arrays when the day has no results - the client renders
-  // the panel per race, only where there is a finisher.
+  `).all(dayId);
   const results = {
     finishers: db.prepare(
       'SELECT * FROM race_results WHERE race_day_id = ? ORDER BY race_number, finish_position',
-    ).all(card.race_day_id),
+    ).all(dayId),
     exotics: db.prepare(
       'SELECT * FROM exotic_payoffs WHERE race_day_id = ? ORDER BY race_number, id',
-    ).all(card.race_day_id),
+    ).all(dayId),
     scratches: db.prepare(
       'SELECT * FROM result_scratches WHERE race_day_id = ? ORDER BY race_number, id',
-    ).all(card.race_day_id),
+    ).all(dayId),
   };
+  return { sources, scratches, results };
+}
 
-  res.json({ ...card, races, allocations, tickets, sources, scratches, results });
+cardsRouter.get('/cards/:id', (req, res) => {
+  const db = getDb();
+  const card = getCardCore(db, Number(req.params.id));
+  if (!card) return res.status(404).json({ error: 'No such card.' });
+  const races = getDayRaces(db, card.race_day_id);
+  const { sources, scratches, results } = getDayFooter(db, card.race_day_id);
+  res.json({ ...card, races, sources, scratches, results });
 });

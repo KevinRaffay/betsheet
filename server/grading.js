@@ -157,10 +157,16 @@ gradingRouter.post('/cards/:id/grade', (req, res) => {
   res.status(201).json({ correlationId, engineVersion: result.engineVersion, summary: result.summary });
 });
 
-gradingRouter.get('/cards/:id/grades', (req, res) => {
-  const db = getDb();
-  const card = db.prepare('SELECT id FROM cards WHERE id = ?').get(Number(req.params.id));
-  if (!card) return res.status(404).json({ error: 'No such card.' });
+/**
+ * One card's grades, in the `{grades, summary}` shape the route returns.
+ * Extracted (D329) so `scripts/build-static-payload.js` shares this exact
+ * query with the route rather than a second, drift-prone copy. Returns
+ * `null` (not `{grades: [], summary: null}`) for a card that does not
+ * exist, so a caller can tell "no such card" from "ungraded".
+ */
+export function getCardGrades(db, cardId) {
+  const card = db.prepare('SELECT id FROM cards WHERE id = ?').get(cardId);
+  if (!card) return null;
   const rows = db.prepare(`
     SELECT gt.*, t.sequence, t.bet_type, t.selections, t.stake_cents, t.cost_cents, t.teller_call
     FROM graded_tickets_latest gt JOIN tickets t ON t.id = gt.ticket_id
@@ -173,5 +179,11 @@ gradingRouter.get('/cards/:id/grades', (req, res) => {
     returnedCents: rows.reduce((a, r) => a + r.returned_cents, 0),
     plCents: rows.reduce((a, r) => a + r.pl_cents, 0),
   };
-  res.json({ grades: rows, summary });
+  return { grades: rows, summary };
+}
+
+gradingRouter.get('/cards/:id/grades', (req, res) => {
+  const result = getCardGrades(getDb(), Number(req.params.id));
+  if (!result) return res.status(404).json({ error: 'No such card.' });
+  res.json(result);
 });

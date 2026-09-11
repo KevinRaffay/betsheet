@@ -1,40 +1,28 @@
-// The static-payload shape (D150): everything the GitHub Pages ticket builder
-// needs about one race day, and nothing else.
+// The static-payload shape (D150, redesigned to v4 by D329): a bundle of one
+// or more race days, each carrying its entries AND every card on it,
+// including grades, for the GitHub Pages read-only viewer (D236 removed
+// construction; this is the schema for what replaces it).
 //
 // PURE and browser-safe - no `node:` import, ever. Two callers share this
 // file so the shape can only be defined once:
 //   * scripts/build-static-payload.js  builds a payload at home,
 //   * the static app (static/src/) reads one in the browser.
 //
-// (A third caller, scripts/import-static-cards.js, used to re-build a payload
-// to verify a returned card was built against the race day this repo still
-// holds - it was deleted along with the static app's card-construction
-// feature, D236. Canonicalization stays here rather than in the builder
-// regardless: `payloadHash` is only worth checking if a reproduction can
-// match it byte for byte, so the hashed text must be a function of the race
-// day alone - never of the clock, of key insertion order, or of which
-// optional flags the build used - and that property is worth keeping for
-// whatever the next verifier turns out to be.)
+// WHAT IS DELIBERATELY NOT HASHED, per day, and why:
+//   * `generatedAt` (top-level) - a build stamp. Hashing it would make every
+//     rebuild a different payload and defeat the whole check.
+//   * `cards` / `grades` - the hash answers "did this day's ENTRIES change,"
+//     not "did the historical record on top of them change." A card being
+//     regraded, or a note being corrected, should not move the hash any more
+//     than adding an unrelated day to the same bundle should - see below.
 //
-// WHAT IS DELIBERATELY NOT HASHED, and why:
-//   * `generatedAt` - a build stamp. Hashing it would make every rebuild a
-//     different payload and defeat the whole check.
-//   * `referenceCards` - `--reference-cards` is an OPTIONAL embed (D150), so
-//     hashing it would make the hash depend on a build flag the importer has
-//     no way to know was used. Contamination is recorded per card instead,
-//     by the `sawReferenceCards` stamp the browser sets when a reference card
-//     is actually revealed - a fact about one card, which is what it is.
-//
-// The hash therefore answers exactly one question: are the entries this
-// ticket was built against still the entries on file at home?
+// THE HASH IS PER DAY, not over the whole bundle. Bundling a second day into
+// a redeploy must not change the hash of a day that did not itself change -
+// a bundle-wide hash would fail that on every single redeploy that adds or
+// drops a day, which defeats the point of a stable per-day fingerprint.
 
 export const STATIC_PAYLOAD_SCHEMA = 'betsheet.static-payload';
-
-// Tracks server/trace-export.js's SCHEMA_VERSION deliberately (D150 spec:
-// "schemaVersion matching the export schema in use") - a payload and the card
-// export it produces are two halves of one round trip, and a reader that
-// understands one version of the pair understands the other.
-export const STATIC_PAYLOAD_SCHEMA_VERSION = 3;
+export const STATIC_PAYLOAD_SCHEMA_VERSION = 4;
 
 /**
  * Deterministic JSON: object keys sorted, arrays kept in order, no
@@ -53,26 +41,26 @@ export function canonicalJson(value) {
   return `{${keys.map((k) => `${JSON.stringify(k)}:${canonicalJson(value[k])}`).join(',')}}`;
 }
 
-/** The slice of a payload `payloadHash` covers - the race day, and only the race day. */
-export function hashedRegion(payload) {
+/** The slice of ONE day's entry a day's own `payloadHash` covers - that day's race day and races, and nothing else. */
+export function hashedRegion(day) {
   return {
-    schema: payload.schema,
-    schemaVersion: payload.schemaVersion,
-    raceDay: payload.raceDay,
-    races: payload.races,
+    schema: STATIC_PAYLOAD_SCHEMA,
+    schemaVersion: STATIC_PAYLOAD_SCHEMA_VERSION,
+    raceDay: day.raceDay,
+    races: day.races,
   };
 }
 
-/** The exact text `payloadHash` is the sha256 of. Callers hash this string as UTF-8. */
-export function canonicalPayloadText(payload) {
-  return canonicalJson(hashedRegion(payload));
+/** The exact text a day's `payloadHash` is the sha256 of. Callers hash this string as UTF-8. */
+export function canonicalPayloadText(day) {
+  return canonicalJson(hashedRegion(day));
 }
 
 // Markup has no business in a payload: parsing happens at home and the
 // browser receives structured data only (D150 hard constraint). This catches
-// a raw-HTML field landing in the payload by accident - a `conditions` string
-// that still carries a navigation strip, say - rather than trusting that the
-// parser upstream always stripped it.
+// a raw-HTML field landing in the payload by accident. Walked over the WHOLE
+// payload, not just the hashed region - v4's card theses/rationales/notes
+// are free text that could smuggle markup and weren't covered before.
 const MARKUP_RE = /<\s*\/?\s*(?:html|head|body|div|span|table|tr|td|th|script|style|a|p|br|img|meta|link)\b|<!DOCTYPE/i;
 
 function walkStrings(value, path, visit) {
@@ -83,13 +71,93 @@ function walkStrings(value, path, visit) {
   }
 }
 
+function validateDay(day, at, problems) {
+  const bad = (message) => problems.push(`${at}: ${message}`);
+
+  if (typeof day?.payloadHash !== 'string' || !/^sha256:[0-9a-f]{64}$/.test(day.payloadHash)) {
+    bad('payloadHash is missing or is not a "sha256:<64 hex>" string');
+  }
+
+  const rd = day?.raceDay;
+  if (!rd || typeof rd !== 'object') { bad('raceDay is missing'); return; }
+  if (!Number.isSafeInteger(rd.raceDayId) || rd.raceDayId <= 0) bad('raceDay.raceDayId is not a positive integer');
+  if (!rd.track) bad('raceDay.track is empty');
+  if (!/^\d{4}-\d{2}-\d{2}$/.test(String(rd.date ?? ''))) bad(`raceDay.date is not YYYY-MM-DD: ${JSON.stringify(rd.date)}`);
+  // meet is null for every track but Del Mar (shared/track-codes.js) - an
+  // absent meet is a fact, not a gap, so only a wrong TYPE is a problem.
+  if (rd.meet !== null && typeof rd.meet !== 'string') bad('raceDay.meet must be a string or null');
+  // timezone is the ONE new raceDay field in v4 - the browser's calendar
+  // needs it to place a race on the Pacific grid and must never carry the
+  // track registry itself to derive it (shared/race-calendar.js's own rule).
+  if (rd.timezone !== null && typeof rd.timezone !== 'string') bad('raceDay.timezone must be a string or null');
+
+  const raceNumbers = new Set();
+  if (!Array.isArray(day.races) || day.races.length === 0) { bad('races is missing or empty'); }
+  else {
+    for (const race of day.races) {
+      const raceAt = `${at} race ${race?.number}`;
+      if (!Number.isSafeInteger(race?.number) || race.number <= 0) { bad(`${raceAt}: number is not a positive integer`); continue; }
+      if (raceNumbers.has(race.number)) bad(`${raceAt}: duplicate race number`);
+      raceNumbers.add(race.number);
+      if (!Array.isArray(race.entries) || race.entries.length === 0) { bad(`${raceAt}: entries is missing or empty`); continue; }
+      const pgms = new Set();
+      for (const e of race.entries) {
+        // snake_case is NOT a slip: the shape the DB itself uses, so a
+        // reader that already understands DB-shaped entries needs no
+        // adapter that could drift.
+        if (typeof e?.program_number !== 'string' || !e.program_number) { bad(`${raceAt}: an entry has no program_number`); continue; }
+        if (pgms.has(e.program_number)) bad(`${raceAt}: duplicate program number ${e.program_number}`);
+        pgms.add(e.program_number);
+        if (typeof e.horse_name !== 'string' || !e.horse_name) bad(`${raceAt}: #${e.program_number} has no horse_name`);
+        if (typeof e.scratched !== 'boolean') bad(`${raceAt}: #${e.program_number} scratched must be a boolean`);
+      }
+    }
+  }
+
+  // Cards/tickets/allocations are deliberately SNAKE_CASE, matching the DB
+  // shape `client/src/components/CardSheet.jsx` (D237) already reads
+  // directly - the same "carry the shape the consuming code already
+  // expects" reasoning as the entries above, applied to the whole card.
+  if (day.cards !== undefined) {
+    if (!Array.isArray(day.cards)) { bad('cards must be an array'); }
+    else {
+      for (const c of day.cards) {
+        const cAt = `${at} card ${c?.id}`;
+        if (c?.id == null) { bad(`${cAt}: id is missing`); continue; }
+        if (!Array.isArray(c.tickets)) { bad(`${cAt}: tickets is missing`); continue; }
+        for (const t of c.tickets) {
+          const tAt = `${cAt} ticket ${t?.sequence}`;
+          if (!Number.isSafeInteger(t?.sequence)) bad(`${tAt}: sequence is not an integer`);
+          if (typeof t?.bet_type !== 'string' || !t.bet_type) bad(`${tAt}: bet_type is missing`);
+          if (!Array.isArray(t?.selections?.legs)) bad(`${tAt}: selections.legs is missing`);
+          if (!Array.isArray(t?.selections?.races)) bad(`${tAt}: selections.races is missing`);
+          if (!Number.isSafeInteger(t?.cost_cents)) bad(`${tAt}: cost_cents is not an integer`);
+          if (typeof t?.teller_call !== 'string' || !t.teller_call) bad(`${tAt}: teller_call is missing`);
+        }
+        if (!Array.isArray(c.allocations)) { bad(`${cAt}: allocations is missing`); }
+        else {
+          for (const a of c.allocations) {
+            if (!raceNumbers.has(a?.race_number)) bad(`${cAt}: allocation references race ${a?.race_number}, not on this day`);
+          }
+        }
+        if (c.grades !== null && c.grades !== undefined) {
+          if (!Array.isArray(c.grades.rows) || typeof c.grades.summary === 'undefined') {
+            bad(`${cAt}: grades must be null or {rows, summary}`);
+          }
+        }
+      }
+    }
+  }
+}
+
 /**
  * Structural validation of a payload, as a list of problems (empty = valid).
  * Never throws - same contract as every parser in this codebase.
  *
- * Deliberately does NOT check `payloadHash` against the content: a caller
- * that wants that recomputes `canonicalPayloadText` and compares, because
- * only the caller knows whether it has the hashing primitive to hand.
+ * Deliberately does NOT check any day's `payloadHash` against its content: a
+ * caller that wants that recomputes `canonicalPayloadText` per day and
+ * compares, because only the caller knows whether it has the hashing
+ * primitive to hand.
  */
 export function validateStaticPayload(payload) {
   const problems = [];
@@ -98,50 +166,23 @@ export function validateStaticPayload(payload) {
   if (!payload || typeof payload !== 'object') { bad('payload is not an object'); return problems; }
   if (payload.schema !== STATIC_PAYLOAD_SCHEMA) bad(`schema is ${JSON.stringify(payload.schema)}, expected ${JSON.stringify(STATIC_PAYLOAD_SCHEMA)}`);
   if (payload.schemaVersion !== STATIC_PAYLOAD_SCHEMA_VERSION) bad(`schemaVersion is ${JSON.stringify(payload.schemaVersion)}, expected ${STATIC_PAYLOAD_SCHEMA_VERSION}`);
-  if (typeof payload.payloadHash !== 'string' || !/^sha256:[0-9a-f]{64}$/.test(payload.payloadHash)) {
-    bad('payloadHash is missing or is not a "sha256:<64 hex>" string');
-  }
 
-  const day = payload.raceDay;
-  if (!day || typeof day !== 'object') bad('raceDay is missing');
-  else {
-    if (!Number.isSafeInteger(day.raceDayId) || day.raceDayId <= 0) bad('raceDay.raceDayId is not a positive integer');
-    if (!day.track) bad('raceDay.track is empty');
-    if (!/^\d{4}-\d{2}-\d{2}$/.test(String(day.date ?? ''))) bad(`raceDay.date is not YYYY-MM-DD: ${JSON.stringify(day.date)}`);
-    // meet is null for every track but Del Mar (shared/track-codes.js) - an
-    // absent meet is a fact, not a gap, so only a wrong TYPE is a problem.
-    if (day.meet !== null && typeof day.meet !== 'string') bad('raceDay.meet must be a string or null');
-  }
-
-  if (!Array.isArray(payload.races) || payload.races.length === 0) bad('races is missing or empty');
-  else {
-    const seen = new Set();
-    for (const race of payload.races) {
-      const at = `race ${race?.number}`;
-      if (!Number.isSafeInteger(race?.number) || race.number <= 0) { bad(`${at}: number is not a positive integer`); continue; }
-      if (seen.has(race.number)) bad(`${at}: duplicate race number`);
-      seen.add(race.number);
-      if (!Array.isArray(race.entries) || race.entries.length === 0) { bad(`${at}: entries is missing or empty`); continue; }
-      const pgms = new Set();
-      for (const e of race.entries) {
-        // snake_case is NOT a slip: shared/parsers/human-picks.js reads
-        // `program_number` / `horse_name` off these rows directly, so the
-        // payload carries the shape the real parser already takes and the
-        // browser needs no adapter that could drift from the server's.
-        if (typeof e?.program_number !== 'string' || !e.program_number) { bad(`${at}: an entry has no program_number`); continue; }
-        if (pgms.has(e.program_number)) bad(`${at}: duplicate program number ${e.program_number}`);
-        pgms.add(e.program_number);
-        if (typeof e.horse_name !== 'string' || !e.horse_name) bad(`${at}: #${e.program_number} has no horse_name`);
-        if (typeof e.scratched !== 'boolean') bad(`${at}: #${e.program_number} scratched must be a boolean`);
+  if (!Array.isArray(payload.raceDays) || payload.raceDays.length === 0) {
+    bad('raceDays is missing or empty');
+  } else {
+    const seenDayIds = new Set();
+    payload.raceDays.forEach((day, i) => {
+      const at = `raceDays[${i}]`;
+      const id = day?.raceDay?.raceDayId;
+      if (id != null) {
+        if (seenDayIds.has(id)) bad(`${at}: duplicate raceDayId ${id}`);
+        seenDayIds.add(id);
       }
-    }
+      validateDay(day, at, problems);
+    });
   }
 
-  if (payload.referenceCards !== null && !Array.isArray(payload.referenceCards)) {
-    bad('referenceCards must be an array or null');
-  }
-
-  walkStrings(hashedRegion(payload), '', (s, path) => {
+  walkStrings(payload, '', (s, path) => {
     if (MARKUP_RE.test(s)) bad(`${path} contains markup - the payload must carry structured data only`);
   });
 
