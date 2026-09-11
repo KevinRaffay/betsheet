@@ -222,7 +222,7 @@ export default function PLView({ onBack, onOpenCard, onOpenDay }) {
                   <td><strong>#{c.cardNumber}</strong></td>
                   <td>{c.template ?? '—'}</td>
                   <td>{c.variant}</td>
-                  <td><code>{c.engineVersion}</code>{c.llmModel && <span className="dim"> ({modelLabel(c.llmModel)})</span>}{c.notesPresent && <span className="tag tag--gold">notes</span>}{c.liveOddsPresent && <span className="tag">board</span>}</td>
+                  <td><code>{c.engineVersion}</code>{c.llmModel && <span className="dim"> ({modelLabel(c.llmModel)})</span>}{c.notesPresent && <span className="tag tag--gold">notes</span>}{c.liveOddsPresent && <span className="tag">board</span>}{c.tipSheetsPresent && <span className="tag">tips</span>}</td>
                   <td><span className={`chip chip--${BUCKET_CHIP[c.completeness] ?? 'guess'}`}>{c.completeness}</span></td>
                   <td>{money(c.bankrollCents)}</td>
                   <td>{money(c.costCents)}</td>

@@ -1030,6 +1030,87 @@ Place | #1 | $20 | Safe.
       reqOf(p3.requestId).live_odds_present === 0);
   }
 
+  // -- D369: does a generation RECORD whether it saw a tip sheet? -----------
+  //
+  // The same shape as the D234 block above, for the third input - plus the one
+  // thing D234's probes could not see: the request row that CREATES a card is
+  // written before the card exists (invariant 9), so it has to be linked at
+  // save, or every per-race read keyed on card_id misses race one.
+  {
+    const wdb = notesDb();
+    const reqOf = (rid) => wdb.prepare('SELECT tip_sheets_present, live_odds_present, card_id, prompt_text FROM llm_card_requests WHERE id = ?').get(rid);
+    const cardOf = (cid) => wdb.prepare('SELECT tip_sheets_present, live_odds_present FROM cards WHERE id = ?').get(cid);
+
+    const before = await (await jpost(`/api/race-days/${dayId}/llm-cards/preview`, {
+      race: 1, __stubResponse: wellFormedResponse(1, 25, 'No sheet yet.'),
+    })).json();
+    check('D369: a generation with NO tip sheet records tip_sheets_present = 0',
+      reqOf(before.requestId).tip_sheets_present === 0 && before.tipSheetsPresent === false, JSON.stringify(before));
+    check('D369: a NEW card\'s first request row has no card yet - the card does not exist before save (invariant 9)',
+      reqOf(before.requestId).card_id === null);
+
+    // Seed a sheet for race 1 the way D176's route stores it.
+    wdb.prepare(`INSERT INTO tip_picks (race_day_id, race_no, source_label, picks, created_at)
+      VALUES (?, 1, 'trackmaster', ?, '2026-08-31T12:00:00Z')`)
+      .run(dayId, JSON.stringify([{ horse_no: '1', rank: 1, horse_name: 'One Runner' }, { horse_no: '2', rank: 2, horse_name: 'Two Runner' }]));
+
+    const t1 = await (await jpost(`/api/race-days/${dayId}/llm-cards/preview`, {
+      race: 1, __stubResponse: wellFormedResponse(1, 25, 'Sheet agrees.'),
+    })).json();
+    check('D369: a generation WITH a tip sheet records tip_sheets_present = 1',
+      reqOf(t1.requestId).tip_sheets_present === 1 && t1.tipSheetsPresent === true, JSON.stringify(reqOf(t1.requestId)));
+    check('D369: and its prompt actually carries the labelled BASELINE PICKS line',
+      reqOf(t1.requestId).prompt_text.includes('\nBASELINE PICKS\ntrackmaster: top #1 One Runner, 2nd #2 Two Runner'));
+    check('D369: the sheet-free generation a moment earlier still reads 0 - the flag is what the CALL saw, not what the day has now',
+      reqOf(before.requestId).tip_sheets_present === 0);
+    check('D369: a sheet is not a board - the same row says live_odds_present = 0',
+      reqOf(t1.requestId).live_odds_present === 0 && t1.liveOddsPresent === false);
+
+    const tsaved = await (await jpost(`/api/race-days/${dayId}/llm-cards`, { race: 1, requestId: t1.requestId, bankrollCents: 20000 })).json();
+    check('D369: persisting a NEW card links its creating request row to the card - race one is no longer orphaned',
+      Number.isInteger(tsaved.cardId) && reqOf(t1.requestId).card_id === tsaved.cardId, JSON.stringify({ tsaved, req: reqOf(t1.requestId) }));
+    check('D369: ...and the unsaved earlier preview stays unlinked - only the row that was saved is claimed',
+      reqOf(before.requestId).card_id === null);
+    check('D369: persisting latches the flag onto the CARD',
+      cardOf(tsaved.cardId).tip_sheets_present === 1);
+    check('D369: ...without inventing a board the card never saw',
+      cardOf(tsaved.cardId).live_odds_present === 0);
+
+    // Race 2 still carries the D234 board and has no sheet: the two latches
+    // must move independently on one card.
+    const t2 = await (await jpost(`/api/race-days/${dayId}/llm-cards/preview`, {
+      race: 2, cardId: tsaved.cardId, __stubResponse: wellFormedResponse(1, 25, 'Board, no sheet.'),
+    })).json();
+    await jpost(`/api/race-days/${dayId}/llm-cards`, { race: 2, requestId: t2.requestId, cardId: tsaved.cardId });
+    check('D369: a later sheet-free race does NOT clear the card flag - it latches',
+      cardOf(tsaved.cardId).tip_sheets_present === 1);
+    check('D369: ...while that race\'s own request row says 0 (and 1 for the board) - per-race truth survives',
+      reqOf(t2.requestId).tip_sheets_present === 0 && reqOf(t2.requestId).live_odds_present === 1);
+    check('D369: the board latch works beside it - the card now carries BOTH flags',
+      cardOf(tsaved.cardId).live_odds_present === 1 && cardOf(tsaved.cardId).tip_sheets_present === 1);
+
+    const reqs = await jget(`/api/cards/${tsaved.cardId}/llm-requests`);
+    check('D369: /cards/:id/llm-requests now lists race ONE (linked at save), with per-race flags on every row',
+      reqs.some((r) => r.raceNumber === 1 && r.tipSheetsPresent === true && r.liveOddsPresent === false)
+      && reqs.some((r) => r.raceNumber === 2 && r.tipSheetsPresent === false && r.liveOddsPresent === true),
+      JSON.stringify(reqs.map((r) => [r.raceNumber, r.tipSheetsPresent, r.liveOddsPresent])));
+
+    const dayCards = await jget(`/api/race-days/${dayId}/cards`);
+    const mine = dayCards.find((c) => c.id === tsaved.cardId);
+    check('D369: the day\'s cards list carries both flags, so the day view can tag them',
+      Boolean(mine) && mine.tip_sheets_present === 1 && mine.live_odds_present === 1, JSON.stringify(mine));
+
+    const pl = await jget('/api/pl?engineVersion=all');
+    const llm = pl.buckets.find((b) => b.completeness === 'LLM_GENERATED');
+    check('D369: /api/pl exposes a byTipSheets split with BOTH sides, sheet-first, summing to the bucket',
+      Array.isArray(llm?.byTipSheets) && llm.byTipSheets.length === 2
+      && llm.byTipSheets[0].tipSheets === true && llm.byTipSheets[0].label === 'Saw tip sheets'
+      && llm.byTipSheets.reduce((a, n) => a + n.cards, 0) === llm.cards
+      && llm.byTipSheets.reduce((a, n) => a + n.plCents, 0) === llm.plCents, JSON.stringify(llm?.byTipSheets));
+    check('D369: every LLM card row echoes tipSheetsPresent as a real boolean',
+      pl.cards.filter((c) => c.completeness === 'LLM_GENERATED').every((c) => typeof c.tipSheetsPresent === 'boolean'));
+  }
+
   dbCheck.close();
 } finally {
   server.kill();

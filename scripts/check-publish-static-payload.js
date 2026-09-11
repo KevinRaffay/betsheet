@@ -165,7 +165,12 @@ try {
   }
 } finally {
   server.kill();
-  fs.rmSync(tmp, { recursive: true, force: true });
+  // D369: the same guard every sibling check carries. On Windows the killed
+  // child can still hold the SQLite file for a moment, and an unguarded
+  // rmSync here threw EPERM AFTER all 21 assertions had passed - failing the
+  // script on teardown alone, identically on main.
+  await new Promise((r) => setTimeout(r, 300));
+  try { fs.rmSync(tmp, { recursive: true, force: true }); } catch { /* win locks */ }
 }
 
 console.log('\n-- NEGATIVE CONTROL: the real committed payload.json was never touched --');

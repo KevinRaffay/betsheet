@@ -102,7 +102,7 @@ function racesRemaining(db, cardId, dayId, excludeRaceId) {
 
 function insertRequestRow(db, {
   raceDayId, cardId, raceNumber, promptText, responseText, model, error, notes,
-  correlationId, systemPromptText, requestParams, liveOddsPresent = false,
+  correlationId, systemPromptText, requestParams, liveOddsPresent = false, tipSheetsPresent = false,
 }) {
   // D92: the notes snapshot rides along on the same insert. It is what makes
   // the log self-describing - the draft in llm_notes is mutable, so a later
@@ -118,8 +118,8 @@ function insertRequestRow(db, {
     INSERT INTO llm_card_requests (race_day_id, card_id, race_number, prompt_text, response_text, model, requested_at, error,
       notes_present, notes_race_text, notes_card_text, notes_source_label, notes_hash, notes_char_count, notes_entered_at, notes_post_result,
       correlation_id, system_prompt_text, system_prompt_hash, user_prompt_hash, notes_rendered_text,
-      prompt_template_id, prompt_template_version, request_params, live_odds_present)
-    VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+      prompt_template_id, prompt_template_version, request_params, live_odds_present, tip_sheets_present)
+    VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
   `).run(raceDayId, cardId ?? null, raceNumber, promptText, responseText ?? null, model ?? null, now(), error ?? null,
     n.notes_present, n.notes_race_text, n.notes_card_text, n.notes_source_label,
     n.notes_hash, n.notes_char_count, n.notes_entered_at, n.notes_post_result,
@@ -128,7 +128,9 @@ function insertRequestRow(db, {
     PROMPT_TEMPLATE_ID, PROMPT_TEMPLATE_VERSION, JSON.stringify(requestParams ?? null),
     // D234: did THIS race's generation carry a board. The per-race truth; the
     // card-level flag below latches from it.
-    liveOddsPresent ? 1 : 0).lastInsertRowid;
+    liveOddsPresent ? 1 : 0,
+    // D369: and did it carry a tip sheet. Same shape, same reason.
+    tipSheetsPresent ? 1 : 0).lastInsertRowid;
 }
 
 /**
@@ -193,10 +195,14 @@ export async function previewLlmRace(db, day, raceNumber, cardId, {
   // the label separately would let the two drift, which is the whole failure
   // mode a stored flag exists to avoid.
   const hasLiveOdds = entries.some((e) => !e.scratched && e.live_odds);
+  // D369: tip sheets, the same way. TIP SHEETS ONLY - the OTR half of the
+  // baseline is a different experiment and stays readable through
+  // server/pick-scoring.js's llmInputsLabel until it earns its own column.
+  const hasTipSheets = baseline.tipsheets.length > 0;
 
   const systemPromptText = buildSystemPrompt({
     hasNotes: notes.present,
-    hasBaseline: baseline.tipsheets.length > 0 || baseline.otrTickets.length > 0,
+    hasBaseline: hasTipSheets || baseline.otrTickets.length > 0,
     // Only when a LIVE horse in this race actually carries a price. A card
     // generated in the morning and one generated at post time therefore
     // differ in their prompt only when the board was really entered.
@@ -237,7 +243,7 @@ export async function previewLlmRace(db, day, raceNumber, cardId, {
   const requestId = insertRequestRow(db, {
     raceDayId: day.id, cardId: card?.id, raceNumber, promptText: userPrompt,
     responseText, model, error: callError, notes,
-    correlationId, systemPromptText, requestParams, liveOddsPresent: hasLiveOdds,
+    correlationId, systemPromptText, requestParams, liveOddsPresent: hasLiveOdds, tipSheetsPresent: hasTipSheets,
   });
 
   if (callError) {
@@ -306,6 +312,7 @@ export async function previewLlmRace(db, day, raceNumber, cardId, {
   return {
     requestId, model, reasoningText: extracted.reasoningText,
     notesPresent: notes.present, notesReport, notesSourceLabel: notes.sourceLabel,
+    liveOddsPresent: hasLiveOdds, tipSheetsPresent: hasTipSheets,
     ...parsed, perRaceBankrollCents: perRaceCents, cardCostCents, bankrollCents,
     overBankroll: cardCostCents > bankrollCents,
   };
@@ -407,13 +414,22 @@ export function persistLlmRace(db, day, { race: raceNumber, requestId, bankrollC
       const newCardId = db.prepare(`INSERT INTO cards
           (race_day_id, card_number, variant, strategy_template_id, bankroll_cents,
            per_race_min_cents, status, correlation_id, consensus_completeness, engine_version, llm_model,
-           notes_present, live_odds_present)
-          VALUES (?, ?, 'default', ?, ?, ?, 'final', ?, 'LLM_GENERATED', 'llm', ?, ?, ?)`)
+           notes_present, live_odds_present, tip_sheets_present)
+          VALUES (?, ?, 'default', ?, ?, ?, 'final', ?, 'LLM_GENERATED', 'llm', ?, ?, ?, ?)`)
         .run(day.id, cardNumber, templateIdFor(db, 'llm'), bankrollCents ?? day.bankroll_cents,
           day.per_race_min_cents ?? null, correlationId, requestRow.model ?? null,
-          requestRow.notes_present ? 1 : 0, requestRow.live_odds_present ? 1 : 0).lastInsertRowid;
+          requestRow.notes_present ? 1 : 0, requestRow.live_odds_present ? 1 : 0,
+          requestRow.tip_sheets_present ? 1 : 0).lastInsertRowid;
       card = db.prepare('SELECT * FROM cards WHERE id = ?').get(newCardId);
     }
+    // D369: link the request row to the card it is being saved onto. The
+    // first race of a NEW card is previewed before the card exists (invariant
+    // 9), so its row was written with card_id NULL - and until D369 nothing
+    // ever set it, which left every per-race read keyed on card_id (D221's
+    // inputs label, D234's saw_board, the modal's /cards/:id/llm-requests)
+    // blind to race one of every card. Only a NULL is filled; a row previewed
+    // against an explicit cardId already carries it and is never rewritten.
+    db.prepare('UPDATE llm_card_requests SET card_id = ? WHERE id = ? AND card_id IS NULL').run(card.id, requestRow.id);
 
     // D92: notes LATCH, they never freeze. Unlike llm_model (fixed at creation,
     // a mismatch is a 409), a user will realistically have commentary for 3 of
@@ -429,6 +445,10 @@ export function persistLlmRace(db, day, { race: raceNumber, requestId, bankrollC
     // lives on llm_card_requests.live_odds_present.
     if (requestRow.live_odds_present) {
       db.prepare('UPDATE cards SET live_odds_present = 1 WHERE id = ? AND live_odds_present = 0').run(card.id);
+    }
+    // D369: and the tip sheets, the third latch of the same shape.
+    if (requestRow.tip_sheets_present) {
+      db.prepare('UPDATE cards SET tip_sheets_present = 1 WHERE id = ? AND tip_sheets_present = 0').run(card.id);
     }
 
     db.prepare('DELETE FROM tickets WHERE card_id = ? AND race_id = ?').run(card.id, race.id);
@@ -611,6 +631,9 @@ llmCardsRouter.get('/cards/:id/llm-requests', (req, res) => {
     // D93: what the badge needs to say whether the draft has MOVED since
     // this generation - the snapshot's own entered-at, not the call time.
     notesPresent: Boolean(r.notes_present), notesEnteredAt: r.notes_entered_at,
+    // D234/D369: what else this race's generation saw, per race - the card
+    // flags latch, so these are the only place the per-race truth is readable.
+    liveOddsPresent: Boolean(r.live_odds_present), tipSheetsPresent: Boolean(r.tip_sheets_present),
   })));
 });
 

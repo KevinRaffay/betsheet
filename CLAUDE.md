@@ -384,6 +384,22 @@ it. Rules still in force:
   `docs/` and a pointer paragraph here - and the pointer is not a courtesy,
   it is what stops the next session rebuilding the table in this file
   because it could not find the real one.
+- **The request row that CREATES an LLM card had no `card_id` until D369 - every per-race read on `llm_card_requests` keyed on `card_id` was blind to race
+  ONE of every card, and three deliverables shipped green on top of it.** The
+  first race of a new card is previewed before the card exists (invariant 9),
+  so `insertRequestRow` wrote `card_id` NULL and nothing ever filled it in.
+  The CARD was always right - `persistLlmRace` latches `notes_present`/
+  `live_odds_present`/`tip_sheets_present` straight from the request row - so
+  only the per-race joins were wrong, which is exactly why D221's inputs
+  label, D234's `saw_board` and the modal's `/cards/:id/llm-requests` list all
+  passed their checks while silently missing the first race of every card (74
+  of 488 rows on the corpus). `persistLlmRace` now fills a NULL `card_id` at
+  save and migration 038 relinked history by correlation id (34 rows, 0
+  ambiguous; the 40 left NULL are previews never saved). **The rule to take
+  forward**: a check for any per-race read of `llm_card_requests` must
+  generate a NEW card (no `cardId` on the preview) and read race one back -
+  D234's probe seeded its request rows with `card_id` already set, which is
+  precisely how the gap stayed invisible.
 - **A blocking parse warning is a REFUSED LINE, not a refused ticket - the
   ticket never existed** (D215). Every blocking path in
   `shared/parsers/human-picks.js` returns without pushing onto `tickets`:
@@ -765,7 +781,17 @@ it. Rules still in force:
   different directories (bash → AppData, node → `C:\tmp`) so use full Windows
   paths for anything node opens; heredocs truncate near 8KB — write long
   files in chunks; git identity may not resolve from the global config —
-  this repo carries a local `user.name`/`user.email`.
+  this repo carries a local `user.name`/`user.email`. **Files may be CRLF on
+  disk** (`core.autocrlf=true`) while Git Bash's `grep`, `cat -A` and
+  `git diff` all show them as LF - so a python/node string match written
+  with a bare LF silently matches nothing (D369, cost three attempts). Read
+  with `newline=''`, normalise CRLF to LF, patch, and write back in the
+  ORIGINAL convention - and check `git ls-files --eol` first: this file is
+  `-text` (never converted by git), so a CRLF write to it lands in the blob
+  verbatim and the next merge conflicts on every line (D369, found live).
+  **And the Bash tool unescapes backslashes before the shell sees them**, so
+  a backslash-r typed inside a quoted heredoc reaches python as a real CR -
+  write such text with the Write tool, never through a heredoc (D369, twice).
 - **Ports**: BetSheet uses api :8788 / vite :5175 for the HUMAN's `npm run dev`
   and for `npm start`. An AGENT's browser-verification stack must use
   `npm run dev:preview` (api :8795 / vite :5185, D97) and never the human's

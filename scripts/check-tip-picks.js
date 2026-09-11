@@ -86,10 +86,14 @@ console.log('-- no HUMAN / LLM / OTR schema was touched --');
   // tip picks into real cards and D174 gave those cards an identity so a
   // re-stake finds them again, so exactly ONE tip_* column exists now, on
   // purpose. Pinned to that one rather than deleted, so a THIRD column would
-  // still have to be a deliberate act.
-  const tipCols = db.prepare('PRAGMA table_info(cards)').all().map((c) => c.name).filter((c) => /tip/i.test(c));
-  check('cards carries exactly one tip_* column, tip_source_label (D174)',
-    tipCols.length === 1 && tipCols[0] === 'tip_source_label', tipCols.join(','));
+  // still have to be a deliberate act. D369 was that act: `tip_sheets_present`
+  // is NOT a TIPSHEET-card identity - it is an LLM card's input flag, the twin
+  // of `live_odds_present`/`notes_present`, recording that the prompt carried
+  // the day's tip sheets. Pinned to exactly these two, so a fourth still has
+  // to be deliberate.
+  const tipCols = db.prepare('PRAGMA table_info(cards)').all().map((c) => c.name).filter((c) => /tip/i.test(c)).sort();
+  check('cards carries exactly two tip_* columns: tip_source_label (D174, identity) and tip_sheets_present (D369, LLM input flag)',
+    tipCols.join(',') === 'tip_sheets_present,tip_source_label', tipCols.join(','));
 }
 
 console.log('-- odds normalize into the format morningLineToDecimal reads --');
