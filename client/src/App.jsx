@@ -7,6 +7,7 @@ import CardView from './components/CardView.jsx';
 import PLView from './components/PLView.jsx';
 import { parseRoute, pathForView } from './routes.js';
 import DistributionView from './components/DistributionView.jsx';
+import PickSourcesView from './components/PickSourcesView.jsx';
 import RaceDayCalendar from './components/RaceDayCalendar.jsx';
 import ReplayDayPicker from './components/ReplayDayPicker.jsx';
 import ReplayDayLanding from './components/ReplayDayLanding.jsx';
@@ -68,6 +69,7 @@ export default function App() {
             onOpen={(id) => navigate({ name: 'day', id })}
             onPL={() => navigate({ name: 'pl' })}
             onDistribution={() => navigate({ name: 'distribution' })}
+            onSources={() => navigate({ name: 'sources' })}
             onReplay={() => navigate({ name: 'replay' })}
             onCalendar={() => navigate({ name: 'calendar' })}
           />
@@ -110,6 +112,12 @@ export default function App() {
         )}
         {view.name === 'distribution' && (
           <DistributionView
+            onBack={() => navigate({ name: 'list' })}
+            onOpenDay={(id) => navigate({ name: 'day', id })}
+          />
+        )}
+        {view.name === 'sources' && (
+          <PickSourcesView
             onBack={() => navigate({ name: 'list' })}
             onOpenDay={(id) => navigate({ name: 'day', id })}
           />
