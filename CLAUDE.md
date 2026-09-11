@@ -542,6 +542,30 @@ it. Rules still in force:
   minted on an unmerged branch in a DIFFERENT clone - if you know of one,
   that is still yours to check by eye. A number in a merged row it now sees
   by itself.
+  **D230 closed the two holes D226 left, and the second one had already
+  cost a renumber.** (a) The seed was read ONCE, when the counter row was
+  absent - correct where the counter is shared and authoritative, wrong in a
+  separate clone, where nothing then ever taught it about a number merged
+  upstream mid-session. (b) `DELIVERABLES.md` in the working tree is only as
+  fresh as that clone's last pull: on 2026-09-11 a cloud session seeded from
+  a checkout topping out at D223 and claimed D224, a number **merged to main
+  69 minutes earlier** (#296 at 02:20Z, the claim at 03:29Z) - and then D225
+  the same way. Both rows had to be renumbered to D228/D229 on rebase. The
+  fix is `syncCounterFloor`: before EVERY claim, raise the counter to
+  `max(counter, local ledger + 1, ORIGIN's ledger + 1)`, reading
+  `origin/main:DELIVERABLES.md` with `git show` after a bounded `git fetch`.
+  It only ever raises, so on a machine whose shared counter is already ahead
+  it is a no-op. **The allocator never REQUIRES a network**: every remote
+  failure path returns null and falls back to the local ledger, `--no-remote`
+  and `BETSHEET_DELIVERABLE_NO_REMOTE=1` opt out, and the CLI says out loud
+  when the strongest check did not run. **What is still NOT fixed, and you
+  should know it**: two clones claiming within the same minute, before either
+  merges, still collide - the window shrinks from "everything merged since my
+  clone" to "everything merged since my last fetch". That residual is the
+  D225 half of the same incident (#298 merged seven minutes AFTER the
+  colliding claim). Closing it needs a server-side atomic claim; see the
+  module header for the shape it would take.
+
 - **A check script's safety assumption about its target can go stale when
   the target changes independently of the check** (D201). D198 shipped
   `check-pull-apify-cli.js`'s "no token" test on the assumption that

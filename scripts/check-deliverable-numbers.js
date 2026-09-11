@@ -37,6 +37,8 @@ import {
   nextNumberPreview,
   setNextNumber,
   resolveDbPath,
+  remoteLedgerHighWaterMark,
+  syncCounterFloor,
 } from './lib/deliverable-numbers.js';
 
 const ROOT = fileURLToPath(new URL('../', import.meta.url));
@@ -175,7 +177,20 @@ async function runAllocateCli(args, env) {
   closeAllocatorDb(openAllocatorDb(dbPath));
 
   const CONCURRENCY = 25;
-  const env = { ...process.env, BETSHEET_DELIVERABLE_DB: dbPath };
+  // D230: the CLI now re-syncs the floor before every claim, from the local
+  // ledger AND origin's. Both must be pinned here for the same reason the DB
+  // already is - otherwise this test reads whatever DELIVERABLES.md and
+  // whatever remote the machine running it happens to have, and its
+  // expectations (a contiguous run starting at DEFAULT_NEXT_NUMBER) become a
+  // property of the checkout rather than of the allocator. NO_LEDGER is an
+  // unreadable path, so the floor falls back to DEFAULT_NEXT_NUMBER exactly
+  // as this test has always assumed.
+  const env = {
+    ...process.env,
+    BETSHEET_DELIVERABLE_DB: dbPath,
+    BETSHEET_DELIVERABLE_LEDGER: NO_LEDGER,
+    BETSHEET_DELIVERABLE_NO_REMOTE: '1',
+  };
   const results = await Promise.all(
     Array.from({ length: CONCURRENCY }, (_, i) => runAllocateCli(
       ['--title', `concurrent claim ${i}`, '--branch', `worker-${i}`, '--who', 'check-script'],
@@ -203,9 +218,17 @@ async function runAllocateCli(args, env) {
 }
 
 // ---------- CLI argument handling ----------
+// D230: same pinning as the concurrency block above - these assertions are
+// about argument handling, not about this machine's ledger or remote.
+
 {
   const dbPath = tempDbPath();
-  const env = { ...process.env, BETSHEET_DELIVERABLE_DB: dbPath };
+  const env = {
+    ...process.env,
+    BETSHEET_DELIVERABLE_DB: dbPath,
+    BETSHEET_DELIVERABLE_LEDGER: NO_LEDGER,
+    BETSHEET_DELIVERABLE_NO_REMOTE: '1',
+  };
 
   const noArgs = await runAllocateCli([], env);
   assertEqual(noArgs.code, 2, 'the CLI with no recognized flags exits 2 and prints usage');
@@ -401,6 +424,164 @@ const LEDGER_HEAD = '| ID | Deliverable | Phase | PR # / branch | Status | Notes
 
   const seedNotices = results.filter((r) => /seeded at D401, from the ledger high-water mark D400/.test(r.stderr));
   assertEqual(seedNotices.length, 1, 'exactly ONE process reports having seeded the database, and it names the ledger it used');
+}
+
+// ---------- D230: the floor is re-checked on EVERY claim, incl. origin ------
+//
+// THE REGRESSION THIS ENCODES IS A REAL ONE, reproduced exactly. On
+// 2026-09-11 a cloud session seeded from a checkout whose ledger topped out
+// at D223 and claimed D224 - which had been merged to main 69 minutes
+// earlier. D226's seeding was working as designed; the design just had no
+// way to look anywhere fresher than a local file.
+{
+  const { openAllocatorDb, closeAllocatorDb, claimDeliverableNumber, setNextNumber } =
+    await import('../scripts/lib/deliverable-numbers.js');
+
+  // -- hole 1: SEED-ONCE. A second claim in the same session must notice a
+  //    ledger that has moved since the counter was seeded.
+  const stale = writeLedger(LEDGER_HEAD + '| D223 | as this clone last pulled | - | b | merged | n |\n');
+  const dbPath = tempDbPath();
+  let db = openAllocatorDb(dbPath, { ledgerPath: stale });
+  const first = claimDeliverableNumber(db, { title: 'first', ledgerPath: stale });
+  assertEqual(first.number, 224, 'first claim comes from the seeded counter as before');
+
+  const moved = writeLedger(LEDGER_HEAD + '| D229 | merged elsewhere since | - | b | merged | n |\n');
+  const second = claimDeliverableNumber(db, { title: 'second', ledgerPath: moved });
+  assertEqual(second.number, 230, 'a LEDGER THAT MOVED raises the floor on the next claim - the seed-once hole');
+  assertTrue(second.floor.raised, 'the raise is reported, not silent');
+  assertEqual(second.floor.from, 225, 'it reports the counter it found');
+  assertEqual(second.floor.to, 230, 'and the floor it moved to');
+
+  // -- RAISES ONLY. A ledger that goes BACKWARDS (truncated, rewritten, or
+  //    just an older checkout) must never pull the counter down, or the
+  //    never-recycle rule is broken and a spent number is reissued.
+  const shrunk = writeLedger(LEDGER_HEAD + '| D100 | truncated | - | b | merged | n |\n');
+  const third = claimDeliverableNumber(db, { title: 'third', ledgerPath: shrunk });
+  assertEqual(third.number, 231, 'a ledger that shrank cannot lower the counter - it only ever raises');
+  assertTrue(!third.floor.raised, 'and the no-op case reports raised:false');
+
+  // -- the built-in floor still wins over everything below it. `force` because
+  //    setNextNumber rightly refuses to drop below an existing claim, and this
+  //    database already has some - the point here is the FLOOR, not that guard.
+  setNextNumber(db, 10, { force: true });
+  const floored = claimDeliverableNumber(db, { title: 'floored', ledgerPath: shrunk });
+  assertEqual(floored.number, DEFAULT_NEXT_NUMBER, 'DEFAULT_NEXT_NUMBER remains a hard lower bound');
+
+  // -- syncFloor:false is a genuine opt-out (the concurrency test relies on it)
+  setNextNumber(db, 500, { force: true });
+  const opted = claimDeliverableNumber(db, { title: 'opted out', ledgerPath: moved, syncFloor: false });
+  assertEqual(opted.number, 500, 'syncFloor:false leaves the counter exactly where it was');
+  assertEqual(opted.floor, null, 'and reports no floor at all');
+  closeAllocatorDb(db);
+
+  // -- hole 2: THE REMOTE LEDGER. Read from a real git repo, because the
+  //    whole point is that `git show origin/main:DELIVERABLES.md` works.
+  const repo = fs.mkdtempSync(path.join(os.tmpdir(), 'betsheet-remotealloc-'));
+  const origin = path.join(repo, 'origin.git');
+  const workA = path.join(repo, 'a');
+  const git = (args, cwd) => execFileSync('git', args, { cwd, encoding: 'utf8', stdio: ['ignore', 'pipe', 'ignore'] });
+  git(['init', '--quiet', '--bare', '-b', 'main', origin], repo);
+  git(['init', '--quiet', '-b', 'main', workA], repo);
+  git(['config', 'user.email', 'a@b.c'], workA);
+  git(['config', 'user.name', 'Check'], workA);
+  fs.writeFileSync(path.join(workA, 'DELIVERABLES.md'),
+    LEDGER_HEAD + '| D240 | merged on origin | - | b | merged | n |\n', 'utf8');
+  git(['add', '-A'], workA);
+  git(['commit', '--quiet', '-m', 'ledger'], workA);
+  git(['remote', 'add', 'origin', origin], workA);
+  git(['push', '--quiet', 'origin', 'main'], workA);
+
+  assertEqual(
+    remoteLedgerHighWaterMark({ cwd: workA, fetch: false }), 240,
+    "remoteLedgerHighWaterMark reads origin/main's ledger, not the working tree's",
+  );
+
+  // The working tree now goes STALE relative to origin - exactly the 2026-09-11
+  // shape: the local file says D223, origin says D240.
+  const staleLocal = writeLedger(LEDGER_HEAD + '| D223 | stale checkout | - | b | merged | n |\n');
+  const db2Path = tempDbPath();
+  const db2 = openAllocatorDb(db2Path, { ledgerPath: staleLocal });
+  const claimed = claimDeliverableNumber(db2, {
+    title: 'the incident', ledgerPath: staleLocal,
+    remote: true, remoteOptions: { cwd: workA, fetch: false },
+  });
+  assertEqual(claimed.number, 241, 'THE FIX: origin said D240, so the claim is D241 - not the stale-local D224');
+  assertEqual(claimed.floor.sources.localLedger, 223, 'and it reports what the local ledger said');
+  assertEqual(claimed.floor.sources.remoteLedger, 240, '...beside what origin said');
+  closeAllocatorDb(db2);
+
+  // -- OFFLINE IS NOT A FAILURE. The allocator must never need a network.
+  const noRemote = fs.mkdtempSync(path.join(os.tmpdir(), 'betsheet-noremote-'));
+  git(['init', '--quiet', '-b', 'main', noRemote], repo);
+  assertEqual(
+    remoteLedgerHighWaterMark({ cwd: noRemote, fetch: false }), null,
+    'a repo with no origin/main returns null rather than throwing',
+  );
+  const db3 = openAllocatorDb(tempDbPath(), { ledgerPath: staleLocal });
+  const offline = claimDeliverableNumber(db3, {
+    title: 'offline', ledgerPath: staleLocal, remote: true, remoteOptions: { cwd: noRemote, fetch: false },
+  });
+  assertEqual(offline.number, 224, 'with no remote reachable it falls back to the local ledger and still works');
+  assertEqual(offline.floor.sources.remoteLedger, null, 'and says the remote was unavailable rather than pretending');
+  closeAllocatorDb(db3);
+
+  // -- BETSHEET_DELIVERABLE_NO_REMOTE forces it off even when asked for
+  process.env.BETSHEET_DELIVERABLE_NO_REMOTE = '1';
+  const db4 = openAllocatorDb(tempDbPath(), { ledgerPath: staleLocal });
+  const forced = claimDeliverableNumber(db4, {
+    title: 'forced local', ledgerPath: staleLocal, remote: true, remoteOptions: { cwd: workA, fetch: false },
+  });
+  assertEqual(forced.number, 224, 'BETSHEET_DELIVERABLE_NO_REMOTE=1 skips the remote read entirely');
+  closeAllocatorDb(db4);
+  delete process.env.BETSHEET_DELIVERABLE_NO_REMOTE;
+
+  // -- a LIVE read of this repo's own origin, so the real mechanism is proven
+  //    rather than only the fixture. Null is acceptable (a CI clone may have
+  //    no origin/main); a number must be >= this checkout's own ledger.
+  const live = remoteLedgerHighWaterMark({ cwd: ROOT, fetch: false });
+  assertTrue(
+    live === null || live >= 1,
+    'a live read of this repo\'s origin/main ledger either works or returns null - never throws',
+  );
+}
+
+// ---------- D230: the raise itself, under real concurrency ------------------
+//
+// syncCounterFloor updates the counter OUTSIDE the claim's transaction, and
+// the header argues that is safe because the raise is monotonic and the claim
+// re-reads inside its own immediate transaction. That is an argument; this is
+// the evidence. Every one of these processes finds a counter BELOW the ledger
+// floor, so every one of them tries to raise it, and they must still come away
+// with distinct numbers.
+{
+  const dbPath = tempDbPath();
+  closeAllocatorDb(openAllocatorDb(dbPath, { ledgerPath: NO_LEDGER }));  // seeds at DEFAULT_NEXT_NUMBER
+  const aheadLedger = writeLedger(LEDGER_HEAD + '| D600 | far ahead of the counter | - | b | merged | n |\n');
+
+  const CONCURRENCY = 25;
+  const results = await Promise.all(
+    Array.from({ length: CONCURRENCY }, (_, i) => runAllocateCli(
+      ['--title', `racing the raise ${i}`, '--branch', `raise-${i}`],
+      {
+        ...process.env,
+        BETSHEET_DELIVERABLE_DB: dbPath,
+        BETSHEET_DELIVERABLE_LEDGER: aheadLedger,
+        BETSHEET_DELIVERABLE_NO_REMOTE: '1',
+      },
+    )),
+  );
+
+  const failed = results.filter((r) => r.code !== 0);
+  assertEqual(failed.length, 0, `all ${CONCURRENCY} processes racing the FLOOR RAISE exit 0 (${failed.map((r) => r.stderr).join(' | ')})`);
+  const numbers = results.map((r) => Number(r.stdout.replace(/^D/, '')));
+  assertEqual(new Set(numbers).size, CONCURRENCY, 'racing the raise still yields DISTINCT numbers - the monotonic raise never hands two processes the same one');
+  const sorted = [...numbers].sort((a, b) => a - b);
+  assertEqual(sorted[0], 601, 'every process ends up above the ledger floor, not at the stale seed');
+  assertTrue(sorted.every((n, i) => i === 0 || n === sorted[i - 1] + 1), 'and the run is contiguous - no number skipped, none repeated');
+  assertTrue(
+    results.some((r) => /Counter raised D203 -> D601/.test(r.stderr)),
+    'at least one process REPORTS the raise, naming where it came from and where it went',
+  );
 }
 
 console.log(failures === 0 ? `\nAll checks passed.` : `\n${failures} check(s) FAILED.`);

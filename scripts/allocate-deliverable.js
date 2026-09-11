@@ -39,10 +39,12 @@ const USAGE = `Usage:
   npm run allocate-deliverable -- --title "Short title" [--branch name] [--who name]
   npm run allocate-deliverable -- --list [--status claimed|released|all]
   npm run allocate-deliverable -- --status <number>
-  npm run allocate-deliverable -- --release <number> --reason "..."`;
+  npm run allocate-deliverable -- --release <number> --reason "..."
+
+  --no-remote   skip the origin/main ledger check (D230); local ledger only`;
 
 function parseArgs(argv) {
-  const out = { title: null, branch: null, who: null, list: false, status: null, release: null, reason: null };
+  const out = { title: null, branch: null, who: null, list: false, status: null, release: null, reason: null, remote: true };
   for (let i = 0; i < argv.length; i++) {
     const a = argv[i];
     if (a === '--title') { out.title = argv[++i]; continue; }
@@ -52,6 +54,10 @@ function parseArgs(argv) {
     if (a === '--status') { out.status = argv[++i]; continue; }
     if (a === '--release') { out.release = argv[++i]; continue; }
     if (a === '--reason') { out.reason = argv[++i]; continue; }
+    // D230: the remote ledger read is ON by default - a clone that cannot see
+    // another machine's counter is exactly the one that needs it. This opts
+    // out for an offline machine or a deliberately air-gapped run.
+    if (a === '--no-remote') { out.remote = false; continue; }
   }
   return out;
 }
@@ -100,11 +106,33 @@ try {
     console.error(`D${n} marked released${args.reason ? ` (${args.reason})` : ''}. The number will never be reissued.`);
     console.log(JSON.stringify(row));
   } else if (args.title) {
-    const { number, claimedAt } = claimDeliverableNumber(db, {
+    const { number, claimedAt, floor } = claimDeliverableNumber(db, {
       title: args.title,
       branch: args.branch,
       claimedBy: args.who,
+      remote: args.remote,
     });
+    // D230: say out loud when the floor moved, and where it came from. A raise
+    // means this clone's counter was BEHIND a number already merged somewhere
+    // else - the silent version of that is what produced the D224/D225
+    // collision, where a stale local ledger looked authoritative and nothing
+    // reported that origin disagreed.
+    if (floor?.raised) {
+      const src = floor.sources;
+      console.error(
+        `Counter raised D${floor.from} -> D${floor.to} before claiming: `
+        + `local ledger ${src.localLedger === null ? 'unreadable' : `D${src.localLedger}`}, `
+        + `origin ledger ${src.remoteLedger === null ? 'unavailable' : `D${src.remoteLedger}`}. `
+        + 'A number below this is already spent somewhere.',
+      );
+    } else if (args.remote && floor && floor.sources.remoteLedger === null) {
+      // Not an error - the allocator must work offline - but the caller is
+      // owed the fact that the strongest check did not actually run.
+      console.error(
+        'Could not read origin\'s DELIVERABLES.md, so this claim was checked against '
+        + 'the LOCAL ledger only. If this clone is behind main, verify the number.',
+      );
+    }
     console.error(`Claimed D${number} at ${claimedAt} for "${args.title}"${args.branch ? ` on branch ${args.branch}` : ''}.`);
     console.log(`D${number}`);
   } else {
