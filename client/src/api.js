@@ -398,16 +398,13 @@ export const deleteTipPicks = (tipId, correlationId) =>
 export const getDayTipScoring = (dayId, correlationId) =>
   fetch(`/api/race-days/${dayId}/tip-scoring`, { headers: hdr(correlationId) }).then(asJson);
 
-/** TIPSHEET staking (D171): preview the three variants, then write them. */
-export const previewTipCards = (dayId, sourceLabel, correlationId) =>
-  fetch(`/api/race-days/${dayId}/tip-cards/preview`, {
-    method: 'POST', headers: hdr(correlationId), body: JSON.stringify({ sourceLabel }),
-  }).then(asJson);
-
-export const saveTipCards = (dayId, sourceLabel, correlationId) =>
-  fetch(`/api/race-days/${dayId}/tip-cards`, {
-    method: 'POST', headers: hdr(correlationId), body: JSON.stringify({ sourceLabel }),
-  }).then(asJson);
+// TIPSHEET staking (D171) is no longer triggered from the client at all: a
+// tip sheet stakes itself, server-side, the moment it's saved, corrected or
+// deleted (`autoStake` in server/tip-picks.js, replacing D183's "Stake all
+// tip sheets into cards" button). `POST .../tip-cards/preview` and
+// `POST .../tip-cards` still exist server-side as the mechanism auto-staking
+// calls into and as a manual escape hatch, but nothing in the UI calls them
+// directly any more.
 
 // ---- P/L display (D175) ------------------------------------------------
 //
