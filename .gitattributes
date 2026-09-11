@@ -16,3 +16,11 @@ scripts/git-hooks/* text eol=lf
 # were frozen - which defeats the point of an archive and invalidates the
 # sha256 recorded in its README. Same reasoning as tests/fixtures/**.
 archive/** -text
+
+# scripts/build-static-payload.js writes this with plain LF newlines (Node's
+# fs.writeFileSync adds none of its own). With core.autocrlf=true, Git was
+# about to rewrite it to CRLF on next checkout - harmless to the JSON itself,
+# but it would make every regenerated payload diff as fully changed. Same
+# "generated data file, not source text" reasoning as tests/fixtures/** and
+# archive/** above.
+static/public/payload.json -text

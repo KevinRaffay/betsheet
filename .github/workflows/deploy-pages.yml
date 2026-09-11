@@ -10,6 +10,18 @@
 # deliberate exception" note for what that changes about why this app exists
 # at all.
 #
+# THE TRIGGER IS `deploy-static-app`, NOT `main` (D345). Publishing a new
+# snapshot is a casual, frequent, data-only act - refresh the corpus, run the
+# builder (or the UI's "Publish snapshot", D336), commit, push - and it does
+# not belong in `main`'s history, which this repo's delivery workflow
+# (CLAUDE.md) reserves for one-deliverable-per-PR code changes. `main`'s
+# pre-push hook only blocks `main`/`master` (`scripts/git-hooks/pre-push`), so
+# `deploy-static-app` takes a direct `git push` with no PR required - publish
+# a snapshot by pushing straight to it (merge or fast-forward from `main` to
+# pick up code changes, then push the payload commit on top; the branch need
+# not always be exactly even with `main`). `workflow_dispatch` still works for
+# a manual re-run against whatever the branch currently holds.
+#
 # The build is deliberately the only thing this workflow can do. It has no
 # database, no secrets and no network access to anything but npm - every piece
 # of race data it publishes was committed by a person who ran the payload
@@ -41,7 +53,7 @@ name: Deploy static app
 on:
   workflow_dispatch:
   push:
-    branches: [main]
+    branches: [deploy-static-app]
     paths:
       # The payload is the race day, so a payload commit is a deploy.
       - 'static/**'
