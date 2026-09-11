@@ -339,6 +339,49 @@ try {
   const trackMismatchUpload = await jpostPdf(`/api/race-days/${saDay.id}/equibase-otr`, pdfBytes);
   check('track mismatch (same date, different track): refused with 422', trackMismatchUpload.status === 422);
 
+  // -------- 7b. sheet prints more races than the day has on file --------
+  // Found live: GP 2026-09-11, a 15-race sheet confirmed against a 9-race
+  // day (entries ingestion only captured the main card). Before the fix,
+  // confirmEquibaseOtr's raceIdByNumber[r.race] was undefined for the
+  // unmatched races and better-sqlite3 threw ("NOT NULL constraint failed:
+  // allocations.race_id") uncaught - a 500, and NONE of the three cards
+  // were saved, not even for the races that matched fine.
+  const gapDate = '2026-08-07';
+  const gapPdfBytes = fs.readFileSync(path.join(FIXTURE_DIR, `DMR-${gapDate}.pdf`));
+  const gapGoldenRaces = allParsed[gapDate].races; // 8 races, parsed in section 1b above
+  const gapRaces = gapGoldenRaces.filter((r) => r.race <= 6).map((r) => {
+    const referenced = [r.showPick, r.winPick, ...r.box4, ...r.box3].map(Number);
+    const max = Math.max(...referenced, 1);
+    return {
+      number: r.race, raceType: 'CLAIMING', conditions: 'synthetic (race-count-gap check)',
+      entries: Array.from({ length: max }, (_, i) => ({
+        programNumber: String(i + 1), horseName: `Horse ${i + 1}`, morningLine: '5/1', morningLineDecimal: 5,
+      })),
+    };
+  });
+  const gapDay = await (await jpost('/api/race-days', {
+    track: 'Del Mar', date: gapDate, bankrollCents: 20000, perRaceMinCents: 500, races: gapRaces,
+  })).json();
+  check('gap day seeded with only races 1-6 (this sheet has 8)', Number.isInteger(gapDay.id) && gapRaces.length === 6);
+
+  const gapPreview = await (await jpostPdf(`/api/race-days/${gapDay.id}/equibase-otr`, gapPdfBytes)).json();
+  check('gap preview: races 7 and 8 flagged otr_unmatched_race, non-blocking',
+    [7, 8].every((n) => gapPreview.warnings.some((w) => w.type === 'otr_unmatched_race' && w.race === n && w.blocking === false)),
+    JSON.stringify(gapPreview.warnings.filter((w) => w.type === 'otr_unmatched_race')));
+  check('gap preview: only the 6 matching races are carried through to ticket construction',
+    gapPreview.races.length === 6 && gapPreview.races.every((r) => r.race <= 6),
+    JSON.stringify(gapPreview.races.map((r) => r.race)));
+
+  const gapConfirmRes = await jpost(`/api/race-days/${gapDay.id}/equibase-otr/confirm`, { parseToken: gapPreview.parseToken });
+  const gapConfirm = await gapConfirmRes.json();
+  check('gap confirm: 201, not 500 - three cards created despite the sheet overrunning the day\'s races',
+    gapConfirmRes.status === 201 && gapConfirm.cards?.length === 3, JSON.stringify({ status: gapConfirmRes.status, body: gapConfirm }));
+
+  const gapCards = await jget(`/api/race-days/${gapDay.id}/cards`);
+  const gapBoth = gapCards.find((c) => c.variant === 'both');
+  check('gap "both" card: exactly 6 races\' worth of tickets (4/race), none for the missing 7/8',
+    gapBoth?.tickets === 24, JSON.stringify(gapBoth));
+
   // -------- 8. bucket isolation in P/L against the engine's own bucket, HUMAN, LLM_GENERATED --------
   // (This fixture day carries entries only, no program PDF, so the
   // live-generated lean card lands in ODDS_ONLY per D40 - not
