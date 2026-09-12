@@ -242,6 +242,16 @@ npm run gh -- pr list    # the GitHub API, through the credential git already ha
   the full argument and for why the first number under the new scheme jumped
   straight to D324 rather than continuing from D237.
 - Feature branches off `main`, short kebab-case names, PR into `main`.
+  **Every deliverable gets its own fresh branch, created directly from
+  `origin/main` at the moment of claim** (user rule, 2026-09-12). Never reuse,
+  stack, or extend an old branch from a prior deliverable to a new one - a
+  disjoint branch per D-number ensures that unrelated work does not accumulate,
+  and a fresh base prevents rebase conflicts that only exist in isolation from
+  the main line. This rule is structural rather than a preference: two
+  concurrent PRs merged to `main` since your last branch point will conflict
+  with your old base but will already be resolved on an `origin/main` pulled
+  fresh, and there is no in-between state worth keeping. The branch may be
+  deleted after merge.
   **Claude opens AND merges its own PRs into `main`, without asking each
   time** - a standing authorization for the duration of this project (user
   decision 2026-09-05, D106). It supersedes the per-PR rule D101 introduced,
