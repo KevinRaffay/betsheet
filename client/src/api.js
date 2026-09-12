@@ -176,10 +176,11 @@ export const pullApifyResults = (dayId, correlationId) =>
 export const getResults = (dayId) =>
   fetch(`/api/race-days/${dayId}/results`).then(asJson);
 
-export const getPL = (engineVersion, meet) => {
+export const getPL = (engineVersion, track, date) => {
   const q = new URLSearchParams();
   if (engineVersion) q.set('engineVersion', engineVersion);
-  if (meet && meet !== 'all') q.set('meet', meet);
+  if (track && track !== 'all') q.set('track', track);
+  if (date && date !== 'all') q.set('date', date);
   const qs = q.toString();
   return fetch(`/api/pl${qs ? `?${qs}` : ''}`).then(asJson);
 };
