@@ -45,6 +45,7 @@ function Meeting({ day }) {
         {s.graded > 0 && <> · <span className={plClass(s.plCents)}>{signedMoney(s.plCents)}</span> on {s.graded} graded</>}
         {s.hasResults && s.graded === 0 && ' · results in'}
       </p>
+      {s.hasOTR && <span className="tag">OTR</span>}
       <button type="button" className="btn btn--primary meeting__cta" onClick={() => navigate(`/day/${day.raceDay.raceDayId}`)}>
         View picks →
       </button>
