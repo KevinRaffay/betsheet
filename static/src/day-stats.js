@@ -12,8 +12,8 @@ const liveRunners = (race) => race.entries.filter((e) => !e.scratched).length;
 export function dayStats(day) {
   const runners = day.races.reduce((n, r) => n + liveRunners(r), 0);
   const graded = day.cards.filter((c) => c.grades?.summary);
-  const otrCards = day.cards.filter((c) => c.template === 'equibase-otr');
-  const llmCards = day.cards.filter((c) => c.completeness === 'LLM_GENERATED');
+  const otrCards = day.cards.filter((c) => c.consensus_completeness === 'EQB_OTR');
+  const llmCards = day.cards.filter((c) => c.consensus_completeness === 'LLM_GENERATED');
   return {
     races: day.races.length,
     runners,
