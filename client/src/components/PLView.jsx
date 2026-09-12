@@ -217,7 +217,7 @@ export default function PLView({ onBack, onOpenCard, onOpenDay }) {
               </tr>
             </thead>
             <tbody>
-              {d.cards.map((c) => (
+              {d.cards.filter((c) => version === 'all' || version === '' || c.engineVersion === version).map((c) => (
                 <tr key={c.cardId} onClick={() => onOpenCard(c.cardId, c.raceDayId)}>
                   <td><strong>#{c.cardNumber}</strong></td>
                   <td>{c.template ?? '—'}</td>
