@@ -1064,6 +1064,7 @@ it. Rules still in force:
   the PAGE still rendered (`#root` still has children) - "the modal is gone" is
   also true when the app has crashed.
 - **`check-static-app` is IN SCOPE - HOUSE RULE** (user rule, 2026-09-12, supersedes D168). Run it in all contexts including git worktrees. The prior ruling (D168, 2026-09-08) that it was out of scope is no longer valid. `npm run check-static-app` must pass before every PR merge.
+- **Desktop app changes are the default; static app changes are the exception - HOUSE RULE** (user rule, 2026-09-12). Going forward, unless explicitly instructed otherwise, make changes to the desktop app (`client/src/`, `server/`) only. Static app changes (`static/src/`) require explicit instruction and are treated case-by-case, not as a default reflex. The two apps share some imports but have distinct use cases and release cadences.
 - **A race-specific input or edit belongs in the Race UI component - HOUSE
   RULE** (user rule, 2026-09-08, D182/D184). If a thing is an opinion about,
   or a property of, ONE race, the place to type it is that race's own panel,
