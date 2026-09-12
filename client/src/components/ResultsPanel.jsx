@@ -9,8 +9,9 @@ const money = (cents) => (cents == null ? '' : `$${(cents / 100).toFixed(2)}`);
 // The results section of a stored race day: upload the chart PDF, review
 // the READ-ONLY preview (invariant 9 - corrections happen in the source,
 // then re-upload), save. Saved results replace the day's prior results;
-// the chart provenance log appends.
-export default function ResultsPanel({ dayId }) {
+// the chart provenance log appends. onSaved callback fires after save so the
+// parent can refresh graded cards (D385: same pattern as EquibaseOtrPanel).
+export default function ResultsPanel({ dayId, onSaved }) {
   const [data, setData] = useState(null);
   const [preview, setPreview] = useState(null);
   const [correlationId, setCorrelationId] = useState(null);
@@ -55,6 +56,7 @@ export default function ResultsPanel({ dayId }) {
       }, correlationId);
       setPreview(null);
       await reload();
+      onSaved?.();
     } catch (e) { setError(String(e.message)); } finally { setBusy(false); }
   };
 
