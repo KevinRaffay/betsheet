@@ -273,8 +273,8 @@ export default function RaceDayList({ onOpen, onOpenRace, onNew, onPL, onDistrib
                 <td>{d.graded ? 'Yes' : '—'}</td>
                 <td className="dim">{formatPacific(showDeleted ? d.deleted_at : d.created_at)}</td>
                 <td className="tags-cell">
-                  {d.hasOTR && <span className="tag">OTR</span>}
-                  {d.hasLLM && <span className="tag">LLM</span>}
+                  {d.hasOTR ? <span className="tag">OTR</span> : null}
+                  {d.hasLLM ? <span className="tag">LLM</span> : null}
                 </td>
                 {showDeleted && (
                   <td>
