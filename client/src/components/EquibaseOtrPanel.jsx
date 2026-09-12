@@ -25,33 +25,24 @@ export default function EquibaseOtrPanel({ dayId, onSaved }) {
       .catch(() => {});
   }, [dayId, confirmed]);
 
-  const handlePreview = async () => {
+  const handleUpload = async () => {
     setBusy(true);
     setError(null);
+    setPreview(null);
     setConfirmed(null);
     try {
-      setPreview(await equibaseOtrPreview(dayId, file));
-    } catch (e) {
-      setError(String(e.message));
-    } finally {
-      setBusy(false);
-    }
-  };
+      const previewData = await equibaseOtrPreview(dayId, file);
+      setPreview(previewData);
 
-  const handleConfirm = async () => {
-    setBusy(true);
-    setError(null);
-    try {
-      const result = await equibaseOtrConfirm(dayId, preview.parseToken);
+      // Auto-confirm and generate cards if there are no blocking errors
+      // (warnings are shown but don't block generation)
+      const result = await equibaseOtrConfirm(dayId, previewData.parseToken);
       setConfirmed(result);
-      setPreview(null);
       setFile(null);
-      // The three new cards land in CardsPanel's own table, a sibling this
-      // panel has no reference to - without this it only reappeared after a
-      // full page reload remounted everything.
       onSaved?.();
     } catch (e) {
       setError(String(e.message));
+      setPreview(null);
     } finally {
       setBusy(false);
     }
@@ -74,6 +65,19 @@ export default function EquibaseOtrPanel({ dayId, onSaved }) {
 
       {error && <p className="notice notice--error">{error}</p>}
 
+      {hadPriorCards && !confirmed && (
+        <p className="notice notice--warn">
+          This day already has Equibase OTR cards - uploading ADDS three more (append-only), it never replaces them.
+        </p>
+      )}
+
+      {preview && preview.warnings.length > 0 && (
+        <div className="notice notice--warn">
+          <strong>{preview.warnings.length} warning{preview.warnings.length === 1 ? '' : 's'}:</strong>
+          <ul>{preview.warnings.map((w, i) => <li key={i}>{w.message}</li>)}</ul>
+        </div>
+      )}
+
       {confirmed && (
         <p className="notice">
           Saved {confirmed.cards.length} card{confirmed.cards.length === 1 ? '' : 's'}
@@ -85,51 +89,10 @@ export default function EquibaseOtrPanel({ dayId, onSaved }) {
         <input type="file" accept="application/pdf" onChange={(e) => setFile(e.target.files?.[0] ?? null)} />
       </div>
       <div className="formrow">
-        <button className="btn" disabled={busy || !file} onClick={handlePreview}>
-          {busy ? 'Working…' : 'Preview'}
+        <button className="btn btn--primary" disabled={busy || !file} onClick={handleUpload}>
+          {busy ? 'Generating cards…' : 'Upload & generate cards'}
         </button>
       </div>
-
-      {preview && (
-        <>
-          <p className="dim">
-            Read-only preview. To correct something, fix the PDF and preview again.
-            {' '}Header read as <strong>{preview.parsedTrack ?? '?'}</strong>, <strong>{preview.parsedDate ?? '?'}</strong>.
-          </p>
-          {hadPriorCards && (
-            <p className="notice notice--warn">
-              This day already has Equibase OTR cards - confirming ADDS three more (append-only), it never replaces them.
-            </p>
-          )}
-          {preview.warnings.length > 0 && (
-            <div className="notice notice--warn">
-              <ul>{preview.warnings.map((w, i) => <li key={i}>{w.message}</li>)}</ul>
-            </div>
-          )}
-          <p className="dim">
-            Totals: some-reward {dollars(preview.variantTotals['some-reward'])}
-            {' '}· higher-reward {dollars(preview.variantTotals['higher-reward'])}
-            {' '}· both {dollars(preview.variantTotals.both)}
-          </p>
-          <table className="grid">
-            <thead><tr><th>Race</th><th>Tier</th><th>Bet</th><th>Say to the teller</th><th>Cost</th></tr></thead>
-            <tbody>
-              {rows.map((t, i) => (
-                <tr key={i}>
-                  <td className="dim">{t.race}</td>
-                  <td>{VARIANT_LABEL[t.tier]}</td>
-                  <td className="dim">{t.betType.replace(/_/g, ' ')}</td>
-                  <td>{t.tellerCall}</td>
-                  <td className="dim">{dollars(t.costCents)}</td>
-                </tr>
-              ))}
-            </tbody>
-          </table>
-          <button className="btn btn--primary" disabled={busy || preview.races.length === 0} onClick={handleConfirm}>
-            Confirm &amp; save three cards
-          </button>
-        </>
-      )}
     </details>
   );
 }

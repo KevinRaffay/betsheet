@@ -17,6 +17,7 @@ import { getNextRace } from '../api.js';
 export default function NextRaceCard({ onOpenRace, refreshKey }) {
   const [state, setState] = useState(null);
   const [error, setError] = useState(null);
+  const [minutesUntil, setMinutesUntil] = useState(null);
 
   useEffect(() => {
     let cancelled = false;
@@ -27,6 +28,25 @@ export default function NextRaceCard({ onOpenRace, refreshKey }) {
     // its own stale response.
     return () => { cancelled = true; };
   }, [refreshKey]);
+
+  useEffect(() => {
+    if (!state?.next?.at) {
+      setMinutesUntil(null);
+      return;
+    }
+
+    const updateCountdown = () => {
+      const now = new Date();
+      const raceTime = new Date(state.next.at);
+      const diff = raceTime - now;
+      const minutes = Math.ceil(diff / (1000 * 60));
+      setMinutesUntil(minutes > 0 ? minutes : null);
+    };
+
+    updateCountdown();
+    const interval = setInterval(updateCountdown, 60 * 1000);
+    return () => clearInterval(interval);
+  }, [state?.next?.at]);
 
   if (error) return <p className="notice notice--error">Next race: {error}</p>;
   if (!state) return null;
@@ -39,7 +59,9 @@ export default function NextRaceCard({ onOpenRace, refreshKey }) {
   return (
     <section className="next-race">
       <div>
-        <div className="eyebrow">Next race</div>
+        <div className="eyebrow">
+          {minutesUntil ? `${minutesUntil} MINUTE${minutesUntil === 1 ? '' : 'S'} TO NEXT RACE` : 'Next race'}
+        </div>
         {next ? (
           <>
             <div className="next-race__what">{next.track} · Race {next.number}</div>
