@@ -13,6 +13,7 @@ export function dayStats(day) {
   const runners = day.races.reduce((n, r) => n + liveRunners(r), 0);
   const graded = day.cards.filter((c) => c.grades?.summary);
   const otrCards = day.cards.filter((c) => c.template === 'equibase-otr');
+  const llmCards = day.cards.filter((c) => c.completeness === 'LLM_GENERATED');
   return {
     races: day.races.length,
     runners,
@@ -22,6 +23,7 @@ export function dayStats(day) {
     plCents: graded.length ? graded.reduce((n, c) => n + c.grades.summary.plCents, 0) : null,
     hasResults: (day.results?.finishers?.length ?? 0) > 0,
     hasOTR: otrCards.length > 0,
+    hasLLM: llmCards.length > 0,
   };
 }
 
