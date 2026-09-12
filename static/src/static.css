@@ -281,6 +281,12 @@
 .race-nav { align-items: center; }
 .race-nav__spacer { flex: 1; }
 
+.tags-row {
+  min-height: 1.5em;
+  display: flex;
+  gap: 4px;
+}
+
 @media (max-width: 720px) {
   .topnav { margin: 0 -8px 8px; padding: 8px; }
   .topnav__link { padding: 8px 10px; }

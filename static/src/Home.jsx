@@ -45,7 +45,7 @@ function Meeting({ day }) {
         {s.graded > 0 && <> · <span className={plClass(s.plCents)}>{signedMoney(s.plCents)}</span> on {s.graded} graded</>}
         {s.hasResults && s.graded === 0 && ' · results in'}
       </p>
-      <div>
+      <div className="tags-row">
         {s.hasOTR && <span className="tag">OTR</span>}
         {s.hasLLM && <span className="tag">LLM</span>}
       </div>
