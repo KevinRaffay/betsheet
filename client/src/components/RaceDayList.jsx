@@ -272,7 +272,7 @@ export default function RaceDayList({ onOpen, onOpenRace, onNew, onPL, onDistrib
                 <td>{d.bankroll_cents != null ? `$${(d.bankroll_cents / 100).toFixed(0)}` : '—'}</td>
                 <td>{d.graded ? 'Yes' : '—'}</td>
                 <td className="dim">{formatPacific(showDeleted ? d.deleted_at : d.created_at)}</td>
-                <td>
+                <td className="tags-cell">
                   {d.hasOTR && <span className="tag">OTR</span>}
                   {d.hasLLM && <span className="tag">LLM</span>}
                 </td>

@@ -373,6 +373,9 @@ input:disabled, select:disabled, textarea:disabled {
   color: var(--color-text-muted);
   vertical-align: middle;
 }
+.tags-cell {
+  min-height: 1.5em;
+}
 .tag--gold { border-color: var(--gold); color: var(--gold); }
 .tag--red { border-color: var(--loss); color: var(--loss); }
 /* D216: the two entry flags. Colour-named to match the two above rather than
