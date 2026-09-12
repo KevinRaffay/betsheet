@@ -363,7 +363,7 @@ export default function RaceDayView({ id, onBack, onOpenCard }) {
         />
       )}
 
-      <ResultsPanel dayId={day.id} />
+      <ResultsPanel dayId={day.id} onSaved={() => setCardsVersion((v) => v + 1)} />
       <EquibaseOtrPanel dayId={day.id} onSaved={() => setCardsVersion((v) => v + 1)} />
       <div className="races-card" ref={racesContainerRef}>
         <div className="races-card__controls">
