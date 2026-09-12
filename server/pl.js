@@ -61,12 +61,15 @@ plRouter.get('/pl', (req, res) => {
   const selectedVersion = requested === 'all' ? 'all'
     : requested && engineVersions.includes(requested) ? requested
       : (engineVersions[0] ?? null);
-  // Meets (D43): ?meet=<DMR-2026-summer> narrows every figure to one meet;
-  // default 'all' (meets may pool - completeness buckets never do).
-  const meets = [...new Set(cardRows.map((r) => r.meet).filter(Boolean))].sort();
-  const requestedMeet = String(req.query.meet ?? '').trim();
-  const selectedMeet = requestedMeet && meets.includes(requestedMeet) ? requestedMeet : 'all';
-  const inSelection = (row) => (selectedVersion === 'all' || row.engineVersion === selectedVersion) && (selectedMeet === 'all' || row.meet === selectedMeet);
+  // Track and date filtering: ?track=<track> and ?date=<date> narrow to specific values;
+  // default 'all' for both (no filtering applied).
+  const tracks = [...new Set(cardRows.map((r) => r.track).filter(Boolean))].sort();
+  const dates = [...new Set(cardRows.map((r) => r.date).filter(Boolean))].sort().reverse();
+  const requestedTrack = String(req.query.track ?? '').trim();
+  const requestedDate = String(req.query.date ?? '').trim();
+  const selectedTrack = requestedTrack && tracks.includes(requestedTrack) ? requestedTrack : 'all';
+  const selectedDate = requestedDate && dates.includes(requestedDate) ? requestedDate : 'all';
+  const inSelection = (row) => (selectedVersion === 'all' || row.engineVersion === selectedVersion) && (selectedTrack === 'all' || row.track === selectedTrack) && (selectedDate === 'all' || row.date === selectedDate);
 
   const byBucket = new Map();
   // D76: within LLM_GENERATED, a further split by which Claude model
@@ -258,9 +261,9 @@ plRouter.get('/pl', (req, res) => {
   // notesPresent is a SQLite 0/1; emit a real boolean so the client can test it
   // the same way it tests every other flag on the row.
   const cardsOut = cardRows
-    .filter((r) => selectedMeet === 'all' || r.meet === selectedMeet)
+    .filter((r) => (selectedTrack === 'all' || r.track === selectedTrack) && (selectedDate === 'all' || r.date === selectedDate))
     .map((r) => ({ ...r, notesPresent: Boolean(r.notesPresent), liveOddsPresent: Boolean(r.liveOddsPresent), tipSheetsPresent: Boolean(r.tipSheetsPresent) }));
-  res.json({ buckets, cards: cardsOut, ungraded: ungraded.filter((r) => selectedMeet === 'all' || r.meet === selectedMeet), engineVersions, selectedVersion, meets, selectedMeet });
+  res.json({ buckets, cards: cardsOut, ungraded: ungraded.filter((r) => (selectedTrack === 'all' || r.track === selectedTrack) && (selectedDate === 'all' || r.date === selectedDate)), engineVersions, selectedVersion, tracks, dates, selectedTrack, selectedDate });
 });
 
 // One day's cards side by side, broken down per race - the variant-compare

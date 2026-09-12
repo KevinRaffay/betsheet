@@ -23,11 +23,12 @@ export default function PLView({ onBack, onOpenCard, onOpenDay }) {
   const [expandedDay, setExpandedDay] = useState(null); // raceDayId
   const [dayPL, setDayPL] = useState(null);
   const [version, setVersion] = useState(''); // '' = server default (latest)
-  const [meet, setMeet] = useState('all'); // D43: one meet, or all meets
+  const [track, setTrack] = useState('all'); // one track, or all tracks
+  const [date, setDate] = useState('all'); // one date, or all dates
 
   useEffect(() => {
-    getPL(version, meet).then(setData).catch((e) => setError(String(e.message)));
-  }, [version, meet]);
+    getPL(version, track, date).then(setData).catch((e) => setError(String(e.message)));
+  }, [version, track, date]);
 
   const toggleDay = async (raceDayId) => {
     if (expandedDay === raceDayId) { setExpandedDay(null); setDayPL(null); return; }
@@ -60,11 +61,19 @@ export default function PLView({ onBack, onOpenCard, onOpenDay }) {
       <div className="pagehead">
         <h2>P/L</h2>
         <div className="btnrow">
-          {data.meets && data.meets.length > 0 && (
-            <label className="dim">Meet{' '}
-              <select className="in in--sm" value={data.selectedMeet ?? 'all'} onChange={(e) => setMeet(e.target.value)}>
-                <option value="all">all meets</option>
-                {data.meets.map((m) => <option key={m} value={m}>{m}</option>)}
+          {data.tracks && data.tracks.length > 0 && (
+            <label className="dim">Track{' '}
+              <select className="in in--sm" value={data.selectedTrack ?? 'all'} onChange={(e) => setTrack(e.target.value)}>
+                <option value="all">all tracks</option>
+                {data.tracks.map((t) => <option key={t} value={t}>{t}</option>)}
+              </select>
+            </label>
+          )}
+          {data.dates && data.dates.length > 0 && (
+            <label className="dim">Day{' '}
+              <select className="in in--sm" value={data.selectedDate ?? 'all'} onChange={(e) => setDate(e.target.value)}>
+                <option value="all">all days</option>
+                {data.dates.map((d) => <option key={d} value={d}>{d}</option>)}
               </select>
             </label>
           )}
