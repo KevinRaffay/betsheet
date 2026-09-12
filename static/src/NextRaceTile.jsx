@@ -17,7 +17,7 @@ export default function NextRaceTile({ raceDays }) {
     ? { dayId: next.day.raceDay.raceDayId, number: next.race.number }
     : latest && lastRace ? { dayId: latest.raceDay.raceDayId, number: lastRace } : null;
 
-  const [minutesUntil, setMinutesUntil] = useState(null);
+  const [timeUntil, setTimeUntil] = useState(null);
 
   useEffect(() => {
     if (!next?.at) return;
@@ -26,7 +26,13 @@ export default function NextRaceTile({ raceDays }) {
       const now = new Date();
       const diff = next.at - now;
       const minutes = Math.ceil(diff / (1000 * 60));
-      setMinutesUntil(minutes > 0 ? minutes : null);
+      if (minutes > 0) {
+        const hours = Math.floor(minutes / 60);
+        const mins = minutes % 60;
+        setTimeUntil(hours > 0 ? `${hours}:${String(mins).padStart(2, '0')}` : `${mins} MINUTE${mins === 1 ? '' : 'S'}`);
+      } else {
+        setTimeUntil(null);
+      }
     };
 
     updateCountdown();
@@ -38,7 +44,7 @@ export default function NextRaceTile({ raceDays }) {
     <section className="next-race">
       <div>
         <div className="eyebrow">
-          {minutesUntil ? `${minutesUntil} MINUTE${minutesUntil === 1 ? '' : 'S'} TO NEXT RACE` : 'Next race'}
+          {timeUntil ? `${timeUntil} TO NEXT RACE` : 'Next race'}
         </div>
         {next ? (
           <>

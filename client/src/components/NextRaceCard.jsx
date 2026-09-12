@@ -17,7 +17,7 @@ import { getNextRace } from '../api.js';
 export default function NextRaceCard({ onOpenRace, refreshKey }) {
   const [state, setState] = useState(null);
   const [error, setError] = useState(null);
-  const [minutesUntil, setMinutesUntil] = useState(null);
+  const [timeUntil, setTimeUntil] = useState(null);
 
   useEffect(() => {
     let cancelled = false;
@@ -31,7 +31,7 @@ export default function NextRaceCard({ onOpenRace, refreshKey }) {
 
   useEffect(() => {
     if (!state?.next?.at) {
-      setMinutesUntil(null);
+      setTimeUntil(null);
       return;
     }
 
@@ -40,7 +40,13 @@ export default function NextRaceCard({ onOpenRace, refreshKey }) {
       const raceTime = new Date(state.next.at);
       const diff = raceTime - now;
       const minutes = Math.ceil(diff / (1000 * 60));
-      setMinutesUntil(minutes > 0 ? minutes : null);
+      if (minutes > 0) {
+        const hours = Math.floor(minutes / 60);
+        const mins = minutes % 60;
+        setTimeUntil(hours > 0 ? `${hours}:${String(mins).padStart(2, '0')}` : `${mins} MINUTE${mins === 1 ? '' : 'S'}`);
+      } else {
+        setTimeUntil(null);
+      }
     };
 
     updateCountdown();
@@ -60,7 +66,7 @@ export default function NextRaceCard({ onOpenRace, refreshKey }) {
     <section className="next-race">
       <div>
         <div className="eyebrow">
-          {minutesUntil ? `${minutesUntil} MINUTE${minutesUntil === 1 ? '' : 'S'} TO NEXT RACE` : 'Next race'}
+          {timeUntil ? `${timeUntil} TO NEXT RACE` : 'Next race'}
         </div>
         {next ? (
           <>
