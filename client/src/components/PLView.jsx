@@ -30,12 +30,20 @@ export default function PLView({ onBack, onOpenCard, onOpenDay }) {
     getPL(version, track, date).then(setData).catch((e) => setError(String(e.message)));
   }, [version, track, date]);
 
+  // When version changes, refetch the expanded day's races to filter by the new version
+  useEffect(() => {
+    if (expandedDay) {
+      setDayPL(null);
+      getDayPL(expandedDay, version || undefined).then(setDayPL).catch((e) => setError(String(e.message)));
+    }
+  }, [version, expandedDay]);
+
   const toggleDay = async (raceDayId) => {
     if (expandedDay === raceDayId) { setExpandedDay(null); setDayPL(null); return; }
     setExpandedDay(raceDayId);
     setDayPL(null);
     try {
-      setDayPL(await getDayPL(raceDayId));
+      setDayPL(await getDayPL(raceDayId, version || undefined));
     } catch (e) {
       setError(String(e.message));
       setExpandedDay(null);

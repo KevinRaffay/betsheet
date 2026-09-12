@@ -184,7 +184,12 @@ export const getPL = (engineVersion, track, date) => {
   const qs = q.toString();
   return fetch(`/api/pl${qs ? `?${qs}` : ''}`).then(asJson);
 };
-export const getDayPL = (dayId) => fetch(`/api/race-days/${dayId}/pl`).then(asJson);
+export const getDayPL = (dayId, engineVersion) => {
+  const q = new URLSearchParams();
+  if (engineVersion) q.set('engineVersion', engineVersion);
+  const qs = q.toString();
+  return fetch(`/api/race-days/${dayId}/pl${qs ? `?${qs}` : ''}`).then(asJson);
+};
 
 export const gradeCardApi = (cardId) =>
   fetch(`/api/cards/${cardId}/grade`, { method: 'POST' }).then(asJson);
