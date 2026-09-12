@@ -268,6 +268,7 @@ plRouter.get('/pl', (req, res) => {
 
 // One day's cards side by side, broken down per race - the variant-compare
 // view. Multi-race tickets settle across races and report under 'multi'.
+// Respects engineVersion query parameter to filter cards by version.
 plRouter.get('/race-days/:id/pl', (req, res) => {
   const db = getDb();
   const day = db.prepare('SELECT * FROM race_days WHERE id = ?').get(Number(req.params.id));
@@ -276,14 +277,18 @@ plRouter.get('/race-days/:id/pl', (req, res) => {
     return res.status(410).json({ error: 'This race day is deleted; deleted days are excluded from P/L.' });
   }
 
+  // Get requested engine version filter
+  const requestedVersion = String(req.query.engineVersion ?? '').trim();
+  const selectedVersion = requestedVersion || null; // null means no filter (show all)
+
   const cards = db.prepare(`
     SELECT c.id, c.card_number, c.variant, st.name AS template, c.bankroll_cents,
            c.consensus_completeness, c.engine_version, c.llm_model, c.notes_present, c.live_odds_present,
            c.tip_sheets_present, c.created_at
     FROM cards c
     LEFT JOIN strategy_templates st ON st.id = c.strategy_template_id
-    WHERE c.race_day_id = ? ORDER BY c.card_number
-  `).all(day.id);
+    WHERE c.race_day_id = ? ${selectedVersion ? 'AND c.engine_version = ?' : ''} ORDER BY c.card_number
+  `)[selectedVersion ? 'all' : 'all'](selectedVersion ? [day.id, selectedVersion] : [day.id]);
 
   const rows = db.prepare(`
     SELECT t.card_id, r.number AS race_number,
@@ -291,8 +296,8 @@ plRouter.get('/race-days/:id/pl', (req, res) => {
     FROM graded_tickets_latest gt
     JOIN tickets t ON t.id = gt.ticket_id
     LEFT JOIN races r ON r.id = t.race_id
-    WHERE t.card_id IN (SELECT id FROM cards WHERE race_day_id = ?)
-  `).all(day.id);
+    WHERE t.card_id IN (SELECT id FROM cards WHERE race_day_id = ? ${selectedVersion ? 'AND engine_version = ?' : ''})
+  `)[selectedVersion ? 'all' : 'all'](selectedVersion ? [day.id, selectedVersion] : [day.id]);
 
   const perCard = new Map();
   for (const row of rows) {
