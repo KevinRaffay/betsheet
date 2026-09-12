@@ -322,8 +322,8 @@ ingestRouter.get('/race-days', (req, res) => {
            COUNT(DISTINCT r.id) AS races,
            COUNT(e.id) AS entries,
            EXISTS(SELECT 1 FROM race_results rr WHERE rr.race_day_id = rd.id) AS graded,
-           EXISTS(SELECT 1 FROM cards c WHERE c.race_day_id = rd.id AND c.template = 'equibase-otr') AS hasOTR,
-           EXISTS(SELECT 1 FROM cards c WHERE c.race_day_id = rd.id AND c.completeness = 'LLM_GENERATED') AS hasLLM
+           EXISTS(SELECT 1 FROM cards c WHERE c.race_day_id = rd.id AND c.consensus_completeness = 'EQB_OTR') AS hasOTR,
+           EXISTS(SELECT 1 FROM cards c WHERE c.race_day_id = rd.id AND c.consensus_completeness = 'LLM_GENERATED') AS hasLLM
     FROM race_days rd
     LEFT JOIN races r ON r.race_day_id = rd.id
     LEFT JOIN entries e ON e.race_id = r.id
