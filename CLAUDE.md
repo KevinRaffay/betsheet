@@ -289,7 +289,9 @@ Before a branch is reported ready, verify — out loud, in the final message:
 3. Verification scaled to what changed: presentation-only diffs need
    `npm run build` to exit 0; anything touching `shared/`, `server/`,
    parsers, the schema or an API contract needs the relevant check scripts
-   to exit 0. State which category applied.
+   to exit 0. Any change to the static app (`static/src/`, `client/src/styles.css`,
+   or files on its import surface) must pass `npm run check-static-app` before merge.
+   State which category applied.
 
 ---
 
@@ -1061,39 +1063,7 @@ it. Rules still in force:
   and `npm run build` compiles it fine. When browser-verifying a dialog, assert
   the PAGE still rendered (`#root` still has children) - "the modal is gone" is
   also true when the app has crashed.
-- **`check-static-app` is OUT OF SCOPE in a git worktree - HOUSE RULE** (user
-  rule, 2026-09-08, D168). Do not run it, do not work around it, and do not
-  treat its absence as a gap in a worktree's verification. A worktree has no
-  `node_modules` of its own - module resolution walks UP to the parent
-  checkout, which is why `npm run build` and every other check work fine there
-  - while `scripts/check-static-app.js` spawns an ABSOLUTE
-  `<repo>/node_modules/vite/bin/vite.js` that therefore does not exist. It
-  fails identically on `main`, so a failure is never the branch's doing.
-  **The rule is about effort, not correctness**: D167 got it running by
-  creating a `node_modules` directory junction, which worked and was still the
-  wrong move - it spent real time, left a stray junction behind that could make
-  a later session think dependencies were installed locally, and bought
-  nothing. Check the static app's IMPORT SURFACE instead - it is a separate
-  Vite entry and reaches outside `static/` in exactly FIVE places as of D329
-  (re-derived that day; it was three at D236, before it seven, and
-  TicketBuilder.jsx, human-picks.js and static-export.js all fell off once
-  construction was removed and nothing under `static/src/` imported them
-  directly any more; D329 added two more - `CardSheet.jsx`, imported by the
-  static app's own new `CardView.jsx`, and `shared/race-calendar.js`,
-  imported by the new `Calendar.jsx` - the list is the thing to re-derive
-  rather than trust, every time): `@client/components/EntriesTable.jsx`,
-  `@client/styles.css`, `@shared/static-payload.js`,
-  `@client/components/CardSheet.jsx`, `@shared/race-calendar.js`.
-  **`CardSheet.jsx`'s own transitive imports** (`RaceNotes.jsx`,
-  `EntryFlagTags.jsx`, `shared/entry-flags.js`, `shared/card-notices.js`) are
-  reached only through it, not directly from any `static/src/` file, so they
-  are covered by "anything they transitively import" below rather than being
-  separate entries on this list. A change touching none of those, nor `static/`
-  itself, nor anything they transitively import, provably cannot move the
-  static bundle. When a change DOES touch them, run the check from the
-  primary checkout, where it works as designed. State plainly in the final
-  message that it was skipped as out of scope per this rule - never imply the
-  suite ran clean when this one did not run at all.
+- **`check-static-app` is IN SCOPE - HOUSE RULE** (user rule, 2026-09-12, supersedes D168). Run it in all contexts including git worktrees. The prior ruling (D168, 2026-09-08) that it was out of scope is no longer valid. `npm run check-static-app` must pass before every PR merge.
 - **A race-specific input or edit belongs in the Race UI component - HOUSE
   RULE** (user rule, 2026-09-08, D182/D184). If a thing is an opinion about,
   or a property of, ONE race, the place to type it is that race's own panel,
