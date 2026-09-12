@@ -1,3 +1,4 @@
+import { formatPacific } from '@shared/time-format.js';
 import React, { useEffect, useRef, useState } from 'react';
 import { listCards, modelLabel, plMoney, plClass, bulkDeleteCards } from '../api.js';
 import LlmCardModal from './LlmCardModal.jsx';
@@ -181,7 +182,7 @@ export default function CardsPanel({ dayId, bankrollCents, onOpenCard }) {
                 <td className={c.graded ? plClass(c.pl_cents) : 'dim'}>
                   {c.graded ? plMoney(c.pl_cents) : '—'}
                 </td>
-                <td className="dim">{c.created_at}</td>
+                <td className="dim">{formatPacific(c.created_at)}</td>
               </tr>
             ))}
           </tbody>

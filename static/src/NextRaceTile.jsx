@@ -1,4 +1,4 @@
-import React from 'react';
+import React, { useState, useEffect } from 'react';
 import { navigate } from './app.jsx';
 import { latestDay, nextRace } from './day-stats.js';
 import { longDate, plural } from './format.js';
@@ -17,10 +17,29 @@ export default function NextRaceTile({ raceDays }) {
     ? { dayId: next.day.raceDay.raceDayId, number: next.race.number }
     : latest && lastRace ? { dayId: latest.raceDay.raceDayId, number: lastRace } : null;
 
+  const [minutesUntil, setMinutesUntil] = useState(null);
+
+  useEffect(() => {
+    if (!next?.at) return;
+
+    const updateCountdown = () => {
+      const now = new Date();
+      const diff = next.at - now;
+      const minutes = Math.ceil(diff / (1000 * 60));
+      setMinutesUntil(minutes > 0 ? minutes : null);
+    };
+
+    updateCountdown();
+    const interval = setInterval(updateCountdown, 60 * 1000);
+    return () => clearInterval(interval);
+  }, [next?.at]);
+
   return (
     <section className="next-race">
       <div>
-        <div className="eyebrow">Next race</div>
+        <div className="eyebrow">
+          {minutesUntil ? `${minutesUntil} MINUTE${minutesUntil === 1 ? '' : 'S'} TO NEXT RACE` : 'Next race'}
+        </div>
         {next ? (
           <>
             <div className="next-race__what">{next.day.raceDay.track} · Race {next.race.number}</div>

@@ -1,3 +1,4 @@
+import { formatPacific } from '@shared/time-format.js';
 import React from 'react';
 
 // D164: the read-only analyst-notes panel, shared by RaceDayView.jsx (`/day`)
@@ -16,7 +17,7 @@ export default function RaceNotes({ note }) {
           <p className="notes-text">{note.text}</p>
           <p className="dim">
             {note.sourceLabel ? `Source: ${note.sourceLabel}` : 'Source: —'}
-            {note.updatedAt ? ` · updated ${note.updatedAt}` : ''}
+            {note.updatedAt ? ` · updated ${formatPacific(note.updatedAt)}` : ''}
           </p>
         </>
       ) : (

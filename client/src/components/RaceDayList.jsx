@@ -1,3 +1,4 @@
+import { formatPacific } from '@shared/time-format.js';
 import React, { useEffect, useRef, useState } from 'react';
 import { bulkDeleteRaceDays, listRaceDays, resetAppApi, restoreRaceDay } from '../api.js';
 import PublishStaticSnapshotModal from './PublishStaticSnapshotModal.jsx';
@@ -270,7 +271,7 @@ export default function RaceDayList({ onOpen, onOpenRace, onNew, onPL, onDistrib
                 <td>{d.entries}</td>
                 <td>{d.bankroll_cents != null ? `$${(d.bankroll_cents / 100).toFixed(0)}` : '—'}</td>
                 <td>{d.graded ? 'Yes' : '—'}</td>
-                <td className="dim">{showDeleted ? d.deleted_at : d.created_at}</td>
+                <td className="dim">{formatPacific(showDeleted ? d.deleted_at : d.created_at)}</td>
                 {showDeleted && (
                   <td>
                     <button className="btn" disabled={busy} onClick={() => handleRestore(d.id)}>

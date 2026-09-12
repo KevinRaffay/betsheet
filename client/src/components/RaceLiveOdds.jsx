@@ -1,3 +1,4 @@
+import { formatPacific } from '@shared/time-format.js';
 import React, { useEffect, useState } from 'react';
 import { getLiveOddsCaptures, saveRaceLiveOdds } from '../api.js';
 
@@ -61,7 +62,7 @@ export function useRaceLiveOdds(dayId, onSaved) {
       const r = await saveRaceLiveOdds(dayId, race.number, odds);
       setResult((m) => new Map(m).set(race.number, {
         ok: true,
-        text: `${r.counts.priced} price(s) saved at ${r.capturedAt}`
+        text: `${r.counts.priced} price(s) saved at ${formatPacific(r.capturedAt)}`
           + `${r.counts.changed ? ` — ${r.counts.changed} moved` : ''}`
           + `${r.warnings.length ? ` · ${r.warnings.length} note(s)` : ''}`,
         warnings: r.warnings,
@@ -144,7 +145,7 @@ export function LiveOddsHistory({ race, ctl }) {
           const wholeDay = (c.races ?? '').split(',').length > 1;
           return (
             <li key={`cap-${c.id}`}>
-              {c.captured_at ?? `(time unknown — saved ${c.ingested_at})`}
+              {formatPacific(c.captured_at) ?? `(time unknown — saved ${formatPacific(c.ingested_at)})`}
               {' — '}
               {wholeDay ? `full-board upload, ${c.prices} price(s) across the day` : `${c.prices} price(s)`}
             </li>

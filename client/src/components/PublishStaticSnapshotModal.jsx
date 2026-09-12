@@ -1,3 +1,4 @@
+import { formatPacific } from '@shared/time-format.js';
 import React, { useState } from 'react';
 import { publishStaticPayload } from '../api.js';
 
@@ -148,7 +149,7 @@ export default function PublishStaticSnapshotModal({ days, onClose }) {
           {result && (
             <>
               <p className="notice">
-                Wrote <code>{result.path}</code> at {result.generatedAt} — {result.days.length} race
+                Wrote <code>{result.path}</code> at {formatPacific(result.generatedAt)} — {result.days.length} race
                 day{result.days.length === 1 ? '' : 's'}. Commit and push that file (and redeploy, if
                 using GitHub Pages) to publish it.
               </p>

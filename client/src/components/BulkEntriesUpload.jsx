@@ -1,3 +1,4 @@
+import { formatPacific } from '@shared/time-format.js';
 import React, { useState } from 'react';
 import { previewEntriesZip, saveEntriesZip } from '../api.js';
 
@@ -139,7 +140,7 @@ export default function BulkEntriesUpload({ onSaved, bankroll, perRaceMin }) {
                     <td>{f.date ?? '—'}</td>
                     <td>{f.races || '—'}</td>
                     <td>{f.entries || '—'}</td>
-                    <td className="dim">{f.oddsCapturedAt ? f.oddsCapturedAt.replace('T', ' ').replace('Z', '') : '—'}</td>
+                    <td className="dim">{formatPacific(f.oddsCapturedAt) ?? '—'}</td>
                     <td>
                       {skipped ? <span className="tag tag--red">{DISPOSITION[f.disposition] ?? f.disposition}</span>
                         : held ? <span className="dim">already stored — tick Replace to overwrite</span>

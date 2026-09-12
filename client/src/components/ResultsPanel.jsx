@@ -1,3 +1,4 @@
+import { formatPacific } from '@shared/time-format.js';
 import React, { useEffect, useState } from 'react';
 import {
   getResults, parseResultsPdf, pullApifyResults, saveResults,
@@ -79,7 +80,7 @@ export default function ResultsPanel({ dayId }) {
           {hasResults && (
             <span className="dim">
               {' '}· {data.results.length} finishers · {data.exotics.length} payoffs ·
-              chart ingested {data.charts[0]?.ingested_at} ({data.charts[0]?.source_kind})
+              chart ingested {formatPacific(data.charts[0]?.ingested_at)} ({data.charts[0]?.source_kind})
             </span>
           )}
         </summary>

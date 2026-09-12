@@ -1,3 +1,4 @@
+import { formatPacific } from '@shared/time-format.js';
 import React, { useState } from 'react';
 import { FAILURE_MODE_WARNINGS } from '@shared/card-notices.js';
 import RaceNotes from './RaceNotes.jsx';
@@ -94,7 +95,7 @@ export default function CardSheet({ card, races, results, notesByRace, grades })
         </span>
         {' '}· template {card.template ?? '—'} · engine <code>{card.engine_version ?? 'lean-0'}</code>
         {card.llmModelLabel && <> · model <code>{card.llmModelLabel}</code></>}{card.notes_present ? <> · <span className="tag tag--gold">analyst notes</span></> : null}{card.live_odds_present ? <> · <span className="tag">live board</span></> : null}{card.tip_sheets_present ? <> · <span className="tag">tip sheets</span></> : null} · bankroll {money(card.bankroll_cents)}
-        {' '}· per-race min {money(card.per_race_min_cents)} · generated {card.created_at}
+        {' '}· per-race min {money(card.per_race_min_cents)} · generated {formatPacific(card.created_at)}
       </p>
 
       {remaining < 0 && (

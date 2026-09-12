@@ -1,3 +1,4 @@
+import { formatPacific } from '@shared/time-format.js';
 import { useState } from 'react';
 import { correctTipPicks, deleteTipPicks } from '../api.js';
 
@@ -190,7 +191,7 @@ export default function RaceTipPicks({ rows = [], scoreFor = () => null, onEnter
         <div className="tip-source" key={row.id}>
           <p className="dim">
             <strong>{row.sourceLabel}</strong> · {row.picks.length} picks
-            {row.edited && <span className="tag" title={`Corrected ${row.editedAt}`}> corrected</span>}
+            {row.edited && <span className="tag" title={`Corrected ${formatPacific(row.editedAt)}`}> corrected</span>}
           </p>
           {editing === row.id ? (
             <CorrectRow
