@@ -12,6 +12,7 @@ import RaceDayCalendar from './components/RaceDayCalendar.jsx';
 import ReplayDayPicker from './components/ReplayDayPicker.jsx';
 import ReplayDayLanding from './components/ReplayDayLanding.jsx';
 import ReplayStanding from './components/ReplayStanding.jsx';
+import FaqView from './components/FaqView.jsx';
 
 export default function App() {
   const [theme, setThemeState] = useState(getActiveTheme());
@@ -68,9 +69,17 @@ export default function App() {
     <div className="shell">
       <header className="topbar">
         <h1 className="topbar__brand" onClick={() => navigate({ name: 'list' })}>BetSheet</h1>
-        <button className="topbar__theme" onClick={toggleTheme} title="Toggle theme">
-          {theme === 'dark' ? 'Light' : 'Dark'}
-        </button>
+        <div className="topbar__actions">
+          {/* D412: the FAQ lives in the top bar rather than the home page's
+              button row so it is reachable from every route, the way a help
+              link is expected to be. */}
+          <button className="topbar__theme" onClick={() => navigate({ name: 'faq' })} title="Frequently asked questions">
+            FAQ
+          </button>
+          <button className="topbar__theme" onClick={toggleTheme} title="Toggle theme">
+            {theme === 'dark' ? 'Light' : 'Dark'}
+          </button>
+        </div>
       </header>
       <main className="pane">
         {view.name === 'list' && (
@@ -85,6 +94,9 @@ export default function App() {
             onReplay={() => navigate({ name: 'replay' })}
             onCalendar={() => navigate({ name: 'calendar' })}
           />
+        )}
+        {view.name === 'faq' && (
+          <FaqView onBack={() => navigate({ name: 'list' })} />
         )}
         {view.name === 'calendar' && (
           <RaceDayCalendar

@@ -116,6 +116,21 @@ html, body {
   cursor: pointer;
 }
 .topbar__theme:hover { background: var(--color-btn-bg-hover); }
+.topbar__actions { display: flex; gap: 8px; }
+
+/* ---- FAQ (D412) ---- */
+.faq__list {
+  list-style: none;
+  margin: 18px 0 0;
+  padding: 0;
+  max-width: 72ch;
+}
+.faq__item { padding: 14px 0; border-top: 1px solid var(--color-border); }
+.faq__item:last-child { border-bottom: 1px solid var(--color-border); }
+.faq__q { margin: 0 0 6px; font-size: 16px; }
+.faq__a p { margin: 6px 0; line-height: 1.5; }
+.faq__a ul { margin: 6px 0; padding-left: 20px; }
+.faq__a li { margin: 4px 0; line-height: 1.5; }
 
 .pane {
   flex: 1;

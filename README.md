@@ -55,7 +55,7 @@ npm run dev      # development: vite on :5175 (proxying /api), api on :8788
 ```
 
 Browser views are available at `/`, `/new`, `/pl`, `/distribution`,
-`/replay`, `/day/:id` and `/card/:id`. Only data requests use the `/api`
+`/replay`, `/faq`, `/day/:id` and `/card/:id`. Only data requests use the `/api`
 prefix, so these routes can be bookmarked and refreshed directly.
 
 The server binds `127.0.0.1` only — BetSheet is not hosted anywhere and is not
