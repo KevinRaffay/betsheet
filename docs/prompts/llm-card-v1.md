@@ -741,6 +741,36 @@ answered is recorded on the `llm_card_requests` row (`model` column,
 retrievable via `GET /api/cards/:id/llm-requests`), so a card's picks are
 always traceable to the model that produced them.
 
+## Prompt caching and usage (D420)
+
+The system prompt goes to the API as one text block carrying a
+`cache_control: {type: 'ephemeral'}` marker; the per-race user prompt follows
+it, unmarked. **The prompt text is unchanged** - the marker is metadata on the
+block, not something the model reads - so `system_prompt_hash`,
+`prompt_template_version` and every comparability boundary recorded above are
+exactly what they were. What changes is the bill: the system prompt is about
+89% of a call's input tokens and is byte-identical from one race to the next
+on a card (it varies only by which optional clause blocks the race carries,
+and the model is locked per card), so every race after the first reads it from
+cache at a tenth of the price instead of paying for it again. Measured on the
+request log before this shipped: 331 of 469 successful calls would have hit.
+
+The cache is a PREFIX match, which is why the marker sits on the END of the
+system prompt and not on the request: a request-level marker lands on the last
+block, the unique user prompt, and pays the write premium on every call with
+nothing ever read back. It is also why nothing volatile - a date, a card id, a
+correlation id - may ever be interpolated into `SYSTEM_PROMPT` or a clause
+block; the user prompt is where per-race facts go, and always was.
+
+Every call now records what the API said it cost, on the same
+`llm_card_requests` row: `input_tokens` (the UNCACHED remainder),
+`output_tokens` (thinking included), `cache_creation_input_tokens` and
+`cache_read_input_tokens`. The whole prompt is the sum of the three input
+figures. `cache_read_input_tokens > 0` on the second race of a card is the
+only proof caching is working; a cache that silently stops hitting looks
+identical to one that works, except on the bill, so check the column after
+any change to prompt assembly rather than trusting the marker.
+
 ## Analyst notes (D92)
 
 Free-text handicapper commentary the user pastes per race, fed to the model as

@@ -34,6 +34,70 @@ function check(name, ok, detail = '') {
 const { ANALYST_NOTES_CLAUSES, buildLlmRaceUserPrompt, buildSystemPrompt, extractNotesReport,
   extractTicketBlock, NOTES_MAX_CHARS, sanitizeNotesForPrompt, SYSTEM_PROMPT } = await import('../server/llm-prompt.js');
 
+// D420: prompt caching. The system prompt is ~89% of every call's input and
+// byte-identical from race to race on a card, so it goes on the wire as ONE
+// text block carrying a cache_control marker; the unique per-race user prompt
+// stays after it. These pin the request SHAPE (the only thing that decides
+// whether anything is ever read back) and the usage mapping, with no network.
+console.log('-- D420: prompt caching on the wire, usage back --');
+{
+  const { buildRequestBody, complete, DEFAULT_REQUEST_PARAMS } = await import('../server/anthropic-client.js');
+  const system = buildSystemPrompt({ hasLiveOdds: true });
+  const body = buildRequestBody({ model: 'claude-sonnet-5', maxTokens: 4000, temperature: 1, system, user: 'RACE 1 of 8' });
+  check('D420: the system prompt is sent as exactly ONE text block',
+    Array.isArray(body.system) && body.system.length === 1 && body.system[0].type === 'text', JSON.stringify(body.system?.map((b) => b.type)));
+  check('D420: ...carrying an ephemeral cache_control marker',
+    JSON.stringify(body.system?.[0]?.cache_control) === '{"type":"ephemeral"}', JSON.stringify(body.system?.[0]?.cache_control));
+  check('D420: ...whose TEXT is byte-identical to the built system prompt (prompt comparability holds)',
+    body.system?.[0]?.text === system);
+  check('D420: no request-level cache_control (it would land on the unique user prompt and never be read back)',
+    !('cache_control' in body));
+  check('D420: the user prompt is NOT marked - it is the varying tail after the breakpoint',
+    body.messages.length === 1 && body.messages[0].role === 'user' && body.messages[0].content === 'RACE 1 of 8'
+      && !JSON.stringify(body.messages).includes('cache_control'), JSON.stringify(body.messages));
+  check('D420: temperature/max_tokens/model unchanged by the caching change',
+    body.model === 'claude-sonnet-5' && body.max_tokens === 4000 && body.temperature === 1);
+  check('D420: temperature null still OMITS the field (D166)',
+    !('temperature' in buildRequestBody({ model: 'm', maxTokens: 1, temperature: null, system, user: 'u' })));
+  check('D420: an empty system prompt sends no system field at all',
+    buildRequestBody({ model: 'm', maxTokens: 1, temperature: 1, system: '', user: 'u' }).system === undefined);
+
+  // The REAL complete() path with a fake transport: what reaches the wire and
+  // what comes back. Never a real call - the key is a throwaway set only for
+  // this block and the fetch never leaves the process.
+  const seen = [];
+  const fetchImpl = async (url, init) => {
+    seen.push({ url, body: JSON.parse(init.body), headers: init.headers });
+    return {
+      ok: true, status: 200,
+      json: async () => ({
+        content: [{ type: 'text', text: 'hello' }], stop_reason: 'end_turn',
+        usage: { input_tokens: 210, output_tokens: 95, cache_creation_input_tokens: 0, cache_read_input_tokens: 2240 },
+      }),
+    };
+  };
+  const hadKey = process.env.ANTHROPIC_API_KEY;
+  process.env.ANTHROPIC_API_KEY = 'check-llm-cards-throwaway';
+  let result; let err;
+  try { result = await complete({ system, user: 'RACE 2 of 8', model: 'claude-opus-5', fetchImpl }); } catch (e) { err = e; }
+  if (hadKey === undefined) delete process.env.ANTHROPIC_API_KEY; else process.env.ANTHROPIC_API_KEY = hadKey;
+  check('D420: complete() sends the cached system block through the real path', !err && seen.length === 1
+    && seen[0].body.system?.[0]?.cache_control?.type === 'ephemeral' && seen[0].body.system[0].text === system, err?.message ?? JSON.stringify(seen[0]?.body?.system));
+  check('D420: ...to the Messages endpoint with the version header', seen[0]?.url.endsWith('/v1/messages') && seen[0]?.headers['anthropic-version'] === '2023-06-01');
+  check('D420: complete() returns all four usage figures, cache fields included',
+    JSON.stringify(result?.usage) === JSON.stringify({ input: 210, output: 95, cacheCreation: 0, cacheRead: 2240 }), JSON.stringify(result?.usage));
+  check('D420: text/model/requestParams unchanged by the usage change',
+    result?.text === 'hello' && result?.model === 'claude-opus-5' && JSON.stringify(result?.requestParams) === JSON.stringify(DEFAULT_REQUEST_PARAMS));
+  const noUsage = [];
+  const fetchNoUsage = async (_url, init) => { noUsage.push(init); return { ok: true, status: 200, json: async () => ({ content: [{ type: 'text', text: 'x' }], stop_reason: 'end_turn' }) }; };
+  process.env.ANTHROPIC_API_KEY = 'check-llm-cards-throwaway';
+  const bare = await complete({ system, user: 'u', fetchImpl: fetchNoUsage }).catch((e) => ({ err: e }));
+  if (hadKey === undefined) delete process.env.ANTHROPIC_API_KEY; else process.env.ANTHROPIC_API_KEY = hadKey;
+  check('D420: a response with no usage block maps to usage null, not a throw', !bare.err && bare.usage === null, bare.err?.message);
+  const noKey = await complete({ system, user: 'u', fetchImpl: async () => { throw new Error('must not be called'); } }).catch((e) => e);
+  check('D420: no API key still refuses BEFORE any transport is touched (401)', noKey?.status === 401, noKey?.message);
+}
+
 console.log('-- pure: buildLlmRaceUserPrompt --');
 {
   const prompt = buildLlmRaceUserPrompt({
@@ -438,6 +502,26 @@ Place | #1 | $20 | Safe.
   check('per-race bankroll on the first (cardless) preview = bankroll / totalRaces', p1.perRaceBankrollCents === 10000, JSON.stringify(p1));
   check('requestId present (the audit log row)', Number.isInteger(p1.requestId));
 
+  // D420: the usage figures land on the request row and read back from the
+  // per-card list. A stub preview carries them only when the body says so -
+  // the same escape hatch as __stubResponse - so this proves the persistence
+  // path end-to-end without a real, billed call.
+  console.log('-- D420: usage persisted on the request row --');
+  {
+    const stubUsage = { input: 180, output: 120, cacheCreation: 2260, cacheRead: 0 };
+    const withUsage = await (await jpost(`/api/race-days/${dayId}/llm-cards/preview`, {
+      race: 1, __stubResponse: wellFormedResponse(1, 25, 'Usage row.'), __stubUsage: stubUsage,
+    })).json();
+    const dbUsage = new Database(dbPath, { readonly: true });
+    const rowWith = dbUsage.prepare('SELECT input_tokens, output_tokens, cache_creation_input_tokens, cache_read_input_tokens FROM llm_card_requests WHERE id = ?').get(withUsage.requestId);
+    check('D420: all four usage columns persisted on the request row',
+      rowWith && rowWith.input_tokens === 180 && rowWith.output_tokens === 120 && rowWith.cache_creation_input_tokens === 2260 && rowWith.cache_read_input_tokens === 0, JSON.stringify(rowWith));
+    const rowWithout = dbUsage.prepare('SELECT input_tokens, output_tokens, cache_creation_input_tokens, cache_read_input_tokens FROM llm_card_requests WHERE id = ?').get(p1.requestId);
+    check('D420: a call that reported no usage leaves all four NULL (never 0 - absent is not free)',
+      rowWithout && rowWithout.input_tokens === null && rowWithout.output_tokens === null && rowWithout.cache_creation_input_tokens === null && rowWithout.cache_read_input_tokens === null, JSON.stringify(rowWithout));
+    dbUsage.close();
+  }
+
   console.log('-- save race 1: creates a new card in its own bucket --');
   const s1 = await jpost(`/api/race-days/${dayId}/llm-cards`, { race: 1, requestId: p1.requestId, bankrollCents: day.bankrollCents });
   const s1Body = await s1.json();
@@ -618,7 +702,21 @@ Place | #1 | $20 | Safe.
   }
 
   console.log('-- reasoning + raw response retrievable per race --');
+  // D420: one more logged (never saved) race-2 attempt on this card, carrying
+  // usage, so the per-card list is proven to expose it - and every row logged
+  // by a plain stub reads `usage: null`, never a zeroed object.
+  const usagePreview = await (await jpost(`/api/race-days/${dayId}/llm-cards/preview`, {
+    race: 2, cardId, __stubResponse: wellFormedResponse(2, 40, 'Usage on the list.'),
+    __stubUsage: { input: 150, output: 110, cacheCreation: 0, cacheRead: 2260 },
+  })).json();
   const requests = await jget(`/api/cards/${cardId}/llm-requests`);
+  {
+    const listed = requests.find((r) => r.id === usagePreview.requestId);
+    check('D420: /cards/:id/llm-requests exposes the four usage figures per row',
+      JSON.stringify(listed?.usage) === JSON.stringify({ input: 150, output: 110, cacheCreation: 0, cacheRead: 2260 }), JSON.stringify(listed?.usage));
+    check('D420: ...and null (not zeros) on a row that reported none',
+      requests.filter((r) => r.id !== usagePreview.requestId).every((r) => r.usage === null), JSON.stringify(requests.map((r) => r.usage)));
+  }
   check('every logged call for this card is retrievable, race 1 and race 2 both present', requests.some((r) => r.raceNumber === 1) && requests.some((r) => r.raceNumber === 2));
   const race2Row = requests.find((r) => r.raceNumber === 2 && !r.error);
   check('raw response text (reasoning included) stored verbatim', race2Row?.responseText === wellFormedResponse(2, 40, 'Value price given the consensus.'), race2Row?.responseText);
