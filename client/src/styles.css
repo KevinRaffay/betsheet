@@ -117,6 +117,48 @@ html, body {
 }
 .topbar__theme:hover { background: var(--color-btn-bg-hover); }
 
+.topbar__actions { display: flex; align-items: center; gap: 10px; }
+
+/* ---- odds/payout popup (D417): non-modal, draggable - never a
+   .modal-backdrop, since it isn't a modal and must not block the page. ---- */
+.odds-popup {
+  position: fixed;
+  z-index: 900;
+  width: 260px;
+  background: var(--color-bg);
+  border: 1px solid var(--color-btn-border);
+  border-radius: var(--radius);
+  box-shadow: 0 12px 40px rgba(0, 0, 0, 0.3);
+  overflow: hidden;
+}
+.odds-popup__header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 8px;
+  padding: 8px 8px 8px 12px;
+  background: var(--color-bg-raised);
+  border-bottom: 1px solid var(--color-border);
+  cursor: move;
+  user-select: none;
+  touch-action: none;
+}
+.odds-popup__title { font-weight: 600; font-size: 13px; }
+.odds-popup__close {
+  border: 1px solid var(--color-border);
+  background: var(--color-bg);
+  color: var(--color-text-muted);
+  border-radius: var(--radius);
+  width: 24px;
+  height: 24px;
+  font-size: 14px;
+  line-height: 1;
+  cursor: pointer;
+}
+.odds-popup__close:hover { background: var(--color-bg-raised); color: var(--color-text); }
+.odds-popup .grid { font-size: 12.5px; }
+.odds-popup .grid th, .odds-popup .grid td { padding: 4px 10px; }
+
 .pane {
   flex: 1;
   padding: 24px 0;

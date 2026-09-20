@@ -12,12 +12,14 @@ import RaceDayCalendar from './components/RaceDayCalendar.jsx';
 import ReplayDayPicker from './components/ReplayDayPicker.jsx';
 import ReplayDayLanding from './components/ReplayDayLanding.jsx';
 import ReplayStanding from './components/ReplayStanding.jsx';
+import OddsPayoutPopup from './components/OddsPayoutPopup.jsx';
 
 export default function App() {
   const [theme, setThemeState] = useState(getActiveTheme());
   // view: { name: 'list' } | { name: 'new' } | { name: 'day', id }
   const [view, setView] = useState(() => parseRoute(window.location.pathname));
   const [refreshKey, setRefreshKey] = useState(0);
+  const [oddsPopupOpen, setOddsPopupOpen] = useState(false);
 
   useEffect(() => {
     const route = parseRoute(window.location.pathname);
@@ -68,10 +70,16 @@ export default function App() {
     <div className="shell">
       <header className="topbar">
         <h1 className="topbar__brand" onClick={() => navigate({ name: 'list' })}>BetSheet</h1>
-        <button className="topbar__theme" onClick={toggleTheme} title="Toggle theme">
-          {theme === 'dark' ? 'Light' : 'Dark'}
-        </button>
+        <div className="topbar__actions">
+          <button className="btn" onClick={() => setOddsPopupOpen((v) => !v)}>
+            Odds &amp; payouts
+          </button>
+          <button className="topbar__theme" onClick={toggleTheme} title="Toggle theme">
+            {theme === 'dark' ? 'Light' : 'Dark'}
+          </button>
+        </div>
       </header>
+      {oddsPopupOpen && <OddsPayoutPopup onClose={() => setOddsPopupOpen(false)} />}
       <main className="pane">
         {view.name === 'list' && (
           <RaceDayList
