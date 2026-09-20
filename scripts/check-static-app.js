@@ -26,9 +26,19 @@
 import fs from 'node:fs';
 import path from 'node:path';
 import { execFileSync } from 'node:child_process';
+import { createRequire } from 'node:module';
 import { fileURLToPath, URL } from 'node:url';
 
 const ROOT = fileURLToPath(new URL('../', import.meta.url));
+// RESOLVED, never joined onto ROOT: a git worktree has no node_modules of
+// its own - every import resolves by walking up to the main checkout's -
+// so a hardcoded `ROOT/node_modules/vite/bin/vite.js` made this check
+// impossible to run from one, which is exactly where the house rule that
+// it must run in ALL contexts (2026-09-12) says it has to.
+// (vite's own `exports` map does not publish ./bin, so the package.json is
+// what gets resolved and the bin path is joined onto its directory.)
+const VITE_BIN = path.join(
+  path.dirname(createRequire(import.meta.url).resolve('vite/package.json')), 'bin', 'vite.js');
 
 let failures = 0;
 const check = (name, ok, detail = '') => {
@@ -39,7 +49,7 @@ const check = (name, ok, detail = '') => {
 
 console.log('-- the built bundle ships no server, construction or generator code --');
 {
-  execFileSync(process.execPath, [path.join(ROOT, 'node_modules', 'vite', 'bin', 'vite.js'),
+  execFileSync(process.execPath, [VITE_BIN,
     'build', '--config', path.join(ROOT, 'vite.static.config.js')], { cwd: ROOT, stdio: 'pipe' });
 
   const outDir = path.join(ROOT, 'dist-static');
@@ -98,7 +108,7 @@ console.log('\n-- the Pages build carries the deployed base (D154) --');
   // the workflow and the config cannot drift apart silently - a deploy that
   // produced root-absolute asset URLs would 404 on every file at
   // user.github.io/betsheet/ and there is no way to notice that locally.
-  execFileSync(process.execPath, [path.join(ROOT, 'node_modules', 'vite', 'bin', 'vite.js'),
+  execFileSync(process.execPath, [VITE_BIN,
     'build', '--config', path.join(ROOT, 'vite.static.config.js')],
   { cwd: ROOT, stdio: 'pipe', env: { ...process.env, BETSHEET_STATIC_BASE: '/betsheet/' } });
   const html = fs.readFileSync(path.join(ROOT, 'dist-static', 'index.html'), 'utf8');

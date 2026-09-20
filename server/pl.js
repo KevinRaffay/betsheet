@@ -23,6 +23,11 @@ import { TIP_VARIANTS, TIP_HEADLINE_VARIANT } from '../shared/tip-staking.js';
 
 // The running view: per-bucket totals + every graded card as a row, plus
 // the cards still waiting on results. Deliberately NO overall total.
+// D413 adds ?variant=<v> alongside ?track= and ?date=: cards.variant is
+// the axis a producer uses to stake the SAME opinion three different ways
+// (TIPSHEET's win-only / across-the-board / exacta-box-top2, EQB_OTR's
+// both / higher-reward / some-reward), so reading one structure across
+// every day it was staked on is the comparison the column exists for.
 // Engine versions (D34, invariant 14) never pool either: the buckets are
 // built from ONE engine version - ?engineVersion=<v>, default the version
 // of the most recently generated graded card - unless the caller asks for
@@ -61,15 +66,26 @@ plRouter.get('/pl', (req, res) => {
   const selectedVersion = requested === 'all' ? 'all'
     : requested && engineVersions.includes(requested) ? requested
       : (engineVersions[0] ?? null);
-  // Track and date filtering: ?track=<track> and ?date=<date> narrow to specific values;
-  // default 'all' for both (no filtering applied).
+  // Track, day and variant filtering: ?track=, ?date= and ?variant= each
+  // narrow to one value; default 'all' for all three (no filtering applied).
+  // An unknown value falls back to 'all' rather than answering an empty
+  // screen, which is the same shape the engine-version selector uses.
   const tracks = [...new Set(cardRows.map((r) => r.track).filter(Boolean))].sort();
   const dates = [...new Set(cardRows.map((r) => r.date).filter(Boolean))].sort().reverse();
+  const variants = [...new Set(cardRows.map((r) => r.variant).filter(Boolean))].sort();
   const requestedTrack = String(req.query.track ?? '').trim();
   const requestedDate = String(req.query.date ?? '').trim();
+  const requestedVariant = String(req.query.variant ?? '').trim();
   const selectedTrack = requestedTrack && tracks.includes(requestedTrack) ? requestedTrack : 'all';
   const selectedDate = requestedDate && dates.includes(requestedDate) ? requestedDate : 'all';
-  const inSelection = (row) => (selectedVersion === 'all' || row.engineVersion === selectedVersion) && (selectedTrack === 'all' || row.track === selectedTrack) && (selectedDate === 'all' || row.date === selectedDate);
+  const selectedVariant = requestedVariant && variants.includes(requestedVariant) ? requestedVariant : 'all';
+  // The scope every row is held to, shared by the aggregates and by the
+  // card/ungraded lists so a filtered total can never disagree with the
+  // rows printed underneath it.
+  const inScope = (row) => (selectedTrack === 'all' || row.track === selectedTrack)
+    && (selectedDate === 'all' || row.date === selectedDate)
+    && (selectedVariant === 'all' || row.variant === selectedVariant);
+  const inSelection = (row) => (selectedVersion === 'all' || row.engineVersion === selectedVersion) && inScope(row);
 
   const byBucket = new Map();
   // D76: within LLM_GENERATED, a further split by which Claude model
@@ -94,6 +110,12 @@ plRouter.get('/pl', (req, res) => {
   // reported as `byVariant`, a breakdown of the same rows, never added in.
   // This is the rule Distributions has always had ("one card per day per
   // bucket") arriving in P/L, where it was missing.
+  // D413: the variant the TIPSHEET total actually counts. Normally the fixed
+  // one; with a variant SELECTED it is that one, because the filter has
+  // already left exactly one card per (day, source) in scope - the D175 rule
+  // is satisfied rather than waived, and it is not cherry-picking because the
+  // user named the structure rather than the server picking the winner.
+  const countedVariant = selectedVariant === 'all' ? TIP_HEADLINE_VARIANT : selectedVariant;
   const tipHeadline = new Map();
   for (const row of cardRows) {
     if (!inSelection(row) || row.completeness !== 'TIPSHEET') continue;
@@ -122,7 +144,7 @@ plRouter.get('/pl', (req, res) => {
       const key = row.variant;
       if (!byVariant.has(key)) {
         byVariant.set(key, {
-          variant: key, headline: key === TIP_HEADLINE_VARIANT, cards: 0, tickets: 0,
+          variant: key, headline: key === countedVariant, cards: 0, tickets: 0,
           costCents: 0, returnedCents: 0, plCents: 0, bankrollCents: 0,
         });
       }
@@ -225,7 +247,7 @@ plRouter.get('/pl', (req, res) => {
         ...b,
         // The total above counts ONE variant per (day, source). This says which,
         // and what the alternatives would have done - side by side, never summed.
-        headlineVariant: TIP_HEADLINE_VARIANT,
+        headlineVariant: countedVariant,
         byVariant: [...byVariant.values()]
           .sort((a, b2) => TIP_VARIANTS.indexOf(a.variant) - TIP_VARIANTS.indexOf(b2.variant)),
       };
@@ -261,14 +283,19 @@ plRouter.get('/pl', (req, res) => {
   // notesPresent is a SQLite 0/1; emit a real boolean so the client can test it
   // the same way it tests every other flag on the row.
   const cardsOut = cardRows
-    .filter((r) => (selectedTrack === 'all' || r.track === selectedTrack) && (selectedDate === 'all' || r.date === selectedDate))
+    .filter(inScope)
     .map((r) => ({ ...r, notesPresent: Boolean(r.notesPresent), liveOddsPresent: Boolean(r.liveOddsPresent), tipSheetsPresent: Boolean(r.tipSheetsPresent) }));
-  res.json({ buckets, cards: cardsOut, ungraded: ungraded.filter((r) => (selectedTrack === 'all' || r.track === selectedTrack) && (selectedDate === 'all' || r.date === selectedDate)), engineVersions, selectedVersion, tracks, dates, selectedTrack, selectedDate });
+  res.json({
+    buckets, cards: cardsOut, ungraded: ungraded.filter(inScope),
+    engineVersions, selectedVersion,
+    tracks, dates, variants, selectedTrack, selectedDate, selectedVariant,
+  });
 });
 
 // One day's cards side by side, broken down per race - the variant-compare
 // view. Multi-race tickets settle across races and report under 'multi'.
-// Respects engineVersion query parameter to filter cards by version.
+// Respects the engineVersion and variant query parameters so an expanded
+// day shows the same cards the filtered running view above it does.
 plRouter.get('/race-days/:id/pl', (req, res) => {
   const db = getDb();
   const day = db.prepare('SELECT * FROM race_days WHERE id = ?').get(Number(req.params.id));
@@ -277,9 +304,21 @@ plRouter.get('/race-days/:id/pl', (req, res) => {
     return res.status(410).json({ error: 'This race day is deleted; deleted days are excluded from P/L.' });
   }
 
-  // Get requested engine version filter
+  // Get requested engine version and variant filters
   const requestedVersion = String(req.query.engineVersion ?? '').trim();
-  const selectedVersion = requestedVersion || null; // null means no filter (show all)
+  // 'all' is the running view's own word for 'do not filter', and the client
+  // forwards whatever sits in the selector - so it has to mean the same thing
+  // here, or expanding a day while pooling versions filters on a literal
+  // 'all' and the day comes back empty.
+  const selectedVersion = requestedVersion && requestedVersion !== 'all' ? requestedVersion : null;
+  const requestedVariant = String(req.query.variant ?? '').trim();
+  const selectedVariant = requestedVariant && requestedVariant !== 'all' ? requestedVariant : null;
+  // Built once and reused by both statements below, so the per-race rows can
+  // never be read from a different set of cards than the header row is.
+  // Two spellings of one clause: the cards query aliases the table, the
+  // subquery under the tickets query does not.
+  const whereFor = (p) => `${selectedVersion ? `AND ${p}engine_version = ?` : ''} ${selectedVariant ? `AND ${p}variant = ?` : ''}`;
+  const cardParams = [selectedVersion, selectedVariant].filter((v) => v != null);
 
   const cards = db.prepare(`
     SELECT c.id, c.card_number, c.variant, st.name AS template, c.bankroll_cents,
@@ -287,8 +326,8 @@ plRouter.get('/race-days/:id/pl', (req, res) => {
            c.tip_sheets_present, c.created_at
     FROM cards c
     LEFT JOIN strategy_templates st ON st.id = c.strategy_template_id
-    WHERE c.race_day_id = ? ${selectedVersion ? 'AND c.engine_version = ?' : ''} ORDER BY c.card_number
-  `)[selectedVersion ? 'all' : 'all'](selectedVersion ? [day.id, selectedVersion] : [day.id]);
+    WHERE c.race_day_id = ? ${whereFor('c.')} ORDER BY c.card_number
+  `).all([day.id, ...cardParams]);
 
   const rows = db.prepare(`
     SELECT t.card_id, r.number AS race_number,
@@ -296,8 +335,8 @@ plRouter.get('/race-days/:id/pl', (req, res) => {
     FROM graded_tickets_latest gt
     JOIN tickets t ON t.id = gt.ticket_id
     LEFT JOIN races r ON r.id = t.race_id
-    WHERE t.card_id IN (SELECT id FROM cards WHERE race_day_id = ? ${selectedVersion ? 'AND engine_version = ?' : ''})
-  `)[selectedVersion ? 'all' : 'all'](selectedVersion ? [day.id, selectedVersion] : [day.id]);
+    WHERE t.card_id IN (SELECT id FROM cards WHERE race_day_id = ? ${whereFor('')})
+  `).all([day.id, ...cardParams]);
 
   const perCard = new Map();
   for (const row of rows) {

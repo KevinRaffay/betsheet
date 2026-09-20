@@ -175,9 +175,16 @@ try {
   // separate engine versions as far as invariant 14 is concerned, so the
   // cross-bucket view needs the explicit all-versions selector.
   const pl = await jget('/api/pl?engineVersion=all');
-  check('response shape: buckets/cards/ungraded + the engine-version selector (D34) + the meet selector (D43) and NOTHING else - no pooled total',
-    JSON.stringify(Object.keys(pl).sort()) === JSON.stringify(['buckets', 'cards', 'engineVersions', 'meets', 'selectedMeet', 'selectedVersion', 'ungraded']) &&
-    pl.selectedVersion === 'all');
+  // The key list is the contract, and it goes stale silently: PR #390
+  // replaced the meet selector with track/day and left this asserting on
+  // `meets`/`selectedMeet`, so check-pl has been red on main since. D413
+  // adds the variant selector and brings the list back in line.
+  check('response shape: buckets/cards/ungraded + the engine-version (D34), track/day (#390) and variant (D413) selectors and NOTHING else - no pooled total',
+    JSON.stringify(Object.keys(pl).sort()) === JSON.stringify([
+      'buckets', 'cards', 'dates', 'engineVersions', 'selectedDate', 'selectedTrack',
+      'selectedVariant', 'selectedVersion', 'tracks', 'ungraded', 'variants',
+    ]) && pl.selectedVersion === 'all',
+    JSON.stringify(Object.keys(pl).sort()));
   check('no bucket is a pooled pseudo-bucket, and no engine bucket exists any more',
     pl.buckets.every((b) => ['HUMAN', 'LLM_GENERATED', 'EQB_OTR'].includes(b.completeness)),
     JSON.stringify(pl.buckets.map((b) => b.completeness)));
@@ -269,6 +276,92 @@ try {
     return after && after.plCents === humanBefore.plCents && after.cards === humanBefore.cards &&
       after.costCents === humanBefore.costCents;
   })(), JSON.stringify(plRestored.buckets));
+
+  console.log('-- the variant filter (D413) --');
+  // A TIPSHEET day: ONE source's picks staked three mutually-exclusive ways,
+  // which is the only place in the corpus where cards.variant carries a real
+  // choice AND where filtering on it collides with a rule (D175's
+  // one-variant-per-(day,source) total). A day of `default` cards could not
+  // test either.
+  const dayD = await (await jpost('/api/race-days', {
+    ...synthDay, date: '2026-08-31',
+  })).json();
+  {
+    const Database = (await import('better-sqlite3')).default;
+    const { insertTipPicks } = await import('../server/tip-picks.js');
+    const db = new Database(path.join(tmp, 'check.sqlite'));
+    for (const race of [1, 2]) {
+      insertTipPicks(db, {
+        raceDayId: dayD.id, raceNo: race, sourceLabel: 'trackmaster',
+        picks: [{ horse_no: '1', horse_name: 'A', rank: 1 }, { horse_no: '2', horse_name: 'B', rank: 2 }],
+      });
+    }
+    db.close();
+  }
+  const stakedD = await (await jpost(`/api/race-days/${dayD.id}/tip-cards`, { sourceLabel: 'trackmaster' })).json();
+  await jpost(`/api/race-days/${dayD.id}/results`, {
+    track: synthChart.track, date: '2026-08-31', sourceKind: 'paste', races: synthChart.races,
+  });
+  check('scenario: three TIPSHEET variants staked on one day and graded',
+    stakedD.cards?.length === 3, JSON.stringify(stakedD).slice(0, 300));
+
+  const plAll = await jget('/api/pl?engineVersion=all');
+  check('the selector offers every variant present, and defaults to all', (() => {
+    const want = ['across-the-board', 'default', 'exacta-box-top2', 'win-only'];
+    return JSON.stringify(plAll.variants) === JSON.stringify(want) && plAll.selectedVariant === 'all';
+  })(), JSON.stringify({ variants: plAll.variants, selected: plAll.selectedVariant }));
+  check('unfiltered, the TIPSHEET total still counts the FIXED headline variant only (D175)', (() => {
+    const b = plAll.buckets.find((x) => x.completeness === 'TIPSHEET');
+    const headline = plAll.cards.filter((c) => c.completeness === 'TIPSHEET' && c.variant === 'win-only');
+    return b && b.headlineVariant === 'win-only' && b.cards === headline.length &&
+      b.costCents === headline.reduce((a, c) => a + c.costCents, 0);
+  })(), JSON.stringify(plAll.buckets.find((x) => x.completeness === 'TIPSHEET')));
+
+  for (const v of ['win-only', 'across-the-board', 'exacta-box-top2']) {
+    const plv = await jget(`/api/pl?engineVersion=all&variant=${v}`);
+    check(`?variant=${v}: every card row and ungraded row is that variant`,
+      plv.selectedVariant === v &&
+      plv.cards.every((c) => c.variant === v) && plv.ungraded.every((c) => c.variant === v),
+      JSON.stringify([...new Set(plv.cards.map((c) => c.variant))]));
+    // The point of the filter: a NON-headline variant reports its own money
+    // rather than the $0 the fixed headline rule would have left it with.
+    check(`?variant=${v}: the TIPSHEET total is exactly that variant's cards`, (() => {
+      const b = plv.buckets.find((x) => x.completeness === 'TIPSHEET');
+      const mine = plv.cards.filter((c) => c.completeness === 'TIPSHEET');
+      const sum = (k) => mine.reduce((a, c) => a + c[k], 0);
+      return b && b.headlineVariant === v && b.cards === mine.length && mine.length > 0 &&
+        b.costCents === sum('costCents') && b.plCents === sum('plCents');
+    })(), JSON.stringify(plv.buckets.find((x) => x.completeness === 'TIPSHEET')));
+    check(`?variant=${v}: no OTHER bucket is left holding a foreign variant`,
+      plv.buckets.every((b) => {
+        const mine = plv.cards.filter((c) => c.completeness === b.completeness);
+        return mine.length > 0 && mine.every((c) => c.variant === v);
+      }), JSON.stringify(plv.buckets.map((b) => b.completeness)));
+  }
+  check("each variant's filtered total equals its own row in the unfiltered byVariant breakdown - the filter reads the same rows the comparison table does", await (async () => {
+    const totals = {};
+    for (const v of ['win-only', 'across-the-board', 'exacta-box-top2']) {
+      const plv = await jget(`/api/pl?engineVersion=all&variant=${v}`);
+      totals[v] = plv.buckets.find((x) => x.completeness === 'TIPSHEET').costCents;
+    }
+    const byVariant = plAll.buckets.find((x) => x.completeness === 'TIPSHEET').byVariant;
+    return byVariant.every((row) => totals[row.variant] === row.costCents);
+  })());
+  const plBogus = await jget('/api/pl?engineVersion=all&variant=no-such-variant');
+  check('an unknown variant falls back to all, never to an empty screen',
+    plBogus.selectedVariant === 'all' && plBogus.cards.length === plAll.cards.length);
+
+  const dayPLd = await jget(`/api/race-days/${dayD.id}/pl?variant=exacta-box-top2`);
+  check('the per-day view honours ?variant= too, so an expanded day matches the table above it',
+    dayPLd.cards.length === 1 && dayPLd.cards[0].variant === 'exacta-box-top2',
+    JSON.stringify(dayPLd.cards.map((c) => c.variant)));
+  // The client forwards the selector's own value, and 'all' is what the
+  // running view calls "do not filter" - so the day view must read it the
+  // same way rather than filtering on a literal 'all' and answering empty.
+  const dayPLpooled = await jget(`/api/race-days/${dayD.id}/pl?engineVersion=all&variant=all`);
+  check("engineVersion=all / variant=all mean POOLED on the day view, not a literal match",
+    dayPLpooled.cards.length === 3,
+    JSON.stringify(dayPLpooled.cards.map((c) => [c.engineVersion, c.variant])));
 } finally {
   server.kill();
   await new Promise((rr) => setTimeout(rr, 300));
