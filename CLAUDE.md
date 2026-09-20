@@ -912,6 +912,27 @@ it. Rules still in force:
   a simulated resize was blamed on React refusing to rewrite the `open`
   attribute, when in fact the hook feeding it had never been told anything
   changed.
+- **The browser pane is `visibilityState: 'hidden'` unless a screenshot is
+  being taken, and `requestAnimationFrame` NEVER FIRES while it is** (D415).
+  The pane keeps working - `read_page`, `get_page_text`, `javascript_tool` and
+  every DOM read are correct, and `setTimeout` still runs - so nothing announces
+  this. But a browser pauses the frame loop for a hidden document, so any code
+  under rAF simply does not run, and a SMOOTH scroll (also frame-driven) does
+  not animate. The pane also reports `innerWidth`/`innerHeight` of 0 while
+  hidden, which collapses `max-height: 85vh` layouts: a `.modal__body` measured
+  9px tall, so every in-view assertion against it was meaningless. Taking a
+  screenshot flips the document visible, the queued rAF callbacks then run, and
+  the same assertion passes - which is what makes this so confusing to debug,
+  because the behaviour appears and disappears with an unrelated tool call.
+  **Cost a wrong diagnosis on the deliverable that found it**: a scroll fired
+  from rAF never moved, which read as a product bug, was "fixed" against an
+  invented layout-shift theory, and still failed - twice - before
+  `visibilityState` was read. **So: verify anything rAF-driven, animated or
+  viewport-measured inside a `browser_batch` that takes a screenshot between
+  the action and the assertion**, and check `document.visibilityState` before
+  believing that a frame-driven behaviour is broken. Same family as D158's
+  missing resize/matchMedia events: the harness is a likelier suspect than the
+  code for anything the frame loop drives.
 - **A wrong Node version here is a SEGFAULT, not an install error** (D156).
   `better-sqlite3@13` requires node `>=22` and `pdfjs-dist@6` `>=22.13`, and
   **npm treats an engine mismatch as a WARNING** (`EBADENGINE`) unless

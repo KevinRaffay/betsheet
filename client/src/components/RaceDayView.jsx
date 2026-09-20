@@ -11,6 +11,7 @@ import TipPicksEntryModal from './TipPicksEntryModal.jsx';
 import RaceDayNotesModal from './RaceDayNotesModal.jsx';
 import LiveOddsModal from './LiveOddsModal.jsx';
 import LlmCardModal from './LlmCardModal.jsx';
+import DayTicketBuilderModal from './DayTicketBuilderModal.jsx';
 import {
   LiveOddsBar, LiveOddsCell, LiveOddsHistory, useRaceLiveOdds,
 } from './RaceLiveOdds.jsx';
@@ -81,6 +82,12 @@ export default function RaceDayView({ id, onBack, onOpenCard }) {
   // to the race the user was actually looking at instead of the top of the
   // grid.
   const [llmRace, setLlmRace] = useState(null);
+  // D415: the same entry point for the HAND builder. Which race's "Build card
+  // by hand" button was clicked; the modal itself is still the day-wide
+  // DayTicketBuilderModal CardsPanel also opens (a human card is built one
+  // race at a time either way) - this opens it scrolled to the race the user
+  // was reading, with that race's ticket box already open.
+  const [handRace, setHandRace] = useState(null);
   const [tipRows, setTipRows] = useState([]);
   const [tipScoring, setTipScoring] = useState(null);
   // The day's analyst notes (same `llm_notes` draft, D92), keyed by race
@@ -362,6 +369,22 @@ export default function RaceDayView({ id, onBack, onOpenCard }) {
           onClose={() => setLlmRace(null)}
         />
       )}
+      {/* D415: CardsPanel is a SIBLING here, not a parent, so its own `reload`
+          is out of reach - remounting it via its `key` is the only way its
+          table sees a card this modal minted, the same wire ResultsPanel and
+          EquibaseOtrPanel already use. Bumped on close as well as on change
+          because closing IS a commit (D103): handleClose locks every previewed
+          race on the way out, so a close alone can mint a card. */}
+      {handRace && (
+        <DayTicketBuilderModal
+          context="live"
+          dayId={day.id}
+          bankrollCents={day.bankroll_cents}
+          initialRace={handRace.number}
+          onCardChanged={() => setCardsVersion((v) => v + 1)}
+          onClose={() => { setHandRace(null); setCardsVersion((v) => v + 1); }}
+        />
+      )}
 
       <ResultsPanel dayId={day.id} onSaved={() => setCardsVersion((v) => v + 1)} />
       <EquibaseOtrPanel dayId={day.id} onSaved={() => setCardsVersion((v) => v + 1)} />
@@ -459,6 +482,12 @@ export default function RaceDayView({ id, onBack, onOpenCard }) {
             <div className="formrow formrow--tight">
               <button className="btn btn--sm" onClick={() => setLlmRace(race)}>
                 Generate Card from LLM
+              </button>
+              {/* D415: same label as the day-level button in CardsPanel, on
+                  purpose - it is the same feature, entered from the race the
+                  user is actually looking at. */}
+              <button className="btn btn--sm" onClick={() => setHandRace(race)}>
+                Build card by hand
               </button>
             </div>
             {/* D184: a note about THIS race is typed here, under the house
