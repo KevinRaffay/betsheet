@@ -25,25 +25,30 @@ export default function PLView({ onBack, onOpenCard, onOpenDay }) {
   const [version, setVersion] = useState(''); // '' = server default (latest)
   const [track, setTrack] = useState('all'); // one track, or all tracks
   const [date, setDate] = useState('all'); // one date, or all dates
+  // D413: one card VARIANT, or all of them. The axis a producer uses to
+  // stake the same opinion three ways, so picking one reads that structure
+  // across every day it was staked on.
+  const [variant, setVariant] = useState('all');
 
   useEffect(() => {
-    getPL(version, track, date).then(setData).catch((e) => setError(String(e.message)));
-  }, [version, track, date]);
+    getPL(version, track, date, variant).then(setData).catch((e) => setError(String(e.message)));
+  }, [version, track, date, variant]);
 
-  // When version changes, refetch the expanded day's races to filter by the new version
+  // When a filter the day view also honours changes, refetch the expanded
+  // day's races so the matrix never shows cards the table above it hides.
   useEffect(() => {
     if (expandedDay) {
       setDayPL(null);
-      getDayPL(expandedDay, version || undefined).then(setDayPL).catch((e) => setError(String(e.message)));
+      getDayPL(expandedDay, version || undefined, variant).then(setDayPL).catch((e) => setError(String(e.message)));
     }
-  }, [version, expandedDay]);
+  }, [version, variant, expandedDay]);
 
   const toggleDay = async (raceDayId) => {
     if (expandedDay === raceDayId) { setExpandedDay(null); setDayPL(null); return; }
     setExpandedDay(raceDayId);
     setDayPL(null);
     try {
-      setDayPL(await getDayPL(raceDayId, version || undefined));
+      setDayPL(await getDayPL(raceDayId, version || undefined, variant));
     } catch (e) {
       setError(String(e.message));
       setExpandedDay(null);
@@ -82,6 +87,14 @@ export default function PLView({ onBack, onOpenCard, onOpenDay }) {
               <select className="in in--sm" value={data.selectedDate ?? 'all'} onChange={(e) => setDate(e.target.value)}>
                 <option value="all">all days</option>
                 {data.dates.map((d) => <option key={d} value={d}>{d}</option>)}
+              </select>
+            </label>
+          )}
+          {data.variants && data.variants.length > 1 && (
+            <label className="dim">Variant{' '}
+              <select className="in in--sm" value={data.selectedVariant ?? 'all'} onChange={(e) => setVariant(e.target.value)}>
+                <option value="all">all variants</option>
+                {data.variants.map((v) => <option key={v} value={v}>{v}</option>)}
               </select>
             </label>
           )}
@@ -124,6 +137,9 @@ export default function PLView({ onBack, onOpenCard, onOpenDay }) {
             {data.selectedVersion === 'all'
               ? ' Showing ALL engine versions pooled - you chose this; improvement is measured by comparing versions.'
               : ` Showing engine ${data.selectedVersion} only.`}
+            {data.selectedVariant && data.selectedVariant !== 'all'
+              ? ` Variant ${data.selectedVariant} only - every figure on this screen is that structure alone.`
+              : ''}
           </p>
           {data.buckets.find((b) => b.completeness === 'LLM_GENERATED')?.byModel?.length > 0 && (
             <details className="race" open>

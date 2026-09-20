@@ -1064,6 +1064,19 @@ it. Rules still in force:
   the PAGE still rendered (`#root` still has children) - "the modal is gone" is
   also true when the app has crashed.
 - **`check-static-app` is IN SCOPE - HOUSE RULE** (user rule, 2026-09-12, supersedes D168). Run it in all contexts including git worktrees. The prior ruling (D168, 2026-09-08) that it was out of scope is no longer valid. `npm run check-static-app` must pass before every PR merge.
+- **A WORKTREE has no `node_modules` of its own, so a script that JOINS one
+  onto the repo root cannot run there** (D413). Every import resolves fine -
+  Node walks up to the main checkout's `node_modules` - which is exactly why
+  this hides: `npm run build` works, `npm start` works, and only a script
+  that builds a tool path by hand fails. `scripts/check-static-app.js` did,
+  with `path.join(ROOT, 'node_modules', 'vite', 'bin', 'vite.js')`, so the
+  house rule directly above - that it must run in ALL contexts including
+  worktrees - was unsatisfiable in one, and the failure read as a broken
+  check (`Cannot find module`) rather than a missing directory. **Resolve the
+  package, never join the path**: `createRequire(import.meta.url).resolve(...)`
+  finds it wherever it actually lives. One wrinkle worth knowing - a modern
+  package's `exports` map usually does NOT publish `./bin`, so resolve its
+  `package.json` and join the bin path onto that directory.
 - **Desktop app changes are the default; static app changes are the exception - HOUSE RULE** (user rule, 2026-09-12). Going forward, unless explicitly instructed otherwise, make changes to the desktop app (`client/src/`, `server/`) only. Static app changes (`static/src/`) require explicit instruction and are treated case-by-case, not as a default reflex. The two apps share some imports but have distinct use cases and release cadences.
 - **A race-specific input or edit belongs in the Race UI component - HOUSE
   RULE** (user rule, 2026-09-08, D182/D184). If a thing is an opinion about,
