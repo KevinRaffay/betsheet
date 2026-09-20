@@ -103,6 +103,7 @@ function racesRemaining(db, cardId, dayId, excludeRaceId) {
 function insertRequestRow(db, {
   raceDayId, cardId, raceNumber, promptText, responseText, model, error, notes,
   correlationId, systemPromptText, requestParams, liveOddsPresent = false, tipSheetsPresent = false,
+  usage = null,
 }) {
   // D92: the notes snapshot rides along on the same insert. It is what makes
   // the log self-describing - the draft in llm_notes is mutable, so a later
@@ -118,8 +119,9 @@ function insertRequestRow(db, {
     INSERT INTO llm_card_requests (race_day_id, card_id, race_number, prompt_text, response_text, model, requested_at, error,
       notes_present, notes_race_text, notes_card_text, notes_source_label, notes_hash, notes_char_count, notes_entered_at, notes_post_result,
       correlation_id, system_prompt_text, system_prompt_hash, user_prompt_hash, notes_rendered_text,
-      prompt_template_id, prompt_template_version, request_params, live_odds_present, tip_sheets_present)
-    VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+      prompt_template_id, prompt_template_version, request_params, live_odds_present, tip_sheets_present,
+      input_tokens, output_tokens, cache_creation_input_tokens, cache_read_input_tokens)
+    VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
   `).run(raceDayId, cardId ?? null, raceNumber, promptText, responseText ?? null, model ?? null, now(), error ?? null,
     n.notes_present, n.notes_race_text, n.notes_card_text, n.notes_source_label,
     n.notes_hash, n.notes_char_count, n.notes_entered_at, n.notes_post_result,
@@ -130,7 +132,12 @@ function insertRequestRow(db, {
     // card-level flag below latches from it.
     liveOddsPresent ? 1 : 0,
     // D369: and did it carry a tip sheet. Same shape, same reason.
-    tipSheetsPresent ? 1 : 0).lastInsertRowid;
+    tipSheetsPresent ? 1 : 0,
+    // D420: what the call COST, as the API reported it - NULL when the call
+    // never reached the API or was a check script's stub. cache_read > 0 on
+    // the second race of a card is the only proof prompt caching is working.
+    usage?.input ?? null, usage?.output ?? null, usage?.cacheCreation ?? null, usage?.cacheRead ?? null,
+  ).lastInsertRowid;
 }
 
 /**
@@ -143,7 +150,7 @@ function insertRequestRow(db, {
  * the user can pick a model per generation in the LLM card modal.
  */
 export async function previewLlmRace(db, day, raceNumber, cardId, {
-  stubResponseText, model: requestedModel, interactive = false, correlationId,
+  stubResponseText, stubUsage, model: requestedModel, interactive = false, correlationId,
 } = {}) {
   const { race, entries } = loadRace(db, day.id, raceNumber);
   const scratched = scratchedProgramNumbersFor(db, day.id, race, entries);
@@ -212,6 +219,11 @@ export async function previewLlmRace(db, day, raceNumber, cardId, {
   let responseText = stubResponseText ?? null;
   let model = stubResponseText ? 'stub' : (requestedModel || MODEL);
   let requestParams = DEFAULT_REQUEST_PARAMS;
+  // D420: the usage block the API reported for this call. `stubUsage` is the
+  // test-only companion of `stubResponseText` - the same escape hatch, one
+  // field wider - so check-llm-cards can prove the figures land on the row
+  // without a real, billed call. Null on every path that never reaches the API.
+  let usage = stubResponseText != null ? (stubUsage ?? null) : null;
   let callError = null;
 
   // D149: the call is logged as SENT before we know whether it will
@@ -234,6 +246,7 @@ export async function previewLlmRace(db, day, raceNumber, cardId, {
         responseText = result.text;
         model = result.model;
         requestParams = result.requestParams;
+        usage = result.usage;
       } catch (err) {
         callError = err.message;
       }
@@ -244,6 +257,7 @@ export async function previewLlmRace(db, day, raceNumber, cardId, {
     raceDayId: day.id, cardId: card?.id, raceNumber, promptText: userPrompt,
     responseText, model, error: callError, notes,
     correlationId, systemPromptText, requestParams, liveOddsPresent: hasLiveOdds, tipSheetsPresent: hasTipSheets,
+    usage,
   });
 
   if (callError) {
@@ -306,6 +320,9 @@ export async function previewLlmRace(db, day, raceNumber, cardId, {
     correlationId, cardId: card?.id ?? null, raceDayId: day.id, responseChars: responseText.length,
     parsedTicketCount: parsed.tickets.length, parsedRaceCount: 1,
     parseErrors: parsed.warnings.filter((w) => w.blocking).map((w) => w.type),
+    // D420: the same four figures the request row carries, so a trace export
+    // reads a card's spend without a DB join. Null for a stub.
+    usage,
   });
 
   const cardCostCents = spentCents + parsed.raceCostCents;
@@ -581,6 +598,7 @@ llmCardsRouter.post('/race-days/:id/llm-cards/preview', async (req, res) => {
   try {
     const preview = await previewLlmRace(db, day, race, req.body?.cardId, {
       stubResponseText: process.env.BETSHEET_LLM_TEST_MODE === '1' ? req.body?.__stubResponse : undefined,
+      stubUsage: process.env.BETSHEET_LLM_TEST_MODE === '1' ? req.body?.__stubUsage : undefined,
       model: requestedModel || undefined,
       // The ONE interactive caller. Nothing else passes this, so a batch path
       // that grows an LLM call later gets a notes-free prompt by default.
@@ -634,6 +652,12 @@ llmCardsRouter.get('/cards/:id/llm-requests', (req, res) => {
     // D234/D369: what else this race's generation saw, per race - the card
     // flags latch, so these are the only place the per-race truth is readable.
     liveOddsPresent: Boolean(r.live_odds_present), tipSheetsPresent: Boolean(r.tip_sheets_present),
+    // D420: what this call cost, as the API reported it. Null for every row
+    // logged before migration 039 and for any call that never reached the API.
+    usage: r.input_tokens == null && r.output_tokens == null && r.cache_read_input_tokens == null ? null : {
+      input: r.input_tokens, output: r.output_tokens,
+      cacheCreation: r.cache_creation_input_tokens, cacheRead: r.cache_read_input_tokens,
+    },
   })));
 });
 

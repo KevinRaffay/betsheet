@@ -1155,6 +1155,27 @@ it. Rules still in force:
   TSV header on every call (a wrong binary throws instead of silently
   mis-parsing), and `BETSHEET_PDFTOTEXT` overrides the path explicitly if
   the winget layout ever changes.
+- **The LLM system prompt is CACHED on the wire, and the cache is a PREFIX
+  match - so nothing volatile may ever enter `SYSTEM_PROMPT` or a clause
+  block, and the marker stays on the system block, never on the request**
+  (D420). `complete()` sends the system prompt as one text block with
+  `cache_control: {type: 'ephemeral'}`; the per-race user prompt follows it
+  unmarked. It is ~89% of every call's input and byte-identical race to race
+  on a card, so every race after the first reads it at a tenth of the price
+  (331 of 469 calls on the real log would have hit). Two ways to silently
+  break it, neither of which errors: (a) interpolating a date, a card id or
+  a correlation id into the system prompt - one changed byte at the front
+  invalidates everything after it, and per-race facts belong in the USER
+  prompt where they always were; (b) reaching for the request-level
+  automatic `cache_control` because it is simpler - it lands the breakpoint
+  on the LAST block, the unique user prompt, so every call pays the 1.25x
+  write premium and nothing is ever read back. **The proof is the
+  `cache_read_input_tokens` column on `llm_card_requests`** (migration 039):
+  non-zero on the second race of a card means it works, and a zero there
+  after a prompt-assembly change means something above broke it. Check the
+  column, not the marker. The text the model reads is unchanged by the
+  marker, so `system_prompt_hash`/`prompt_template_version` and every
+  prompt-comparability boundary in docs/prompts/llm-card-v1.md hold.
 - **Newer models REJECT a non-default `temperature`; the default value is fine**
   (D166). `claude-sonnet-5` answers a 400 `\`temperature\` is deprecated for this
   model.` to `temperature: 0`, while `temperature: 1` - what `complete()` sends
