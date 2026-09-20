@@ -1,4 +1,4 @@
-import React, { useEffect, useState } from 'react';
+import React, { useEffect, useRef, useState } from 'react';
 import { deleteHumanTicket, getReplayDayRaces, listCards, lockHumanCard, previewHumanCard } from '../api.js';
 import { clearDraft, loadDayDrafts, saveDraft } from '../drafts.js';
 import TicketBuilder from './TicketBuilder.jsx';
@@ -90,7 +90,7 @@ const cardOptionLabel = (c) => [
 // server, and a "draft" card here means only "not every race is locked
 // yet" - there is no draft STATE on a card, and this modal invents none.
 export default function DayTicketBuilderModal({
-  dayId, bankrollCents, onClose, onCardChanged, context = 'replay',
+  dayId, bankrollCents, onClose, onCardChanged, context = 'replay', initialRace = null,
 }) {
   const live = context === 'live';
   const [cardId, setCardId] = useState(null);
@@ -99,6 +99,12 @@ export default function DayTicketBuilderModal({
   const [humanCards, setHumanCards] = useState([]); // D140: every human card on the day, newest first
   const [newCardName, setNewCardName] = useState(''); // draft name, editable only while cardId is null
   const [races, setRaces] = useState(null);
+  // D415: which card `races` was actually FETCHED for, and whether the card
+  // resolution that picks that card has finished. Only the initialRace scroll
+  // reads them - see the effect below for why a scroll fired any earlier lands
+  // on a layout that is about to change under it.
+  const [racesForCard, setRacesForCard] = useState(undefined);
+  const [cardsResolved, setCardsResolved] = useState(false);
   const [open, setOpen] = useState(() => new Set());
   const [textByRace, setTextByRace] = useState(() => new Map());
   const [draftAt, setDraftAt] = useState(() => new Map());
@@ -130,11 +136,12 @@ export default function DayTicketBuilderModal({
     setCardId(on?.id ?? null);
     setCardNumber(on?.card_number ?? null);
     setCardName(on?.name ?? null);
-  }).catch(() => {});
+    setCardsResolved(true);
+  }).catch(() => { setCardsResolved(true); });
   useEffect(() => { loadCards(); }, [dayId]); // eslint-disable-line react-hooks/exhaustive-deps
 
   const reload = () => getReplayDayRaces(dayId, cardId)
-    .then((d) => setRaces(d.races))
+    .then((d) => { setRaces(d.races); setRacesForCard(cardId); })
     .catch((e) => setError(String(e.message)));
   // Wrapped so the effect returns undefined, never the promise `reload`
   // hands back: React treats an effect's return value as its cleanup and
@@ -142,6 +149,68 @@ export default function DayTicketBuilderModal({
   // "destroy is not a function" the moment the modal closed and took the
   // whole app down with it. Same shape as CardsPanel/ConsensusPanel.
   useEffect(() => { reload(); }, [dayId, cardId]); // eslint-disable-line react-hooks/exhaustive-deps
+
+  // D415: opened from ONE race's own panel on /day/:id rather than the
+  // day-level "Betting cards" button - bring that race's card into view and
+  // open its builder, so the user goes from reading a race to typing its bets
+  // in one click. Same entry-point shape as LlmCardModal's `initialRace`
+  // (D182/D184's house rule: a race-specific input belongs in the race's UI).
+  //
+  // The latch is load-bearing, not caution: `races` reloads on every lock and
+  // on every card switch, and `switchTo` deliberately clears `open` - without
+  // it, locking race 3 would silently re-open (and re-scroll to) a race the
+  // user had since collapsed. Fires once per mount, after `races` exists,
+  // because the anchor is not in the DOM until then.
+  //
+  // It must also wait for the RIGHT `races`, not merely the first one, or it
+  // scrolls to a position that is about to move. Opening this modal fires two
+  // independent loads: `loadCards` (which resolves the day's latest human card)
+  // and `reload` (the races, fetched for whatever cardId is known at the time).
+  // On a day that already HAS a human card, the races therefore land twice -
+  // once for `cardId` null, then again for the resolved card - and the second
+  // payload marks that card's races locked, which grows each of them by a
+  // ticket table, pushing every race below it down.
+  //
+  // Measured on this repo's own scratch day (one card, race 1 locked), polling
+  // the anchor every 8ms from the click: at ms 21 race 1 read "Not played" at
+  // 81px tall with race 6's anchor at offsetTop 979; at ms 38 race 1 read
+  // "Locked" at 210px and race 6 had moved to 1108. A 129px drop, 17ms in -
+  // squarely inside the window an ungated rAF scroll fires in, so the scroll
+  // would land 129px short of its target. That is one locked race above it;
+  // the shift is cumulative, so a day whose card already has five locked races
+  // ahead of the target misses by enough to land on a different race entirely.
+  //
+  // So fire only once card resolution has finished AND the races in hand were
+  // fetched for that resolved card - `racesForCard === cardId` - which is the
+  // first moment the layout is the one the user will actually be looking at.
+  const appliedInitialRace = useRef(false);
+  useEffect(() => {
+    if (initialRace == null || !races || appliedInitialRace.current) return;
+    if (!cardsResolved || racesForCard !== cardId) return;
+    const target = races.find((r) => r.raceNumber === initialRace);
+    if (!target) return;
+    appliedInitialRace.current = true;
+    // A locked race has no Build button at all, so there is nothing to open -
+    // scroll to it anyway, so the lock state and the card picker above it are
+    // what the user sees rather than an empty body.
+    if (!target.locked) setOpen((s) => new Set(s).add(initialRace));
+    // Deliberately NOT `behavior: 'smooth'`, which is where LlmCardModal's
+    // otherwise-identical effect differs. Two reasons, and the second is why
+    // this must not be "tidied" back: (a) the modal has only just appeared, so
+    // there is no scroll position the user is tracking and nothing for an
+    // animation to preserve - it is 400ms of travel to a place they asked to
+    // be; (b) a smooth scroll is interruptible and, measured in this repo's
+    // browser harness with the document VISIBLE (so this is not the hidden-pane
+    // artifact in Gotchas), `scrollTo({top: 600, behavior: 'smooth'})` on
+    // `.modal__body` is a NO-OP - scrollTop stays 0 where the same call without
+    // `behavior` reaches 600 - with prefers-reduced-motion false and
+    // scroll-behavior auto. So the animated form cannot be verified here at
+    // all, the same shape of harness gap D158 records for resize events.
+    requestAnimationFrame(() => {
+      document.getElementById(`builder-race-${initialRace}`)
+        ?.scrollIntoView({ block: 'start' });
+    });
+  }, [initialRace, races, racesForCard, cardId, cardsResolved]);
 
   useEffect(() => {
     const onKey = (e) => { if (e.key === 'Escape') closeRef.current(); };
@@ -475,7 +544,7 @@ export default function DayTicketBuilderModal({
                 const draftText = (textByRace.get(r.raceNumber) ?? '').trim();
                 const hasDraft = !r.locked && draftText.length > 0;
                 return (
-                  <article className="race-card" key={r.raceNumber}>
+                  <article className="race-card" key={r.raceNumber} id={`builder-race-${r.raceNumber}`}>
                     <div className="race-card__header">
                       <strong>Race {r.raceNumber}</strong>
                       <span className="dim">{r.distance ?? '?'} · {r.raceType ?? '?'}</span>
