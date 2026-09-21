@@ -205,20 +205,33 @@ export default function ReplayRaceView({ dayId, initialRace = 1, onBack, onOpenS
 
         {blind.locked && blind.pass && <p className="dim">PASSED this race.</p>}
 
-        {blind.locked && !blind.pass && Array.isArray(blind.tickets) && (
-          <table className="grid">
-            <thead><tr><th>Bet type</th><th>Selections / rationale</th><th>Say to the teller</th><th>Cost</th></tr></thead>
-            <tbody>
-              {blind.tickets.map((t, i) => (
-                <tr key={i}>
-                  <td className="bt">{t.betType.replace(/_/g, ' ')}</td>
-                  <td>{t.legs.map((l) => l.join(',')).join(' / ')}{t.rationaleText ? <span className="dim"> — {t.rationaleText}</span> : null}</td>
-                  <td className="teller">{t.tellerCall}</td>
-                  <td>{money(t.costCents)}</td>
-                </tr>
-              ))}
-            </tbody>
-          </table>
+        {/* The card you committed, in the position it has always occupied:
+            under the entries, above the finish order. Once this race is
+            revealed the SAME table gains Result and P/L per ticket, from
+            `humanGraded` - already on the wire for every revealed race, so
+            this costs no round trip. Before D426 the only outcome on screen
+            was the one-line race total below, which says the race lost $12
+            and not WHICH of the four lines lost it; reading that meant
+            re-grading every ticket by eye against the finish order and the
+            payoff table. Pre-reveal the table is unchanged: cost only. */}
+        {blind.locked && !blind.pass && (
+          revealed && Array.isArray(blind.humanGraded)
+            ? <GradedTicketsTable graded={blind.humanGraded} />
+            : Array.isArray(blind.tickets) && (
+              <table className="grid">
+                <thead><tr><th>Bet type</th><th>Selections / rationale</th><th>Say to the teller</th><th>Cost</th></tr></thead>
+                <tbody>
+                  {blind.tickets.map((t, i) => (
+                    <tr key={i}>
+                      <td className="bt">{t.betType.replace(/_/g, ' ')}</td>
+                      <td>{t.legs.map((l) => l.join(',')).join(' / ')}{t.rationaleText ? <span className="dim"> — {t.rationaleText}</span> : null}</td>
+                      <td className="teller">{t.tellerCall}</td>
+                      <td>{money(t.costCents)}</td>
+                    </tr>
+                  ))}
+                </tbody>
+              </table>
+            )
         )}
 
         {/* Editing a locked race after ANY race on the card was revealed would
@@ -282,11 +295,16 @@ export default function ReplayRaceView({ dayId, initialRace = 1, onBack, onOpenS
               <strong>Lean this race:</strong>{' '}
               {blind.leanGraded == null ? <span className="dim">no lean card on this day</span> : <>{money(blind.leanAllocatedCents)} allocated, race P/L {signed(blind.leanRacePl)}</>}
             </p>
-            {summary?.closed && (
-              <>
-                <GradedTicketsTable title="Human card, this race" graded={blind.humanGraded} />
-                <GradedTicketsTable title="Lean card, this race" graded={blind.leanGraded} />
-              </>
+            {/* The HUMAN card is no longer repeated here - it IS the table
+                above, which now carries Result and P/L itself. Lean keeps a
+                title (a different card, so it needs naming) and no longer
+                waits for the day to close: its race P/L is already on the
+                line directly above, so withholding only the per-ticket
+                breakdown was arbitrary. Rendered only when there are lean
+                tickets, because the no-lean-card case is already said in
+                that same line and does not want saying twice. */}
+            {blind.leanGraded?.length > 0 && (
+              <GradedTicketsTable title="Lean card, this race" graded={blind.leanGraded} />
             )}
           </div>
         )}
@@ -296,19 +314,33 @@ export default function ReplayRaceView({ dayId, initialRace = 1, onBack, onOpenS
 }
 
 // The actual betting card, ticket by ticket, with the grader's outcome and
-// payout - shown only once the day is closed (mid-play the one-line race
-// P/L summary above is enough; the full card is for the after-the-fact
-// review). `graded`: [{ticket: {betType, legs, costCents, tellerCall,
-// rationaleText}, outcome, returnedCents, plCents, note}] from the grader,
-// or null when there's no card at all (e.g. no lean card on this day).
-function GradedTicketsTable({ title, graded }) {
-  if (graded == null) return <p className="dim">{title}: no card.</p>;
-  if (graded.length === 0) return <p className="dim">{title}: no tickets this race.</p>;
+// payout. It was gated on `summary.closed` until D426, on the reasoning that
+// mid-play the one-line race P/L was enough and the full card was for the
+// after-the-fact review. That reasoning did not survive contact with the
+// screen (user request, 2026-09-21): the one line reports that the race lost
+// $12 without saying which of its tickets lost it, so every review meant
+// re-grading the card by eye against the finish order and the payoff table
+// sitting right below it. It now renders as soon as a race is REVEALED,
+// which withholds nothing that was being withheld - every figure in it is
+// already on the wire for that race, and its total is already printed.
+//
+// `title` is optional: the human card renders untitled, in place of the
+// pre-reveal ticket table inside that race's own panel, where a heading
+// would only repeat the panel's. Untitled therefore also means the
+// empty/absent cases have nothing to name themselves with, and render
+// nothing rather than a dangling ": no card."
+//
+// `graded`: [{ticket: {betType, legs, costCents, tellerCall, rationaleText},
+// outcome, returnedCents, plCents, note}] from the grader, or null when
+// there's no card at all (e.g. no lean card on this day).
+function GradedTicketsTable({ title = null, graded }) {
+  if (graded == null) return title ? <p className="dim">{title}: no card.</p> : null;
+  if (graded.length === 0) return title ? <p className="dim">{title}: no tickets this race.</p> : null;
   const totalCost = graded.reduce((a, g) => a + g.ticket.costCents, 0);
   const totalReturned = graded.reduce((a, g) => a + g.returnedCents, 0);
   return (
     <>
-      <p><strong>{title}</strong></p>
+      {title && <p><strong>{title}</strong></p>}
       <table className="grid">
         <thead>
           <tr><th>Bet type</th><th>Selections / rationale</th><th>Say to the teller</th><th>Cost</th><th>Result</th><th>P/L</th></tr>
