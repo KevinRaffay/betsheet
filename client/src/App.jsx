@@ -121,7 +121,7 @@ export default function App() {
           <PLView
             onBack={() => navigate({ name: 'list' })}
             onOpenDay={(id) => navigate({ name: 'day', id })}
-            onOpenCard={(cardId, dayId) => navigate({ name: 'card', id: cardId, dayId })}
+            onOpenCard={(cardId, dayId) => navigate({ name: 'card', id: cardId, dayId, from: 'pl' })}
           />
         )}
         {view.name === 'distribution' && (
@@ -152,8 +152,12 @@ export default function App() {
         {view.name === 'card' && (
           <CardView
             cardId={view.id}
-            onBack={() => navigate(view.dayId ? { name: 'day', id: view.dayId } : { name: 'list' })}
-            onDeleted={() => navigate(view.dayId ? { name: 'day', id: view.dayId } : { name: 'list' })}
+            onBack={() => navigate(
+              view.from === 'pl' ? { name: 'pl' } : view.dayId ? { name: 'day', id: view.dayId } : { name: 'list' }
+            )}
+            onDeleted={() => navigate(
+              view.from === 'pl' ? { name: 'pl' } : view.dayId ? { name: 'day', id: view.dayId } : { name: 'list' }
+            )}
           />
         )}
       </main>
