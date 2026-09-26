@@ -333,6 +333,24 @@ export const lockLlmCard = (dayId, { race, requestId, bankrollCents, cardId }, c
   }).then(asJson);
 export const getLlmRequests = (cardId) => fetch(`/api/cards/${cardId}/llm-requests`).then(asJson);
 
+// COMBINED parlays (D436 server, D438 UI). The preview writes nothing and
+// returns candidates under BOTH selections (combined model / market alone);
+// the save rebuilds them from the same `options` and refuses (409) a choice
+// the rebuild no longer produces - so pass the options the PREVIEW ran with,
+// not whatever the form holds now.
+export const previewCombinedParlays = (dayId, options, correlationId) =>
+  fetch(`/api/race-days/${dayId}/combined-cards/preview`, {
+    method: 'POST',
+    headers: { 'content-type': 'application/json', ...(correlationId ? { 'x-correlation-id': correlationId } : {}) },
+    body: JSON.stringify(options),
+  }).then(asJson);
+export const saveCombinedParlay = (dayId, { options, choice, name }, correlationId) =>
+  fetch(`/api/race-days/${dayId}/combined-cards`, {
+    method: 'POST',
+    headers: { 'content-type': 'application/json', ...(correlationId ? { 'x-correlation-id': correlationId } : {}) },
+    body: JSON.stringify({ ...options, choice, name }),
+  }).then(asJson);
+
 // Replay (D55): the blind race-by-race view, reveal, close, standing.
 export const getReplayDays = () => fetch('/api/replay/days').then(asJson);
 export const getRandomReplayDay = () => fetch('/api/replay/random').then(asJson);

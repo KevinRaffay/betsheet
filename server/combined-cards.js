@@ -196,7 +196,7 @@ export function persistCombinedParlay(db, day, { options, choice, name, correlat
 
   let graded = null;
   if (preview.resultsOnFile) graded = gradeAndPersist(db, card.id, correlationId, { engineVersion: COMBINED_VERSION });
-  return { cardId: card.id, correlationId, ticket, graded };
+  return { cardId: card.id, cardNumber: card.card_number, correlationId, ticket, graded };
 }
 
 function liveDay(db, id, res) {
