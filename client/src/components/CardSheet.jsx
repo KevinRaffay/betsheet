@@ -6,6 +6,7 @@ import EntryFlagTags from './EntryFlagTags.jsx';
 import MlRankHeader from './MlRankHeader.jsx';
 import { flagRaceEntries, mlRankOrder } from '@shared/entry-flags.js';
 import { BUCKET_CHIP } from '@shared/distribution.js';
+import { describeCardSources } from '@shared/card-sources.js';
 
 const RESPONSIBLE_LINE =
   'Entertainment wagering with a pre-committed budget. No mid-card increases.';
@@ -76,6 +77,7 @@ export default function CardSheet({ card, races, results, notesByRace, grades })
   const multis = card.tickets.filter((t) => t.selections.races.length !== 1);
   const total = card.tickets.reduce((a, t) => a + t.cost_cents, 0);
   const remaining = card.bankroll_cents - total;
+  const sourceLine = describeCardSources(card);
   const allTriggers = card.allocations.flatMap((a) => {
     const { triggers } = splitThesis(a.thesis);
     return triggers.map((t) => ({ race: a.race_number, text: t }));
@@ -128,12 +130,12 @@ export default function CardSheet({ card, races, results, notesByRace, grades })
             </strong>
           </p>
         )}
+        {/* D439: what THIS card had, not the day's pre-pivot fetch audit. */}
         <p className="dim">
-          Sources used: {card.sources.used.length
-            ? card.sources.used.map((s) => `${s.name} (${s.ts?.slice(0, 10) ?? '—'})`).join(', ')
-            : 'program analysis and morning lines only'}
-          {card.sources.unavailable.length > 0 && (
-            <> · Unavailable: {card.sources.unavailable.map((s) => s.name).join(', ')}</>
+          Sources used: {sourceLine.used}
+          {sourceLine.note && <> ({sourceLine.note})</>}
+          {sourceLine.unavailable.length > 0 && (
+            <> · Unavailable: {sourceLine.unavailable.join(', ')}</>
           )}
         </p>
         {card.scratches.length > 0 && (

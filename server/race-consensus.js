@@ -33,8 +33,14 @@ const parseLegs = (json) => {
  * Signals for one day. Returns null for a missing or soft-deleted day,
  * otherwise `{ day, races: Map raceNumber -> { entries, tipRoles, llmRoles,
  * otrRoles, llmModels, tipSources }, excluded: { llmPostResult } }`.
+ *
+ * `asOf` (D439): an ISO timestamp. When set, only tip sheets and LLM/OTR
+ * cards on file AT that moment count - which is how the card sheet names the
+ * sources a saved COMBINED card read without a column recording them. It can
+ * only under-count (a tip sheet re-extracted later carries the later
+ * `created_at`), never name a source that arrived after the save.
  */
-export function loadDaySignals(db, dayId) {
+export function loadDaySignals(db, dayId, { asOf = null } = {}) {
   const day = db.prepare('SELECT id, date, track, track_code, meet FROM race_days WHERE id = ? AND deleted_at IS NULL').get(dayId);
   if (!day) return null;
 
@@ -58,7 +64,9 @@ export function loadDaySignals(db, dayId) {
     });
   }
 
-  for (const t of db.prepare('SELECT race_no, source_label, picks FROM tip_picks WHERE race_day_id = ? ORDER BY id').all(dayId)) {
+  for (const t of db.prepare(`SELECT race_no, source_label, picks FROM tip_picks
+     WHERE race_day_id = ? AND (? IS NULL OR julianday(created_at) <= julianday(?))
+     ORDER BY id`).all(dayId, asOf, asOf)) {
     let picks = [];
     try { picks = JSON.parse(t.picks); } catch { picks = []; }
     const r = raceAt(t.race_no);
@@ -76,7 +84,14 @@ export function loadDaySignals(db, dayId) {
       JOIN cards c ON c.id = t.card_id
       JOIN races ra ON ra.id = t.race_id
      WHERE c.race_day_id = ? AND c.consensus_completeness IN ('LLM_GENERATED', 'EQB_OTR')
-     ORDER BY c.id, t.sequence`).all(dayId);
+       AND (? IS NULL OR julianday(c.created_at) <= julianday(?))
+       -- An LLM card grows race by race after it is created, so its card
+       -- timestamp is not enough: the race's own request must predate asOf.
+       AND (? IS NULL OR c.consensus_completeness <> 'LLM_GENERATED' OR EXISTS (
+             SELECT 1 FROM llm_card_requests q
+              WHERE q.card_id = c.id AND q.race_number = ra.number
+                AND julianday(q.requested_at) <= julianday(?)))
+     ORDER BY c.id, t.sequence`).all(dayId, asOf, asOf, asOf, asOf);
 
   const otr = new Map();       // race -> tickets[]
   const llm = new Map();       // `${race}|${model}` -> Map(cardId -> { postResult, tickets[] })
