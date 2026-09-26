@@ -293,6 +293,7 @@ export const getLlmModels = () => fetch('/api/llm-models').then(asJson);
 // Mirrors server/anthropic-client.js's KNOWN_MODELS, retired entries
 // included: a card generated under a retired model still renders here.
 export const MODEL_LABEL = {
+  'claude-opus-5-5': 'Opus 5.5',
   'claude-opus-5': 'Opus 5',
   'claude-sonnet-5': 'Sonnet 5',
   'claude-haiku-4-5-20251001': 'Haiku 4.5', // retired 2026-09-05; kept so old cards label
