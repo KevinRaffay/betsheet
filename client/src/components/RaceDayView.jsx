@@ -18,9 +18,10 @@ import {
 import RaceNotesEditor from './RaceNotesEditor.jsx';
 import { NoteSourceDatalist } from './AnalystNotesEditor.jsx';
 import { entriesStaleness } from '@shared/staleness.js';
-import { flagRaceEntries } from '@shared/entry-flags.js';
+import { flagRaceEntries, mlRankOrder } from '@shared/entry-flags.js';
 import { dollars } from '@shared/betmath.js';
 import EntryFlagTags from './EntryFlagTags.jsx';
+import MlRankHeader from './MlRankHeader.jsx';
 
 // D224: the win probability a morning line implies, 0-1 -> a percent string.
 const pct = (p) => (p == null ? '' : `${(p * 100).toFixed(0)}%`);
@@ -90,6 +91,10 @@ export default function RaceDayView({ id, onBack, onOpenCard }) {
   const [handRace, setHandRace] = useState(null);
   const [tipRows, setTipRows] = useState([]);
   const [tipScoring, setTipScoring] = useState(null);
+  // ML-rank sort direction per race's entries table (null = original entries
+  // order), keyed by race number - one screen renders every race, so a click
+  // on one race's header must not resort the others.
+  const [rankSort, setRankSort] = useState(new Map());
   // The day's analyst notes (same `llm_notes` draft, D92), keyed by race
   // number so each race's own panel can look itself up. D184: these are now
   // EDITABLE in place - the panel below is `RaceNotesEditor`, not the
@@ -269,6 +274,12 @@ export default function RaceDayView({ id, onBack, onOpenCard }) {
   // table rather than gaining three columns of dashes, which also keeps the
   // width off a phone until there is something on it worth the width.
   const hasBoard = new Map([...raceFlags].map(([n, r]) => [n, r.comparableCount >= 2]));
+  // The row order the "ML rank" click-to-sort header uses, per race -
+  // computed here for the same reason `raceFlags` is above (the races `.map`
+  // below is an expression arrow, so it holds no `const` of its own).
+  const rowOrder = new Map(
+    day.races.map((r) => [r.number, mlRankOrder(entryFlags.get(r.number) ?? [], rankSort.get(r.number) ?? null)]),
+  );
 
   return (
     <section>
@@ -432,48 +443,58 @@ export default function RaceDayView({ id, onBack, onOpenCard }) {
               <th title="This horse's share of the morning-line book, so a race sums to 100%. Hover a cell for the raw 1 / (odds + 1) reading, which sums to 118-136% because of the track's take">ML Win%</th>
               {hasBoard.get(race.number) && <th title="The same reading off the typed live board, normalised over the same runners - which is what makes it subtractable from the column beside it">Live Win%</th>}
               {hasBoard.get(race.number) && <th title="Live Win% minus ML Win%, in percentage points. Both books are normalised over the runners priced in each, so a race's moves sum to zero and a horse reads as moved only if another moved the other way - a raw difference would have shown every runner drifting or steaming together whenever the two books totalled differently, or whenever a scratch re-priced the field">&Delta;%</th>}
-              <th title="Predicted order of finish from the morning line (1 = shortest line; ties share a rank)">ML rank</th>
+              <MlRankHeader
+                direction={rankSort.get(race.number) ?? null}
+                onClick={() => setRankSort((prev) => {
+                  const next = new Map(prev);
+                  next.set(race.number, prev.get(race.number) === 'asc' ? 'desc' : 'asc');
+                  return next;
+                })}
+              />
               {hasBoard.get(race.number) && <th title="The same ordering read off the live board (1 = shortest live price; ties share a rank). Read against ML rank: a horse moving up the board is one the crowd backed harder than the linemaker predicted">Live rank</th>}</tr>
             </thead>
             <tbody>
               {/* D216: index-aligned with `race.entries`, computed once per race. */}
-              {race.entries.map((e, ei) => (
-                <tr
-                  key={e.id}
-                  className={[e.scratched ? 'row--scratched' : '',
-                    (entryFlags.get(race.number)?.[ei]?.baffert
-                      || entryFlags.get(race.number)?.[ei]?.favorite) ? 'row--entry-flag' : ''].filter(Boolean).join(' ')}
-                >
-                  <td>{e.program_number}</td>
-                  <td className="dim">{e.post_position ?? ''}</td>
-                  <td>
-                    {e.horse_name}
-                    {e.best_bet ? <span className="tag tag--gold">BEST BET</span> : null}
-                    {e.not_to_be_claimed ? <span className="tag">NTC</span> : null}
-                    {e.scratched ? <span className="tag tag--red">SCR</span> : null}
-                    <EntryFlagTags flag={entryFlags.get(race.number)?.[ei]} />
-                  </td>
-                  <td>{e.jockey ?? ''}</td>
-                  <td>{e.trainer ?? ''}</td>
-                  <td>{e.weight ?? ''}</td>
-                  <td>{e.morning_line ?? ''}</td>
-                  <LiveOddsCell race={race} entry={e} ctl={oddsCtl} />
-                  <td className="dim">{entryFlags.get(race.number)?.[ei]?.mlPayoutCents != null ? dollars(entryFlags.get(race.number)[ei].mlPayoutCents) : ''}</td>
-                  <td className="dim" title={rawTitle(entryFlags.get(race.number)?.[ei]?.mlWinProbability)}>{pct(entryFlags.get(race.number)?.[ei]?.mlFairProbability)}</td>
-                  {hasBoard.get(race.number) && (
-                    <td className="dim" title={rawTitle(entryFlags.get(race.number)?.[ei]?.liveWinProbability)}>
-                      {pct(entryFlags.get(race.number)?.[ei]?.liveFairProbability)}
+              {rowOrder.get(race.number).map((ei) => {
+                const e = race.entries[ei];
+                return (
+                  <tr
+                    key={e.id}
+                    className={[e.scratched ? 'row--scratched' : '',
+                      (entryFlags.get(race.number)?.[ei]?.baffert
+                        || entryFlags.get(race.number)?.[ei]?.favorite) ? 'row--entry-flag' : ''].filter(Boolean).join(' ')}
+                  >
+                    <td>{e.program_number}</td>
+                    <td className="dim">{e.post_position ?? ''}</td>
+                    <td>
+                      {e.horse_name}
+                      {e.best_bet ? <span className="tag tag--gold">BEST BET</span> : null}
+                      {e.not_to_be_claimed ? <span className="tag">NTC</span> : null}
+                      {e.scratched ? <span className="tag tag--red">SCR</span> : null}
+                      <EntryFlagTags flag={entryFlags.get(race.number)?.[ei]} />
                     </td>
-                  )}
-                  {hasBoard.get(race.number) && (
-                    <td className={`odds-delta odds-delta--${(entryFlags.get(race.number)?.[ei]?.move?.direction) ?? 'flat'}`}>
-                      {deltaPoints(entryFlags.get(race.number)?.[ei])}
-                    </td>
-                  )}
-                  <td className="dim">{entryFlags.get(race.number)?.[ei]?.mlRank ?? ''}</td>
-                  {hasBoard.get(race.number) && <td className="dim">{entryFlags.get(race.number)?.[ei]?.liveRank ?? ''}</td>}
-                </tr>
-              ))}
+                    <td>{e.jockey ?? ''}</td>
+                    <td>{e.trainer ?? ''}</td>
+                    <td>{e.weight ?? ''}</td>
+                    <td>{e.morning_line ?? ''}</td>
+                    <LiveOddsCell race={race} entry={e} ctl={oddsCtl} />
+                    <td className="dim">{entryFlags.get(race.number)?.[ei]?.mlPayoutCents != null ? dollars(entryFlags.get(race.number)[ei].mlPayoutCents) : ''}</td>
+                    <td className="dim" title={rawTitle(entryFlags.get(race.number)?.[ei]?.mlWinProbability)}>{pct(entryFlags.get(race.number)?.[ei]?.mlFairProbability)}</td>
+                    {hasBoard.get(race.number) && (
+                      <td className="dim" title={rawTitle(entryFlags.get(race.number)?.[ei]?.liveWinProbability)}>
+                        {pct(entryFlags.get(race.number)?.[ei]?.liveFairProbability)}
+                      </td>
+                    )}
+                    {hasBoard.get(race.number) && (
+                      <td className={`odds-delta odds-delta--${(entryFlags.get(race.number)?.[ei]?.move?.direction) ?? 'flat'}`}>
+                        {deltaPoints(entryFlags.get(race.number)?.[ei])}
+                      </td>
+                    )}
+                    <td className="dim">{entryFlags.get(race.number)?.[ei]?.mlRank ?? ''}</td>
+                    {hasBoard.get(race.number) && <td className="dim">{entryFlags.get(race.number)?.[ei]?.liveRank ?? ''}</td>}
+                  </tr>
+                );
+              })}
             </tbody>
             </table>
             <LiveOddsBar race={race} ctl={oddsCtl} />

@@ -340,6 +340,8 @@ label.btn.btn--primary { color: var(--color-accent-text); }
 }
 .grid--click tbody tr { cursor: pointer; }
 .grid--click tbody tr:hover { background: var(--color-bg-subtle); }
+.th-sort { cursor: pointer; user-select: none; white-space: nowrap; }
+.th-sort:hover { color: var(--color-text); }
 .row--scratched td { opacity: 0.45; text-decoration: line-through; }
 .row--scratched td:last-child { text-decoration: none; opacity: 1; }
 

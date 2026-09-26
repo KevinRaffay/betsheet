@@ -1,7 +1,8 @@
-import React from 'react';
-import { flagRaceEntries } from '@shared/entry-flags.js';
+import React, { useState } from 'react';
+import { flagRaceEntries, mlRankOrder } from '@shared/entry-flags.js';
 import { dollars } from '@shared/betmath.js';
 import EntryFlagTags from './EntryFlagTags.jsx';
+import MlRankHeader from './MlRankHeader.jsx';
 
 // D224: the win probability a morning line implies, 0-1 -> a percent string.
 const pct = (p) => (p == null ? '—' : `${(p * 100).toFixed(0)}%`);
@@ -71,6 +72,13 @@ export default function EntriesTable({ entries, open = false, showRank = true })
   // changed and no width spent on a phone for three columns of dashes.
   const { flags, comparableCount } = flagRaceEntries(entries);
   const hasBoard = comparableCount >= 2;
+  // Click-to-sort on ML rank (null = original entries order). One table per
+  // component instance, so plain local state is enough - no per-race keying
+  // needed here, unlike the day view and card sheet, which render several of
+  // these in one screen.
+  const [rankSort, setRankSort] = useState(null);
+  const normalized = entries.map(normalizeEntry);
+  const order = mlRankOrder(flags, rankSort);
   return (
     <details className="race-entries" open={open}>
       <summary>Entries ({entries.length})</summary>
@@ -83,38 +91,46 @@ export default function EntriesTable({ entries, open = false, showRank = true })
             {hasBoard && <th title="The typed post-time price, the tote board as it stood when this race was priced">Live</th>}
             {hasBoard && <th title="The same reading off the typed live board, normalised over the same runners - which is what makes it subtractable from the column beside it">Live Win%</th>}
             {hasBoard && <th title="Live Win% minus ML Win%, in percentage points. Both books are normalised over the runners priced in each, so a race's moves sum to zero">&Delta;%</th>}
-            {showRank && <th title="Predicted order of finish from the morning line (1 = shortest line; ties share a rank)">ML rank</th>}
+            {showRank && (
+              <MlRankHeader
+                direction={rankSort}
+                onClick={() => setRankSort((d) => (d === 'asc' ? 'desc' : 'asc'))}
+              />
+            )}
             {showRank && hasBoard && <th title="The same ordering read off the live board (1 = shortest live price; ties share a rank)">Live rank</th>}
           </tr>
         </thead>
         <tbody>
-          {entries.map(normalizeEntry).map((e, i) => (
-            <tr
-              key={e.programNumber ?? i}
-              className={[e.scratched ? 'row--scratched' : '',
-                (flags[i]?.baffert || flags[i]?.favorite) ? 'row--entry-flag' : ''].filter(Boolean).join(' ')}
-            >
-              <td>{e.programNumber ?? '—'}</td>
-              <td>
-                {e.horseName}
-                {e.bestBet ? <span className="tag tag--gold">BEST BET</span> : null}
-                {e.scratched ? <span className="tag tag--red">SCR</span> : null}
-                <EntryFlagTags flag={flags[i]} />
-              </td>
-              <td>{e.jockey ?? '—'}</td>
-              <td>{e.trainer ?? '—'}</td>
-              <td>{e.morningLine ?? '—'}</td>
-              <td className="dim">{flags[i]?.mlPayoutCents != null ? dollars(flags[i].mlPayoutCents) : '—'}</td>
-              <td className="dim" title={rawTitle(flags[i]?.mlWinProbability)}>{pct(flags[i]?.mlFairProbability)}</td>
-              {hasBoard && <td>{e.liveOdds ?? '—'}</td>}
-              {hasBoard && <td className="dim" title={rawTitle(flags[i]?.liveWinProbability)}>{pct(flags[i]?.liveFairProbability)}</td>}
-              {hasBoard && (
-                <td className={`odds-delta odds-delta--${flags[i]?.move?.direction ?? 'flat'}`}>{deltaPoints(flags[i])}</td>
-              )}
-              {showRank && <td>{flags[i]?.mlRank ?? '—'}</td>}
-              {showRank && hasBoard && <td>{flags[i]?.liveRank ?? '—'}</td>}
-            </tr>
-          ))}
+          {order.map((i) => {
+            const e = normalized[i];
+            return (
+              <tr
+                key={e.programNumber ?? i}
+                className={[e.scratched ? 'row--scratched' : '',
+                  (flags[i]?.baffert || flags[i]?.favorite) ? 'row--entry-flag' : ''].filter(Boolean).join(' ')}
+              >
+                <td>{e.programNumber ?? '—'}</td>
+                <td>
+                  {e.horseName}
+                  {e.bestBet ? <span className="tag tag--gold">BEST BET</span> : null}
+                  {e.scratched ? <span className="tag tag--red">SCR</span> : null}
+                  <EntryFlagTags flag={flags[i]} />
+                </td>
+                <td>{e.jockey ?? '—'}</td>
+                <td>{e.trainer ?? '—'}</td>
+                <td>{e.morningLine ?? '—'}</td>
+                <td className="dim">{flags[i]?.mlPayoutCents != null ? dollars(flags[i].mlPayoutCents) : '—'}</td>
+                <td className="dim" title={rawTitle(flags[i]?.mlWinProbability)}>{pct(flags[i]?.mlFairProbability)}</td>
+                {hasBoard && <td>{e.liveOdds ?? '—'}</td>}
+                {hasBoard && <td className="dim" title={rawTitle(flags[i]?.liveWinProbability)}>{pct(flags[i]?.liveFairProbability)}</td>}
+                {hasBoard && (
+                  <td className={`odds-delta odds-delta--${flags[i]?.move?.direction ?? 'flat'}`}>{deltaPoints(flags[i])}</td>
+                )}
+                {showRank && <td>{flags[i]?.mlRank ?? '—'}</td>}
+                {showRank && hasBoard && <td>{flags[i]?.liveRank ?? '—'}</td>}
+              </tr>
+            );
+          })}
         </tbody>
       </table>
     </details>
