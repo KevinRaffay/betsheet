@@ -734,8 +734,8 @@ untouched, so no version bump.
 v1's template and system prompt are model-agnostic - which Claude model
 actually answers is a runtime choice, not part of the prompt. `BETSHEET_LLM_MODEL`
 sets the server's default (`claude-sonnet-5` if unset); the LLM card modal's
-Model picker (`server/anthropic-client.js`'s `SELECTABLE_MODELS`: Opus 5 /
-Sonnet 5 / Haiku 4.5 / Fable 5.1) lets the user override it per generation
+Model picker (`server/anthropic-client.js`'s `SELECTABLE_MODELS`: Opus 5.5 /
+Opus 5 / Sonnet 5 / Fable 5.1) lets the user override it per generation
 via `POST .../llm-cards/preview`'s `model` field. Whichever model actually
 answered is recorded on the `llm_card_requests` row (`model` column,
 retrievable via `GET /api/cards/:id/llm-requests`), so a card's picks are

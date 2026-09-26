@@ -25,6 +25,7 @@ export const MODEL = process.env.BETSHEET_LLM_MODEL || 'claude-sonnet-5';
  * the display of cards already in the corpus.
  */
 export const KNOWN_MODELS = [
+  { id: 'claude-opus-5-5', label: 'Opus 5.5' },
   { id: 'claude-opus-5', label: 'Opus 5' },
   { id: 'claude-sonnet-5', label: 'Sonnet 5' },
   // Retired 2026-09-05 by user decision - a product choice about which models
@@ -88,10 +89,10 @@ function buildMessages(user, prefill) {
  * The TEXT is unchanged. `cache_control` is metadata on the block, not part
  * of what the model reads, so `llm_card_requests.system_prompt_hash` and
  * `PROMPT_TEMPLATE_VERSION` are computed over exactly the same string as
- * before and prompt comparability across the corpus holds. All three
- * selectable models clear the minimum cacheable prefix (512 tokens on Opus 5
- * and Fable 5.1, 1024 on Sonnet 5; SYSTEM_PROMPT alone is ~2,200) - the
- * retired Haiku 4.5's 4,096 minimum would NOT have, silently.
+ * before and prompt comparability across the corpus holds. All four
+ * selectable models clear the minimum cacheable prefix (512 tokens on Opus
+ * 5, Opus 5.5 and Fable 5.1, 1024 on Sonnet 5; SYSTEM_PROMPT alone is ~2,200)
+ * - the retired Haiku 4.5's 4,096 minimum would NOT have, silently.
  *
  * The default 5-minute TTL is the right one: the dominant traffic shape is
  * "Regenerate All Races" - 8 to 14 calls in two minutes - and a read refreshes
