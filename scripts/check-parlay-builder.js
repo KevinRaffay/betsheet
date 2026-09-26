@@ -197,6 +197,7 @@ console.log('-- the producer, on a temp database --');
   check('ticket carries the teller call and the estimate band', tickets[0].teller_call === pick.tellerCall
     && tickets[0].est_payout_min_cents === pick.estMinCents && tickets[0].est_is_range === 1);
   check('no results yet: not graded', saved.graded === null);
+  check('the response names the day card number the UI shows', saved.cardNumber === card.card_number);
 
   // A tampered choice, never shown by the preview, is refused.
   let refused = null;

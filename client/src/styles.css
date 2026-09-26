@@ -864,6 +864,22 @@ input:disabled, select:disabled, textarea:disabled {
 }
 .modal__close:hover { background: var(--color-bg-raised); color: var(--color-text); }
 
+/* ---------- combined parlay modal (D438) ---------- */
+.combined-parlay__section { margin-top: 14px; }
+.combined-parlay__section h4 { margin: 0 0 6px; }
+.combined-parlay__legs { list-style: none; margin: 0; padding: 0; }
+/* The leg's own label stays on one line; its source tags wrap beneath it. */
+.combined-parlay__legs li { margin-bottom: 2px; }
+.combined-parlay__leg { white-space: nowrap; }
+/* Five columns plus per-leg tags: wider than the shared 880px modal. */
+.modal.combined-parlay { max-width: 1120px; }
+.combined-parlay__legs .tag { margin-left: 4px; }
+/* A checkbox beside its word, not above it: .formrow label is a column (built
+   for text fields) and .formrow input's min-width would stretch the box. */
+.formrow .combined-parlay__kind { flex-direction: row; align-items: center; gap: 6px; color: var(--color-text); }
+.formrow .combined-parlay__kind input { min-width: 0; }
+.combined-parlay__kinds { align-items: center; }
+
 /* ---------- ticket builder (D86) ---------- */
 /* All colour comes from the semantic tokens, so the .dark-theme block at the
    top of this file re-themes the builder with no rules of its own. */

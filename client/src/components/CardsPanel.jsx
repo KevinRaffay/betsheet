@@ -3,6 +3,7 @@ import React, { useEffect, useRef, useState } from 'react';
 import { listCards, modelLabel, plMoney, plClass, bulkDeleteCards } from '../api.js';
 import LlmCardModal from './LlmCardModal.jsx';
 import DayTicketBuilderModal from './DayTicketBuilderModal.jsx';
+import CombinedParlayModal from './CombinedParlayModal.jsx';
 
 // The cards section of a stored race day: the cards on file, and the two
 // ways left to make one. D111 removed the engine's "Generate card" button
@@ -19,11 +20,17 @@ import DayTicketBuilderModal from './DayTicketBuilderModal.jsx';
 // without this panel's help. D137 first put a picker and a name field here;
 // that split card management across two components for no reason a caller
 // ever needed to pass a card id, so it was undone (D139) rather than kept.
+//
+// D438: a third way - "Build a parlay" opens CombinedParlayModal, which
+// previews WPS parlays from the combined per-race model (D434/D436) and saves
+// the one you pick as a COMBINED card. Same onCardChanged/reload wiring as the
+// other two, so a saved parlay appears in the table without a page reload.
 export default function CardsPanel({ dayId, bankrollCents, onOpenCard }) {
   const [cards, setCards] = useState(null);
   const [error, setError] = useState(null);
   const [showLlmModal, setShowLlmModal] = useState(false);
   const [showHandModal, setShowHandModal] = useState(false);
+  const [showParlayModal, setShowParlayModal] = useState(false);
   // Bulk-select (checkbox column), mirroring RaceDayList.jsx's pattern.
   // Unlike a race day, a card has no grading guard here at all (user
   // decision 2026-09-09) - any card, graded or not, may be selected and
@@ -105,6 +112,9 @@ export default function CardsPanel({ dayId, bankrollCents, onOpenCard }) {
           </button>
           <button className="btn" onClick={() => setShowHandModal(true)}>
             Build card by hand
+          </button>
+          <button className="btn" onClick={() => setShowParlayModal(true)}>
+            Build a parlay
           </button>
         </div>
       </div>
@@ -195,6 +205,13 @@ export default function CardsPanel({ dayId, bankrollCents, onOpenCard }) {
           bankrollCents={bankrollCents}
           onCardChanged={reload}
           onClose={() => { setShowHandModal(false); reload(); }}
+        />
+      )}
+      {showParlayModal && (
+        <CombinedParlayModal
+          dayId={dayId}
+          onCardChanged={reload}
+          onClose={() => { setShowParlayModal(false); reload(); }}
         />
       )}
       {showLlmModal && (
