@@ -7,6 +7,8 @@ export const BET = {
   minimums: {
     win: 200, place: 200, exacta: 100, quinella: 200, trifecta: 50,
     superfecta: 10, daily_double: 200, pick3: 50, parlay: 200,
+    // D436: our own WPS-parlay construct, priced like the win parlay.
+    parlay_place: 200, parlay_show: 200,
   },
 
   // --- structure-layer thresholds (the Del Mar rules) ---
@@ -39,6 +41,13 @@ export const BET = {
   estimates: {
     placeLow: 0.2,            // place price ~ml*0.2 .. ml*0.5 on top of stake
     placeHigh: 0.5,
+    // D436: show ~ 1 + ml*0.065 .. 1 + ml*0.2 per $1. MEASURED, not tuned:
+    // the interquartile range of (show_cents/200 - 1) / morning-line decimal
+    // over 1,050 in-the-money finishers on the live corpus, 2026-09-26
+    // (median 0.125). The same query puts place at 0.167 .. 0.40 (n=713),
+    // which is why placeLow/placeHigh above were left alone.
+    showLow: 0.065,
+    showHigh: 0.2,
     exactaFactor: 0.55,       // exacta ~ (mlA+1)(mlB+1)*factor per $1
     trifectaFactor: 0.35,
     doubleFactor: 0.6,
@@ -250,6 +259,20 @@ export function placeEstimate(stakeCents, ml) {
   ];
 }
 
+/**
+ * Show is an estimate band too (D436). See BET.estimates.showLow/showHigh for
+ * where the constants came from - a show price is the least predictable of
+ * the three, because the pool splits three ways and the other two finishers
+ * decide what is left.
+ */
+export function showEstimate(stakeCents, ml) {
+  const { showLow, showHigh } = BET.estimates;
+  return [
+    Math.round(stakeCents * (1 + ml * showLow)),
+    Math.round(stakeCents * (1 + ml * showHigh)),
+  ];
+}
+
 const band = (point) => {
   const s = BET.estimates.rangeSpread;
   return [Math.round(point * (1 - s)), Math.round(point * (1 + s))];
@@ -366,6 +389,7 @@ const BET_ABBR = {
   trifecta: 'TRI', trifecta_box: 'TRI BOX',
   superfecta: 'SUPER', superfecta_box: 'SUPER BOX',
   daily_double: 'DD', parlay: 'PARLAY',
+  parlay_place: 'PLACE PARLAY', parlay_show: 'SHOW PARLAY',
 };
 
 /**

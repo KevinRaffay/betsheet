@@ -28,6 +28,7 @@ const TEMPLATE_ROWS = [
   ['llm', 'LLM-generated picks, one race at a time from entries and any notes (D63).'],
   ['equibase-otr', "Equibase's Off to the Races sheet, tickets taken verbatim (D71)."],
   ['tipsheet', 'A third-party tip sheet, staked into tickets by variant (D171).'],
+  ['combined', 'A WPS parlay whose legs the combined per-race model chose - market odds nudged by tip sheets, LLM cards and OTR (D436).'],
 ];
 
 export function seedTemplates(db) {

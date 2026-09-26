@@ -593,6 +593,6 @@ A day's odds, tip sheets, analyst notes and LLM picks combined into one per-race
 | One combined per-race win/place/show probability from market + tip sheets + LLM + OTR, with stated (unfitted) weights and zero weights reproducing the market exactly | D434 |
 | Leakage rule: no input formed after the result counts, and post-time odds are never an input | D434 |
 | Read-only backtest vs the market with n and SE on every figure, and a findings file with a pre-registered out-of-sample test | D434 |
-| WPS parlay builder, place/show parlay grading, a never-pooled bucket, producer and trace | DB (not yet claimed) |
+| WPS parlay builder, place/show parlay grading, a never-pooled bucket, producer and trace | D436 |
 | DD / Pick N builder over the wager menu, with the first pool-grading fixture | DC (not yet claimed) |
 | Day-view preview-then-save modal (desktop only) | DD (not yet claimed) |

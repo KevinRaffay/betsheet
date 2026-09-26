@@ -5,6 +5,7 @@ import RaceNotes from './RaceNotes.jsx';
 import EntryFlagTags from './EntryFlagTags.jsx';
 import MlRankHeader from './MlRankHeader.jsx';
 import { flagRaceEntries, mlRankOrder } from '@shared/entry-flags.js';
+import { BUCKET_CHIP } from '@shared/distribution.js';
 
 const RESPONSIBLE_LINE =
   'Entertainment wagering with a pre-committed budget. No mid-card increases.';
@@ -96,7 +97,10 @@ export default function CardSheet({ card, races, results, notesByRace, grades })
   return (
     <section className="card-sheet">
       <p className="dim">
-        <span className={`chip chip--${card.consensus_completeness === 'FULL' ? 'unanimous' : card.consensus_completeness === 'PARTIAL' ? 'split' : card.consensus_completeness === 'HUMAN' ? 'human' : card.consensus_completeness === 'LLM_GENERATED' ? 'llm' : 'chaos'}`}>
+        {/* D436: BUCKET_CHIP, the one bucket->chip map. The inline copy this
+            replaced knew five buckets and painted every other one - EQB_OTR,
+            TIPSHEET, and COMBINED - with PROGRAM_ONLY's red `chaos` chip. */}
+        <span className={`chip chip--${BUCKET_CHIP[card.consensus_completeness] ?? 'guess'}`}>
           {card.consensus_completeness}
         </span>
         {' '}· template {card.template ?? '—'} · engine <code>{card.engine_version ?? 'lean-0'}</code>
