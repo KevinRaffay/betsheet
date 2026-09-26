@@ -318,6 +318,15 @@ check('completeness: HUMAN accepted (D54, migration 016 rebuild)',
 d.prepare("UPDATE cards SET consensus_completeness = 'LLM_GENERATED' WHERE id = ?").run(card);
 check('completeness: LLM_GENERATED accepted (D63, migration 018 rebuild)',
   d.prepare('SELECT consensus_completeness c FROM cards WHERE id = ?').get(card).c === 'LLM_GENERATED');
+d.prepare("UPDATE cards SET consensus_completeness = 'COMBINED' WHERE id = ?").run(card);
+check('completeness: COMBINED accepted (D436, migration 040 rebuild)',
+  d.prepare('SELECT consensus_completeness c FROM cards WHERE id = ?').get(card).c === 'COMBINED');
+check('migration 040 kept every index on cards (day, external_id, tip_source)',
+  ['idx_cards_day', 'idx_cards_external_id', 'idx_cards_tip_source'].every((n) =>
+    d.prepare("SELECT 1 FROM sqlite_master WHERE type = 'index' AND name = ? AND tbl_name = 'cards'").get(n)));
+check('migration 040 kept the three columns added since 030',
+  ['tip_source_label', 'live_odds_present', 'tip_sheets_present'].every((c) =>
+    d.prepare('PRAGMA table_info(cards)').all().some((x) => x.name === c)));
 d.prepare("UPDATE cards SET consensus_completeness = 'FULL' WHERE id = ?").run(card);
 
 d.prepare(`INSERT INTO allocations (card_id, race_id, amount_cents, confidence, rule)

@@ -156,12 +156,18 @@ things live code can break. **Invariant 4 went with the consensus removal
     LLM_GENERATED - D63: an LLM's picks, generated manually one race at a
     time, never engine-generated or simulated / EQB_OTR - D71: Equibase's
     "Off to the Races" printed sheet, tickets taken verbatim, never
-    engine-generated or simulated) from the sources that
+    engine-generated or simulated / TIPSHEET - D171: a third-party tip
+    sheet staked by variant / COMBINED - D436: a WPS parlay whose legs the
+    combined per-race model chose from the market plus the tip-sheet, LLM
+    and OTR signals, versioned by `COMBINED_VERSION`) from the sources that
     actually contributed. All P/L, simulation, and distribution reporting
     buckets by this level — a program-only backfill card and a
     full-consensus card never share an aggregate, and none of HUMAN,
-    LLM_GENERATED or EQB_OTR ever shares one with any engine bucket or with
-    each other. Structure-layer rules
+    LLM_GENERATED, EQB_OTR, TIPSHEET or COMBINED ever shares one with any
+    engine bucket or with each other. **COMBINED reads the other buckets'
+    signals, which is exactly why it must never pool with them**: its P/L
+    would otherwise be counted twice, once as the source and once as the
+    parlay built from it. Structure-layer rules
     (place-money, hedge cuts, exotic construction, allocation curves) are
     benchmarkable on ANY bucket; signal-layer conclusions require the bucket
     that actually had the signal.

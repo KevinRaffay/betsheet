@@ -19,7 +19,8 @@
 //     leg scratched, the ticket is refunded whole. (Tracks pay
 //     consolations/rollovers here; the conservative refund never
 //     overstates P/L. Revisit with real consolation data.)
-//   * Win parlay (our own construct, not a pool): a scratched leg passes
+//   * WPS parlay (our own construct, not a pool - `parlay` for win, and
+//     since D436 `parlay_place` / `parlay_show`): a scratched leg passes
 //     through at factor 1.0, standard parlay practice.
 //
 // Outcomes: 'win' (money came back from a hit, refunds included or not),
@@ -71,8 +72,15 @@ export function gradeTicket(ticket, dayResults) {
     return done('loss', 0);
   }
 
-  // ---------- win parlay (our construct; graded off win prices) ----------
-  if (betType === 'parlay') {
+  // ---------- WPS parlays (our construct; graded off the chart's WPS prices) ----------
+  // `parlay` is the win parlay. D436 adds `parlay_place` / `parlay_show`: a
+  // leg hits on a top-2 / top-3 finish and multiplies by that horse's place /
+  // show price, exactly as a win leg multiplies by its win price. A leg that
+  // finished in the money but has no price in the chart is a LOSS with a note,
+  // never a factor of 1 - the same rule the straight WPS path above applies.
+  if (betType === 'parlay' || betType === 'parlay_place' || betType === 'parlay_show') {
+    const kind = betType === 'parlay' ? 'win' : betType === 'parlay_place' ? 'place' : 'show';
+    const need = kind === 'win' ? 1 : kind === 'place' ? 2 : 3;
     let factor = 1;
     let liveLegs = 0;
     for (let i = 0; i < races.length; i++) {
@@ -80,8 +88,12 @@ export function gradeTicket(ticket, dayResults) {
       const pgm = legs[i][0];
       if (race.scratched.has(pgm)) continue; // pass-through leg
       liveLegs++;
-      if (!race.finishByPos.get(1)?.has(pgm)) return done('loss', 0, `leg ${races[i]} lost`);
-      factor *= (race.priceOf.get(pgm)?.win ?? 0) / 200;
+      let hit = false;
+      for (let pos = 1; pos <= need && !hit; pos++) hit = Boolean(race.finishByPos.get(pos)?.has(pgm));
+      if (!hit) return done('loss', 0, `leg ${races[i]} lost`);
+      const price = race.priceOf.get(pgm)?.[kind];
+      if (price == null) return done('loss', 0, `leg ${races[i]} finished in the money but has no ${kind} price in the chart`);
+      factor *= price / 200;
     }
     if (liveLegs === 0) return done('refund', costCents, 'every leg scratched');
     return done('win', Math.round(stakeCents * factor), liveLegs < races.length ? 'scratched leg(s) passed through' : null);

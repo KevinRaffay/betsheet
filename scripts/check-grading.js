@@ -92,6 +92,33 @@ check('parlay scratched leg passes through at factor 1',
 r = g(T('parlay', [1, 2], [['9'], ['8']], 200));
 check('parlay with every leg scratched refunds', r.outcome === 'refund' && r.returnedCents === 200);
 
+// D436: place / show parlays chain the place / show price of each leg.
+r = g(T('parlay_place', [1, 2], [['7'], ['1']], 200));
+check('place parlay, both legs 2nd: $2 x 6.20/2 x 5.00/2 = $15.50',
+  r.outcome === 'win' && r.returnedCents === Math.round(200 * (620 / 200) * (500 / 200)), JSON.stringify(r));
+r = g(T('parlay_place', [1, 2], [['3'], ['5']], 200));
+check('place parlay on two WINNERS pays their place prices, not win: $2 x 5.40/2 x 4.00/2 = $10.80',
+  r.outcome === 'win' && r.returnedCents === Math.round(200 * (540 / 200) * (400 / 200)), JSON.stringify(r));
+r = g(T('parlay_place', [1, 2], [['2'], ['5']], 200));
+check('place parlay with a 3rd-place leg loses whole', r.outcome === 'loss' && r.returnedCents === 0);
+r = g(T('parlay_show', [1, 2], [['2'], ['1']], 200));
+check('show parlay, 3rd and 2nd: $2 x 2.80/2 x 3.20/2 = $4.48',
+  r.outcome === 'win' && r.returnedCents === Math.round(200 * (280 / 200) * (320 / 200)), JSON.stringify(r));
+r = g(T('parlay_show', [1, 2], [['4'], ['5']], 200));
+check('show parlay with a 4th-place leg loses whole', r.outcome === 'loss');
+r = g(T('parlay_show', [1, 2], [['9'], ['5']], 200));
+check('show parlay scratched leg passes through at factor 1',
+  r.outcome === 'win' && r.returnedCents === Math.round(200 * (300 / 200)) && /passed through/.test(r.note));
+r = g(T('parlay_show', [1, 2], [['9'], ['8']], 200));
+check('show parlay with every leg scratched refunds', r.outcome === 'refund' && r.returnedCents === 200);
+{
+  // In the money with no price printed: a loss with a note, never a factor of 1.
+  const noPrice = buildDayResults([{ number: 1, results: [{ programNumber: '6', finishPosition: 2, winCents: null, placeCents: null, showCents: null }], exotics: [], scratchedPgms: [] },
+    { number: 2, results: [{ programNumber: '5', finishPosition: 1, winCents: 800, placeCents: 400, showCents: 300 }], exotics: [], scratchedPgms: [] }]);
+  r = gradeTicket(T('parlay_place', [1, 2], [['6'], ['5']], 200), noPrice);
+  check('place parlay leg in the money with no price is a LOSS with a note', r.outcome === 'loss' && /no place price/.test(r.note), JSON.stringify(r));
+}
+
 r = g(T('daily_double', [1, 2], [['3'], ['5']], 200));
 check('double hit ($2 base, alternate first leg "3/1"): pays $50', r.outcome === 'win' && r.returnedCents === 5000);
 r = g(T('daily_double', [1, 2], [['4'], ['5']], 200));
