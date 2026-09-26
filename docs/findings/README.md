@@ -16,6 +16,7 @@ while the new one guards the analyzer replacing it.
 | `lean-1.1-program-only.md` | **HISTORY.** The engine it describes is deleted, not superseded by a newer version, so no `lean-1.2` file will ever follow it. Never edited. |
 | `llm-analyst-notes-v1.md` | **LIVE, with an amendment.** A pre-registration; its corpus is now split by a prompt change (D112). See the amendment in the file. |
 | `combined-parlay-v1.md` | **LIVE.** D434's combined per-race model (market + tip sheets + LLM + OTR) against the market alone, and "most likely to cash" parlays graded at real prices, over 361 races / 37 days. Pre-registers the out-of-sample test for days after 2026-09-26. Its run output is committed beside it (`combined-parlay-v1.run.json`). |
+| `combined-pools-v1.md` | **LIVE.** D442's Daily Double / Pick 3-5 builder on the same model: one best pool ticket per day, graded against the chart's own payoff rows, 37 days per setting. Spreading buys hit rate, not money; DD P(hit) roughly calibrated, Pick 3 overstated. Pre-registers the out-of-sample test. Run output committed beside it (`combined-pools-v1.run.json`). |
 
 ## The rules, still in force for anything written here next
 

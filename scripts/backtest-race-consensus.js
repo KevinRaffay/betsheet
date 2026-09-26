@@ -33,6 +33,7 @@ import Database from 'better-sqlite3';
 import { combineRace, DEFAULT_WEIGHTS, MARKET_ONLY_WEIGHTS } from '../shared/race-consensus.js';
 import { impliedProbabilities } from '../shared/pick-scoring.js';
 import { gradeTicket } from '../shared/grading.js';
+import { buildPoolTickets, POOL_TYPES } from '../shared/parlay-builder.js';
 import { loadDaySignals, gradedDayIds } from '../server/race-consensus.js';
 import { loadDayResultsFor } from '../server/grading.js';
 
@@ -53,6 +54,8 @@ const FLOORS = [null, 2, 4];
 const LEG_COUNTS = [2, 3];
 const KINDS = ['win', 'place', 'show'];
 const CANDIDATES_PER_RACE = 3;
+// D442: pool-ticket budgets the backtest spends per day.
+const POOL_BUDGETS = [600, 1200, 2400];
 
 const up = (p) => String(p).trim().toUpperCase();
 const mean = (xs) => (xs.length ? xs.reduce((a, b) => a + b, 0) / xs.length : null);
@@ -228,6 +231,42 @@ function run(db) {
     }
   }
 
+  // ---- 5: pool tickets - Daily Double / Pick 3-5 (D442) -----------------
+  // One ticket per day and pool setting: the builder's single best candidate
+  // (limit 1) under each selection, graded against the chart's own payoff row
+  // on the settling race. A ticket whose chart carries NO row for that pool is
+  // UNGRADABLE and left out - counted, never scored as a loss, because a
+  // missing row says nothing about whether the ticket hit.
+  const menuStmt = db.prepare('SELECT number, wager_menu FROM races WHERE race_day_id = ?');
+  const pools = [];
+  for (const variant of ['market', 'combined']) {
+    for (const budgetCents of POOL_BUDGETS) {
+      for (const pool of [...POOL_TYPES, 'any']) {
+        const tally = { variant, pool, budgetCents, n: 0, hits: 0, predicted: [], costCents: 0, returnedCents: 0, ungradable: 0, refunds: 0 };
+        for (const d of byDay) {
+          const menus = new Map(menuStmt.all(d.dayId).map((m) => [m.number, m.wager_menu]));
+          const input = d.races.map((r) => ({ raceNumber: r.raceNo, combined: r.models.combined, market: r.models.market, wagerMenu: menus.get(r.raceNo) }));
+          const t = buildPoolTickets({ races: input, pools: pool === 'any' ? POOL_TYPES : [pool], budgetCents, selection: variant, limit: 1 }).candidates[0];
+          if (!t) continue;
+          const g = gradeTicket({ betType: t.betType, races: t.raceNumbers, legs: t.legs, stakeCents: t.stakeCents, costCents: t.costCents }, remapResults(d.results));
+          if (g.outcome === 'loss' && /payoff in the chart|shape mismatch|no results for race/.test(g.note ?? '')) { tally.ungradable += 1; continue; }
+          tally.n += 1;
+          tally.predicted.push(t.pHit);
+          tally.costCents += t.costCents;
+          tally.returnedCents += g.returnedCents;
+          if (g.outcome === 'win') tally.hits += 1;
+          if (g.outcome === 'refund') tally.refunds += 1;
+        }
+        pools.push({
+          variant, pool, budgetCents, n: tally.n, hits: tally.hits, refunds: tally.refunds, ungradable: tally.ungradable,
+          hitRate: tally.n ? tally.hits / tally.n : null, meanPredicted: mean(tally.predicted),
+          costCents: tally.costCents, returnedCents: tally.returnedCents,
+          roi: tally.costCents ? (tally.returnedCents - tally.costCents) / tally.costCents : null,
+        });
+      }
+    }
+  }
+
   const report = {
     generatedAt: new Date().toISOString(),
     db: dbPath,
@@ -242,7 +281,7 @@ function run(db) {
       racesLiveBasis: races.filter((r) => r.basis === 'live').length,
       skipped, llmPostResultExcluded: llmPostResult,
     },
-    forecasts, calibration, parlays,
+    forecasts, calibration, parlays, pools,
   };
   print(report);
   if (jsonOut) {
@@ -318,6 +357,14 @@ function print(r) {
   console.log('  variant   kind   legs floor   n days  hits  hit rate  mean P(hit)  cost     returned  ROI');
   for (const p of r.parlays) {
     console.log(`  ${p.variant.padEnd(8)}  ${p.kind.padEnd(5)}  ${String(p.legs).padEnd(4)} ${String(p.floor ?? '-').padEnd(6)}  ${String(p.n).padEnd(6)}  ${String(p.hits).padEnd(4)}  ${pct(p.hitRate).padEnd(8)}  ${pct(p.meanPredicted).padEnd(11)}  $${(p.costCents / 100).toFixed(2).padEnd(7)} $${(p.returnedCents / 100).toFixed(2).padEnd(8)} ${pct(p.roi)}`);
+  }
+
+  if (r.pools) {
+    console.log('\n5. POOL TICKETS (D442), the best candidate per day, graded against the chart\'s own payoff row');
+    console.log('  variant   pool          budget  n days  hits  hit rate  mean P(hit)  cost      returned   ROI      ungradable');
+    for (const p of r.pools) {
+      console.log(`  ${p.variant.padEnd(8)}  ${p.pool.padEnd(12)}  $${String(p.budgetCents / 100).padEnd(5)}  ${String(p.n).padEnd(6)}  ${String(p.hits).padEnd(4)}  ${pct(p.hitRate).padEnd(8)}  ${pct(p.meanPredicted).padEnd(11)}  $${(p.costCents / 100).toFixed(2).padEnd(8)} $${(p.returnedCents / 100).toFixed(2).padEnd(9)} ${pct(p.roi).padEnd(8)} ${p.ungradable}`);
+    }
   }
 }
 

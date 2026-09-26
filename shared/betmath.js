@@ -9,6 +9,12 @@ export const BET = {
     superfecta: 10, daily_double: 200, pick3: 50, parlay: 200,
     // D436: our own WPS-parlay construct, priced like the win parlay.
     parlay_place: 200, parlay_show: 200,
+    // D442: fallbacks for a menu that names Pick 4 / Pick 5 without printing
+    // an amount. $1, not the more common 50c, on purpose: a base ABOVE a
+    // track's minimum is still a legal ticket, one BELOW it is refused at the
+    // window, and $1 is at or above every pick4/pick5 base in the corpus's
+    // charts (20c / 50c / $1). The builder labels any fallback as ASSUMED.
+    pick4: 100, pick5: 100,
   },
 
   // --- structure-layer thresholds (the Del Mar rules) ---
@@ -48,6 +54,22 @@ export const BET = {
     // which is why placeLow/placeHigh above were left alone.
     showLow: 0.065,
     showHigh: 0.2,
+    // D442: what a multi-race pool actually pays, per base, as a fraction of
+    // the winners' morning-line odds chained (product of 1 / fair ML
+    // probability). MEASURED, not tuned: the interquartile range of
+    // payout_per_base / prod(1/q_ml) over every stored DD / Pick N payoff on the
+    // live corpus, 2026-09-26 - DD n=316 (median 0.567), Pick 3 n=276 (0.443),
+    // Pick 4 n=73 (0.317), Pick 5 n=66 (0.235). The shortfall against a
+    // chained parlay is the pool's takeout plus the linemaker being wrong
+    // about who the crowd will back. Pick 6 is deliberately ABSENT: n=16,
+    // median 0.003 - jackpot and carryover pools pay mostly consolations, so
+    // no band estimates what a full hit pays.
+    poolFactor: {
+      daily_double: [0.365, 0.837],
+      pick3: [0.235, 0.699],
+      pick4: [0.096, 0.595],
+      pick5: [0.062, 0.453],
+    },
     exactaFactor: 0.55,       // exacta ~ (mlA+1)(mlB+1)*factor per $1
     trifectaFactor: 0.35,
     doubleFactor: 0.6,
@@ -114,7 +136,12 @@ const MENU_PATTERNS = [
   ['quinella', menuRe(String.raw`\s+Quinella`)],
   ['trifecta', menuRe(String.raw`\s+Tri(?:fecta|actor)`)],
   ['daily_double', menuRe(String.raw`\s+(?:Rolling\s+)?(?:Daily\s+)?Double`)],
-  ['pick3', menuRe(String.raw`\s+(?:Rolling\s+)?Pick\s*3`)],
+  ['pick3', menuRe(String.raw`\s+(?:Rolling\s+)?Pick\s*(?:3|Three)\b`)],
+  // D442: Pick 4/5/6, and the spelled-out names - "$1 Pick Three (Races
+  // 1-2-3)" is on 33 stored menus and read as the 50c fallback before this.
+  ['pick4', menuRe(String.raw`\s+(?:Rolling\s+)?Pick\s*(?:4|Four)\b`)],
+  ['pick5', menuRe(String.raw`\s+(?:Rolling\s+)?Pick\s*(?:5|Five)\b`)],
+  ['pick6', menuRe(String.raw`\s+(?:Rolling\s+)?Pick\s*(?:6|Six)\b`)],
   ['parlay', menuRe(String.raw`\s+WPS\s+Parlay`)],
 ];
 const SUPER_FLAT_RE = menuRe(String.raw`\s+Superfecta`);
@@ -132,7 +159,10 @@ const MENU_TRAILING = [
   ['trifecta', /Tri(?:fecta|actor)\s*\(([^)]*)\)/i],
   ['superfecta', /Super(?:fecta)?\s*\(([^)]*)\)/i],
   ['daily_double', /(?:Rolling\s+|Daily\s+)?Double\s*\(([^)]*)\)/i],
-  ['pick3', /(?:Rolling\s+)?Pick\s*3\s*\(([^)]*)\)/i],
+  ['pick3', /(?:Rolling\s+)?Pick\s*(?:3|Three)\s*\(([^)]*)\)/i],
+  ['pick4', /(?:Rolling\s+)?Pick\s*(?:4|Four)\s*\(([^)]*)\)/i],
+  ['pick5', /(?:Rolling\s+)?Pick\s*(?:5|Five)\s*\(([^)]*)\)/i],
+  ['pick6', /(?:Rolling\s+)?Pick\s*(?:6|Six)\s*\(([^)]*)\)/i],
 ];
 
 /**
@@ -143,9 +173,32 @@ const MENU_TRAILING = [
  * as MENU_AMOUNT above: "Pick 4 (4)" is a race, not a $4 minimum.
  */
 function menuParenCents(content) {
-  const t = String(content ?? '').trim().replace(/\s*min\.?$/i, '').trim();
+  // D442: "Minimum" as well as "min" - Remington Park prints "(.50 Cent Minimum)".
+  let t = String(content ?? '').trim().replace(/\s*min(?:imum)?\.?$/i, '').trim();
   if (!/[$.]|c\s*$|¢|cents?/i.test(t)) return null;
+  // ".50 Cent" / ".10 Cent": a DECIMAL DOLLAR amount with a redundant cents
+  // word. Read as the decimal ($0.50 = 50c), which is what both spellings mean;
+  // parseMoneyToken would reject the pair, and it stays strict because it is
+  // the teller grammar's reader too. Menu-only, so the teller is unaffected.
+  const dec = t.match(/^\$?(\d*\.\d+)\s*(?:¢|-?cents?)$/i);
+  if (dec) t = dec[1];
   return parseMoneyToken(t);
+}
+
+/**
+ * A trailing-parenthetical amount for one MENU_TRAILING pattern, or null.
+ * D442: the amount may follow a RACE LIST rather than the name -
+ * "Pick 3 (Races 3-4-5) (.50 Cent Minimum)" - so when the first parenthetical
+ * holds no money, the one right after it is tried. Only one: a menu's next
+ * parenthetical beyond that belongs to the next bet type.
+ */
+function trailingCents(t, re) {
+  const m = t.match(re);
+  if (!m) return null;
+  const first = menuParenCents(m[1]);
+  if (first != null) return first;
+  const next = t.slice(m.index + m[0].length).match(/^\s*\(([^)]*)\)/);
+  return next ? menuParenCents(next[1]) : null;
 }
 
 /**
@@ -172,11 +225,8 @@ export function parseWagerMenu(text) {
   // "Trifecta (.50)" / "$1 Superfecta (10c min)" - the bet type first, its
   // amount trailing. Applied LAST so the parenthetical wins a disagreement.
   for (const [key, re] of MENU_TRAILING) {
-    const m = t.match(re);
-    if (m) {
-      const v = menuParenCents(m[1]);
-      if (v) menu[key] = v;
-    }
+    const v = trailingCents(t, re);
+    if (v) menu[key] = v;
   }
   return menu;
 }
@@ -197,10 +247,99 @@ export function wagerMenuOffered(text) {
   for (const [key, re] of MENU_PATTERNS) if (re.test(t)) offered.add(key);
   if (SUPER_FLAT_RE.test(t)) offered.add('superfecta');
   for (const [key, re] of MENU_TRAILING) {
-    const m = t.match(re);
-    if (m && menuParenCents(m[1]) != null) offered.add(key);
+    if (trailingCents(t, re) != null) offered.add(key);
   }
   return offered;
+}
+
+// ---------- multi-race pools on a menu (D442) ----------
+
+/** Legs per multi-race pool. */
+export const POOL_LEGS = Object.freeze({ daily_double: 2, pick3: 3, pick4: 4, pick5: 5, pick6: 6 });
+
+// The pool's NAME alone, with or without an amount - unlike MENU_PATTERNS,
+// which only fire on "amount then name". "Daily Double / Exacta / Trifecta /
+// Superfecta / Pick 3 (Races 2-3-4)" prints no amounts at all and still sells
+// both pools, so whether a pool is offered cannot depend on a money token.
+const POOL_NAME_RE = {
+  daily_double: /(?:Rolling\s+|Daily\s+)?Double\b/i,
+  pick3: /Pick\s*(?:3|Three)\b/i,
+  pick4: /Pick\s*(?:4|Four)\b/i,
+  pick5: /Pick\s*(?:5|Five)\b/i,
+  pick6: /Pick\s*(?:6|Six)\b/i,
+};
+
+/**
+ * The race list printed right after a pool's name, as numbers, or null when
+ * none is printed (or it cannot be read). Shapes in the corpus:
+ * "(Races 2-3-4)", "(Races 1-5)" (a RANGE, for a Pick 5), "($1) (3-5)" (a
+ * range after a money parenthetical), and a double's bare "($1) 3 & 4".
+ */
+function raceListAfter(tail, legs) {
+  let rest = String(tail ?? '');
+  // Skip a money parenthetical first - "($1)", "(.50)", "(10c min)".
+  const money = rest.match(/^\s*\(([^)]*)\)/);
+  if (money && menuParenCents(money[1]) != null) rest = rest.slice(money[0].length);
+  const paren = rest.match(/^\s*\(\s*(?:Races?\s*)?(\d+(?:\s*[-–,&]\s*\d+)*)\s*\)/i);
+  const bare = rest.match(/^\s*(\d+\s*&\s*\d+)/);
+  const list = paren?.[1] ?? bare?.[1];
+  if (!list) return null;
+  const nums = list.split(/\s*[-–,&]\s*/).map(Number).filter(Number.isFinite);
+  let races = nums;
+  if (nums.length === 2 && legs > 2 && nums[1] - nums[0] + 1 === legs) {
+    races = Array.from({ length: legs }, (_, i) => nums[0] + i);
+  }
+  const consecutive = races.length === legs && races.every((n, i) => i === 0 || n === races[i - 1] + 1);
+  // A list IS printed but is not N consecutive races - Gulfstream's "Tropical
+  // Turf Pick 3 (Races 2, 6, 9)". That is a real pool, just not one a
+  // consecutive-legs builder can express, so it must read as NOT BUILDABLE
+  // rather than fall through to "no list, rolling from here", which would
+  // have offered a Pick 3 on races 2-3-4 at the $3 base.
+  return consecutive ? races : 'unbuildable';
+}
+
+/** Did the menu PRINT this bet type's amount (vs parseWagerMenu falling back)? */
+function printedMinimum(t, key) {
+  const lead = MENU_PATTERNS.find(([k]) => k === key)?.[1];
+  const trail = MENU_TRAILING.find(([k]) => k === key)?.[1];
+  const a = lead ? t.match(lead) : null;
+  if (a && menuCents(a[1])) return true;
+  return Boolean(trail && trailingCents(t, trail) != null);
+}
+
+/**
+ * Which multi-race pools START at this race, per its printed menu.
+ * Returns { [pool]: { legs, races, baseCents, baseSource } } where `races`
+ * are the leg race numbers (starting at `raceNumber`), `baseCents` the
+ * minimum base (parseWagerMenu's reading) and `baseSource` 'menu' when the
+ * menu printed it or 'assumed' when it fell back to BET.minimums.
+ *
+ * A pool whose printed race list starts ANYWHERE ELSE is not offered here:
+ * across the corpus, 375 of 376 printed lists start at the race whose menu
+ * prints them, and the one exception ("Pick 4 (Races 4-5-6-7)" on a race 9
+ * menu) is a source error that must not become a ticket on races 9-12.
+ * With no list printed, the pool is read as starting here, the rolling
+ * convention every such menu follows.
+ */
+export function menuPools(text, raceNumber) {
+  const out = {};
+  if (!text || !Number.isInteger(raceNumber)) return out;
+  const t = String(text);
+  const menu = parseWagerMenu(t);
+  for (const [pool, legs] of Object.entries(POOL_LEGS)) {
+    const m = t.match(POOL_NAME_RE[pool]);
+    if (!m) continue;
+    const listed = raceListAfter(t.slice(m.index + m[0].length, m.index + m[0].length + 48), legs);
+    if (listed === 'unbuildable') continue;
+    if (listed && listed[0] !== raceNumber) continue;
+    out[pool] = {
+      legs,
+      races: listed ?? Array.from({ length: legs }, (_, i) => raceNumber + i),
+      baseCents: menu[pool] ?? null,
+      baseSource: printedMinimum(t, pool) ? 'menu' : 'assumed',
+    };
+  }
+  return out;
 }
 
 // ---------- payout estimates ----------

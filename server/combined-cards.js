@@ -27,7 +27,7 @@
 
 import express from 'express';
 import { combineRace, DEFAULT_WEIGHTS, MARKET_ONLY_WEIGHTS } from '../shared/race-consensus.js';
-import { buildWpsParlays, CALIBRATION_NOTE } from '../shared/parlay-builder.js';
+import { buildWpsParlays, buildPoolTickets, POOL_TYPES, CALIBRATION_NOTE } from '../shared/parlay-builder.js';
 import { morningLineToDecimal } from '../shared/betmath.js';
 import { COMBINED_VERSION } from '../shared/version.js';
 import { getDb } from './db.js';
@@ -51,18 +51,36 @@ class CombinedCardError extends Error {
 const up = (p) => String(p).trim().toUpperCase();
 const num = (v) => (typeof v === 'number' && Number.isFinite(v) ? v : null);
 
-/** The build options, from a request body, with the builder's defaults. */
+/**
+ * The build options, from a request body, with the builder's defaults.
+ * D442: `mode` is 'wps' (the default - D436's WPS parlays) or 'pool'
+ * (Daily Double / Pick 3-5), which reads `pools` and `budgetCents` instead of
+ * `kinds` / legs / `stakeCents`. Only the fields of the chosen mode are
+ * returned, so the options echoed in the preview and traced on save are
+ * exactly the ones the build ran with.
+ */
 export function readOptions(body = {}) {
-  const kinds = Array.isArray(body.kinds) && body.kinds.length ? body.kinds.map(String) : ['win', 'place', 'show'];
   const int = (v, d) => (v === undefined || v === null || v === '' ? d : Number(v));
   const floor = body.payoutFloor === undefined || body.payoutFloor === null || body.payoutFloor === '' ? null : Number(body.payoutFloor);
+  const limit = Math.min(20, Math.max(1, int(body.limit, 5)));
+  if (body.mode === 'pool') {
+    return {
+      mode: 'pool',
+      pools: Array.isArray(body.pools) && body.pools.length ? body.pools.map(String) : [...POOL_TYPES],
+      budgetCents: int(body.budgetCents, 1200),
+      payoutFloor: floor,
+      limit,
+    };
+  }
+  const kinds = Array.isArray(body.kinds) && body.kinds.length ? body.kinds.map(String) : ['win', 'place', 'show'];
   return {
+    mode: 'wps',
     kinds,
     legsMin: int(body.legsMin, 2),
     legsMax: int(body.legsMax, 3),
     payoutFloor: floor,
     stakeCents: int(body.stakeCents, 200),
-    limit: Math.min(20, Math.max(1, int(body.limit, 5))),
+    limit,
   };
 }
 
@@ -88,13 +106,14 @@ function dayModels(db, dayId) {
   if (!sig) throw new CombinedCardError(404, 'No such race day.');
   const races = [];
   const storedPgm = new Map();
+  const menus = new Map(db.prepare('SELECT number, wager_menu FROM races WHERE race_day_id = ?').all(dayId).map((r) => [r.number, r.wager_menu]));
   for (const [raceNumber, s] of [...sig.races].sort((a, b) => a[0] - b[0])) {
     if (!s.entries.length) continue;
     for (const e of s.entries) storedPgm.set(`${raceNumber}|${up(e.programNumber)}`, e.programNumber);
     const combined = combineRace({ entries: s.entries, tipRoles: s.tipRoles, llmRoles: s.llmRoles, otrRoles: s.otrRoles, weights: DEFAULT_WEIGHTS });
     const market = combineRace({ entries: s.entries, weights: MARKET_ONLY_WEIGHTS });
     races.push({
-      raceNumber, combined, market,
+      raceNumber, combined, market, wagerMenu: menus.get(raceNumber) ?? null,
       oddsOf: oddsReader(s.entries, combined?.basis ?? 'ml'),
       summary: {
         race: raceNumber, basis: combined?.basis ?? null, modelled: Boolean(combined),
@@ -108,7 +127,15 @@ function dayModels(db, dayId) {
 function restorePgms(candidates, storedPgm) {
   return candidates.map((c) => {
     const legs = c.legs.map((leg, i) => leg.map((p) => storedPgm.get(`${c.raceNumbers[i]}|${up(p)}`) ?? p));
-    return { ...c, legs, legDetail: c.legDetail.map((d, i) => ({ ...d, programNumber: legs[i][0] })) };
+    // A WPS leg names one horse (`programNumber`); a pool leg several
+    // (`programNumbers`, D442). Restore whichever the leg carries.
+    return {
+      ...c,
+      legs,
+      legDetail: c.legDetail.map((d, i) => (Array.isArray(d.programNumbers)
+        ? { ...d, programNumbers: legs[i], horses: d.horses?.map((h, j) => ({ ...h, programNumber: legs[i][j] })) }
+        : { ...d, programNumber: legs[i][0] })),
+    };
   });
 }
 
@@ -116,10 +143,14 @@ function restorePgms(candidates, storedPgm) {
 export function previewCombinedParlays(db, dayId, options) {
   const { sig, races, storedPgm } = dayModels(db, dayId);
   const out = {};
+  let skipped = [];
   for (const selection of ['combined', 'market']) {
-    const built = buildWpsParlays({ races, ...options, selection });
+    const built = options.mode === 'pool'
+      ? buildPoolTickets({ races, ...options, selection })
+      : buildWpsParlays({ races, ...options, selection });
     if (built.error) throw new CombinedCardError(400, built.error);
     out[selection] = restorePgms(built.candidates, storedPgm);
+    if (selection === 'combined') skipped = built.skipped ?? built.skippedRaces ?? [];
   }
   return {
     raceDayId: sig.day.id,
@@ -129,6 +160,7 @@ export function previewCombinedParlays(db, dayId, options) {
     options,
     races: races.map((r) => r.summary),
     excluded: sig.excluded,
+    skipped,
     resultsOnFile: Boolean(db.prepare('SELECT 1 FROM race_results WHERE race_day_id = ? LIMIT 1').get(dayId)),
     candidates: out,
   };

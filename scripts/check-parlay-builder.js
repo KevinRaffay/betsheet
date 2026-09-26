@@ -153,6 +153,71 @@ console.log('-- the builder --');
   })());
 }
 
+console.log('-- menuPools: which pools start at a race (real menu shapes) --');
+{
+  const { menuPools, parseWagerMenu } = await import('../shared/betmath.js');
+  const a = menuPools('Daily Double / Exacta / Trifecta / Superfecta / Pick 3 (Races 2-3-4) Pick 4 (Races 2-3-4-5) / Super Hi-5 / Odd vs Even', 2);
+  check('an amount-less menu still offers its pools', Boolean(a.daily_double && a.pick3 && a.pick4));
+  check('...over the printed legs', same(a.pick3.races, [2, 3, 4]) && same(a.pick4.races, [2, 3, 4, 5]) && same(a.daily_double.races, [2, 3]));
+  check('...at an ASSUMED base, labelled so', a.pick3.baseSource === 'assumed' && a.pick4.baseCents === 100);
+  const b = menuPools('Exacta ($1), Trifecta (.50), Super (.10), Double ($1) 3 & 4, Pick 3 ($1) (3-5) Mandatory Pay Pick 5 (.50) (3-7)', 3);
+  check('trailing parenthetical amounts and a (3-5) range', b.pick3.baseCents === 100 && b.pick3.baseSource === 'menu' && same(b.pick3.races, [3, 4, 5]));
+  check('a Pick 5 range (3-7) expands to five legs', same(b.pick5.races, [3, 4, 5, 6, 7]) && b.pick5.baseCents === 50);
+  check('a double "($1) 3 & 4"', same(b.daily_double.races, [3, 4]) && b.daily_double.baseCents === 100);
+  const c = menuPools('$1 Exacta / $1 Trifecta / $2 Rolling Double / $1 Superfecta (.10 Min.) $1 Pick Three (Races 1-2-3) / $0.50 Pick 5 (Races 1-5)', 1);
+  check('"Pick Three" is Pick 3, at its printed $1', c.pick3?.baseCents === 100 && c.pick3.baseSource === 'menu');
+  check('parseWagerMenu reads "$1 Pick Three" as $1, not the 50c fallback', parseWagerMenu('$1 Pick Three (Races 1-2-3)').pick3 === 100);
+  const d = menuPools('Rolling Double / Exacta / 0.20 Trifecta / 0.20 Superfecta 0 0.20 Pick 3 (Races 9-10-11) / 0.20 Pick 4 (Races 4-5-6-7)/$1 Swinger', 9);
+  check('a printed list that starts at ANOTHER race is not offered here (the real race-9 typo)', Boolean(d.pick3) && !d.pick4);
+  check('20c bare-decimal amounts are read', d.pick3.baseCents === 20);
+  check('no menu, no pools', Object.keys(menuPools(null, 1)).length === 0);
+  // Gulfstream's real race-2 menu: a NON-consecutive Pick 3 must not become a rolling one.
+  const g = menuPools('$1 Daily Double /$1 Exacta / $.50 Trifecta / $.10 Superfecta $1 Bet 3 (Races 2-3-4) / $.50 Pick 4 (Races 2-3-4-5) $1 Players Place Pick 8 (Races 2-9) / $3 Tropical Turf Pick 3 (Races 2, 6, 9)', 2);
+  check('a non-consecutive printed list (Races 2, 6, 9) is not offered, never read as rolling', !g.pick3 && same(g.pick4?.races, [2, 3, 4, 5]) && g.pick4.baseCents === 50);
+  // Remington Park prints the minimum AFTER the race list, as "(.50 Cent Minimum)".
+  const e = menuPools('WPS / Exacta / Trifecta (.20 Cent Minimum) / Superfecta (.10 Cent Minimum) Pick 3 (Races 3-4-5) (.20 Cent Minimum)', 3);
+  check('an amount AFTER the race list is read, and labelled as printed', e.pick3?.baseCents === 20 && e.pick3.baseSource === 'menu' && same(e.pick3.races, [3, 4, 5]));
+  check('".20 Cent Minimum" is 20c on the single-race bets too', parseWagerMenu('Trifecta (.20 Cent Minimum) / Superfecta (.10 Cent Minimum)').trifecta === 20
+    && parseWagerMenu('Trifecta (.20 Cent Minimum)').superfecta === BET.minimums.superfecta);
+}
+
+console.log('-- pool tickets (Daily Double / Pick N) --');
+{
+  const { buildPoolTickets, POOL_TYPES } = await import('../shared/parlay-builder.js');
+  const menus = { 1: '$1 Daily Double / $1 Exacta / .50 Pick 3 (Races 1-2-3)', 2: '$1 Daily Double / $1 Exacta', 3: '$1 Exacta' };
+  const races = racesFor().map((r) => ({ ...r, wagerMenu: menus[r.raceNumber] }));
+  const out = buildPoolTickets({ races, pools: ['daily_double', 'pick3'], budgetCents: 1200, limit: 10 });
+  check('no error', out.error === null, out.error);
+  const dd = out.candidates.filter((c) => c.betType === 'daily_double');
+  const p3 = out.candidates.find((c) => c.betType === 'pick3');
+  check('doubles start where the menu offers one (races 1-2 and 2-3), never at race 3', same(dd.map((c) => c.raceNumbers).sort(), [[1, 2], [2, 3]]));
+  check('the pick 3 covers races 1-3 at the menu\'s 50c base', p3 && same(p3.raceNumbers, [1, 2, 3]) && p3.stakeCents === 50 && p3.baseSource === 'menu');
+  check('every ticket fits the budget, and cost = base x combinations',
+    out.candidates.every((c) => c.costCents <= 1200 && c.costCents === c.stakeCents * c.legs.reduce((a, l) => a * l.length, 1)));
+  check('P(hit) is the product of leg coverages', out.candidates.every((c) => near(c.pHit, c.legDetail.reduce((a, l) => a * l.pHit, 1))));
+  check('a leg spreads to more than one horse when the budget allows', p3.legs.some((l) => l.length > 1));
+  check('each leg holds its most likely horses (as a set)', p3.legDetail.every((l) => {
+    const race = races.find((r) => r.raceNumber === l.race);
+    const top = race.combined.runners.slice(0, l.programNumbers.length).map((x) => x.programNumber);
+    return same([...top].sort(), [...l.programNumbers].sort());
+  }));
+  check('each leg lists its horses in program-number order, the teller order', out.candidates.every((c) =>
+    c.legs.every((leg) => leg.every((pgm, i) => i === 0 || Number(leg[i - 1]) < Number(pgm)))));
+  check('both coverages and the calibration note ride along', out.candidates.every((c) => typeof c.combinedPHit === 'number' && typeof c.marketPHit === 'number' && c.calibration === CALIBRATION_NOTE));
+  check('estimate band low <= high', out.candidates.every((c) => c.estMinCents <= c.estMaxCents && c.estIsRange));
+  check('teller call names the pool and the races', /^Races 1-2-3 \$0\.50 PICK 3 /.test(p3.tellerCall) || /^Races 1-2-3 50c PICK 3 /.test(p3.tellerCall), p3.tellerCall);
+  const bigger = buildPoolTickets({ races, pools: ['pick3'], budgetCents: 4800 }).candidates[0];
+  check('a bigger budget never LOWERS the chance of hitting', bigger.pHit >= p3.pHit - 1e-12);
+  const floored = buildPoolTickets({ races, pools: ['pick3'], budgetCents: 4800, payoutFloor: 3 });
+  check('a payout floor holds at the pessimistic estimate over COST', floored.candidates.every((c) => c.estMinCents / c.costCents >= 3 - 1e-9));
+  check('a base bigger than the budget is skipped with a reason', (() => {
+    const r = buildPoolTickets({ races, pools: ['pick3'], budgetCents: 40 });
+    return r.candidates.length === 0 && r.skipped.some((s) => /exceeds the budget/.test(s.reason));
+  })());
+  check('pick 6 is not buildable (no estimate exists)', !POOL_TYPES.includes('pick6') && buildPoolTickets({ races, pools: ['pick6'] }).error !== null);
+  check('selection=market coverage equals market coverage', buildPoolTickets({ races, pools: ['pick3'], selection: 'market' }).candidates.every((c) => near(c.pHit, c.marketPHit)));
+}
+
 console.log('-- the bucket --');
 check('COMBINED is in BUCKET_ORDER with a chip', BUCKET_ORDER.includes('COMBINED') && BUCKET_CHIP.COMBINED === 'combined');
 check('COMBINED_VERSION is not a lean-* version (grades under its own label)', !/^lean-/.test(COMBINED_VERSION));
@@ -168,7 +233,9 @@ console.log('-- the producer, on a temp database --');
   const dayId = db.prepare("INSERT INTO race_days (track, date, correlation_id, bankroll_cents) VALUES ('Del Mar', '2026-08-30', 'corr-day', 20000)").run().lastInsertRowid;
   const day = () => db.prepare('SELECT * FROM race_days WHERE id = ?').get(dayId);
   for (const [n, entries] of Object.entries(ENTRIES)) {
-    const raceId = db.prepare('INSERT INTO races (race_day_id, number) VALUES (?, ?)').run(dayId, Number(n)).lastInsertRowid;
+    // D442: race 1 prints a Pick 3 over races 1-3 at 50c; races 1-2 a $1 double.
+    const menu = { 1: '.50 Pick 3 (Races 1-2-3) / $1 Daily Double / $1 Exacta', 2: '$1 Daily Double / $1 Exacta', 3: '$1 Exacta' }[n];
+    const raceId = db.prepare('INSERT INTO races (race_day_id, number, wager_menu) VALUES (?, ?, ?)').run(dayId, Number(n), menu).lastInsertRowid;
     for (const e of entries) {
       db.prepare('INSERT INTO entries (race_id, program_number, horse_name, morning_line_decimal) VALUES (?, ?, ?, ?)')
         .run(raceId, e.programNumber, `Horse ${n}-${e.programNumber}`, e.morningLineDecimal);
@@ -245,6 +312,47 @@ console.log('-- the producer, on a temp database --');
     added && added.legs.length === pick.legs.length && added.legs.every((l) => typeof l.combinedPHit === 'number' && typeof l.marketPHit === 'number' && l.votes)
     && typeof added.pHit === 'number' && added.calibration === CALIBRATION_NOTE);
   check('both saves trace under their own correlation id', events.some((e) => e.event === 'card_generated' && e.correlationId === 'corr-parlay-2'));
+
+  // ---- D442: a Pick 3, previewed, saved and graded end to end ----
+  // A FRESH day, so the pool is saved blind (no results) and the results are
+  // then written so the ticket's own top horses win - the hit path, exactly.
+  const day2Id = db.prepare("INSERT INTO race_days (track, date, correlation_id, bankroll_cents) VALUES ('Del Mar', '2026-08-31', 'corr-day2', 20000)").run().lastInsertRowid;
+  for (const [n, entries] of Object.entries(ENTRIES)) {
+    const menu = { 1: '.50 Pick 3 (Races 1-2-3) / $1 Daily Double / $1 Exacta', 2: '$1 Daily Double / $1 Exacta', 3: '$1 Exacta' }[n];
+    const raceId = db.prepare('INSERT INTO races (race_day_id, number, wager_menu) VALUES (?, ?, ?)').run(day2Id, Number(n), menu).lastInsertRowid;
+    for (const e of entries) {
+      db.prepare('INSERT INTO entries (race_id, program_number, horse_name, morning_line_decimal) VALUES (?, ?, ?, ?)')
+        .run(raceId, e.programNumber, `Horse ${n}-${e.programNumber}`, e.morningLineDecimal);
+    }
+  }
+  const day2 = db.prepare('SELECT * FROM race_days WHERE id = ?').get(day2Id);
+  const poolOptions = readOptions({ mode: 'pool', pools: ['pick3', 'daily_double'], budgetCents: 1200, limit: 5 });
+  check('readOptions keeps only the pool fields in pool mode', poolOptions.mode === 'pool' && poolOptions.budgetCents === 1200 && !('kinds' in poolOptions));
+  const pp = previewCombinedParlays(db, day2Id, poolOptions);
+  const p3 = pp.candidates.combined.find((c) => c.betType === 'pick3');
+  check('pool preview returns a Pick 3 over races 1-3 and doubles', p3 && same(p3.raceNumbers, [1, 2, 3]) && pp.candidates.combined.some((c) => c.betType === 'daily_double'));
+  check('pool legDetail carries every horse of every leg', p3.legDetail.every((l, i) => same(l.programNumbers, p3.legs[i]) && l.horses.length === p3.legs[i].length));
+  const saved3 = persistCombinedParlay(db, day2, {
+    options: poolOptions, choice: { selection: 'combined', betType: 'pick3', raceNumbers: p3.raceNumbers, legs: p3.legs }, correlationId: 'corr-pool-1',
+  });
+  const t3 = db.prepare('SELECT * FROM tickets WHERE card_id = ?').get(saved3.cardId);
+  check('saved pick 3: race_id NULL, stake = the 50c base, cost = base x combinations',
+    t3.race_id === null && t3.bet_type === 'pick3' && t3.stake_cents === 50 && t3.cost_cents === p3.costCents
+    && same(JSON.parse(t3.selections), { races: [1, 2, 3], legs: p3.legs }));
+  check('saved blind: no results, not graded', saved3.graded === null);
+  // Each leg's LAST covered horse wins - a hit, but not on the obvious favorites.
+  const winners = p3.legs.map((leg) => leg[leg.length - 1]);
+  for (const [i, raceNo] of [1, 2, 3].entries()) results.run(day2Id, raceNo, winners[i], 1, 800, 400, 300);
+  db.prepare("INSERT INTO exotic_payoffs (race_day_id, race_number, bet_type, base_cents, combination, payout_cents) VALUES (?, 3, 'pick3', 50, ?, 12345)")
+    .run(day2Id, winners.join('-'));
+  const g3 = gradeAndPersist(db, saved3.cardId, 'corr-pool-grade').grades[0];
+  check('the pick 3 grades as a HIT against the chart row: $123.45 back on a 50c combo',
+    g3.outcome === 'win' && g3.returnedCents === 12345 && g3.plCents === 12345 - p3.costCents, JSON.stringify(g3));
+  const lines = fs.readdirSync(process.env.BETSHEET_LOG_DIR).filter((f) => f.startsWith('decision-trace'))
+    .flatMap((f) => fs.readFileSync(path.join(process.env.BETSHEET_LOG_DIR, f), 'utf8').split(String.fromCharCode(10)))
+    .map((l) => l.trim()).filter(Boolean).map((l) => { try { return JSON.parse(l); } catch { return null; } }).filter(Boolean);
+  const poolAdded = lines.find((e) => e.event === 'ticket_added' && e.correlationId === 'corr-pool-1');
+  check('the pool ticket_added traces each leg of horses with both probabilities', poolAdded && poolAdded.legs.every((l) => l.horses.every((h) => typeof h.combinedP === 'number' && typeof h.marketP === 'number')));
   db.close();
 }
 
