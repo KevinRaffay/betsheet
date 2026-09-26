@@ -4,6 +4,7 @@ import {
 } from '../api.js';
 import EntriesTable from './EntriesTable.jsx';
 import { NoteSourceDatalist, NotesEditor } from './AnalystNotesEditor.jsx';
+import RaceNotes from './RaceNotes.jsx';
 import RaceTipPicks from './RaceTipPicks.jsx';
 import TipPicksEntryModal from './TipPicksEntryModal.jsx';
 
@@ -604,14 +605,13 @@ export default function LlmCardModal({ dayId, initialRace = null, onCardChanged,
                         </div>
                       </div>
                       <EntriesTable entries={r.entries ?? []} />
-                      <details className="race-bottom-line">
-                        <summary>
-                          Analyst notes
-                          {noteFor(r.number)?.text ? <span className="tag tag--gold">notes</span> : null}
-                        </summary>
-                        <NotesEditor scope="race" draft={draftOf(r.number)} disabled={busy}
-                          onEdit={(patch) => editNote(r.number, patch)} onFlush={flushNotes} />
-                      </details>
+                      {/* Read-only (D184's house rule): a race-specific note is
+                          AUTHORED in that race's own panel on /day, via
+                          RaceNotesEditor.jsx - this modal only shows what a
+                          generation will actually read, the same read-only card
+                          CardView.jsx renders (RaceNotes.jsx), never a second
+                          place to type it. */}
+                      <RaceNotes note={noteFor(r.number)} />
                       <RaceTipPicks
                         rows={tipRows.filter((row) => row.raceNo === r.number)}
                         scoreFor={() => null}
