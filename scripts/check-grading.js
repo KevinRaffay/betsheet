@@ -126,6 +126,40 @@ check('double miss loses', r.outcome === 'loss');
 r = g(T('daily_double', [1, 2], [['3'], ['8']], 200));
 check('double with a scratched-out leg refunds whole', r.outcome === 'refund' && r.returnedCents === 200);
 
+{
+  // D442: Pick 3 / Pick 4 grade off the SETTLING race's payoff row, exactly as
+  // a double does - the first regression fixture for either. Four races; the
+  // chart prints the Pick 3 (races 2-4) and the Pick 4 (races 1-4) on race 4,
+  // with a dead heat in race 3 ("5/6").
+  const four = buildDayResults([
+    { number: 1, results: [{ programNumber: '2', finishPosition: 1, winCents: 500, placeCents: 300, showCents: 220 }], exotics: [], scratchedPgms: [] },
+    { number: 2, results: [{ programNumber: '7', finishPosition: 1, winCents: 900, placeCents: 400, showCents: 300 }], exotics: [], scratchedPgms: ['8'] },
+    { number: 3, results: [{ programNumber: '5', finishPosition: 1, winCents: 600, placeCents: 300, showCents: 240 }, { programNumber: '6', finishPosition: 1, winCents: 700, placeCents: 320, showCents: 250 }], exotics: [], scratchedPgms: [] },
+    { number: 4, results: [{ programNumber: '1', finishPosition: 1, winCents: 400, placeCents: 260, showCents: 210 }], exotics: [
+      { betType: 'pick3', baseCents: 50, combination: '7-5/6-1', payoutCents: 11550 },
+      { betType: 'pick4', baseCents: 50, combination: '2-7-5/6-1', payoutCents: 48020 },
+    ], scratchedPgms: [] },
+  ]);
+  const P = (betType, races, legs, stake) => gradeTicket({ betType, races, legs, stakeCents: stake, costCents: stake * legs.reduce((a, l) => a * l.length, 1) }, four);
+  let x = P('pick3', [2, 3, 4], [['7', '3'], ['5'], ['1', '4']], 50);
+  check('pick 3 hit, spread 2x1x2 at 50c: one live combo pays $115.50 on a $2 ticket',
+    x.outcome === 'win' && x.returnedCents === 11550 && x.plCents === 11550 - 200, JSON.stringify(x));
+  x = P('pick3', [2, 3, 4], [['7'], ['6'], ['1']], 100);
+  check('pick 3 on the OTHER dead-heat winner also hits, and a $1 stake pays double the 50c base: $231.00',
+    x.outcome === 'win' && x.returnedCents === 23100, JSON.stringify(x));
+  x = P('pick3', [2, 3, 4], [['7'], ['5'], ['4']], 50);
+  check('pick 3 missing the last leg loses', x.outcome === 'loss' && x.returnedCents === 0);
+  x = P('pick4', [1, 2, 3, 4], [['2', '3'], ['7'], ['5', '6'], ['1']], 50);
+  check('pick 4 hit, spread 2x1x2x1 at 50c: pays $480.20 on a $2 ticket',
+    x.outcome === 'win' && x.returnedCents === 48020 && x.plCents === 48020 - 200, JSON.stringify(x));
+  x = P('pick4', [1, 2, 3, 4], [['2'], ['8'], ['5'], ['1']], 50);
+  check('pick 4 whose only horse in a leg scratched is refunded whole (the conservative policy)',
+    x.outcome === 'refund' && x.returnedCents === 50, JSON.stringify(x));
+  x = gradeTicket({ betType: 'pick5', races: [1, 2, 3, 4, 5], legs: [['2'], ['7'], ['5'], ['1'], ['1']], stakeCents: 50, costCents: 50 }, four);
+  check('a pool whose settling race has no results is ungradable (loss with a note), never a guess',
+    x.outcome === 'loss' && /no results for race 5/.test(x.note), JSON.stringify(x));
+}
+
 r = g(T('exacta', [1], [['3'], ['7']], 300));
 check('straight exacta hit: $3 at $25.60/$1 returns $76.80', r.outcome === 'win' && r.returnedCents === 7680);
 r = g(T('exacta', [1], [['7'], ['3']], 300));

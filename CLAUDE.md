@@ -461,8 +461,21 @@ it. Rules still in force:
   `$1 Superfecta (10c min)`), the second added by D214. When a new track's menu
   arrives, check `parseWagerMenu` against it rather than assuming - one shape is
   still unread, an amount separated from its bet type by a word
-  (`$3 PRIME PICK 3`), harmless today only because it coincides with the
-  fallback. **A near-miss regex here fails silently and expensively**: the
+  (`50c Early Pick 5`, `$.50 Cent Pick 4`, `$3 PRIME PICK 3`). The first two
+  fall back to $1, above the real 50c, so a ticket built on them is still
+  legal. **`$3 PRIME PICK 3` falls back BELOW its real $3**, so a pool ticket
+  built from it would be refused at the window, and the only thing standing
+  between it and a bad ticket is the D442 builder's `base assumed` label. Read
+  that shape before trusting any unlabelled pool base. **D442 read three more**: the amount
+  AFTER a race list (`Pick 3 (Races 3-4-5) (.50 Cent Minimum)`, Remington Park,
+  whose `.50 Cent` is a decimal dollar plus a redundant cents word), the
+  spelled-out `Pick Three` (37 menus had read it as the 50c fallback when they
+  print $1), and Pick 4/5/6, which were never read at all. **And a menu can
+  name a pool it prints NO amount for** (`Daily Double / ... / Pick 3 (Races
+  2-3-4)`), which is why `menuPools` finds pools by name alone and labels such a
+  base `assumed`. A printed race list that is not N consecutive races
+  (Gulfstream's `Tropical Turf Pick 3 (Races 2, 6, 9)`) must read as NOT
+  buildable, never as "no list, so rolling from here". **A near-miss regex here fails silently and expensively**: the
   pre-D214 superfecta rule demanded the exact spelling `(10c min)`, so Del Mar's
   own `(10c min.)` and `(10-cent min)` fell through to `$1 Superfecta` and the
   home track's dime-super minimum read as $1 across the whole corpus, unnoticed

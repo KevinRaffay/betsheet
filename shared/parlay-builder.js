@@ -37,7 +37,7 @@
 // every show-parlay configuration in that backtest lost 29-78%.
 
 import {
-  BET, winPayout, placeEstimate, showEstimate, tellerCall,
+  BET, winPayout, placeEstimate, showEstimate, tellerCall, comboCost, menuPools,
 } from './betmath.js';
 
 export const KIND_BET_TYPE = Object.freeze({ win: 'parlay', place: 'parlay_place', show: 'parlay_show' });
@@ -182,4 +182,164 @@ function toTicket({ kind, legs, pHit }, stakeCents, selection) {
       multiplier: l.multiplier, votes: l.votes,
     })),
   };
+}
+
+// ---------- multi-race pools: Daily Double / Pick 3 / 4 / 5 (D442) ----------
+//
+// A pool ticket covers SEVERAL horses per leg, so "most likely to hit" is a
+// spend question rather than a choice of one horse: every horse added to a leg
+// raises that leg's coverage and multiplies the ticket's cost. The builder
+// therefore walks a GREEDY spread per (pool, starting race): start with the
+// single most likely horse in every leg, then repeatedly add whichever next
+// horse buys the most log-coverage per unit of log-cost, until the next
+// addition would break the budget. P(hit) is the product of leg coverages.
+// That is the optimal order for this objective when a leg's coverage has
+// diminishing returns, which sorted win probabilities always do.
+//
+// WHICH POOLS, WHERE: only a pool the STARTING race's printed menu names
+// (betmath's `menuPools`), over the legs it names, at the base it prints - or
+// at an ASSUMED fallback base, labelled as such, when it prints the pool but
+// no amount. Pick 6 is never built: see BET.estimates.poolFactor for why no
+// estimate of a full Pick 6 hit exists on this corpus.
+//
+// THE PAYOUT ESTIMATE is BET.estimates.poolFactor applied to the market's own
+// odds chained over the covered winners: the pessimistic end chains each leg's
+// SHORTEST covered horse at the low factor, the optimistic end its LONGEST at
+// the high factor. The payout floor, as for WPS, is checked against the
+// pessimistic end, as a multiple of the ticket's COST (not its base), because
+// spreading is what a pool ticket spends its money on.
+
+export const POOL_TYPES = Object.freeze(['daily_double', 'pick3', 'pick4', 'pick5']);
+export const MAX_PER_LEG = 8;
+
+function poolLegs(race, selection) {
+  const market = new Map((race.market?.runners ?? []).map((r) => [r.programNumber, r]));
+  const combined = new Map((race.combined?.runners ?? []).map((r) => [r.programNumber, r]));
+  const source = selection === 'market' ? market : combined;
+  return [...source.values()].sort((a, b) => b.combinedP - a.combinedP).map((r) => ({
+    programNumber: r.programNumber,
+    p: r.combinedP,
+    combinedP: combined.get(r.programNumber)?.combinedP ?? null,
+    marketP: market.get(r.programNumber)?.combinedP ?? null,
+    votes: combined.get(r.programNumber)?.votes ?? null,
+  }));
+}
+
+/**
+ * Build pool-ticket candidates for a day.
+ *
+ * `races` - [{ raceNumber, combined, market, wagerMenu }] (combineRace outputs).
+ * `pools` - subset of POOL_TYPES. `budgetCents` - the most one ticket may cost.
+ * `payoutFloor` - minimum PESSIMISTIC estimated return as a multiple of the
+ *   ticket's cost, or null. `selection` - 'combined' or 'market'.
+ *
+ * Returns { candidates, skipped, error }: ONE candidate per (pool, starting
+ * race) - the widest spread on its greedy path that fits the budget and
+ * clears the floor - best P(hit) first. `skipped` names every offered pool
+ * that could not be built and why.
+ */
+export function buildPoolTickets({
+  races = [], pools = POOL_TYPES, budgetCents = 1200, payoutFloor = null,
+  selection = 'combined', limit = 5, maxPerLeg = MAX_PER_LEG,
+} = {}) {
+  const fail = (error) => ({ candidates: [], skipped: [], error });
+  const wanted = (Array.isArray(pools) ? pools : []).filter((p) => POOL_TYPES.includes(p));
+  if (wanted.length === 0) return fail(`pools must include at least one of ${POOL_TYPES.join(', ')}`);
+  if (!Number.isInteger(budgetCents) || budgetCents <= 0) return fail('budget must be a positive whole number of cents');
+  if (selection !== 'combined' && selection !== 'market') return fail("selection must be 'combined' or 'market'");
+  if (payoutFloor !== null && !(Number.isFinite(payoutFloor) && payoutFloor > 0)) return fail('payoutFloor must be a positive number or null');
+
+  const byNumber = new Map(races.filter(Boolean).map((r) => [r.raceNumber, r]));
+  const skipped = [];
+  const found = [];
+
+  for (const start of [...byNumber.values()].sort((a, b) => a.raceNumber - b.raceNumber)) {
+    const offered = menuPools(start.wagerMenu, start.raceNumber);
+    for (const pool of wanted) {
+      const offer = offered[pool];
+      if (!offer) continue;
+      const why = (reason) => skipped.push({ pool, startRace: start.raceNumber, reason });
+      const legRaces = offer.races.map((n) => byNumber.get(n));
+      if (legRaces.some((r) => !r || !r.combined || !r.market)) { why('a leg race has no readable market'); continue; }
+      const base = offer.baseCents;
+      if (!Number.isInteger(base) || base <= 0) { why('no base amount'); continue; }
+      const lists = legRaces.map((r) => poolLegs(r, selection));
+      const n = lists.map(() => 1);
+      if (base > budgetCents) { why(`the ${base}c base alone exceeds the budget`); continue; }
+
+      const [fLow, fHigh] = BET.estimates.poolFactor[pool];
+      const snapshot = () => {
+        const legs = lists.map((l, i) => l.slice(0, n[i]));
+        const cover = (key) => legs.reduce((a, leg) => a * leg.reduce((s, h) => s + (h[key] ?? 0), 0), 1);
+        const inv = legs.map((leg) => leg.map((h) => 1 / Math.max(1e-6, h.marketP ?? 0)));
+        const cost = comboCost(base, legs.map((leg) => leg.map((h) => h.programNumber)));
+        const estMin = Math.round(base * inv.reduce((a, v) => a * Math.min(...v), 1) * fLow);
+        const estMax = Math.round(base * inv.reduce((a, v) => a * Math.max(...v), 1) * fHigh);
+        return { legs, pHit: cover('p'), combinedPHit: cover('combinedP'), marketPHit: cover('marketP'), cost, estMin, estMax };
+      };
+
+      let best = null;
+      const consider = (s) => {
+        if (payoutFloor !== null && s.estMin / s.cost < payoutFloor) return;
+        if (!best || s.pHit > best.pHit) best = s;
+      };
+      consider(snapshot());
+      for (;;) {
+        const cost = comboCost(base, n.map((k) => Array(k).fill(0)));
+        let pick = -1;
+        let pickRatio = -Infinity;
+        for (let i = 0; i < lists.length; i++) {
+          if (n[i] >= lists[i].length || n[i] >= maxPerLeg) continue;
+          if ((cost / n[i]) * (n[i] + 1) > budgetCents) continue;
+          const covered = lists[i].slice(0, n[i]).reduce((s, h) => s + h.p, 0);
+          const gain = Math.log(covered + lists[i][n[i]].p) - Math.log(covered);
+          const ratio = gain / Math.log((n[i] + 1) / n[i]);
+          if (ratio > pickRatio) { pickRatio = ratio; pick = i; }
+        }
+        if (pick < 0) break;
+        n[pick] += 1;
+        consider(snapshot());
+      }
+      if (!best) { why('no spread within the budget clears the payout floor'); continue; }
+      found.push({ pool, offer, base, ...best });
+    }
+  }
+
+  found.sort((a, b) => (b.pHit - a.pHit) || (b.estMin - a.estMin));
+  // A pool leg is a SET: order its horses by program number, so the same
+  // ticket reads - and keys - identically whichever model chose it, and the
+  // teller call is in the order a teller expects ("1-7", not "7-1").
+  const byPgm = (a, b) => a.programNumber.localeCompare(b.programNumber, undefined, { numeric: true });
+  const candidates = found.slice(0, Math.max(0, limit)).map((f0) => {
+    const f = { ...f0, legs: f0.legs.map((leg) => [...leg].sort(byPgm)) };
+    const raceNumbers = f.offer.races;
+    const legs = f.legs.map((leg) => leg.map((h) => h.programNumber));
+    return {
+      betType: f.pool,
+      kind: f.pool,
+      raceNumbers,
+      legs,
+      stakeCents: f.base,
+      costCents: f.cost,
+      baseSource: f.offer.baseSource,
+      selection,
+      pHit: f.pHit,
+      combinedPHit: f.combinedPHit,
+      marketPHit: f.marketPHit,
+      calibration: CALIBRATION_NOTE,
+      estMinCents: f.estMin,
+      estMaxCents: f.estMax,
+      estIsRange: true,
+      tellerCall: tellerCall(f.pool, raceNumbers, f.base, legs),
+      legDetail: f.legs.map((leg, i) => ({
+        race: raceNumbers[i],
+        programNumbers: leg.map((h) => h.programNumber),
+        pHit: leg.reduce((s, h) => s + h.p, 0),
+        combinedPHit: leg.reduce((s, h) => s + (h.combinedP ?? 0), 0),
+        marketPHit: leg.reduce((s, h) => s + (h.marketP ?? 0), 0),
+        horses: leg.map((h) => ({ programNumber: h.programNumber, combinedP: h.combinedP, marketP: h.marketP, votes: h.votes })),
+      })),
+    };
+  });
+  return { candidates, skipped, error: null };
 }
