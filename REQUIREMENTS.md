@@ -583,3 +583,16 @@ ML-only corpus beat the closing line?) is nearly answerable for zero API calls.
 | An odds A/B must hold four things fixed or the arms differ by more than the odds: the per-race bankroll (path-dependent today - `(bankroll - spent so far) / races remaining`), the D179 baseline inputs (137 of 356 stored prompts carried the OTR block), analyst notes (already fails closed, 409), and the prompt template version (LLM cards have no version axis, so the stored corpus is not a valid control arm) | - (evaluated, not built; PT-3) |
 | The arm that actually tests *"edge as odds move"* shows the model BOTH the morning line and the post-time board, since drift is invisible to an arm that sees only one of them - post-time-replaces-ML tests a better prior, not movement | - (evaluated, not built; PT-3) |
 | No batch generation harness exists - the only route is `POST /api/race-days/:id/llm-cards/preview`, one race per call - though `persistLlmRace`'s `interactive` flag already anticipates one and fails closed on notes | - (evaluated, not built; PT-3) |
+
+## Combined-signal parlays (requested 2026-09-26)
+
+A day's odds, tip sheets, analyst notes and LLM picks combined into one per-race probability, which then feeds WPS parlays and DD / Pick N tickets built for a high chance of hitting, subject to a payout floor. User decisions, 2026-09-26: both bet kinds, a deterministic formula (no paid call at build time), max P(hit) subject to a payout floor. The model is backtested before any builder ships (the one rule).
+
+| Requirement | Deliverables |
+| --- | --- |
+| One combined per-race win/place/show probability from market + tip sheets + LLM + OTR, with stated (unfitted) weights and zero weights reproducing the market exactly | D434 |
+| Leakage rule: no input formed after the result counts, and post-time odds are never an input | D434 |
+| Read-only backtest vs the market with n and SE on every figure, and a findings file with a pre-registered out-of-sample test | D434 |
+| WPS parlay builder, place/show parlay grading, a never-pooled bucket, producer and trace | DB (not yet claimed) |
+| DD / Pick N builder over the wager menu, with the first pool-grading fixture | DC (not yet claimed) |
+| Day-view preview-then-save modal (desktop only) | DD (not yet claimed) |
