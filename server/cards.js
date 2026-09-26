@@ -12,6 +12,7 @@
 import express from 'express';
 import { getDb } from './db.js';
 import { getLogger, newCorrelationId } from './logging.js';
+import { getCardInputs } from './card-inputs.js';
 
 const appLog = getLogger('app');
 
@@ -207,5 +208,7 @@ cardsRouter.get('/cards/:id', (req, res) => {
   if (!card) return res.status(404).json({ error: 'No such card.' });
   const races = getDayRaces(db, card.race_day_id);
   const { sources, scratches, results } = getDayFooter(db, card.race_day_id);
-  res.json({ ...card, races, sources, scratches, results });
+  // D439: `sources` is the DAY's legacy fetch audit; `inputs` is what THIS
+  // card had, which is what the footer states for every post-pivot bucket.
+  res.json({ ...card, races, sources, inputs: getCardInputs(db, card), scratches, results });
 });

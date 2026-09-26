@@ -20,6 +20,7 @@ import path from 'node:path';
 import crypto from 'node:crypto';
 import { fileURLToPath, URL } from 'node:url';
 import { getCardCore, getDayRaces, getDayFooter } from './cards.js';
+import { getCardInputs } from './card-inputs.js';
 import { getCardGrades } from './grading.js';
 import { readNotes } from './llm-notes.js';
 import { canonicalizeTrack } from '../shared/track-codes.js';
@@ -72,6 +73,10 @@ function loadCards(db, dayId) {
       llm_model: card.llm_model,
       llm_model_label: modelLabel(card.llm_model),
       notes_present: card.notes_present,
+      live_odds_present: card.live_odds_present,
+      tip_sheets_present: card.tip_sheets_present,
+      // D439: what this card itself had - the footer's "Sources used".
+      inputs: getCardInputs(db, card),
       consensus_completeness: card.consensus_completeness,
       engine_version: card.engine_version,
       bankroll_cents: card.bankroll_cents,

@@ -152,6 +152,13 @@ function validateDay(day, at, problems) {
             if (!raceNumbers.has(a?.race_number)) bad(`${cAt}: allocation references race ${a?.race_number}, not on this day`);
           }
         }
+        // D439: optional (a pre-D439 payload has none), but when present it is
+        // exactly what shared/card-sources.js reads - never a half-shape.
+        if (c.inputs !== null && c.inputs !== undefined) {
+          if (!Array.isArray(c.inputs.used) || !c.inputs.used.every((u) => typeof u === 'string')) {
+            bad(`${cAt}: inputs.used must be an array of strings`);
+          }
+        }
         if (c.grades !== null && c.grades !== undefined) {
           if (!Array.isArray(c.grades.rows) || typeof c.grades.summary === 'undefined') {
             bad(`${cAt}: grades must be null or {rows, summary}`);
