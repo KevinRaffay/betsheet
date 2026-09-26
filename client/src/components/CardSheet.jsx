@@ -3,7 +3,8 @@ import React, { useState } from 'react';
 import { FAILURE_MODE_WARNINGS } from '@shared/card-notices.js';
 import RaceNotes from './RaceNotes.jsx';
 import EntryFlagTags from './EntryFlagTags.jsx';
-import { flagRaceEntries } from '@shared/entry-flags.js';
+import MlRankHeader from './MlRankHeader.jsx';
+import { flagRaceEntries, mlRankOrder } from '@shared/entry-flags.js';
 
 const RESPONSIBLE_LINE =
   'Entertainment wagering with a pre-committed budget. No mid-card increases.';
@@ -59,6 +60,11 @@ export default function CardSheet({ card, races, results, notesByRace, grades })
   // set rather than the open one so a race that appears later (a reload after
   // a regrade) is open without having to be added anywhere.
   const [collapsedRaces, setCollapsedRaces] = useState(() => new Set());
+  // Per-race ML-rank sort direction, keyed by race_number - one sheet renders
+  // every race's entries table in the same screen, so a click on one race's
+  // header must not resort every other race (same keyed-Map shape as
+  // `collapsedRaces` above, just per-race values instead of a membership set).
+  const [rankSort, setRankSort] = useState(() => new Map());
 
   const gradeByTicket = new Map((grades?.rows ?? grades?.grades ?? []).map((g) => [g.sequence, g]));
   const graded = gradeByTicket.size > 0;
@@ -163,6 +169,7 @@ export default function CardSheet({ card, races, results, notesByRace, grades })
         // time. Leaving it off here would make the same horse look flagged on
         // one screen and unflagged on another.
         const { flags: entryFlags } = flagRaceEntries(entries);
+        const rowOrder = mlRankOrder(entryFlags, rankSort.get(a.race_number) ?? null);
         const raceResults = resultsByRace.get(a.race_number);
         const raceTickets = singles.filter((t) => t.selections.races[0] === a.race_number);
         const subtotal = raceTickets.reduce((s, t) => s + t.cost_cents, 0);
@@ -226,25 +233,35 @@ export default function CardSheet({ card, races, results, notesByRace, grades })
                   <tr><th>#</th><th>Horse</th><th>Jockey</th><th>Trainer</th><th>M/L</th>
                     <th title="What $2-to-win pays if this horse wins - the printed line as a forecast, not the actual tote price">$2 win</th>
                     <th title="The win probability the morning line implies (1 / (odds + 1)); a full field sums well over 100% because of the track's own take">Win %</th>
-                    <th title="Predicted order of finish from the morning line (1 = shortest line; ties share a rank)">ML rank</th></tr>
+                    <MlRankHeader
+                      direction={rankSort.get(a.race_number) ?? null}
+                      onClick={() => setRankSort((prev) => {
+                        const next = new Map(prev);
+                        next.set(a.race_number, prev.get(a.race_number) === 'asc' ? 'desc' : 'asc');
+                        return next;
+                      })}
+                    /></tr>
                 </thead>
                 <tbody>
-                  {entries.map((entry, ei) => (
-                    <tr
-                      key={entry.id}
-                      className={[entry.scratched ? 'row--scratched' : '',
-                        (entryFlags[ei]?.baffert || entryFlags[ei]?.favorite) ? 'row--entry-flag' : ''].filter(Boolean).join(' ')}
-                    >
-                      <td>{entry.program_number ?? '—'}</td>
-                      <td>{entry.horse_name}<EntryFlagTags flag={entryFlags[ei]} /></td>
-                      <td>{entry.jockey ?? '—'}</td>
-                      <td>{entry.trainer ?? '—'}</td>
-                      <td>{entry.morning_line ?? '—'}</td>
-                      <td className="dim">{entryFlags[ei]?.mlPayoutCents != null ? money(entryFlags[ei].mlPayoutCents) : '—'}</td>
-                      <td className="dim">{pct(entryFlags[ei]?.mlWinProbability)}</td>
-                      <td>{entryFlags[ei]?.mlRank ?? '—'}</td>
-                    </tr>
-                  ))}
+                  {rowOrder.map((ei) => {
+                    const entry = entries[ei];
+                    return (
+                      <tr
+                        key={entry.id}
+                        className={[entry.scratched ? 'row--scratched' : '',
+                          (entryFlags[ei]?.baffert || entryFlags[ei]?.favorite) ? 'row--entry-flag' : ''].filter(Boolean).join(' ')}
+                      >
+                        <td>{entry.program_number ?? '—'}</td>
+                        <td>{entry.horse_name}<EntryFlagTags flag={entryFlags[ei]} /></td>
+                        <td>{entry.jockey ?? '—'}</td>
+                        <td>{entry.trainer ?? '—'}</td>
+                        <td>{entry.morning_line ?? '—'}</td>
+                        <td className="dim">{entryFlags[ei]?.mlPayoutCents != null ? money(entryFlags[ei].mlPayoutCents) : '—'}</td>
+                        <td className="dim">{pct(entryFlags[ei]?.mlWinProbability)}</td>
+                        <td>{entryFlags[ei]?.mlRank ?? '—'}</td>
+                      </tr>
+                    );
+                  })}
                 </tbody>
               </table>
             </details>

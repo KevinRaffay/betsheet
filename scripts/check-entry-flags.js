@@ -42,7 +42,7 @@
 // Run: npm run check-entry-flags
 
 import {
-  FAVORITE_FIELD_SIZE, MOVE_THRESHOLDS, flagRaceEntries, isBaffertEntry,
+  FAVORITE_FIELD_SIZE, MOVE_THRESHOLDS, flagRaceEntries, isBaffertEntry, mlRankOrder,
 } from '../shared/entry-flags.js';
 
 let failures = 0;
@@ -417,6 +417,26 @@ const moveOf = (f) => (f.move ? `${f.move.direction}/${f.move.magnitude}` : null
     { morning_line: '3/1', live_odds: '5/1', scratched: false },
   ]).flags;
   check('a stored live_odds_decimal wins over the printed string', stored[0].liveDecimal === 1.5);
+}
+
+console.log('\nmlRankOrder (D4xx) - the click-to-sort "ML rank" header, every entries table shares');
+{
+  // A, B, C, D at ranks 2, null (scratched), 1, 3.
+  const scr = [e('A', '6/1'), e('B', '4/5', { scratched: true }), e('C', '5/2'), e('D', '8/1')];
+  const flags = flagsOf(scr);
+  check('null direction is the original order, untouched',
+    JSON.stringify(mlRankOrder(flags, null)) === '[0,1,2,3]');
+  check('asc: favorite (rank 1) first; the scratch (null rank) sorts LAST, not by array position',
+    JSON.stringify(mlRankOrder(flags, 'asc')) === '[2,0,3,1]', JSON.stringify(mlRankOrder(flags, 'asc')));
+  check('desc: reverses the RANKED rows only - the null rank stays last, never walks to the top',
+    JSON.stringify(mlRankOrder(flags, 'desc')) === '[3,0,2,1]', JSON.stringify(mlRankOrder(flags, 'desc')));
+  const tied = [e('A', '5/2'), e('B', '3/1'), e('C', '5/2'), e('D', '10/1')];
+  check('a tie (ranks 1,3,1,4) keeps its original relative order within the tie: A before C',
+    JSON.stringify(mlRankOrder(flagsOf(tied), 'asc')) === '[0,2,1,3]');
+  check('an unrecognized direction is treated as null (original order), never throws',
+    JSON.stringify(mlRankOrder(flags, 'sideways')) === '[0,1,2,3]');
+  check('never throws on junk input', JSON.stringify(mlRankOrder(null, 'asc')) === '[]'
+    && JSON.stringify(mlRankOrder(undefined, 'asc')) === '[]');
 }
 
 if (failures) {

@@ -1,7 +1,8 @@
-import React from 'react';
-import { flagRaceEntries } from '@shared/entry-flags.js';
+import React, { useState } from 'react';
+import { flagRaceEntries, mlRankOrder } from '@shared/entry-flags.js';
 import { dollars } from '@shared/betmath.js';
 import EntryFlagTags from './EntryFlagTags.jsx';
+import MlRankHeader from './MlRankHeader.jsx';
 
 // D224: the win probability a morning line implies, 0-1 -> a percent string.
 const pct = (p) => (p == null ? '' : `${(p * 100).toFixed(0)}%`);
@@ -33,6 +34,10 @@ export function RacePreview({ race }) {
   // from the parser's own output. Invariant 9 is untouched - nothing here is
   // editable and nothing about what Save stores changes.
   const { flags } = flagRaceEntries(race.entries);
+  // Display-order sort only (invariant 9): reordering the rendered rows
+  // never touches `race.entries`, which is exactly what Save still writes.
+  const [rankSort, setRankSort] = useState(null);
+  const order = mlRankOrder(flags, rankSort);
   return (
     <details className="race" open>
       <summary>
@@ -48,35 +53,41 @@ export function RacePreview({ race }) {
             <th>Wt</th><th>M/L</th>
             <th title="What $2-to-win pays if this horse wins - the printed line as a forecast, not the actual tote price">$2 win</th>
             <th title="The win probability the morning line implies (1 / (odds + 1)); a full field sums well over 100% because of the track's own take">Win %</th>
-            <th title="Predicted order of finish from the morning line (1 = shortest line; ties share a rank)">ML rank</th>
+            <MlRankHeader
+              direction={rankSort}
+              onClick={() => setRankSort((d) => (d === 'asc' ? 'desc' : 'asc'))}
+            />
           </tr>
         </thead>
         <tbody>
-          {race.entries.map((e, ei) => (
-            <tr
-              key={ei}
-              className={[e.scratched ? 'row--scratched' : '',
-                (flags[ei]?.baffert || flags[ei]?.favorite) ? 'row--entry-flag' : ''].filter(Boolean).join(' ')}
-            >
-              <td>{e.programNumber ?? 'SCR'}</td>
-              <td className="dim">{e.postPosition ?? ''}</td>
-              <td>
-                {e.horseName}
-                {e.bestBet ? <span className="tag tag--gold">BEST BET</span> : null}
-                {e.alsoEligible ? <span className="tag">AE</span> : null}
-                {e.notToBeClaimed ? <span className="tag">NTC</span> : null}
-                {e.scratched ? <span className="tag tag--red">SCR</span> : null}
-                <EntryFlagTags flag={flags[ei]} />
-              </td>
-              <td>{e.jockey ?? ''}</td>
-              <td>{e.trainer ?? ''}</td>
-              <td>{e.weight ?? ''}</td>
-              <td>{e.morningLine ?? ''}</td>
-              <td className="dim">{flags[ei]?.mlPayoutCents != null ? dollars(flags[ei].mlPayoutCents) : ''}</td>
-              <td className="dim">{pct(flags[ei]?.mlWinProbability)}</td>
-              <td className="dim">{flags[ei]?.mlRank ?? ''}</td>
-            </tr>
-          ))}
+          {order.map((ei) => {
+            const e = race.entries[ei];
+            return (
+              <tr
+                key={ei}
+                className={[e.scratched ? 'row--scratched' : '',
+                  (flags[ei]?.baffert || flags[ei]?.favorite) ? 'row--entry-flag' : ''].filter(Boolean).join(' ')}
+              >
+                <td>{e.programNumber ?? 'SCR'}</td>
+                <td className="dim">{e.postPosition ?? ''}</td>
+                <td>
+                  {e.horseName}
+                  {e.bestBet ? <span className="tag tag--gold">BEST BET</span> : null}
+                  {e.alsoEligible ? <span className="tag">AE</span> : null}
+                  {e.notToBeClaimed ? <span className="tag">NTC</span> : null}
+                  {e.scratched ? <span className="tag tag--red">SCR</span> : null}
+                  <EntryFlagTags flag={flags[ei]} />
+                </td>
+                <td>{e.jockey ?? ''}</td>
+                <td>{e.trainer ?? ''}</td>
+                <td>{e.weight ?? ''}</td>
+                <td>{e.morningLine ?? ''}</td>
+                <td className="dim">{flags[ei]?.mlPayoutCents != null ? dollars(flags[ei].mlPayoutCents) : ''}</td>
+                <td className="dim">{pct(flags[ei]?.mlWinProbability)}</td>
+                <td className="dim">{flags[ei]?.mlRank ?? ''}</td>
+              </tr>
+            );
+          })}
         </tbody>
       </table>
       {race.wagerMenu && <p className="dim wager">{race.wagerMenu}</p>}

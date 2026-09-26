@@ -330,3 +330,32 @@ export function flagRaceEntries(entries) {
   }
   return { flags, liveCount, favoriteCount, livePricedCount: livePriced.length, comparableCount: comparable.length };
 }
+
+/**
+ * Row indices for `flags` (and the `entries` it was computed from - the two
+ * stay index-aligned), reordered by `mlRank` for the click-to-sort "ML rank"
+ * header every entries table shares (EntriesTable, the ingest preview, the
+ * card sheet, the day view).
+ *
+ * `direction` is `null` (the original, unsorted order), `'asc'` (favorite -
+ * rank 1 - first) or `'desc'`. A null rank (scratched or unpriced, per
+ * `flagRaceEntries`'s own doc) always sorts LAST regardless of direction -
+ * "no line" cannot be placed, but it is not last place either, so reversing
+ * the direction must not walk it to the top. Ties, and every row when
+ * `direction` is null, keep their original relative order (`Array#sort` is
+ * stable).
+ */
+export function mlRankOrder(flags, direction) {
+  const list = Array.isArray(flags) ? flags : [];
+  const idx = list.map((_, i) => i);
+  if (direction !== 'asc' && direction !== 'desc') return idx;
+  const sign = direction === 'desc' ? -1 : 1;
+  return idx.sort((a, b) => {
+    const ra = list[a]?.mlRank;
+    const rb = list[b]?.mlRank;
+    if (ra == null && rb == null) return 0;
+    if (ra == null) return 1;
+    if (rb == null) return -1;
+    return sign * (ra - rb);
+  });
+}
