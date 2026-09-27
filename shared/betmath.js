@@ -124,8 +124,25 @@ export function parseMoneyToken(raw) {
 // this corpus - as a $10 Pick 3, and no menu here prints a whole-dollar
 // amount without a '$'. Amounts are converted by parseMoneyToken above, so
 // the menu and the teller grammar read money through ONE function.
-const MENU_AMOUNT = String.raw`(\$[\d.]+|\d+(?:\.\d+)?\s*(?:¢|-?cents?|c)|\d*\.\d+)`;
+// D444: a DECIMAL amount may carry a redundant cents word - ".50 Cent
+// Trifecta", "$.50 Cent Pick 4" (41 stored menus). It means the decimal
+// ($0.50 = 50c), and menuCents below reads it so.
+const MENU_AMOUNT = String.raw`(\$\d*\.\d+(?:\s*-?cents?\b)?|\$[\d.]+|\d+(?:\.\d+)?\s*(?:¢|-?cents?|c)|\d*\.\d+(?:\s*-?cents?\b)?)`;
 const menuRe = (tail) => new RegExp(MENU_AMOUNT + tail, 'i');
+
+// D444: the WORDS a track prints between a pool's amount and its name -
+// "$3 PRIME PICK 3", "$5 Late Double", "50c Early Pick 5", "$1 Gulfstream
+// Summer Sweep Pick 5", ".20 ASD JACKPOT PICK 5", "50c min Rolling Pick Three".
+// Up to four, LETTERS ONLY, and never a bet name. That shape is what keeps it
+// from reaching back into the previous bet: a digit, '$', ')' or '/' ends it,
+// so "$1 Box $1 Trifecta", ".50 Minimum) Superfecta" and "10 cent) $2 Daily
+// Double" - all real, all the tail of the bet BEFORE - can never lend their
+// amount to the name after them. Pools only: on a single-race bet a qualifier
+// usually names a DIFFERENT bet ("$.20 Jackpot Super" is not the superfecta's
+// minimum), and the corpus has no single-race shape that needs one.
+// WHOLE bet words only: a prefix test ("Tri...") would also stop at "Trick" in
+// Horseshoe's "$1 Horseshoe Hat Trick Turf Pick 3".
+const POOL_GAP = String.raw`(?:\s+(?!(?:Exacta|Exactor|Trifecta|Triactor|Superfecta|Super|Quinella|Double|Daily|Rolling|Pick|Place|Show|Win|WPS|Parlay|Box|Wheel)\b)[A-Za-z][A-Za-z'-]*){0,4}`;
 
 // The printed-menu patterns, module level so parseWagerMenu (which minimum?)
 // and wagerMenuOffered (is it sold at all?) can never drift apart.
@@ -135,17 +152,22 @@ const MENU_PATTERNS = [
   ['exacta', menuRe(String.raw`\s+Exact(?:a|or)`)],
   ['quinella', menuRe(String.raw`\s+Quinella`)],
   ['trifecta', menuRe(String.raw`\s+Tri(?:fecta|actor)`)],
-  ['daily_double', menuRe(String.raw`\s+(?:Rolling\s+)?(?:Daily\s+)?Double`)],
-  ['pick3', menuRe(String.raw`\s+(?:Rolling\s+)?Pick\s*(?:3|Three)\b`)],
+  ['daily_double', menuRe(POOL_GAP + String.raw`\s+(?:Rolling\s+)?(?:Daily\s+)?Double`)],
+  ['pick3', menuRe(POOL_GAP + String.raw`\s+(?:Rolling\s+)?Pick\s*(?:3|Three)\b`)],
   // D442: Pick 4/5/6, and the spelled-out names - "$1 Pick Three (Races
   // 1-2-3)" is on 33 stored menus and read as the 50c fallback before this.
-  ['pick4', menuRe(String.raw`\s+(?:Rolling\s+)?Pick\s*(?:4|Four)\b`)],
-  ['pick5', menuRe(String.raw`\s+(?:Rolling\s+)?Pick\s*(?:5|Five)\b`)],
-  ['pick6', menuRe(String.raw`\s+(?:Rolling\s+)?Pick\s*(?:6|Six)\b`)],
+  ['pick4', menuRe(POOL_GAP + String.raw`\s+(?:Rolling\s+)?Pick\s*(?:4|Four)\b`)],
+  ['pick5', menuRe(POOL_GAP + String.raw`\s+(?:Rolling\s+)?Pick\s*(?:5|Five)\b`)],
+  ['pick6', menuRe(POOL_GAP + String.raw`\s+(?:Rolling\s+)?Pick\s*(?:6|Six)\b`)],
   ['parlay', menuRe(String.raw`\s+WPS\s+Parlay`)],
 ];
 const SUPER_FLAT_RE = menuRe(String.raw`\s+Superfecta`);
-const menuCents = (tok) => parseMoneyToken(tok);
+// ".50 Cent" (a decimal with a redundant cents word, D444) reads as the
+// decimal; everything else goes straight to parseMoneyToken.
+const menuCents = (tok) => {
+  const dec = String(tok ?? '').trim().match(/^\$?(\d*\.\d+)\s*-?cents?$/i);
+  return parseMoneyToken(dec ? dec[1] : tok);
+};
 
 // The OTHER shape a printed menu takes: the bet type first, its amount in a
 // trailing parenthetical - "Exacta ($1), Trifecta (.50), Super (.10), Double
@@ -280,11 +302,12 @@ function raceListAfter(tail, legs) {
   // Skip a money parenthetical first - "($1)", "(.50)", "(10c min)".
   const money = rest.match(/^\s*\(([^)]*)\)/);
   if (money && menuParenCents(money[1]) != null) rest = rest.slice(money[0].length);
-  const paren = rest.match(/^\s*\(\s*(?:Races?\s*)?(\d+(?:\s*[-–,&]\s*\d+)*)\s*\)/i);
+  // D444: "(R7-9-11)" too - Del Mar's "$3 Turf Pick 3 (R7-9-11)".
+  const paren = rest.match(/^\s*\(\s*(?:Races?|R)?\s*(\d+(?:\s*[-–,&]\s*R?\d+)*)\s*\)/i);
   const bare = rest.match(/^\s*(\d+\s*&\s*\d+)/);
   const list = paren?.[1] ?? bare?.[1];
   if (!list) return null;
-  const nums = list.split(/\s*[-–,&]\s*/).map(Number).filter(Number.isFinite);
+  const nums = list.replace(/R/gi, '').split(/\s*[-–,&]\s*/).map(Number).filter(Number.isFinite);
   let races = nums;
   if (nums.length === 2 && legs > 2 && nums[1] - nums[0] + 1 === legs) {
     races = Array.from({ length: legs }, (_, i) => nums[0] + i);
@@ -298,21 +321,44 @@ function raceListAfter(tail, legs) {
   return consecutive ? races : 'unbuildable';
 }
 
-/** Did the menu PRINT this bet type's amount (vs parseWagerMenu falling back)? */
-function printedMinimum(t, key) {
-  const lead = MENU_PATTERNS.find(([k]) => k === key)?.[1];
-  const trail = MENU_TRAILING.find(([k]) => k === key)?.[1];
-  const a = lead ? t.match(lead) : null;
-  if (a && menuCents(a[1])) return true;
-  return Boolean(trail && trailingCents(t, trail) != null);
+// The amount belonging to ONE mention of a pool (D444), not the menu's first
+// mention of that bet type: race 7 of a Del Mar card prints both "50c Rolling
+// Pick 3" and "$3 Turf Pick 3 (R7-9-11)", two pools with two minimums, and a
+// first-match reading hands one pool the other's price.
+//   LEAD  - an amount before the name, qualifier words allowed (POOL_GAP), plus
+//           the Rolling/Daily prefix POOL_NAME_RE leaves outside its match.
+//   TRAIL - a money parenthetical right after the name, or right after the race
+//           list that follows it. It wins over LEAD, as D214's trailing rule does.
+const POOL_LEAD_RE = new RegExp(MENU_AMOUNT + POOL_GAP + String.raw`(?:\s+(?:Rolling|Daily))?\s+$`, 'i');
+function mentionCents(t, start, end) {
+  const after = t.slice(end);
+  const p1 = after.match(/^\s*\(([^)]*)\)/);
+  if (p1) {
+    const v = menuParenCents(p1[1]);
+    if (v != null) return v;
+    const p2 = after.slice(p1[0].length).match(/^\s*\(([^)]*)\)/);
+    const w = p2 ? menuParenCents(p2[1]) : null;
+    if (w != null) return w;
+  }
+  const lead = t.slice(Math.max(0, start - 64), start).match(POOL_LEAD_RE);
+  return lead ? menuCents(lead[1]) : null;
 }
 
 /**
  * Which multi-race pools START at this race, per its printed menu.
  * Returns { [pool]: { legs, races, baseCents, baseSource } } where `races`
  * are the leg race numbers (starting at `raceNumber`), `baseCents` the
- * minimum base (parseWagerMenu's reading) and `baseSource` 'menu' when the
- * menu printed it or 'assumed' when it fell back to BET.minimums.
+ * minimum base printed with THAT mention of the pool (D444) and `baseSource`
+ * 'menu' when the menu printed it or 'assumed' when it fell back to
+ * BET.minimums.
+ *
+ * EVERY mention of a pool is tried (D444). Before that only the first mention
+ * was read, so a non-consecutive special printed ahead of the real pool hid it
+ * - Horseshoe's "1st Leg of $1 Horseshoe Hat Trick Turf Pick 3 (Races 4, 6,
+ * 8) 50 Cent Pick 3 (Races 4-5-6)". A mention whose PRINTED list starts here
+ * beats a list-less one, because a list-less mention can be a leg of some
+ * other pool ("2nd Leg of ... Turf Pick 3", then "50 Cent Pick 3 (Races
+ * 6-7-8)"); among equals, the first wins.
  *
  * A pool whose printed race list starts ANYWHERE ELSE is not offered here:
  * across the corpus, 375 of 376 printed lists start at the race whose menu
@@ -325,19 +371,26 @@ export function menuPools(text, raceNumber) {
   const out = {};
   if (!text || !Number.isInteger(raceNumber)) return out;
   const t = String(text);
-  const menu = parseWagerMenu(t);
   for (const [pool, legs] of Object.entries(POOL_LEGS)) {
-    const m = t.match(POOL_NAME_RE[pool]);
-    if (!m) continue;
-    const listed = raceListAfter(t.slice(m.index + m[0].length, m.index + m[0].length + 48), legs);
-    if (listed === 'unbuildable') continue;
-    if (listed && listed[0] !== raceNumber) continue;
-    out[pool] = {
-      legs,
-      races: listed ?? Array.from({ length: legs }, (_, i) => raceNumber + i),
-      baseCents: menu[pool] ?? null,
-      baseSource: printedMinimum(t, pool) ? 'menu' : 'assumed',
-    };
+    const global = new RegExp(POOL_NAME_RE[pool].source, 'gi');
+    let chosen = null;
+    for (const m of t.matchAll(global)) {
+      const end = m.index + m[0].length;
+      const listed = raceListAfter(t.slice(end, end + 48), legs);
+      if (listed === 'unbuildable') continue;
+      if (listed && listed[0] !== raceNumber) continue;
+      const mention = { listed, printed: mentionCents(t, m.index, end) };
+      if (listed) { chosen = mention; break; }   // an explicit list starting here wins outright
+      chosen ??= mention;                         // else the first list-less mention
+    }
+    if (chosen) {
+      out[pool] = {
+        legs,
+        races: chosen.listed ?? Array.from({ length: legs }, (_, i) => raceNumber + i),
+        baseCents: chosen.printed ?? BET.minimums[pool] ?? null,
+        baseSource: chosen.printed != null ? 'menu' : 'assumed',
+      };
+    }
   }
   return out;
 }

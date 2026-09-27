@@ -171,6 +171,40 @@ console.log('-- menuPools: which pools start at a race (real menu shapes) --');
   check('a printed list that starts at ANOTHER race is not offered here (the real race-9 typo)', Boolean(d.pick3) && !d.pick4);
   check('20c bare-decimal amounts are read', d.pick3.baseCents === 20);
   check('no menu, no pools', Object.keys(menuPools(null, 1)).length === 0);
+
+  // D444: words between the amount and the pool name - every one a real stored menu.
+  const prime = menuPools('ROLLING DOUBLE / .20 ASD JACKPOT PICK 5 (Races 4-8) / $3 PRIME PICK 3 .20 SUPERFECTA / .20 TRIACTOR / EXACTOR', 4);
+  check('"$3 PRIME PICK 3" reads $3 from the menu, not the 50c fallback below it', prime.pick3?.baseCents === 300 && prime.pick3.baseSource === 'menu');
+  check('".20 ASD JACKPOT PICK 5 (Races 4-8)" reads 20c over races 4-8', prime.pick5?.baseCents === 20 && same(prime.pick5.races, [4, 5, 6, 7, 8]));
+  check('parseWagerMenu agrees: "$3 PRIME PICK 3" is a $3 minimum', parseWagerMenu('$3 PRIME PICK 3').pick3 === 300);
+  const dm9 = menuPools('$1 Exacta / $2 Quinella / 50c Trifecta $2 Rolling Double / $3 Late Pick 3 $1 Superfecta (10c min) / $2 WPS Parlay / $1 3x3', 9);
+  check('Del Mar "$3 Late Pick 3" reads $3', dm9.pick3?.baseCents === 300 && dm9.pick3.baseSource === 'menu');
+  check('...and its "$2 Rolling Double" still $2', dm9.daily_double?.baseCents === 200 && dm9.daily_double.baseSource === 'menu');
+  check('Del Mar "$5 Late Double" reads $5', menuPools('$1 Exacta / $2 Quinella / 50c Trifecta / $5 Late Double $1 Superfecta (10c min)', 10).daily_double?.baseCents === 500);
+  check('"50c Early Pick 5" / "50c Middle Pick 4" read 50c',
+    menuPools('$1 Superfecta (10c min) 50c Early Pick 5 / $2 WPS Parlay', 1).pick5?.baseCents === 50
+    && menuPools('50c Rolling Pick 3 50c Middle Pick 4 / $1 Superfecta (10c min)', 4).pick4?.baseCents === 50);
+  check('"$.50 Cent Pick 4" (a decimal with a redundant cents word) reads 50c', menuPools('Exacta / $.50 Cent Pick 4 (Races 11-14)', 11).pick4?.baseCents === 50);
+  check('"$5 Late Thoroughbred Daily Double" reads $5 (two qualifier words)', menuPools('$5 Late Thoroughbred Daily Double / $1 Exacta', 9).daily_double?.baseCents === 500);
+  check('"50c min Rolling Pick Three" reads 50c', menuPools('$2 Rolling Double / 50c min Rolling Pick Three / $1 Superfecta (10c min)', 2).pick3?.baseCents === 50);
+  // The false positives the survey found: the tail of the PREVIOUS bet never lends its amount.
+  check('"$.20 Box $2 Pick 4" is $2, not the box\'s 20c', menuPools('$2 Exacta $1 Box $1 Trifecta $.50 Box $1 Superfecta $.20 Box $2 Pick 4 (races 1-4) $.50 Wheel', 1).pick4?.baseCents === 200);
+  check('"10 cent) $2 Daily Double" is $2', menuPools('Superfecta (.10 cent) $2 Daily Double', 1).daily_double?.baseCents === 200);
+  check('".50 Minimum) Pick 4" does not read the superfecta\'s .50', (() => {
+    const x = menuPools('Superfecta (.50 Minimum) Pick 4 (Races 2-3-4-5)', 2).pick4;
+    return x && x.baseSource === 'assumed' && x.baseCents === BET.minimums.pick4;
+  })());
+  check('a qualifier on a SINGLE-race bet is not read: "$.20 Jackpot Super" is not the superfecta minimum',
+    parseWagerMenu('$1 Superfecta / $.20 Jackpot Super').superfecta === 100);
+  // Del Mar race 7 prints TWO Pick 3s: the rolling one is offered, at its own 50c; the turf special is not.
+  const dm7 = menuPools('$2 Rolling Double 50c Rolling Pick 3 / $1 Superfecta (10c min) 50c Late Pick 5 / $2 WPS Parlay / $3 Turf Pick 3 (R7-9-11)', 7);
+  check('two Pick 3s on one menu: the rolling one at 50c over 7-9, never the (R7-9-11) special', dm7.pick3?.baseCents === 50 && same(dm7.pick3.races, [7, 8, 9]));
+  check('...and the special alone is not offered (non-consecutive "R7-9-11")', !menuPools('$3 Turf Pick 3 (R7-9-11)', 7).pick3);
+  // Horseshoe: a special printed FIRST must not hide the real pool, and an explicit list beats a list-less leg.
+  const hs4 = menuPools('Superfecta 10 Cent Superfecta 1st Leg of $1 Horseshoe Hat Trick Turf Pick 3 (Races 4, 6, 8) 50 Cent Pick 3 (Races 4-5-6) / 10 Cent', 4);
+  check('Horseshoe race 4: the real 50c Pick 3 (Races 4-5-6) is offered behind the non-consecutive special', hs4.pick3?.baseCents === 50 && hs4.pick3.baseSource === 'menu' && same(hs4.pick3.races, [4, 5, 6]));
+  const hs6 = menuPools('Superfecta 10 Cent Superfecta / 2nd Leg of $1 Horseshoe Hat Trick Turf Pick 3 50 Cent Pick 3 (Races 6-7-8) / 10 Cent', 6);
+  check('Horseshoe race 6: the explicit (Races 6-7-8) mention beats the list-less "2nd Leg of" one', hs6.pick3?.baseCents === 50 && hs6.pick3.baseSource === 'menu');
   // Gulfstream's real race-2 menu: a NON-consecutive Pick 3 must not become a rolling one.
   const g = menuPools('$1 Daily Double /$1 Exacta / $.50 Trifecta / $.10 Superfecta $1 Bet 3 (Races 2-3-4) / $.50 Pick 4 (Races 2-3-4-5) $1 Players Place Pick 8 (Races 2-9) / $3 Tropical Turf Pick 3 (Races 2, 6, 9)', 2);
   check('a non-consecutive printed list (Races 2, 6, 9) is not offered, never read as rolling', !g.pick3 && same(g.pick4?.races, [2, 3, 4, 5]) && g.pick4.baseCents === 50);

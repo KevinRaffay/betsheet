@@ -459,14 +459,23 @@ it. Rules still in force:
   `.50`, `0.20`, plus `Exactor`/`Triactor` at Canadian tracks) and
   name-then-parenthetical (`Trifecta (.50)`, `Super (.10)`, `Pick 3 ($1)`,
   `$1 Superfecta (10c min)`), the second added by D214. When a new track's menu
-  arrives, check `parseWagerMenu` against it rather than assuming - one shape is
-  still unread, an amount separated from its bet type by a word
-  (`50c Early Pick 5`, `$.50 Cent Pick 4`, `$3 PRIME PICK 3`). The first two
-  fall back to $1, above the real 50c, so a ticket built on them is still
-  legal. **`$3 PRIME PICK 3` falls back BELOW its real $3**, so a pool ticket
-  built from it would be refused at the window, and the only thing standing
-  between it and a bad ticket is the D442 builder's `base assumed` label. Read
-  that shape before trusting any unlabelled pool base. **D442 read three more**: the amount
+  arrives, check `parseWagerMenu` against it rather than assuming. **D444 read
+  the shape this entry used to call unread**: an amount separated from its POOL
+  by qualifier words (`$3 PRIME PICK 3`, `$3 Late Pick 3`, `$5 Late Double`,
+  `50c Early Pick 5`, `$1 Gulfstream Summer Sweep Pick 5`). A survey found 92
+  distinct such shapes across the 1,706 stored menus, and several fell back
+  BELOW the real minimum, which is an unbuyable ticket (`$3 Late Pick 3` read
+  as 50c on 100 menus, `$5 Late Double` as $2 on 90). The qualifier words are
+  letters only and never a bet name, and that is the load-bearing part: a
+  looser gap reads the TAIL OF THE PREVIOUS BET as this one's amount, and the
+  survey found real menus that would do exactly that (`$.20 Box $2 Pick 4`,
+  `.50 Minimum) Pick 4`, `10 cent) $2 Daily Double`). The gap applies to
+  pools only, because on a single-race bet a qualifier names a different bet
+  (`$.20 Jackpot Super` is not the superfecta's minimum). **A menu can print
+  the same pool twice** (Del Mar's `50c Rolling Pick 3` and `$3 Turf Pick 3
+  (R7-9-11)` on one race), so `menuPools` reads the amount belonging to each
+  MENTION, tries every mention, and prefers one whose printed list starts at
+  this race. **D442 read three more**: the amount
   AFTER a race list (`Pick 3 (Races 3-4-5) (.50 Cent Minimum)`, Remington Park,
   whose `.50 Cent` is a decimal dollar plus a redundant cents word), the
   spelled-out `Pick Three` (37 menus had read it as the 50c fallback when they

@@ -63,3 +63,30 @@ On days recorded **after 2026-09-26**, with these weights and this builder froze
 1. **Pick 3 calibration.** Does the Pick 3 P(hit) overstatement at $12-$24 persist? That is, is predicted minus observed still above 5 points?
 2. **Daily Double calibration.** Does the Daily Double stay within 5 points?
 3. **ROI.** Is `any`-pool ROI at $6 still at or above the $12 and $24 ROI? That is the "spreading buys hit rate, not money" claim, restated so it can fail.
+
+## Correction, 2026-09-26 (D444): the builder misread some pool bases
+
+**What was wrong.** D442's `menuPools` could not read an amount separated from its pool by a qualifier word. Examples: `$3 PRIME PICK 3`, `$3 Late Pick 3`, `$5 Late Double`, `50c Early Pick 5`, `$.50 Cent Pick 4`. It fell back to `BET.minimums`, sometimes BELOW the real minimum. `$3 Late Pick 3` was read as 50c, which is an unbuyable ticket. It also read only a pool's first mention on a menu, so a non-consecutive special printed first hid the real pool. D444 fixes both. Some tickets above were therefore built at the wrong base.
+
+**The effect, isolated.** Both runs are on the SAME corpus, now 38 days: the 37 above plus Santa Anita 2026-09-26, graded today.
+
+| run | code | file | generatedAt |
+| --- | --- | --- | --- |
+| baseline | `main` before the fix | `combined-pools-v1.d444-baseline.run.json` | `2026-09-27T03:48:08Z` (2026-09-26 20:48 PT) |
+| fixed | D444 | `combined-pools-v1.d444.run.json` | `2026-09-27T03:47:52Z` (20:47 PT) |
+
+- **12 of the 30 pool rows are identical**: **every `any` row and every Daily Double row**. The headline table above is therefore not changed by the fix.
+- **The six Pick 5 rows** differ only in mean predicted P(hit), by under 0.03 points. Their hits, cost and ROI are identical.
+- The `any` rows do differ from the 37-day numbers above, by the new day alone. For example, combined $6 goes from 17/37 to 17/38, and $24 from 28/37 to 29/38.
+- **Pick 3 rows** move by at most one hit.
+  - Combined $12: 11/38 becomes 10/38. Mean predicted P(hit) 35.3% becomes 33.1%.
+  - Combined $24: 14/38 becomes 13/38. Mean predicted 48.4% becomes 45.5%.
+  - So the combined Pick 3 overstatement at $12-$24 holds under the corrected bases: 33.1% predicted vs 26.3% observed at $12, and 45.5% vs 34.2% at $24.
+- **Pick 4 ROI swings widely** on 5-8 hits:
+  - combined $12: −56.5% becomes −2.8%
+  - combined $24: +10.7% becomes −16.3%
+  - market $12: −71.6% becomes −17.8%
+  
+  That volatility is the finding: a single hit's payout moves a Pick 4 row by tens of points of ROI, which is why none of those rows was read above and none should be now.
+
+**The pre-registered test** runs under the D444 reading. A misread base is a bug, not a builder rule anyone chose, and the test is about calibration and the $6-vs-larger ROI ordering, neither of which the fix moved. Santa Anita 2026-09-26 is NOT "after 2026-09-26", so it stays outside that test.
