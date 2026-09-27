@@ -96,8 +96,13 @@ function CandidateTable({ title, selection, rows, saved, busyKey, onSave, disabl
                   <td>
                     <code>{c.tellerCall}</code>
                     {c.baseSource === 'assumed' && (
-                      <span className="tag tag--gold" title="The menu names this pool but prints no minimum; the base is BetSheet's fallback - check it at the window">
+                      <span className="tag tag--gold" title="The menu names this pool but prints no minimum, and this track has no charted base on file; the base is BetSheet's fallback - check it at the window">
                         base assumed
+                      </span>
+                    )}
+                    {c.baseSource === 'chart-history' && (
+                      <span className="tag tag--gold" title="The menu names this pool but prints no minimum; the base is the highest this pool has charted at this track on earlier days - legal, possibly above today's minimum">
+                        base from past charts
                       </span>
                     )}
                   </td>

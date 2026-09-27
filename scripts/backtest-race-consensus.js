@@ -34,7 +34,7 @@ import { combineRace, DEFAULT_WEIGHTS, MARKET_ONLY_WEIGHTS } from '../shared/rac
 import { impliedProbabilities } from '../shared/pick-scoring.js';
 import { gradeTicket } from '../shared/grading.js';
 import { buildPoolTickets, POOL_TYPES } from '../shared/parlay-builder.js';
-import { loadDaySignals, gradedDayIds } from '../server/race-consensus.js';
+import { loadDaySignals, gradedDayIds, poolBaseHistory } from '../server/race-consensus.js';
 import { loadDayResultsFor } from '../server/grading.js';
 
 const ROOT = path.resolve(path.dirname(fileURLToPath(import.meta.url)), '..');
@@ -246,7 +246,10 @@ function run(db) {
         for (const d of byDay) {
           const menus = new Map(menuStmt.all(d.dayId).map((m) => [m.number, m.wager_menu]));
           const input = d.races.map((r) => ({ raceNumber: r.raceNo, combined: r.models.combined, market: r.models.market, wagerMenu: menus.get(r.raceNo) }));
-          const t = buildPoolTickets({ races: input, pools: pool === 'any' ? POOL_TYPES : [pool], budgetCents, selection: variant, limit: 1 }).candidates[0];
+          // D446: unpriced pools take the track's charted base from EARLIER days
+          // only (poolBaseHistory) - never this day's own chart, which is the answer.
+          const baseHistory = poolBaseHistory(db, d.dayId);
+          const t = buildPoolTickets({ races: input, pools: pool === 'any' ? POOL_TYPES : [pool], budgetCents, selection: variant, limit: 1, baseHistory }).candidates[0];
           if (!t) continue;
           const g = gradeTicket({ betType: t.betType, races: t.raceNumbers, legs: t.legs, stakeCents: t.stakeCents, costCents: t.costCents }, remapResults(d.results));
           if (g.outcome === 'loss' && /payoff in the chart|shape mismatch|no results for race/.test(g.note ?? '')) { tally.ungradable += 1; continue; }

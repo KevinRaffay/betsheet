@@ -205,6 +205,30 @@ console.log('-- menuPools: which pools start at a race (real menu shapes) --');
   check('Horseshoe race 4: the real 50c Pick 3 (Races 4-5-6) is offered behind the non-consecutive special', hs4.pick3?.baseCents === 50 && hs4.pick3.baseSource === 'menu' && same(hs4.pick3.races, [4, 5, 6]));
   const hs6 = menuPools('Superfecta 10 Cent Superfecta / 2nd Leg of $1 Horseshoe Hat Trick Turf Pick 3 50 Cent Pick 3 (Races 6-7-8) / 10 Cent', 6);
   check('Horseshoe race 6: the explicit (Races 6-7-8) mention beats the list-less "2nd Leg of" one', hs6.pick3?.baseCents === 50 && hs6.pick3.baseSource === 'menu');
+
+  // D446: Santa Anita prints the price INSIDE a parenthetical with more text after it.
+  const sa8 = menuPools('Win ($2) / Place ($2) / Show ($2) / Exacta ($1) Trifecta ($1) / Superfecta ($.10) / Rolling Double ($2) Late Pick 3($3 -15% takeout) / 3x3 ($1)', 8);
+  check('"Late Pick 3($3 -15% takeout)" reads $3 from the menu', sa8.pick3?.baseCents === 300 && sa8.pick3.baseSource === 'menu');
+  const sa9 = menuPools('Win ($2) / Place ($2) / Show ($2) / Exacta ($1) Trifecta ($1) / Superfecta ($.10) LateDouble ($5 - 15% takeout) Leg 2 of All Turf Pick 3', 9);
+  check('"LateDouble ($5 - 15% takeout)" reads $5', sa9.daily_double?.baseCents === 500 && sa9.daily_double.baseSource === 'menu');
+  check('"Leg 2 of All Turf Pick 3" is NOT a Pick 3 starting here', !sa9.pick3);
+  check('"3rd Leg of Horseshoe Hat Trick Turf Pick 3" is NOT a start either',
+    !menuPools('Superfecta 10 Cent Superfecta / 3rd Leg of Horseshoe Hat Trick Turf Pick 3 10 Cent Grand High 5 (Pentafecta)', 8).pick3);
+  check('"1st Leg of" IS a start and is kept',
+    Boolean(menuPools('1st Leg of $1 Turf Pick 3 / $1 Exacta', 4).pick3));
+  check('a box price "($1 Box)" is still not read as the bet\'s minimum', parseWagerMenu('$2 Trifecta($1 Box)').trifecta === 200);
+  check('".50 Minimum) Superfecta"-style race lists stay unread: "(Races 1-2-3)" is not money', parseWagerMenu('Pick 3 (Races 1-2-3)').pick3 === BET.minimums.pick3);
+
+  // D446: a pool named with NO price takes the track's charted base when history is given.
+  const churchill = 'Daily Double / Exacta / Trifecta / Superfecta / Pick 3 (Races 8-9-10) Super Hi-5 / Odd vs Even';
+  check('unpriced, no history: the BET.minimums fallback, labelled assumed', (() => {
+    const x = menuPools(churchill, 8).pick3; return x.baseCents === BET.minimums.pick3 && x.baseSource === 'assumed';
+  })());
+  check('unpriced, with history: the charted base, labelled chart-history', (() => {
+    const x = menuPools(churchill, 8, { pick3: 300, daily_double: 100 }).pick3; return x.baseCents === 300 && x.baseSource === 'chart-history';
+  })());
+  check('history never overrides a PRINTED price', menuPools('$1 Exacta / 50c Rolling Pick 3', 3, { pick3: 300 }).pick3.baseCents === 50);
+  check('junk history is ignored', menuPools(churchill, 8, { pick3: 'x' }).pick3.baseSource === 'assumed');
   // Gulfstream's real race-2 menu: a NON-consecutive Pick 3 must not become a rolling one.
   const g = menuPools('$1 Daily Double /$1 Exacta / $.50 Trifecta / $.10 Superfecta $1 Bet 3 (Races 2-3-4) / $.50 Pick 4 (Races 2-3-4-5) $1 Players Place Pick 8 (Races 2-9) / $3 Tropical Turf Pick 3 (Races 2, 6, 9)', 2);
   check('a non-consecutive printed list (Races 2, 6, 9) is not offered, never read as rolling', !g.pick3 && same(g.pick4?.races, [2, 3, 4, 5]) && g.pick4.baseCents === 50);
@@ -346,6 +370,44 @@ console.log('-- the producer, on a temp database --');
     added && added.legs.length === pick.legs.length && added.legs.every((l) => typeof l.combinedPHit === 'number' && typeof l.marketPHit === 'number' && l.votes)
     && typeof added.pHit === 'number' && added.calibration === CALIBRATION_NOTE);
   check('both saves trace under their own correlation id', events.some((e) => e.event === 'card_generated' && e.correlationId === 'corr-parlay-2'));
+
+  // ---- D446: poolBaseHistory - earlier days only, same track, never a deleted day ----
+  {
+    const { poolBaseHistory } = await import('../server/race-consensus.js');
+    const mkDay = (track, date, deleted = null) => db.prepare('INSERT INTO race_days (track, date, correlation_id, deleted_at) VALUES (?, ?, ?, ?)')
+      .run(track, date, `corr-${track}-${date}`, deleted).lastInsertRowid;
+    const pay = (dayIdX, raceNo, betType, base) => db.prepare('INSERT INTO exotic_payoffs (race_day_id, race_number, bet_type, base_cents, combination, payout_cents) VALUES (?, ?, ?, ?, ?, ?)')
+      .run(dayIdX, raceNo, betType, base, '1-1-1', 1000);
+    const early = mkDay('Churchill Downs', '2026-09-01');
+    pay(early, 5, 'pick3', 50); pay(early, 10, 'pick3', 300); pay(early, 6, 'daily_double', 100);
+    const gone = mkDay('Churchill Downs', '2026-09-05', '2026-09-06');
+    pay(gone, 9, 'pick3', 500);                                   // soft-deleted: must not count
+    const other = mkDay('Kentucky Downs', '2026-09-02');
+    pay(other, 7, 'pick3', 2000);                                 // another track: must not count
+    const cdId = mkDay('Churchill Downs', '2026-09-10');
+    pay(cdId, 10, 'pick3', 1000);                                 // this day's own chart: the answer, never an input
+    const later = mkDay('Churchill Downs', '2026-09-20');
+    pay(later, 10, 'pick3', 900);                                 // a later day: must not count
+    const h = poolBaseHistory(db, cdId);
+    check('history is the HIGHEST earlier charted base per pool at this track', h.pick3 === 300 && h.daily_double === 100, JSON.stringify(h));
+    check('...ignoring the day\'s own chart, later days, other tracks and deleted days', !Object.values(h).some((v) => [500, 900, 1000, 2000].includes(v)));
+    check('a first day at a track has no history', Object.keys(poolBaseHistory(db, early)).length === 0);
+
+    // And the producer uses it: an unpriced Churchill menu builds at the charted $3.
+    for (const [n, entries] of Object.entries(ENTRIES)) {
+      const menu = { 1: 'Daily Double / Exacta / Trifecta / Superfecta / Pick 3 (Races 1-2-3) Super Hi-5 / Odd vs Even', 2: 'Daily Double / Exacta', 3: 'Exacta' }[n];
+      const raceId = db.prepare('INSERT INTO races (race_day_id, number, wager_menu) VALUES (?, ?, ?)').run(cdId, Number(n), menu).lastInsertRowid;
+      for (const e of entries) {
+        db.prepare('INSERT INTO entries (race_id, program_number, horse_name, morning_line_decimal) VALUES (?, ?, ?, ?)')
+          .run(raceId, e.programNumber, `Horse ${n}-${e.programNumber}`, e.morningLineDecimal);
+      }
+    }
+    const cp = previewCombinedParlays(db, cdId, readOptions({ mode: 'pool', pools: ['pick3'], budgetCents: 2400, limit: 3 }));
+    const cp3 = cp.candidates.combined.find((c) => c.betType === 'pick3');
+    check('the preview echoes the history it priced with', cp.baseHistory?.pick3 === 300);
+    check('an unpriced Churchill Pick 3 builds at the charted $3, labelled chart-history (not the 50c fallback)',
+      cp3 && cp3.stakeCents === 300 && cp3.baseSource === 'chart-history' && /\$3 PICK 3/.test(cp3.tellerCall), JSON.stringify(cp3 && [cp3.stakeCents, cp3.baseSource, cp3.tellerCall]));
+  }
 
   // ---- D442: a Pick 3, previewed, saved and graded end to end ----
   // A FRESH day, so the pool is saved blind (no results) and the results are

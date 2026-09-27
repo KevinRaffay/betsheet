@@ -241,6 +241,10 @@ function poolLegs(race, selection) {
 export function buildPoolTickets({
   races = [], pools = POOL_TYPES, budgetCents = 1200, payoutFloor = null,
   selection = 'combined', limit = 5, maxPerLeg = MAX_PER_LEG,
+  // D446: { [pool]: cents } - the highest base each pool has charted at this
+  // track on EARLIER days, for a pool the menu names without a price. See
+  // betmath's menuPools; the caller owns the "earlier days only" rule.
+  baseHistory = null,
 } = {}) {
   const fail = (error) => ({ candidates: [], skipped: [], error });
   const wanted = (Array.isArray(pools) ? pools : []).filter((p) => POOL_TYPES.includes(p));
@@ -254,7 +258,7 @@ export function buildPoolTickets({
   const found = [];
 
   for (const start of [...byNumber.values()].sort((a, b) => a.raceNumber - b.raceNumber)) {
-    const offered = menuPools(start.wagerMenu, start.raceNumber);
+    const offered = menuPools(start.wagerMenu, start.raceNumber, baseHistory);
     for (const pool of wanted) {
       const offer = offered[pool];
       if (!offer) continue;
