@@ -475,7 +475,15 @@ it. Rules still in force:
   the same pool twice** (Del Mar's `50c Rolling Pick 3` and `$3 Turf Pick 3
   (R7-9-11)` on one race), so `menuPools` reads the amount belonging to each
   MENTION, tries every mention, and prefers one whose printed list starts at
-  this race. **D442 read three more**: the amount
+  this race. **A pool named with NO price is the one case a menu cannot
+  settle** (D446): Churchill prints its 50c rolling Pick 3s and its $3 late
+  Pick 3 identically, so any fixed fallback is wrong for one of them. It takes
+  the highest base that pool has charted at that track on EARLIER days
+  (`poolBaseHistory`, never the day's own chart - that is the answer), because
+  a base above a pool's minimum is a legal ticket and one below is refused.
+  Labelled `chart-history`; with no history the old fallback stays `assumed`.
+  Also: a price may LEAD a longer parenthetical (`($3 -15% takeout)`), and a
+  "Leg 2 of ... Pick 3" mention is a leg, not a start. **D442 read three more**: the amount
   AFTER a race list (`Pick 3 (Races 3-4-5) (.50 Cent Minimum)`, Remington Park,
   whose `.50 Cent` is a decimal dollar plus a redundant cents word), the
   spelled-out `Pick Three` (37 menus had read it as the 50c fallback when they

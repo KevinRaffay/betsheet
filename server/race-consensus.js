@@ -114,6 +114,30 @@ export function loadDaySignals(db, dayId) {
   return { day, races, excluded: { llmPostResult } };
 }
 
+/**
+ * D446: the highest base each multi-race pool has CHARTED at this day's track,
+ * over non-deleted days strictly BEFORE this one - { [pool]: cents }. It is
+ * what betmath's `menuPools` uses for a pool the menu names with no price.
+ *
+ * Strictly before: a backtest building a past day must never price its ticket
+ * off that day's own chart, which is the answer. For a live day nothing later
+ * exists anyway. The track is matched on `track_code` when the day has one,
+ * else on the name. Invariant 12: soft-deleted days never contribute.
+ */
+export function poolBaseHistory(db, dayId) {
+  const day = db.prepare('SELECT id, date, track, track_code FROM race_days WHERE id = ?').get(dayId);
+  if (!day) return {};
+  const rows = db.prepare(`
+    SELECT x.bet_type, MAX(x.base_cents) AS base
+      FROM exotic_payoffs x JOIN race_days d ON d.id = x.race_day_id
+     WHERE d.deleted_at IS NULL AND d.date < ?
+       AND ${day.track_code ? 'd.track_code = ?' : 'd.track = ?'}
+       AND x.bet_type IN ('daily_double', 'pick3', 'pick4', 'pick5', 'pick6')
+       AND x.base_cents > 0
+     GROUP BY x.bet_type`).all(day.date, day.track_code ?? day.track);
+  return Object.fromEntries(rows.map((r) => [r.bet_type, r.base]));
+}
+
 /** Non-deleted day ids that carry race results - the backtest's corpus. */
 export function gradedDayIds(db) {
   return db.prepare(`

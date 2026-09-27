@@ -204,7 +204,15 @@ function menuParenCents(content) {
   // the teller grammar's reader too. Menu-only, so the teller is unaffected.
   const dec = t.match(/^\$?(\d*\.\d+)\s*(?:¢|-?cents?)$/i);
   if (dec) t = dec[1];
-  return parseMoneyToken(t);
+  const whole = parseMoneyToken(t);
+  if (whole != null) return whole;
+  // D446: a parenthetical that LEADS with money and then says something else
+  // - Santa Anita's "Late Pick 3($3 -15% takeout)" and "LateDouble ($5 - 15%
+  // takeout)". The leading amount is the minimum. It must be followed by a
+  // separator, never a word, so "($1 Box)" (a box price, not this bet's) stays
+  // unread as before.
+  const lead = t.match(/^(\$\d*\.?\d+|\d*\.\d+|\d+\s*(?:¢|-?cents?|c))\s*(?=[-–,;/]|$)/i);
+  return lead ? menuCents(lead[1]) : null;
 }
 
 /**
@@ -366,8 +374,28 @@ function mentionCents(t, start, end) {
  * menu) is a source error that must not become a ticket on races 9-12.
  * With no list printed, the pool is read as starting here, the rolling
  * convention every such menu follows.
+ *
+ * D446: A MENTION THAT IS A LATER LEG OF ANOTHER POOL IS NOT A START. "Leg 2
+ * of All Turf Pick 3" (Santa Anita) and "2nd Leg of $1 Horseshoe Hat Trick
+ * Turf Pick 3" print a pool's name on a race the pool merely passes through;
+ * read as list-less, either would become a Pick 3 starting on the wrong race.
+ * "1st Leg of" / "Leg 1 of" IS a start and is kept.
+ *
+ * D446: A POOL NAMED WITH NO PRICE AT ALL takes its base from `history` when
+ * given - { [pool]: cents }, the HIGHEST base that pool has ever charted at
+ * this track (server/combined-cards.js builds it from days BEFORE the one
+ * being built, so a backtest never reads its own answer). Highest, because the
+ * same unpriced text can be two different pools: Churchill Downs prints its
+ * 50c rolling Pick 3s and its $3 late Pick 3 identically as "Pick 3 (Races
+ * 8-9-10)", and a base ABOVE a pool's minimum is always a legal ticket, where
+ * one below it is refused at the window. `baseSource` is then 'chart-history'.
+ * With no history either, the BET.minimums fallback stands, still 'assumed'.
  */
-export function menuPools(text, raceNumber) {
+// The "Leg N of" phrase must belong to THIS mention: no other pool name may sit
+// between it and the mention, or "2nd Leg of ... Turf Pick 3 50 Cent Pick 3
+// (Races 6-7-8)" would also disqualify the real Pick 3 printed after the special.
+const LATER_LEG_RE = /\b(?:(?:2nd|3rd|[4-9]th)\s+Leg|Leg\s+[2-9])\s+of\b(?:(?!Pick\s*(?:\d|Three|Four|Five|Six)\b|Double\b)[^/])*$/i;
+export function menuPools(text, raceNumber, history = null) {
   const out = {};
   if (!text || !Number.isInteger(raceNumber)) return out;
   const t = String(text);
@@ -375,6 +403,7 @@ export function menuPools(text, raceNumber) {
     const global = new RegExp(POOL_NAME_RE[pool].source, 'gi');
     let chosen = null;
     for (const m of t.matchAll(global)) {
+      if (LATER_LEG_RE.test(t.slice(Math.max(0, m.index - 64), m.index))) continue;
       const end = m.index + m[0].length;
       const listed = raceListAfter(t.slice(end, end + 48), legs);
       if (listed === 'unbuildable') continue;
@@ -384,11 +413,16 @@ export function menuPools(text, raceNumber) {
       chosen ??= mention;                         // else the first list-less mention
     }
     if (chosen) {
+      const charted = Number.isInteger(history?.[pool]) && history[pool] > 0 ? history[pool] : null;
+      let baseCents = chosen.printed;
+      let baseSource = 'menu';
+      if (baseCents == null && charted != null) { baseCents = charted; baseSource = 'chart-history'; }
+      if (baseCents == null) { baseCents = BET.minimums[pool] ?? null; baseSource = 'assumed'; }
       out[pool] = {
         legs,
         races: chosen.listed ?? Array.from({ length: legs }, (_, i) => raceNumber + i),
-        baseCents: chosen.printed ?? BET.minimums[pool] ?? null,
-        baseSource: chosen.printed != null ? 'menu' : 'assumed',
+        baseCents,
+        baseSource,
       };
     }
   }

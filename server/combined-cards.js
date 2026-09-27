@@ -33,7 +33,7 @@ import { COMBINED_VERSION } from '../shared/version.js';
 import { getDb } from './db.js';
 import { gradeAndPersist } from './grading.js';
 import { templateIdFor } from './templates.js';
-import { loadDaySignals } from './race-consensus.js';
+import { loadDaySignals, poolBaseHistory } from './race-consensus.js';
 import { getLogger, newCorrelationId } from './logging.js';
 
 const traceLog = getLogger('decision-trace');
@@ -142,11 +142,15 @@ function restorePgms(candidates, storedPgm) {
 /** Both selections' candidates for a day. Throws CombinedCardError on bad options. */
 export function previewCombinedParlays(db, dayId, options) {
   const { sig, races, storedPgm } = dayModels(db, dayId);
+  // D446: the track's charted pool bases from EARLIER days, for a pool the
+  // menu names with no price (read at preview AND at save, so the rebuild on
+  // save prices the same ticket the preview showed).
+  const baseHistory = options.mode === 'pool' ? poolBaseHistory(db, dayId) : null;
   const out = {};
   let skipped = [];
   for (const selection of ['combined', 'market']) {
     const built = options.mode === 'pool'
-      ? buildPoolTickets({ races, ...options, selection })
+      ? buildPoolTickets({ races, ...options, selection, baseHistory })
       : buildWpsParlays({ races, ...options, selection });
     if (built.error) throw new CombinedCardError(400, built.error);
     out[selection] = restorePgms(built.candidates, storedPgm);
@@ -161,6 +165,7 @@ export function previewCombinedParlays(db, dayId, options) {
     races: races.map((r) => r.summary),
     excluded: sig.excluded,
     skipped,
+    baseHistory,
     resultsOnFile: Boolean(db.prepare('SELECT 1 FROM race_results WHERE race_day_id = ? LIMIT 1').get(dayId)),
     candidates: out,
   };

@@ -90,3 +90,44 @@ On days recorded **after 2026-09-26**, with these weights and this builder froze
   That volatility is the finding: a single hit's payout moves a Pick 4 row by tens of points of ROI, which is why none of those rows was read above and none should be now.
 
 **The pre-registered test** runs under the D444 reading. A misread base is a bug, not a builder rule anyone chose, and the test is about calibration and the $6-vs-larger ROI ordering, neither of which the fix moved. Santa Anita 2026-09-26 is NOT "after 2026-09-26", so it stays outside that test.
+
+## Correction, 2026-09-26 (D446): unpriced pools priced from chart history
+
+**What changed.**
+1. **A pool the menu names with NO price** now takes the highest base that pool has charted at that track on EARLIER days (`poolBaseHistory`), rather than the fixed `BET.minimums` fallback. The fallback was below the real minimum where the same unpriced text is two different pools: Churchill Downs' 50c rolling Pick 3s and its $3 late Pick 3 are both printed "Pick 3 (Races 8-9-10)".
+2. **A price printed at the start of a parenthetical** is now read: Santa Anita's "Late Pick 3($3 -15% takeout)".
+3. **"Leg 2 of … Pick 3" / "3rd Leg of …" mentions** are no longer read as pools starting on that race.
+
+**Measured before building.** Of the unpriced offers on live days that have a chart row for the same day. These counts cover Daily Double and Pick 3; every Pick 4/5 fallback was already at or above the real minimum, and Pick 6 is never built.
+
+| | fallback below the real minimum (unbuyable) |
+| --- | --- |
+| before D446 | 7 |
+| after D446 | 1 (Churchill 2026-09-10, the first Churchill day on file, with no earlier chart to learn from) |
+
+Every chart-history base is at or above its day's real minimum.
+
+**The cost of that safety is visible.** Churchill's rolling Pick 3s are now bet at $3 a combination, not 50c, so a budget buys less spread.
+
+**The effect, isolated.** Both runs are on the same 38-day corpus:
+
+| run | code | file | generatedAt |
+| --- | --- | --- | --- |
+| baseline | `main` at D444 | `combined-pools-v1.d446-baseline.run.json` | `2026-09-27T04:21:08Z` (2026-09-26 21:21 PT) |
+| fixed | D446 | `combined-pools-v1.d446.run.json` | `2026-09-27T04:21:07Z` |
+
+- **All 30 rows move this time, in both directions.** Where a track has only ever charted a $1 Daily Double, the $2 fallback drops to $1 (cheaper, more spread, higher predicted P). Where an unpriced Pick 3 might be the $3 one, it rises (dearer, less spread, lower predicted P).
+- **The `any`-pool ordering holds:**
+
+  | selection | $6 | $12 | $24 |
+  | --- | --- | --- | --- |
+  | combined | +7.7% (18/38) | −19.6% (21/38) | −33.5% (29/38) |
+  | market | −7.9% | −34.4% | −41.8% |
+
+  "Spreading buys hit rate, not money" survives the fix.
+- **The combined Pick 3 overstatement holds, and widens:**
+  - $12: 29.4% predicted vs 21.1% observed (8/38)
+  - $24: 40.8% vs 34.2% (13/38)
+- **Daily Double stays within about 3 points**, e.g. combined $12: 54.4% predicted vs 52.6% observed (20/38), and $24: 73.9% vs 76.3% (29/38).
+
+**The pre-registered test** runs under the D446 reading, for the same reason as D444's: an unbuyable base is a bug, not a rule anyone chose.
