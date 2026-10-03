@@ -27,6 +27,7 @@ export const MODEL = process.env.BETSHEET_LLM_MODEL || 'claude-sonnet-5';
 export const KNOWN_MODELS = [
   { id: 'claude-opus-5-5', label: 'Opus 5.5' },
   { id: 'claude-opus-5', label: 'Opus 5' },
+  { id: 'claude-sonnet-5-5', label: 'Sonnet 5.5' },
   { id: 'claude-sonnet-5', label: 'Sonnet 5' },
   // Retired 2026-09-05 by user decision - a product choice about which models
   // are worth spending generations on, NOT a finding. The corpus holds exactly

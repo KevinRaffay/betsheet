@@ -295,6 +295,7 @@ export const getLlmModels = () => fetch('/api/llm-models').then(asJson);
 export const MODEL_LABEL = {
   'claude-opus-5-5': 'Opus 5.5',
   'claude-opus-5': 'Opus 5',
+  'claude-sonnet-5-5': 'Sonnet 5.5',
   'claude-sonnet-5': 'Sonnet 5',
   'claude-haiku-4-5-20251001': 'Haiku 4.5', // retired 2026-09-05; kept so old cards label
   'claude-fable-5-1': 'Fable 5.1',
