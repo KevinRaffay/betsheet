@@ -359,3 +359,52 @@ export function mlRankOrder(flags, direction) {
     return sign * (ra - rb);
   });
 }
+
+/**
+ * Sort key for a printed program number: "7" -> [7, ''], "1A" -> [1, 'A'].
+ * Numeric first, so "10" follows "9" (a string sort puts it before "2"), and
+ * an entry's coupling letter ("1A" after "1") breaks the tie. Anything that is
+ * not digits-then-letters - a null (a scratch Equibase printed with no number,
+ * D180) or junk - has no place in the order and returns null.
+ */
+export function programNumberKey(pn) {
+  const m = /^(\d+)([A-Za-z]*)$/.exec(String(pn ?? '').trim());
+  return m ? [Number(m[1]), m[2].toUpperCase()] : null;
+}
+
+/**
+ * Row indices for `programNumbers` (index-aligned with the entries and flags),
+ * reordered by program number. `direction` as in `mlRankOrder`; an entry with
+ * no sortable number always goes LAST in either direction, for the same reason
+ * a null ML rank does there. Stable, so ties keep their original order.
+ */
+export function programNumberOrder(programNumbers, direction) {
+  const list = Array.isArray(programNumbers) ? programNumbers : [];
+  const idx = list.map((_, i) => i);
+  if (direction !== 'asc' && direction !== 'desc') return idx;
+  const sign = direction === 'desc' ? -1 : 1;
+  const keys = list.map(programNumberKey);
+  return idx.sort((a, b) => {
+    const ka = keys[a];
+    const kb = keys[b];
+    if (!ka && !kb) return 0;
+    if (!ka) return 1;
+    if (!kb) return -1;
+    if (ka[0] !== kb[0]) return sign * (ka[0] - kb[0]);
+    return ka[1] === kb[1] ? 0 : sign * (ka[1] < kb[1] ? -1 : 1);
+  });
+}
+
+/**
+ * The one entries-table sort: `sort` is `null` (original order) or
+ * `{ by: 'ml' | 'pgm', dir: 'asc' | 'desc' }`. Only one column sorts at a time.
+ */
+export function entryOrder(flags, programNumbers, sort) {
+  if (sort?.by === 'pgm') return programNumberOrder(programNumbers, sort.dir);
+  return mlRankOrder(flags, sort?.by === 'ml' ? sort.dir : null);
+}
+
+/** A header click: first click on a column sorts asc, then it flips asc <-> desc. */
+export function toggleEntrySort(sort, by) {
+  return { by, dir: sort?.by === by && sort.dir === 'asc' ? 'desc' : 'asc' };
+}

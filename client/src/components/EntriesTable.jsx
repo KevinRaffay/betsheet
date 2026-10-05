@@ -1,8 +1,9 @@
 import React, { useState } from 'react';
-import { flagRaceEntries, mlRankOrder } from '@shared/entry-flags.js';
+import { flagRaceEntries, entryOrder, toggleEntrySort } from '@shared/entry-flags.js';
 import { dollars } from '@shared/betmath.js';
 import EntryFlagTags from './EntryFlagTags.jsx';
 import MlRankHeader from './MlRankHeader.jsx';
+import ProgramNumberHeader from './ProgramNumberHeader.jsx';
 
 // D224: the win probability a morning line implies, 0-1 -> a percent string.
 const pct = (p) => (p == null ? '—' : `${(p * 100).toFixed(0)}%`);
@@ -76,16 +77,20 @@ export default function EntriesTable({ entries, open = false, showRank = true })
   // component instance, so plain local state is enough - no per-race keying
   // needed here, unlike the day view and card sheet, which render several of
   // these in one screen.
-  const [rankSort, setRankSort] = useState(null);
+  const [sort, setSort] = useState(null);
   const normalized = entries.map(normalizeEntry);
-  const order = mlRankOrder(flags, rankSort);
+  const order = entryOrder(flags, normalized.map((e) => e.programNumber), sort);
   return (
     <details className="race-entries" open={open}>
       <summary>Entries ({entries.length})</summary>
       <table className="grid grid--entries">
         <thead>
           <tr>
-            <th>#</th><th>Horse</th><th>Jockey</th><th>Trainer</th><th>M/L</th>
+            <ProgramNumberHeader
+              direction={sort?.by === 'pgm' ? sort.dir : null}
+              onClick={() => setSort((s) => toggleEntrySort(s, 'pgm'))}
+            />
+            <th>Horse</th><th>Jockey</th><th>Trainer</th><th>M/L</th>
             <th title="What $2-to-win pays if this horse wins - the printed line as a forecast, not the actual tote price">$2 win</th>
             <th title="This horse's share of the morning-line book, so a race sums to 100%. Hover a cell for the raw 1 / (odds + 1) reading, which sums to well over 100% because of the track's take">ML Win%</th>
             {hasBoard && <th title="The typed post-time price, the tote board as it stood when this race was priced">Live</th>}
@@ -93,8 +98,8 @@ export default function EntriesTable({ entries, open = false, showRank = true })
             {hasBoard && <th title="Live Win% minus ML Win%, in percentage points. Both books are normalised over the runners priced in each, so a race's moves sum to zero">&Delta;%</th>}
             {showRank && (
               <MlRankHeader
-                direction={rankSort}
-                onClick={() => setRankSort((d) => (d === 'asc' ? 'desc' : 'asc'))}
+                direction={sort?.by === 'ml' ? sort.dir : null}
+                onClick={() => setSort((s) => toggleEntrySort(s, 'ml'))}
               />
             )}
             {showRank && hasBoard && <th title="The same ordering read off the live board (1 = shortest live price; ties share a rank)">Live rank</th>}
