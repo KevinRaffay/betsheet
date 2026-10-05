@@ -43,6 +43,7 @@
 
 import {
   FAVORITE_FIELD_SIZE, MOVE_THRESHOLDS, flagRaceEntries, isBaffertEntry, mlRankOrder,
+  programNumberOrder, entryOrder, toggleEntrySort,
 } from '../shared/entry-flags.js';
 
 let failures = 0;
@@ -437,6 +438,28 @@ console.log('\nmlRankOrder (D4xx) - the click-to-sort "ML rank" header, every en
     JSON.stringify(mlRankOrder(flags, 'sideways')) === '[0,1,2,3]');
   check('never throws on junk input', JSON.stringify(mlRankOrder(null, 'asc')) === '[]'
     && JSON.stringify(mlRankOrder(undefined, 'asc')) === '[]');
+}
+
+console.log('\nprogramNumberOrder - the click-to-sort "#" header');
+{
+  const pn = ['10', '2', '1A', '1', null, '9'];
+  const j = (x) => JSON.stringify(x);
+  check('null direction keeps the original order', j(programNumberOrder(pn, null)) === '[0,1,2,3,4,5]');
+  check('asc is numeric (10 after 9), coupled letter after its base, null last',
+    j(programNumberOrder(pn, 'asc')) === '[3,2,1,5,0,4]', j(programNumberOrder(pn, 'asc')));
+  check('desc reverses the numbers but a null still sorts LAST',
+    j(programNumberOrder(pn, 'desc')) === '[0,5,1,2,3,4]', j(programNumberOrder(pn, 'desc')));
+  check('never throws on junk input', j(programNumberOrder(null, 'asc')) === '[]');
+  const flags = [{ mlRank: 2 }, { mlRank: 1 }];
+  check('entryOrder dispatches on the active column',
+    j(entryOrder(flags, ['2', '1'], { by: 'pgm', dir: 'asc' })) === '[1,0]'
+    && j(entryOrder(flags, ['1', '2'], { by: 'ml', dir: 'asc' })) === '[1,0]'
+    && j(entryOrder(flags, ['2', '1'], null)) === '[0,1]');
+  const a = toggleEntrySort(null, 'pgm');
+  const b = toggleEntrySort(a, 'pgm');
+  const c = toggleEntrySort(b, 'ml');
+  check('toggleEntrySort: asc, then desc, and a new column starts asc',
+    a.dir === 'asc' && b.dir === 'desc' && c.by === 'ml' && c.dir === 'asc');
 }
 
 if (failures) {

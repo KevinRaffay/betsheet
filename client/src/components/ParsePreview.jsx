@@ -1,8 +1,9 @@
 import React, { useState } from 'react';
-import { flagRaceEntries, mlRankOrder } from '@shared/entry-flags.js';
+import { flagRaceEntries, entryOrder, toggleEntrySort } from '@shared/entry-flags.js';
 import { dollars } from '@shared/betmath.js';
 import EntryFlagTags from './EntryFlagTags.jsx';
 import MlRankHeader from './MlRankHeader.jsx';
+import ProgramNumberHeader from './ProgramNumberHeader.jsx';
 
 // D224: the win probability a morning line implies, 0-1 -> a percent string.
 const pct = (p) => (p == null ? '' : `${(p * 100).toFixed(0)}%`);
@@ -36,8 +37,8 @@ export function RacePreview({ race }) {
   const { flags } = flagRaceEntries(race.entries);
   // Display-order sort only (invariant 9): reordering the rendered rows
   // never touches `race.entries`, which is exactly what Save still writes.
-  const [rankSort, setRankSort] = useState(null);
-  const order = mlRankOrder(flags, rankSort);
+  const [sort, setSort] = useState(null);
+  const order = entryOrder(flags, race.entries.map((e) => e.programNumber), sort);
   return (
     <details className="race" open>
       <summary>
@@ -49,13 +50,17 @@ export function RacePreview({ race }) {
       <table className="grid">
         <thead>
           <tr>
-            <th>#</th><th>PP</th><th>Horse</th><th>Jockey</th><th>Trainer</th>
+            <ProgramNumberHeader
+              direction={sort?.by === 'pgm' ? sort.dir : null}
+              onClick={() => setSort((s) => toggleEntrySort(s, 'pgm'))}
+            />
+            <th>PP</th><th>Horse</th><th>Jockey</th><th>Trainer</th>
             <th>Wt</th><th>M/L</th>
             <th title="What $2-to-win pays if this horse wins - the printed line as a forecast, not the actual tote price">$2 win</th>
             <th title="The win probability the morning line implies (1 / (odds + 1)); a full field sums well over 100% because of the track's own take">Win %</th>
             <MlRankHeader
-              direction={rankSort}
-              onClick={() => setRankSort((d) => (d === 'asc' ? 'desc' : 'asc'))}
+              direction={sort?.by === 'ml' ? sort.dir : null}
+              onClick={() => setSort((s) => toggleEntrySort(s, 'ml'))}
             />
           </tr>
         </thead>

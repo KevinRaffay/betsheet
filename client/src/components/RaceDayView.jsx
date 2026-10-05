@@ -18,10 +18,11 @@ import {
 import RaceNotesEditor from './RaceNotesEditor.jsx';
 import { NoteSourceDatalist } from './AnalystNotesEditor.jsx';
 import { entriesStaleness } from '@shared/staleness.js';
-import { flagRaceEntries, mlRankOrder } from '@shared/entry-flags.js';
+import { flagRaceEntries, entryOrder, toggleEntrySort } from '@shared/entry-flags.js';
 import { dollars } from '@shared/betmath.js';
 import EntryFlagTags from './EntryFlagTags.jsx';
 import MlRankHeader from './MlRankHeader.jsx';
+import ProgramNumberHeader from './ProgramNumberHeader.jsx';
 
 // D224: the win probability a morning line implies, 0-1 -> a percent string.
 const pct = (p) => (p == null ? '' : `${(p * 100).toFixed(0)}%`);
@@ -94,7 +95,7 @@ export default function RaceDayView({ id, onBack, onOpenCard }) {
   // ML-rank sort direction per race's entries table (null = original entries
   // order), keyed by race number - one screen renders every race, so a click
   // on one race's header must not resort the others.
-  const [rankSort, setRankSort] = useState(new Map());
+  const [entrySort, setEntrySort] = useState(new Map());
   // The day's analyst notes (same `llm_notes` draft, D92), keyed by race
   // number so each race's own panel can look itself up. D184: these are now
   // EDITABLE in place - the panel below is `RaceNotesEditor`, not the
@@ -278,7 +279,7 @@ export default function RaceDayView({ id, onBack, onOpenCard }) {
   // computed here for the same reason `raceFlags` is above (the races `.map`
   // below is an expression arrow, so it holds no `const` of its own).
   const rowOrder = new Map(
-    day.races.map((r) => [r.number, mlRankOrder(entryFlags.get(r.number) ?? [], rankSort.get(r.number) ?? null)]),
+    day.races.map((r) => [r.number, entryOrder(entryFlags.get(r.number) ?? [], r.entries.map((e) => e.program_number), entrySort.get(r.number) ?? null)]),
   );
 
   return (
@@ -437,19 +438,18 @@ export default function RaceDayView({ id, onBack, onOpenCard }) {
             {race.conditions && <p className="conditions">{race.conditions}</p>}
             <table className="grid">
             <thead>
-              <tr><th>#</th><th>PP</th><th>Horse</th><th>Jockey</th><th>Trainer</th><th>Wt</th><th>M/L</th>
+              <tr><ProgramNumberHeader
+                direction={entrySort.get(race.number)?.by === 'pgm' ? entrySort.get(race.number).dir : null}
+                onClick={() => setEntrySort((prev) => new Map(prev).set(race.number, toggleEntrySort(prev.get(race.number), 'pgm')))}
+              /><th>PP</th><th>Horse</th><th>Jockey</th><th>Trainer</th><th>Wt</th><th>M/L</th>
               <th title="The tote board, typed at post time. Equibase's own page cannot supply it - the LiveOdds column is empty in the served HTML and filled by client-side JS - so this is entered by hand, per race, and every save keeps its own capture time">Live</th>
               <th title="What $2-to-win pays if this horse wins - the printed line as a forecast, not the actual tote price">$2 win</th>
               <th title="This horse's share of the morning-line book, so a race sums to 100%. Hover a cell for the raw 1 / (odds + 1) reading, which sums to 118-136% because of the track's take">ML Win%</th>
               {hasBoard.get(race.number) && <th title="The same reading off the typed live board, normalised over the same runners - which is what makes it subtractable from the column beside it">Live Win%</th>}
               {hasBoard.get(race.number) && <th title="Live Win% minus ML Win%, in percentage points. Both books are normalised over the runners priced in each, so a race's moves sum to zero and a horse reads as moved only if another moved the other way - a raw difference would have shown every runner drifting or steaming together whenever the two books totalled differently, or whenever a scratch re-priced the field">&Delta;%</th>}
               <MlRankHeader
-                direction={rankSort.get(race.number) ?? null}
-                onClick={() => setRankSort((prev) => {
-                  const next = new Map(prev);
-                  next.set(race.number, prev.get(race.number) === 'asc' ? 'desc' : 'asc');
-                  return next;
-                })}
+                direction={entrySort.get(race.number)?.by === 'ml' ? entrySort.get(race.number).dir : null}
+                onClick={() => setEntrySort((prev) => new Map(prev).set(race.number, toggleEntrySort(prev.get(race.number), 'ml')))}
               />
               {hasBoard.get(race.number) && <th title="The same ordering read off the live board (1 = shortest live price; ties share a rank). Read against ML rank: a horse moving up the board is one the crowd backed harder than the linemaker predicted">Live rank</th>}</tr>
             </thead>

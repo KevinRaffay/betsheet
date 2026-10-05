@@ -4,7 +4,8 @@ import { FAILURE_MODE_WARNINGS } from '@shared/card-notices.js';
 import RaceNotes from './RaceNotes.jsx';
 import EntryFlagTags from './EntryFlagTags.jsx';
 import MlRankHeader from './MlRankHeader.jsx';
-import { flagRaceEntries, mlRankOrder } from '@shared/entry-flags.js';
+import ProgramNumberHeader from './ProgramNumberHeader.jsx';
+import { flagRaceEntries, entryOrder, toggleEntrySort } from '@shared/entry-flags.js';
 import { BUCKET_CHIP } from '@shared/distribution.js';
 
 const RESPONSIBLE_LINE =
@@ -65,7 +66,7 @@ export default function CardSheet({ card, races, results, notesByRace, grades })
   // every race's entries table in the same screen, so a click on one race's
   // header must not resort every other race (same keyed-Map shape as
   // `collapsedRaces` above, just per-race values instead of a membership set).
-  const [rankSort, setRankSort] = useState(() => new Map());
+  const [entrySort, setEntrySort] = useState(() => new Map());
 
   const gradeByTicket = new Map((grades?.rows ?? grades?.grades ?? []).map((g) => [g.sequence, g]));
   const graded = gradeByTicket.size > 0;
@@ -173,7 +174,7 @@ export default function CardSheet({ card, races, results, notesByRace, grades })
         // time. Leaving it off here would make the same horse look flagged on
         // one screen and unflagged on another.
         const { flags: entryFlags } = flagRaceEntries(entries);
-        const rowOrder = mlRankOrder(entryFlags, rankSort.get(a.race_number) ?? null);
+        const rowOrder = entryOrder(entryFlags, entries.map((e) => e.program_number), entrySort.get(a.race_number) ?? null);
         const raceResults = resultsByRace.get(a.race_number);
         const raceTickets = singles.filter((t) => t.selections.races[0] === a.race_number);
         const subtotal = raceTickets.reduce((s, t) => s + t.cost_cents, 0);
@@ -234,16 +235,15 @@ export default function CardSheet({ card, races, results, notesByRace, grades })
               <summary>Entries ({entries.length})</summary>
               <table className="grid grid--entries">
                 <thead>
-                  <tr><th>#</th><th>Horse</th><th>Jockey</th><th>Trainer</th><th>M/L</th>
+                  <tr><ProgramNumberHeader
+                    direction={entrySort.get(a.race_number)?.by === 'pgm' ? entrySort.get(a.race_number).dir : null}
+                    onClick={() => setEntrySort((prev) => new Map(prev).set(a.race_number, toggleEntrySort(prev.get(a.race_number), 'pgm')))}
+                  /><th>Horse</th><th>Jockey</th><th>Trainer</th><th>M/L</th>
                     <th title="What $2-to-win pays if this horse wins - the printed line as a forecast, not the actual tote price">$2 win</th>
                     <th title="The win probability the morning line implies (1 / (odds + 1)); a full field sums well over 100% because of the track's own take">Win %</th>
                     <MlRankHeader
-                      direction={rankSort.get(a.race_number) ?? null}
-                      onClick={() => setRankSort((prev) => {
-                        const next = new Map(prev);
-                        next.set(a.race_number, prev.get(a.race_number) === 'asc' ? 'desc' : 'asc');
-                        return next;
-                      })}
+                      direction={entrySort.get(a.race_number)?.by === 'ml' ? entrySort.get(a.race_number).dir : null}
+                      onClick={() => setEntrySort((prev) => new Map(prev).set(a.race_number, toggleEntrySort(prev.get(a.race_number), 'ml')))}
                     /></tr>
                 </thead>
                 <tbody>
