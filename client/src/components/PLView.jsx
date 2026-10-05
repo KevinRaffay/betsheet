@@ -29,26 +29,28 @@ export default function PLView({ onBack, onOpenCard, onOpenDay }) {
   // stake the same opinion three ways, so picking one reads that structure
   // across every day it was staked on.
   const [variant, setVariant] = useState('all');
+  // D452: one LLM model, or all of them. Only LLM cards carry a model.
+  const [model, setModel] = useState('all');
 
   useEffect(() => {
-    getPL(version, track, date, variant).then(setData).catch((e) => setError(String(e.message)));
-  }, [version, track, date, variant]);
+    getPL(version, track, date, variant, model).then(setData).catch((e) => setError(String(e.message)));
+  }, [version, track, date, variant, model]);
 
   // When a filter the day view also honours changes, refetch the expanded
   // day's races so the matrix never shows cards the table above it hides.
   useEffect(() => {
     if (expandedDay) {
       setDayPL(null);
-      getDayPL(expandedDay, version || undefined, variant).then(setDayPL).catch((e) => setError(String(e.message)));
+      getDayPL(expandedDay, version || undefined, variant, model).then(setDayPL).catch((e) => setError(String(e.message)));
     }
-  }, [version, variant, expandedDay]);
+  }, [version, variant, model, expandedDay]);
 
   const toggleDay = async (raceDayId) => {
     if (expandedDay === raceDayId) { setExpandedDay(null); setDayPL(null); return; }
     setExpandedDay(raceDayId);
     setDayPL(null);
     try {
-      setDayPL(await getDayPL(raceDayId, version || undefined, variant));
+      setDayPL(await getDayPL(raceDayId, version || undefined, variant, model));
     } catch (e) {
       setError(String(e.message));
       setExpandedDay(null);
@@ -98,6 +100,14 @@ export default function PLView({ onBack, onOpenCard, onOpenDay }) {
               </select>
             </label>
           )}
+          {data.models && data.models.length > 0 && (
+            <label className="dim">Model{' '}
+              <select className="in in--sm" value={data.selectedModel ?? 'all'} onChange={(e) => setModel(e.target.value)}>
+                <option value="all">all models</option>
+                {data.models.map((m) => <option key={m.id} value={m.id}>{m.label}</option>)}
+              </select>
+            </label>
+          )}
           {data.engineVersions.length > 0 && (
             <label className="dim">Engine{' '}
               <select className="in in--sm" value={data.selectedVersion ?? ''} onChange={(e) => setVersion(e.target.value)}>
@@ -137,6 +147,9 @@ export default function PLView({ onBack, onOpenCard, onOpenDay }) {
             {data.selectedVersion === 'all'
               ? ' Showing ALL engine versions pooled - you chose this; improvement is measured by comparing versions.'
               : ` Showing engine ${data.selectedVersion} only.`}
+            {data.selectedModel && data.selectedModel !== 'all'
+              ? ` Model ${data.models.find((m) => m.id === data.selectedModel)?.label ?? data.selectedModel} only - other buckets carry no model and are not shown.`
+              : ''}
             {data.selectedVariant && data.selectedVariant !== 'all'
               ? ` Variant ${data.selectedVariant} only - every figure on this screen is that structure alone.`
               : ''}

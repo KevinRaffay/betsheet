@@ -179,10 +179,10 @@ try {
   // replaced the meet selector with track/day and left this asserting on
   // `meets`/`selectedMeet`, so check-pl has been red on main since. D413
   // adds the variant selector and brings the list back in line.
-  check('response shape: buckets/cards/ungraded + the engine-version (D34), track/day (#390) and variant (D413) selectors and NOTHING else - no pooled total',
+  check('response shape: buckets/cards/ungraded + the engine-version (D34), track/day (#390) variant (D413) and model (D452) selectors and NOTHING else - no pooled total',
     JSON.stringify(Object.keys(pl).sort()) === JSON.stringify([
-      'buckets', 'cards', 'dates', 'engineVersions', 'selectedDate', 'selectedTrack',
-      'selectedVariant', 'selectedVersion', 'tracks', 'ungraded', 'variants',
+      'buckets', 'cards', 'dates', 'engineVersions', 'models', 'selectedDate', 'selectedModel',
+      'selectedTrack', 'selectedVariant', 'selectedVersion', 'tracks', 'ungraded', 'variants',
     ]) && pl.selectedVersion === 'all',
     JSON.stringify(Object.keys(pl).sort()));
   check('no bucket is a pooled pseudo-bucket, and no engine bucket exists any more',
@@ -362,6 +362,27 @@ try {
   check("engineVersion=all / variant=all mean POOLED on the day view, not a literal match",
     dayPLpooled.cards.length === 3,
     JSON.stringify(dayPLpooled.cards.map((c) => [c.engineVersion, c.variant])));
+
+  // D452: ?model= narrows to one Claude model's cards.
+  const llmCard = plAll.cards.find((c) => c.completeness === 'LLM_GENERATED');
+  const mid = llmCard?.llmModel;
+  check('the model list offers exactly the models LLM cards were generated under',
+    !!mid && plAll.models.length === 1 && plAll.models[0].id === mid && plAll.selectedModel === 'all',
+    JSON.stringify(plAll.models));
+  const plm = await jget(`/api/pl?engineVersion=all&model=${encodeURIComponent(mid)}`);
+  check('?model= leaves only the chosen model cards, in the rows and in the buckets',
+    plm.selectedModel === mid && plm.cards.length > 0 && plm.cards.every((c) => c.llmModel === mid)
+      && plm.buckets.every((b) => b.completeness === 'LLM_GENERATED'),
+    JSON.stringify(plm.buckets.map((b) => b.completeness)));
+  check("the filtered LLM total equals the unfiltered LLM bucket - the filter reads the same rows",
+    plm.buckets[0].plCents === plAll.buckets.find((x) => x.completeness === 'LLM_GENERATED').plCents);
+  const plmBogus = await jget('/api/pl?engineVersion=all&model=no-such-model');
+  check('an unknown model falls back to all, never to an empty screen',
+    plmBogus.selectedModel === 'all' && plmBogus.cards.length === plAll.cards.length);
+  const dayPLm = await jget(`/api/race-days/${dayA.id}/pl?engineVersion=all&model=${encodeURIComponent(mid)}`);
+  check('the per-day view honours ?model= too',
+    dayPLm.cards.length > 0 && dayPLm.cards.every((c) => c.llm_model === mid || c.llmModel === mid),
+    JSON.stringify(dayPLm.cards.map((c) => [c.llm_model, c.llmModel])));
 } finally {
   server.kill();
   await new Promise((rr) => setTimeout(rr, 300));

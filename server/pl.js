@@ -79,12 +79,20 @@ plRouter.get('/pl', (req, res) => {
   const selectedTrack = requestedTrack && tracks.includes(requestedTrack) ? requestedTrack : 'all';
   const selectedDate = requestedDate && dates.includes(requestedDate) ? requestedDate : 'all';
   const selectedVariant = requestedVariant && variants.includes(requestedVariant) ? requestedVariant : 'all';
+  // D452: ?model=<id> narrows to the cards one Claude model generated
+  // (cards.llm_model, frozen at creation, D76). Only LLM cards carry a model,
+  // so selecting one leaves the other buckets empty by construction - that is
+  // what "this model only" means, not a bug.
+  const models = [...new Set(cardRows.map((r) => r.llmModel).filter(Boolean))].sort();
+  const requestedModel = String(req.query.model ?? '').trim();
+  const selectedModel = requestedModel && models.includes(requestedModel) ? requestedModel : 'all';
   // The scope every row is held to, shared by the aggregates and by the
   // card/ungraded lists so a filtered total can never disagree with the
   // rows printed underneath it.
   const inScope = (row) => (selectedTrack === 'all' || row.track === selectedTrack)
     && (selectedDate === 'all' || row.date === selectedDate)
-    && (selectedVariant === 'all' || row.variant === selectedVariant);
+    && (selectedVariant === 'all' || row.variant === selectedVariant)
+    && (selectedModel === 'all' || row.llmModel === selectedModel);
   const inSelection = (row) => (selectedVersion === 'all' || row.engineVersion === selectedVersion) && inScope(row);
 
   const byBucket = new Map();
@@ -289,6 +297,7 @@ plRouter.get('/pl', (req, res) => {
     buckets, cards: cardsOut, ungraded: ungraded.filter(inScope),
     engineVersions, selectedVersion,
     tracks, dates, variants, selectedTrack, selectedDate, selectedVariant,
+    models: models.map((id) => ({ id, label: MODEL_LABEL[id] ?? id })), selectedModel,
   });
 });
 
@@ -317,8 +326,10 @@ plRouter.get('/race-days/:id/pl', (req, res) => {
   // never be read from a different set of cards than the header row is.
   // Two spellings of one clause: the cards query aliases the table, the
   // subquery under the tickets query does not.
-  const whereFor = (p) => `${selectedVersion ? `AND ${p}engine_version = ?` : ''} ${selectedVariant ? `AND ${p}variant = ?` : ''}`;
-  const cardParams = [selectedVersion, selectedVariant].filter((v) => v != null);
+  const requestedModel = String(req.query.model ?? '').trim();
+  const selectedModel = requestedModel && requestedModel !== 'all' ? requestedModel : null;
+  const whereFor = (p) => `${selectedVersion ? `AND ${p}engine_version = ?` : ''} ${selectedVariant ? `AND ${p}variant = ?` : ''} ${selectedModel ? `AND ${p}llm_model = ?` : ''}`;
+  const cardParams = [selectedVersion, selectedVariant, selectedModel].filter((v) => v != null);
 
   const cards = db.prepare(`
     SELECT c.id, c.card_number, c.variant, st.name AS template, c.bankroll_cents,

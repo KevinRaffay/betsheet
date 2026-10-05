@@ -176,21 +176,23 @@ export const pullApifyResults = (dayId, correlationId) =>
 export const getResults = (dayId) =>
   fetch(`/api/race-days/${dayId}/results`).then(asJson);
 
-export const getPL = (engineVersion, track, date, variant) => {
+export const getPL = (engineVersion, track, date, variant, model) => {
   const q = new URLSearchParams();
   if (engineVersion) q.set('engineVersion', engineVersion);
   if (track && track !== 'all') q.set('track', track);
   if (date && date !== 'all') q.set('date', date);
   if (variant && variant !== 'all') q.set('variant', variant);
+  if (model && model !== 'all') q.set('model', model);
   const qs = q.toString();
   return fetch(`/api/pl${qs ? `?${qs}` : ''}`).then(asJson);
 };
 // D413: the expanded day takes the SAME filters as the running view above
 // it, so the cards in the matrix are the cards in the table.
-export const getDayPL = (dayId, engineVersion, variant) => {
+export const getDayPL = (dayId, engineVersion, variant, model) => {
   const q = new URLSearchParams();
   if (engineVersion) q.set('engineVersion', engineVersion);
   if (variant && variant !== 'all') q.set('variant', variant);
+  if (model && model !== 'all') q.set('model', model);
   const qs = q.toString();
   return fetch(`/api/race-days/${dayId}/pl${qs ? `?${qs}` : ''}`).then(asJson);
 };
